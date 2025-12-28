@@ -1,0 +1,30 @@
+name: ci
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran make
+
+      - name: Build
+        run: |
+          make -C make
+
+      - name: Check executable exists
+        run: |
+          test -f ./msg123
+          ls -l ./msg123
+

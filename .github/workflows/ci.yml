@@ -21,7 +21,7 @@ jobs:
 
       - name: Build
         run: |
-          make
+          make -C make FC=gfortran
 
       - name: Check executable exists
         run: |

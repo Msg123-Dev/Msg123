@@ -39,4 +39,4 @@ If you use this model, please cite:
 See CITATION.cff.
 
 ## License
-This project is licensed under the Apache-2.0 License.
+This project is licensed under the GNU Lesser General Public License v3.0 or later (LGPL-3.0-or-later).

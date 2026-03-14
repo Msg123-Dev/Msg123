@@ -18,18 +18,18 @@ FC = ifort
 MODE = release
 
 # Define the parallel (MPI, OpenMP, Hybrid)
-PARA = OpenMP
+# PARA = OpenMP
 
 #for gfortran
 ifeq ($(FC),gfortran)
 	ifeq ($(MODE),debug)
 		FFLAGS = -cpp -Wall -g -fbacktrace -fbounds-check  -Wuninitialized -pedantic -ffpe-trap=invalid,zero,overflow
 	else
-		FFLAGS = -cpp -Wall -O3 -fmax-stack-var-size=65535
+		FFLAGS = -cpp -Wall -O3 -Wno-unused-function -fmax-stack-var-size=65535
 	endif
 	ifeq ($(PARA),Hybrid)
 		FC = mpif90
-		FFLAGS = -cpp -Wall -O3 -fopenmp
+		FFLAGS += -fopenmp
 		CPPFLAGS = -DMPI_MSG
 	endif
 	ifeq ($(PARA),MPI)
@@ -37,7 +37,7 @@ ifeq ($(FC),gfortran)
 		CPPFLAGS = -DMPI_MSG
 	endif
 	ifeq ($(PARA),OpenMP)
-		FFLAGS = -cpp -Wall -O3 -fopenmp
+		FFLAGS += -fopenmp
 	endif
 endif
 

@@ -64,7 +64,7 @@ module check_condition
       temp_seal(:) = SZERO ; mask(:) = (greg_flag(:) == 0)
       temp_seal(:) = pack(check_seal(:), mask(:))
       !$omp end parallel workshare
-      if (any((temp_seal(:)==SNOVAL))) then
+      if (any((temp_seal(:) == SNOVAL))) then
         call write_err_stop("Null value in sea region.")
       end if
 

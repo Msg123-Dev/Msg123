@@ -295,7 +295,7 @@ module initial_module
     ! -- module
     use constval_module, only: SZERO, DZERO, DONE, SINFI, MACHI_EPS, INF_SPEC, INF_CLAS,&
                                INF_POIN, INF_2DTX, INF_2DBI, INF_3DTX, INF_3DBI,&
-                               INF_EXTR, OUTF_TABL, OUTF_2DBI, OUTF_3DBI
+                               INF_EXTR, OUTF_TABL, OUTF_2DBI, OUTF_3DBI, CHALEN, TIMELEN
     ! -- inout
 
     ! -- local
@@ -366,6 +366,65 @@ module initial_module
     in_type(:) = [INF_SPEC, INF_CLAS, INF_POIN, INF_2DTX, INF_2DBI, INF_3DTX, INF_3DBI, INF_EXTR]
     out_type(:) = [OUTF_TABL, OUTF_2DBI, OUTF_3DBI]
 
+    st_sim%sim_name  = repeat(' ', CHALEN)
+    st_sim%cal_unit  = repeat(' ', TIMELEN)
+    st_sim%reg_name  = repeat(' ', CHALEN)
+    st_sim%inact_name = repeat(' ', CHALEN)
+
+    st_in_path%grid = repeat(' ', CHALEN)
+    st_in_path%retn = repeat(' ', CHALEN)
+    st_in_path%parm = repeat(' ', CHALEN)
+    st_in_path%geog = repeat(' ', CHALEN)
+    st_in_path%init = repeat(' ', CHALEN)
+    st_in_path%seal = repeat(' ', CHALEN)
+    st_in_path%rech = repeat(' ', CHALEN)
+    st_in_path%well = repeat(' ', CHALEN)
+    st_in_path%weks = repeat(' ', CHALEN)
+    st_in_path%weke = repeat(' ', CHALEN)
+    st_in_path%rive = repeat(' ', CHALEN)
+    st_in_path%lake = repeat(' ', CHALEN)
+    st_in_path%prec = repeat(' ', CHALEN)
+    st_in_path%evap = repeat(' ', CHALEN)
+    st_in_path%mass = repeat(' ', CHALEN)
+
+    st_in_unit%init = repeat(' ', TIMELEN)
+    st_in_unit%seal = repeat(' ', TIMELEN)
+    st_in_unit%rech = repeat(' ', TIMELEN)
+    st_in_unit%well = repeat(' ', TIMELEN)
+    st_in_unit%prec = repeat(' ', TIMELEN)
+    st_in_unit%evap = repeat(' ', TIMELEN)
+
+    st_out_path%conv = repeat(' ', CHALEN)
+    st_out_path%head = repeat(' ', CHALEN)
+    st_out_path%rest = repeat(' ', CHALEN)
+    st_out_path%srat = repeat(' ', CHALEN)
+    st_out_path%wtab = repeat(' ', CHALEN)
+    st_out_path%mass = repeat(' ', CHALEN)
+    st_out_path%velx = repeat(' ', CHALEN)
+    st_out_path%vely = repeat(' ', CHALEN)
+    st_out_path%velz = repeat(' ', CHALEN)
+    st_out_path%rivr = repeat(' ', CHALEN)
+    st_out_path%lakr = repeat(' ', CHALEN)
+    st_out_path%sufr = repeat(' ', CHALEN)
+    st_out_path%dunr = repeat(' ', CHALEN)
+    st_out_path%seal = repeat(' ', CHALEN)
+    st_out_path%well = repeat(' ', CHALEN)
+    st_out_path%rech = repeat(' ', CHALEN)
+    st_out_path%calg = repeat(' ', CHALEN)
+
+    st_out_unit%head = repeat(' ', TIMELEN)
+    st_out_unit%rest = repeat(' ', TIMELEN)
+    st_out_unit%srat = repeat(' ', TIMELEN)
+    st_out_unit%wtab = repeat(' ', TIMELEN)
+    st_out_unit%mass = repeat(' ', TIMELEN)
+    st_out_unit%velc = repeat(' ', TIMELEN)
+    st_out_unit%rivr = repeat(' ', TIMELEN)
+    st_out_unit%lakr = repeat(' ', TIMELEN)
+    st_out_unit%sufr = repeat(' ', TIMELEN)
+    st_out_unit%dunr = repeat(' ', TIMELEN)
+    st_out_unit%seal = repeat(' ', TIMELEN)
+    st_out_unit%well = repeat(' ', TIMELEN)
+    st_out_unit%rech = repeat(' ', TIMELEN)
 
   end subroutine init_var
 

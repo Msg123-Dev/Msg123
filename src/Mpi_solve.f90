@@ -39,15 +39,15 @@ module mpi_solve
     !-------------------------------------------------------------------------------------
     allocate(requ_send(neib_mpi_totn), requ_recv(neib_mpi_totn))
     allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
-    !$omp parallel
-    !$omp workshare
+    !$omp parallel workshare
     requ_send(:) = 0 ; requ_recv(:) = 0
     stat_s(:,:) = 0 ; stat_r(:,:) = 0
-    !$omp end workshare
+    !$omp end parallel workshare
 
     nsenrev = max(send_cind(neib_mpi_totn), recv_cind(neib_mpi_totn))
 
     allocate(sbufint(nsenrev), rbufint(nsenrev))
+    !$omp parallel
     !$omp workshare
     sbufint(:) = 0 ; rbufint(:) = 0
     !$omp end workshare
@@ -84,9 +84,10 @@ module mpi_solve
       end if
     end do
     !$omp end do
-
+    !$omp single
     call MPI_WAITALL(neib_mpi_totn, requ_recv, stat_r, ierr)
     call MPI_WAITALL(neib_mpi_totn, requ_send, stat_s, ierr)
+    !$omp end single
 
     !$omp do private(i, k, kk)
     do i = 1, neib_mpi_totn
@@ -120,15 +121,15 @@ module mpi_solve
     !-------------------------------------------------------------------------------------
     allocate(requ_send(neib_mpi_totn), requ_recv(neib_mpi_totn))
     allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
-    !$omp parallel
-    !$omp workshare
+    !$omp parallel workshare
     requ_send(:) = 0 ; requ_recv(:) = 0
     stat_s(:,:) = 0 ; stat_r(:,:) = 0
-    !$omp end workshare
+    !$omp end parallel workshare
 
     nsenrev = max(send_cind(neib_mpi_totn), recv_cind(neib_mpi_totn))
 
     allocate(sbufreal(nsenrev), rbufreal(nsenrev))
+    !$omp parallel
     !$omp workshare
     sbufreal(:) = DZERO ; rbufreal(:) = DZERO
     !$omp end workshare
@@ -165,9 +166,10 @@ module mpi_solve
       end if
     end do
     !$omp end do
-
+    !$omp single
     call MPI_WAITALL(neib_mpi_totn, requ_recv, stat_r, ierr)
     call MPI_WAITALL(neib_mpi_totn, requ_send, stat_s, ierr)
+    !$omp end single
 
     !$omp do private(i, k, kk)
     do i = 1, neib_mpi_totn
@@ -182,106 +184,6 @@ module mpi_solve
     deallocate(requ_send, requ_recv, stat_s, stat_r, sbufreal, rbufreal)
 
   end subroutine senrec_rvectv
-
-  subroutine senrec_lumatv(lu_mat)
-  !***************************************************************************************
-  ! senrec_lumatv -- Send and Recieve lu matrix value
-  !***************************************************************************************
-    ! -- module
-
-    ! -- inout
-    real(DP), intent(inout) :: lu_mat(:)
-    ! -- local
-    integer(I4) :: i, k, kk, ierr
-    integer(I4) :: nsenrev, isend_sta, isend_end, irecv_sta, irecv_end
-    integer(I4) :: buflen_send, buflen_recv
-    integer(I4) :: off_row_num, count_offrow, sta_off, end_off
-    integer(I4), allocatable :: requ_send(:), requ_recv(:)
-    integer(I4), allocatable :: stat_s(:,:), stat_r(:,:)
-    integer(I4), allocatable :: temp_offrow(:)
-    real(DP), allocatable :: sbufreal(:), rbufreal(:)
-    !-------------------------------------------------------------------------------------
-    off_row_num = crs_index(1)%offind(ncalc)
-    allocate(temp_offrow(off_row_num))
-    !$omp parallel workshare
-    temp_offrow(:) = 0
-    !$omp end parallel workshare
-    count_offrow = 0
-    do i = 1, ncalc
-      sta_off = crs_index(1)%offind(i-1) + 1
-      end_off = crs_index(1)%offind(i)
-      do k = sta_off, end_off
-        if (crs_index(1)%offrow(k) > ncalc) then
-          count_offrow = count_offrow + 1
-          temp_offrow(count_offrow) = lu_mat(k)
-        end if
-      end do
-    end do
-
-    allocate(requ_send(neib_mpi_totn), requ_recv(neib_mpi_totn))
-    allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
-    !$omp parallel workshare
-    requ_send(:) = 0 ; requ_recv(:) = 0
-    stat_s(:,:) = 0 ; stat_r(:,:) = 0
-    !$omp end parallel workshare
-
-    nsenrev = max(send_cind(neib_mpi_totn), recv_cind(neib_mpi_totn))
-
-    allocate(sbufreal(nsenrev), rbufreal(nsenrev))
-
-    !$omp parallel
-    !$omp workshare
-    sbufreal(:) = DZERO ; rbufreal(:) = DZERO
-    !$omp end workshare
-
-    !$omp do private(i, k)
-    do i = 1, neib_mpi_totn
-      do k = send_cind(i-1)+1, send_cind(i)
-        sbufreal(k) = temp_offrow(k)
-      end do
-    end do
-    !$omp end do
-
-    !$omp do private(i, isend_sta, isend_end, buflen_send)
-    do i = 1, neib_mpi_totn
-      isend_sta = send_cind(i-1)+1
-      isend_end = send_cind(i)
-      buflen_send = isend_end - isend_sta + 1
-      if (buflen_send /= 0) then
-        call MPI_ISEND(sbufreal(isend_sta), buflen_send, MPI_REAL8, neib_num(i), 0,&
-                       my_comm, requ_send(i), ierr)
-      end if
-    end do
-    !$omp end do
-
-    !$omp do private(i, irecv_sta, irecv_end, buflen_recv)
-    do i = 1, neib_mpi_totn
-      irecv_sta = recv_cind(i-1)+1
-      irecv_end = recv_cind(i)
-      buflen_recv = irecv_end - irecv_sta + 1
-      if (buflen_recv /= 0) then
-        call MPI_IRECV(rbufreal(irecv_sta), buflen_recv, MPI_REAL8, neib_num(i), 0,&
-                       my_comm, requ_recv(i), ierr)
-      end if
-    end do
-    !$omp end do
-
-    call MPI_WAITALL(neib_mpi_totn, requ_recv, stat_r, ierr)
-    call MPI_WAITALL(neib_mpi_totn, requ_send, stat_s, ierr)
-
-    !$omp do private(i, k, kk)
-    do i = 1, neib_mpi_totn
-      do k = recv_cind(i-1)+1, recv_cind(i)
-        kk = crs_index(1)%offind(recv_citem(k))
-        lu_mat(kk) = rbufreal(k)
-      end do
-    end do
-    !$omp end do
-    !$omp end parallel
-
-    deallocate(requ_send, requ_recv, stat_s, stat_r, sbufreal, rbufreal, temp_offrow)
-
-  end subroutine senrec_lumatv
 
   subroutine precon_mpi_dilu(pre_ind, pre_inlu, pre_d)
   !***************************************************************************************
@@ -523,6 +425,13 @@ module mpi_solve
     end if
 
     str_len = len_trim(cval)
+    call MPI_BCAST(str_len, 1, MPI_INTEGER, wrank, my_comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Broadcast absolute change grid length information.")
+      end if
+    end if
+
     call MPI_BCAST(cval, str_len, MPI_CHARACTER, wrank, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then

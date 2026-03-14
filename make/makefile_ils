@@ -5,7 +5,7 @@ include $(TOPDIR)/src/Mkinclude
 
 OBJDIR = ./obj_temp
 BINDIR = ../../bin
-PROGRAM = $(BINDIR)/exe_msg
+PROGRAM = $(BINDIR)/exe_msg123
 
 SOURCEDIR = ./
 
@@ -87,6 +87,7 @@ $(OBJDIR)/%.o : %.f90
 clean :
 	-rm -rf $(OBJDIR)
 	-rm -rf $(PROGRAM)
+	-rm -rf *.mod
 
 # Clean the object and module files
 .PHONY : cleanobj

@@ -9,7 +9,7 @@ module set_cell
   public :: set_cell_info, get_cals_grid, get_calc_grid
   integer(I4), public :: amg_setflag
   integer(I4), public :: ncalc, ncals, ncell, nsurf, no_ncalc, no_ncals
-  integer(I4), public :: seal_cnum, neib_mpi_totn, neib_ncalc
+  integer(I4), public :: seal_snum, seal_cnum, neib_mpi_totn, neib_ncals, neib_ncalc
   integer(I4), allocatable, public :: clas_flag(:,:)
   integer(I4), allocatable, public :: calc2reg(:)
   integer(I4), allocatable, public :: glo2loc_ijk(:), loc2glo_ijk(:), loc2glo_ij(:)
@@ -22,7 +22,7 @@ module set_cell
 #endif
 
   ! -- local
-  integer(I4) :: ns_unknow, nc_unknow, seal_snum, neib_ncals
+  integer(I4) :: ns_unknow, nc_unknow
   integer(I4) :: totnreg, loc_regn
   integer(I4), allocatable :: glob_reg_flag(:), glob_mpi_flag(:)
   integer(I4), allocatable :: glob_clas_flag(:,:)
@@ -108,10 +108,10 @@ module set_cell
         call div_nocalc_flag_2d()
       ! -- Check the calculation regin (calc_region)
         call check_calc_region(glob_clas_flag, glob_reg_flag)
-        allocate(glob_num(count(glob_reg_flag(:) == 0)))
-        glob_num(:) = 0
-        glob_mpi_flag(:) = unpack(glob_num(:), glob_reg_flag(:) == 0, glob_mpi_flag(:))
-        deallocate(glob_num)
+!        allocate(glob_num(count(glob_reg_flag(:) == 0)))
+!        glob_num(:) = 0
+!        glob_mpi_flag(:) = unpack(glob_num(:), glob_reg_flag(:) == 0, glob_mpi_flag(:))
+!        deallocate(glob_num)
 !      if (st_sim%reg_neib == 1) then
 !        ! -- Divide calculation region for 2d (calc_reg_2d)
 !          call div_calc_reg_2d()
@@ -202,7 +202,7 @@ module set_cell
     loc2glo_noc(:) = pack(glob_num(:), (glob_mpi_flag(:) == -(my_rank+1)))
 #endif
 
-    deallocate(l2g_ij, l2g_ijk, temp_locs, temp_locc, glob_num, glob_mpi_flag, glo2loc_ij)
+    deallocate(l2g_ij, l2g_ijk, temp_locs, temp_locc, glob_num, glob_mpi_flag)
 
 #ifdef MPI_MSG
     if (pro_totn /= 1) then
@@ -264,20 +264,35 @@ module set_cell
     deallocate(sort_sglo, nsun_num, glo2unk_ij)
     deallocate(sort_cglo, ncun_num, glo2unk_ijk)
 
+    allocate(sort_sglo(ncals+no_ncals), sort_cglo(ncalc+no_ncalc))
+    !$omp parallel
+    !$omp workshare
+    sort_sglo(1:ncals) = loc2glo_ij(1:ncals) ; sort_sglo(ncals+1:ncals+no_ncals) = loc2glo_nos(1:no_ncals)
+    sort_cglo(1:ncalc) = loc2glo_ijk(1:ncalc) ; sort_cglo(ncalc+1:ncalc+no_ncalc) = loc2glo_noc(1:no_ncalc)
+    !$omp end workshare
+    !$omp end parallel
+
+    call iquick_sort(sort_sglo, 1, ncals+no_ncals)
+    call iquick_sort(sort_cglo, 1, ncalc+no_ncalc)
+
     ! -- Set calculation view (calc_view)
       call set_calc_view(ncals, ncalc, loc2glo_ij, loc2glo_ijk)
     ! -- Set seal view (seal_view)
-      call set_seal_view(no_ncals, no_ncalc, loc2glo_nos, loc2glo_noc)
+      call set_seal_view(seal_snum, seal_cnum, loc2glo_ij(mpi_ncals+1:), loc2glo_ijk(mpi_ncalc+1:))
     ! -- Set restart view (rest_view)
       call set_rest_view(ncalc, nc_unknow, loc2unk_ijk)
     ! -- Set write file view (write_fview)
-      call set_write_fview(ncals, ncalc, loc2glo_ij, loc2glo_ijk, loc2glo_nos, loc2glo_noc)
+      call set_write_fview(ncals, ncalc, loc2glo_ij, loc2glo_ijk, sort_sglo, sort_cglo)
+    deallocate(sort_sglo, sort_cglo)
+
 #ifdef ICI
     deallocate(loc2unk_ijk)
 #else
     deallocate(loc2unk_ij, loc2unk_ijk)
 #endif
 #endif
+
+    deallocate(glo2loc_ij)
 
     if (noclas_flag /= 1) then
       ! -- Set local cell classification (loc_cell_clas)

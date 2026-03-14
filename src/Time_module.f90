@@ -292,7 +292,7 @@ module time_module
     integer(I4) :: ierr
     character(:), allocatable :: bound_name, err_mes, str_time
     !-------------------------------------------------------------------------------------
-    ierr = 0 ; str_time = ""
+    ierr = 0 ; str_time = "" ; ; err_mes = ""
     if (st_step_flag%seal == 1) then
       bound_name = "sea level"
       if (st_in_type%seal /= in_type(7)) then

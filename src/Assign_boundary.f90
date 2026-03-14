@@ -34,9 +34,8 @@ module assign_boundary
     use initial_module, only: st_seal, st_in_type
     use read_module, only: read_3dpointf
     use open_file, only: st_intse
-    use set_cell, only: ncell, seal_cnum, no_ncals, no_ncalc
-    use set_condition, only: set_point2seal, set_2dfile2seal, set_3dfile2seal,&
-                             set_bound2calc
+    use set_cell, only: ncell, seal_snum, seal_cnum
+    use set_condition, only: set_point2seal, set_2dfile2seal, set_3dfile2seal, set_bound2calc
 #ifdef MPI_MSG
     use mpi_utility, only: bcast_char
     use mpi_set, only: bcast_3dpoint
@@ -100,14 +99,15 @@ module assign_boundary
           intse_type = st_intse%type
           temp_ftype = intse_type
         else
+          intse_type = 0
           temp_ftype = seal_ftype
         end if
 
         if (temp_ftype == in_type(3) .or. temp_ftype == in_type(4)) then
-          call set_2dfile2seal(st_seal%fnum, seal_ftype, intse_type, no_ncals, SNOVAL,&
+          call set_2dfile2seal(st_seal%fnum, seal_ftype, intse_type, seal_snum, SNOVAL,&
                                read_seal, seal_cflag, sealn)
         else if (temp_ftype == in_type(5) .or. temp_ftype == in_type(6)) then
-          call set_3dfile2seal(st_seal%fnum, seal_ftype, intse_type, no_ncalc, SNOVAL,&
+          call set_3dfile2seal(st_seal%fnum, seal_ftype, intse_type, seal_cnum, SNOVAL,&
                                read_seal, seal_cflag, sealn)
         end if
         if (seal_ftype == in_type(7)) then
@@ -131,7 +131,9 @@ module assign_boundary
           err_mes = "The number of sea grids is different in rank "//rank_str//"."
         end if
 #ifdef MPI_MSG
-        call bcast_char(err_mes)
+        if (allocated(err_mes)) then
+          call bcast_char(err_mes)
+        end if
 #endif
         if (my_rank == 0 .and. allocated(err_mes)) then
           call write_err_stop(err_mes)

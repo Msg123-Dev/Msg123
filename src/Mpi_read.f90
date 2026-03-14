@@ -481,6 +481,8 @@ module mpi_read
         end if
       end if
       read_count= st_grid%nxyz+1
+    else
+      read_count = 0
     end if
 
     time_flag = 0 ; read_head = 0
@@ -579,19 +581,28 @@ module mpi_read
     ! -- inout
     character(*), intent(in) :: emess
     ! -- local
-    integer(I4) :: ierr
-    integer(I4), allocatable :: xyblock(:), xydis(:), xytype(:)
+    integer(I4) :: ierr, tmptype
+    integer(I4), allocatable :: xyblock(:), xytype(:)
+    integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
+    integer(KIND=MPI_ADDRESS_KIND), allocatable :: xydis(:)
     !-------------------------------------------------------------------------------------
     ierr = 0
-    allocate(xyblock(3), xydis(3), xytype(3))
-    xyblock(1) = 1 ; xyblock(2) = 1 ; xyblock(3) = 1
-    xydis(1) = 0 ; xydis(2) = 0 ; xydis(3) = (st_grid%nx*st_grid%ny+1)*I4
-    xytype(1) = MPI_LB ; xytype(2) = MPI_REAL4 ; xytype(3) = MPI_UB
+    allocate(xyblock(1), xydis(1), xytype(1))
+    xyblock(1) = 1 ; xydis(1) = 0_MPI_ADDRESS_KIND ; xytype(1) = MPI_REAL4
 
-    call MPI_TYPE_STRUCT(3, xyblock, xydis, xytype, gview2d, ierr)
+    call MPI_TYPE_CREATE_STRUCT(1, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype "//emess//" in MPI program.")
+      end if
+    end if
+
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int((st_grid%nx*st_grid%ny+1)*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, gview2d, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype "//emess//" in MPI program.")
       end if
     end if
 
@@ -599,6 +610,13 @@ module mpi_read
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype "//emess//" in MPI program.")
+      end if
+    end if
+
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype "//emess//" in MPI program.")
       end if
     end if
 
@@ -615,19 +633,28 @@ module mpi_read
     ! -- inout
     character(*), intent(in) :: emess
     ! -- local
-    integer(I4) :: ierr
-    integer(I4), allocatable :: xyzblock(:), xyzdis(:), xyztype(:)
+    integer(I4) :: ierr, tmptype
+    integer(I4), allocatable :: xyzblock(:), xyztype(:)
+    integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
+    integer(KIND=MPI_ADDRESS_KIND), allocatable :: xyzdis(:)
     !-------------------------------------------------------------------------------------
     ierr = 0
-    allocate(xyzblock(3), xyzdis(3), xyztype(3))
-    xyzblock(1) = 1 ; xyzblock(2) = 1 ; xyzblock(3) = 1
-    xyzdis(1) = 0 ; xyzdis(2) = 0 ; xyzdis(3) = (st_grid%nxyz+1)*I4
-    xyztype(1) = MPI_LB ; xyztype(2) = MPI_REAL4 ; xyztype(3) = MPI_UB
+    allocate(xyzblock(1), xyzdis(1), xyztype(1))
+    xyzblock(1) = 1 ; xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(1) = MPI_REAL4
 
-    call MPI_TYPE_STRUCT(3, xyzblock, xyzdis, xyztype, gview3d, ierr)
+    call MPI_TYPE_CREATE_STRUCT(1, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype "//emess//" in MPI program.")
+      end if
+    end if
+
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int((st_grid%nxyz+1)*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, gview3d, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype "//emess//" in MPI program.")
       end if
     end if
 
@@ -635,6 +662,13 @@ module mpi_read
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype "//emess//" in MPI program.")
+      end if
+    end if
+
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype "//emess//" in MPI program.")
       end if
     end if
 

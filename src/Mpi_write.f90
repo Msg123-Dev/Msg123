@@ -27,6 +27,7 @@ module mpi_write
   !***************************************************************************************
     ! -- module
     use set_cell, only: no_ncals
+    use mpi_set, only: write_2d_ind
     ! -- inout
     integer(I4), intent(in) :: out_fh, out_totn
     integer(I4), intent(in) :: calc_num(:)
@@ -46,7 +47,7 @@ module mpi_write
 
     !$omp do private(i, s)
     do i = 1, out_totn
-      s = calc_num(i) + 1
+      s = write_2d_ind(calc_num(i)) + 1
       vari_sp(s) = real(out_val(i)*out_unit, kind=SP)
     end do
     !$omp end do
@@ -71,6 +72,7 @@ module mpi_write
   !***************************************************************************************
     ! -- module
     use set_cell, only: no_ncalc
+    use mpi_set, only: write_3d_ind
     ! -- inout
     integer(I4), intent(in) :: out_fh, out_totn
     integer(I4), intent(in) :: calc_num(:)
@@ -90,7 +92,7 @@ module mpi_write
 
     !$omp do private(i, c)
     do i = 1, out_totn
-      c = calc_num(i) + 1
+      c = write_3d_ind(calc_num(i)) + 1
       vari_sp(c) = real(out_val(i)*out_unit, kind=SP)
     end do
     !$omp end do
@@ -158,16 +160,14 @@ module mpi_write
     real(DP), allocatable :: mpi_sto(:), mpi_con(:), mpi_sea(:), mpi_wel(:)
     real(DP), allocatable :: mpi_rec(:), mpi_sur(:), mpi_riv(:), mpi_lak(:), mpi_tot(:)
     !-------------------------------------------------------------------------------------
-    if (my_rank == 0) then
-      allocate(mpi_sto(num_mass), mpi_con(num_mass), mpi_sea(num_mass), mpi_wel(num_mass))
-      allocate(mpi_rec(num_mass), mpi_sur(num_mass), mpi_riv(num_mass), mpi_lak(num_mass))
-      allocate(mpi_tot(num_mass))
-      !$omp parallel workshare
-      mpi_sto(:) = DZERO ; mpi_con(:) = DZERO ; mpi_sea(:) = DZERO ; mpi_wel(:) = DZERO
-      mpi_rec(:) = DZERO ; mpi_sur(:) = DZERO ; mpi_riv(:) = DZERO ; mpi_lak(:) = DZERO
-      mpi_tot(:) = DZERO
-      !$omp end parallel workshare
-    end if
+    allocate(mpi_sto(num_mass), mpi_con(num_mass), mpi_sea(num_mass), mpi_wel(num_mass))
+    allocate(mpi_rec(num_mass), mpi_sur(num_mass), mpi_riv(num_mass), mpi_lak(num_mass))
+    allocate(mpi_tot(num_mass))
+    !$omp parallel workshare
+    mpi_sto(:) = DZERO ; mpi_con(:) = DZERO ; mpi_sea(:) = DZERO ; mpi_wel(:) = DZERO
+    mpi_rec(:) = DZERO ; mpi_sur(:) = DZERO ; mpi_riv(:) = DZERO ; mpi_lak(:) = DZERO
+    mpi_tot(:) = DZERO
+    !$omp end parallel workshare
 
     ierr = 0
     call MPI_REDUCE(inout_st%sto(1), mpi_sto(1), num_mass, MPI_REAL8, MPI_SUM, 0, my_comm, ierr)
@@ -241,10 +241,11 @@ module mpi_write
       inout_st%riv(:) = mpi_riv(:) ; inout_st%lak(:) = mpi_lak(:)
       inout_st%tot(:) = mpi_tot(:)
       !$omp end parallel workshare
-      deallocate(mpi_sto, mpi_con, mpi_sea, mpi_wel)
-      deallocate(mpi_rec, mpi_sur, mpi_riv, mpi_lak)
-      deallocate(mpi_tot)
     end if
+
+    deallocate(mpi_sto, mpi_con, mpi_sea, mpi_wel)
+    deallocate(mpi_rec, mpi_sur, mpi_riv, mpi_lak)
+    deallocate(mpi_tot)
 
   end subroutine redu_mpi_mass
 
@@ -550,54 +551,5 @@ module mpi_write
     !$omp end parallel do
 
   end subroutine set_send_vari
-
-  subroutine set_recv_vari(r_flag, s_flag, c_head, c_srat, r_head, r_srat, s_head, s_srat)
-  !***************************************************************************************
-  ! set_recv_vari -- Set receive variable
-  !***************************************************************************************
-    ! -- module
-    use constval_module, only: DONE
-    ! -- inout
-    integer(I4), intent(in) :: r_flag(:)
-    integer(I4), intent(inout) :: s_flag(:)
-    real(DP), intent(in) :: c_head(:), c_srat(:)
-    real(DP), intent(in) :: r_head(:), r_srat(:)
-    real(DP), intent(out) :: s_head(:), s_srat(:)
-    ! -- local
-    integer(I4) :: i, j, k, c_num, irecv, nxyz, loc_n, loc_r
-    integer(I4) :: ir_sta, ir_end
-    integer(I4) :: i_num, j_num, k_num
-    !-------------------------------------------------------------------------------------
-    !$omp parallel do private(i, j, k, c_num, irecv, nxyz, loc_n, loc_r, ir_sta, ir_end, i_num, j_num, k_num)
-    do i = 1, neib_wtab_rtotn
-      ir_sta = recv_wtab_cind(i-1) ; ir_end = recv_wtab_cind(i)
-      do irecv = 1, ir_end-ir_sta
-        j = ir_sta + irecv ; c_num = recv_wtab_citem(j)
-        call get_calc_grid(c_num, i_num, j_num, k_num)
-        unsat: do k = st_grid%nz, k_num, -1
-          nxyz = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
-          loc_n = 0 ; loc_n = findloc(loc2glo_ijk(:), value = nxyz, dim = 1)
-          if (loc_n /= 0) then
-            loc_r = 0 ; loc_r = findloc(recv_wtab_citem(:), value = loc_n, dim = 1)
-            if (loc_r == 0) then
-              s_head(j) = c_head(loc_n) ; s_srat(j) = c_srat(loc_n)
-            else if (r_flag(loc_r) /= 0) then
-              s_flag(j) = 1
-              if (r_srat(loc_r) /= DONE) then
-                s_head(j) = r_head(loc_r) ; s_srat(j) = r_srat(loc_r)
-              else
-                s_head(j) = c_head(loc_n) ; s_srat(j) = c_srat(loc_n)
-              end if
-            end if
-            if (s_srat(j) /= DONE) then
-              exit unsat
-            end if
-          end if
-        end do unsat
-      end do
-    end do
-    !$omp end parallel do
-
-  end subroutine set_recv_vari
 
 end module mpi_write

@@ -163,8 +163,7 @@ module set_condition
           do jj = jst, jen
             do kk = kst, ken
               c_num = gridx*(gridy*(kk-1) + (jj-1)) + ii
-              l_ijk = findloc(loc2glo_ijk(:), value = c_num, dim = 1)
-!              l_ijk = glo2loc_ijk(c_num)
+              l_ijk = 0 ; l_ijk = findloc(loc2glo_ijk(:), value = c_num, dim = 1)
               if (l_ijk > mpi_ncalc .and. l_ijk <= cnum) then
                 cell_val(l_ijk-mpi_ncalc) = tg_val(i)
                 tg_flag(l_ijk-mpi_ncalc) = 1
@@ -218,8 +217,7 @@ module set_condition
       do ii = ist, ien
         do jj = jst, jen
           s_num = gridx*(jj-1) + ii
-          l_ij = 0
-          l_ij = findloc(loc2glo_ij(:), value = s_num, dim = 1)
+          l_ij = 0 ; l_ij = findloc(loc2glo_ij(:), value = s_num, dim = 1)
           if (l_ij > 0 .and. l_ij <= ncals) then
             cell_val(l_ij) = tg_val(i)
             tg_flag(l_ij) = 1
@@ -290,7 +288,7 @@ module set_condition
   !***************************************************************************************
     ! -- modules
 #ifdef MPI_MSG
-    use set_cell, only: loc2glo_nos
+    use set_cell, only: neib_ncals
 #endif
     ! -- inout
     integer(I4), intent(in) :: fnum, ftype, int_ft, rsnum
@@ -302,9 +300,8 @@ module set_condition
     integer(I4) :: cnum
     integer(I4) :: gridx, gridy, gridz, gridxyz
 #ifdef MPI_MSG
-    integer(I4) :: i, j, k, s
-    real(SP), allocatable :: array_seas(:), array_temp(:)
-    character(:), allocatable :: str_fnum
+    integer(I4) :: i, j, k, s, mpi_ncals
+    real(SP), allocatable :: array_seas(:)
 #else
     integer(I4) :: dummy
 #endif
@@ -332,26 +329,24 @@ module set_condition
 
     else if (ftype == in_type(4) .or. int_ft == in_type(4)) then
 #ifdef MPI_MSG
-      allocate(array_seas(rsnum), array_temp(gridxyz), array_flat(gridxyz))
+      allocate(array_seas(rsnum), array_flat(gridxyz))
       !$omp parallel workshare
-      array_seas(:) = no_val ; array_temp(:) = no_val ; array_flat(:) = no_val
+      array_seas(:) = no_val ; array_flat(:) = no_val
       !$omp end parallel workshare
       call read_mpi_file(ftype, int_ft, fnum, rsnum, array_seas)
       !$omp parallel do private(i, j, k, s)
+      mpi_ncals = ncals + neib_ncals
       do i = 1, rsnum
-        s = 0 ; s = loc2glo_nos(i)
+        s = 0 ; s = loc2glo_ij(mpi_ncals+i)
         if (s /= 0) then
           do j = 1, gridz
             k = gridx*gridy*(j-1) + s
-            array_temp(k) = array_seas(i)
+            array_flat(k) = array_seas(i)
           end do
         end if
       end do
       !$omp end parallel do
-      str_fnum = conv_i2s(fnum)
-      ! -- MAX value for MPI (val)
-        call mpimax_val(array_temp, "file number "//str_fnum, array_flat)
-      deallocate(array_seas, array_temp)
+      deallocate(array_seas)
       call set_calcr4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
 #else
       dummy = rsnum
@@ -386,7 +381,7 @@ module set_condition
   !***************************************************************************************
     ! -- modules
 #ifdef MPI_MSG
-    use set_cell, only: loc2glo_noc
+    use set_cell, only: neib_ncalc
 #endif
     ! -- inout
     integer(I4), intent(in) :: fnum, ftype, int_ft, rcnum
@@ -398,9 +393,8 @@ module set_condition
     integer(I4) :: cnum
     integer(I4) :: gridx, gridy, gridz, gridxyz
 #ifdef MPI_MSG
-    integer(I4) :: i, c
-    real(SP), allocatable :: array_seac(:), array_temp(:)
-    character(:), allocatable :: str_fnum
+    integer(I4) :: i, c, mpi_ncalc
+    real(SP), allocatable :: array_seac(:)
 #else
     integer(I4) :: dummy
 #endif
@@ -428,23 +422,21 @@ module set_condition
 
     else if (ftype == in_type(6) .or. int_ft == in_type(6)) then
 #ifdef MPI_MSG
-      allocate(array_seac(rcnum), array_temp(gridxyz), array_flat(gridxyz))
+      allocate(array_seac(rcnum), array_flat(gridxyz))
       !$omp parallel workshare
-      array_seac(:) = no_val ; array_temp(:) = no_val ; array_flat(:) = no_val
+      array_seac(:) = no_val ; array_flat(:) = no_val
       !$omp end parallel workshare
       call read_mpi_file(ftype, int_ft, fnum, rcnum, array_seac)
       !$omp parallel do private(i, c)
+      mpi_ncalc = ncalc + neib_ncalc
       do i = 1, rcnum
-        c = 0 ; c = loc2glo_noc(i)
+        c = 0 ; c = loc2glo_ijk(mpi_ncalc+i)
         if (c /= 0) then
-          array_temp(c) = array_seac(i)
+          array_flat(c) = array_seac(i)
         end if
       end do
       !$omp end parallel do
-      str_fnum = conv_i2s(fnum)
-      ! -- MAX value for MPI (val)
-        call mpimax_val(array_temp, "file number "//str_fnum, array_flat)
-      deallocate(array_seac, array_temp)
+      deallocate(array_seac)
       call set_calcr4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
 #else
       dummy = rcnum

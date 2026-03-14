@@ -21,7 +21,7 @@ module mpi_initfin
     integer(I4), intent(in) :: num_log
     integer(I4), intent(out) :: num_prot, num_rank
     ! -- local
-    integer(I4) :: ierr
+    integer(I4) :: ierr, provided
     logical :: mpi_init_check
     !-------------------------------------------------------------------------------------
     ierr = 0
@@ -34,11 +34,17 @@ module mpi_initfin
     end if
 
     if (.not. mpi_init_check) then
-      call MPI_INIT(ierr)
+      call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, ierr)
       my_comm = MPI_COMM_WORLD
       if (ierr /= MPI_SUCCESS) then
         if (num_rank == 0) then
           write(num_log,'(a)') "Error!! Start MPI program."
+        end if
+        call abort_proc(num_rank, num_log)
+      end if
+      if (provided < MPI_THREAD_MULTIPLE) then
+        if (num_rank == 0) then
+          write(num_log,'(a)') "Error!! MPI_THREAD_MULTIPLE not supported."
         end if
         call abort_proc(num_rank, num_log)
       end if
@@ -94,7 +100,7 @@ module mpi_initfin
     ! -- local
     integer(I4) :: ierr, errcode
     !-------------------------------------------------------------------------------------
-    ierr = 0
+    ierr = 0 ; errcode = 0
     call MPI_ABORT(my_comm, errcode, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (num_rank == 0) then

@@ -52,11 +52,11 @@ module open_file
     namelist/inretn_type/vana_type, vann_type, resi_type
     namelist/inretn_path/in_vapath, in_vnpath, in_repath
     !-------------------------------------------------------------------------------------
+    in_vapath = "" ; in_vnpath = "" ; in_repath = ""
     if (my_rank == 0) then
       ! -- Open new read text file (new_rtxt)
         call open_new_rtxt(1, 1, retn_path, "input retention", st_retn%fnum)
       if (retn_type == in_type(0)) then
-        in_vapath = "" ; in_vnpath = "" ; in_repath = ""
         read(unit=st_retn%fnum,nml=inretn_type,iostat=ierr)
         if (ierr /= 0) then
           call write_err_stop("While reading file type section in retention file.")
@@ -65,9 +65,6 @@ module open_file
         if (ierr /= 0) then
           call write_err_stop("While reading file path section in retention file.")
         end if
-        mess_vana = "input van genuchten parameter alpha"
-        mess_vann = "input van genuchten parameter n"
-        mess_resi = "input residual water content"
       else if (retn_type  == in_type(1)) then
         read(unit=st_retn%fnum,fmt=*,iostat=ierr) st_retn%totn
         if (ierr /= 0) then
@@ -85,6 +82,10 @@ module open_file
     if (present(view_calc)) then
       temp_view = view_calc
     end if
+
+    mess_vana = "input van genuchten parameter alpha"
+    mess_vann = "input van genuchten parameter n"
+    mess_resi = "input residual water content"
 
 #ifdef MPI_MSG
     if (pro_totn /= 1) then
@@ -182,11 +183,11 @@ module open_file
     namelist/inparm_type/pakx_type, paky_type, pakz_type, pass_type, pats_type
     namelist/inparm_path/in_kxpath, in_kypath, in_kzpath, in_sspath, in_tspath
     !-------------------------------------------------------------------------------------
+    in_kxpath = "" ; in_kypath = "" ; in_kzpath = "" ; in_sspath = "" ; in_tspath = ""
     if (my_rank == 0) then
       ! -- Open new read text file (new_rtxt)
         call open_new_rtxt(1, 1, parm_path, "input parameter", st_parm%fnum)
       if (parm_type == in_type(0)) then
-        in_kxpath = "" ; in_kypath = "" ; in_kzpath = "" ; in_sspath = "" ; in_tspath = ""
         read(unit=st_parm%fnum,nml=inparm_type,iostat=ierr)
         if (ierr /= 0) then
           call write_err_stop("While reading file type section in parameter file.")
@@ -195,11 +196,6 @@ module open_file
         if (ierr /= 0) then
           call write_err_stop("While reading file path section in parameter file.")
         end if
-        mess_kx = "input saturated hydraulic conductivity in x direction"
-        mess_ky = "input saturated hydraulic conductivity in y direction"
-        mess_kz = "input saturated hydraulic conductivity in z direction"
-        mess_ss = "input specific storage"
-        mess_ts = "input porosity"
       else if (parm_type == in_type(1)) then
         read(unit=st_parm%fnum,fmt=*,iostat=ierr) st_parm%totn
         if (ierr /= 0) then
@@ -217,6 +213,12 @@ module open_file
     if (present(view_calc)) then
       temp_view = view_calc
     end if
+
+    mess_kx = "input saturated hydraulic conductivity in x direction"
+    mess_ky = "input saturated hydraulic conductivity in y direction"
+    mess_kz = "input saturated hydraulic conductivity in z direction"
+    mess_ss = "input specific storage"
+    mess_ts = "input porosity"
 
 #ifdef MPI_MSG
     if (pro_totn /= 1) then
@@ -329,6 +331,7 @@ module open_file
     namelist/ingeog_type/geoz_type, geor_type, geoa_type
     namelist/ingeog_path/in_gzpath, in_grpath, in_gapath
     !-------------------------------------------------------------------------------------
+    in_gzpath = "" ; in_grpath = "" ;  in_gapath = ""
     if (my_rank == 0) then
       ! -- Open new read text file (new_rtxt)
         call open_new_rtxt(1, 1, geog_path, "input geography", geog_num)
@@ -337,7 +340,6 @@ module open_file
       if (ierr /= 0) then
         call write_err_stop("While reading file type section in geography file.")
       end if
-      in_gzpath = "" ; in_grpath = "" ;  in_gapath = ""
       read(unit=geog_num,nml=ingeog_path,iostat=ierr)
       if (ierr /= 0) then
         call write_err_stop("While reading file path section in geography file.")

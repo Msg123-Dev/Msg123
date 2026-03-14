@@ -21,8 +21,10 @@ module mpi_set
   public :: bcast_clas_val, bcast_2dpoint, bcast_3dpoint, bcast_wellpoint
   integer(I4), public :: cals_i4view, calc_i4view
   integer(I4), public :: cals_r4view, cals_r4hview, calc_r4view, calc_r4hview
-  integer(I4), public :: surf_r4view, surf_r4hview, cell_r4view, cell_r4hview, rest_view
-  integer(I4), public :: write_2dview, write_3dview, write_no2dview, write_no3dview
+  integer(I4), public :: surf_r4view, surf_r4hview, cell_r4view, cell_r4hview
+  integer(I4), public :: rest_view
+  integer(I4), public :: write_2dview, write_3dview
+  integer(I4), allocatable, public :: write_2d_ind(:), write_3d_ind(:)
 
   interface scatter_xyval
     module procedure scatter_i4xy
@@ -67,6 +69,13 @@ module mpi_set
     !-------------------------------------------------------------------------------------
     ierr = 0
     length = len_trim(mcomp)
+    call MPI_BCAST(length, 1, MPI_INTEGER, 0, my_comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Broadcast the component name length for ILS.")
+      end if
+    end if
+
     call MPI_BCAST(mcomp, length, MPI_CHARACTER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -75,6 +84,13 @@ module mpi_set
     end if
 
     length = len_trim(mgrid)
+    call MPI_BCAST(length, 1, MPI_INTEGER, 0, my_comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Broadcast the grid name length for ILS.")
+      end if
+    end if
+
     call MPI_BCAST(mgrid, length, MPI_CHARACTER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -83,6 +99,13 @@ module mpi_set
     end if
 
     length = len_trim(ici_file)
+    call MPI_BCAST(length, 1, MPI_INTEGER, 0, my_comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Broadcast the coupling conf file length for ILS.")
+      end if
+    end if
+
     call MPI_BCAST(ici_file, length, MPI_CHARACTER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -255,6 +278,13 @@ module mpi_set
     end if
 
     char_leng = len_trim(st_sim%inact_name)
+    call MPI_BCAST(char_leng, 1, MPI_INTEGER, 0, my_comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Broadcast the inactive region name length.")
+      end if
+    end if
+
     call MPI_BCAST(st_sim%inact_name, char_leng, MPI_CHARACTER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -283,6 +313,13 @@ module mpi_set
 
     do i = 1, clas_totn
       char_leng = len_trim(clas_name(i))
+      call MPI_BCAST(char_leng, 1, MPI_INTEGER, 0, my_comm, ierr)
+      if (ierr /= MPI_SUCCESS) then
+        if (my_rank == 0) then
+          call write_err_stop("Broadcast the classification name "//clas_name(i)//" length.")
+        end if
+      end if
+
       call MPI_BCAST(clas_name(i), char_leng, MPI_CHARACTER, 0, my_comm, ierr)
       if (ierr /= MPI_SUCCESS) then
         if (my_rank == 0) then
@@ -430,198 +467,259 @@ module mpi_set
     integer(I4), intent(in) :: loc_ncals, loc_ncalc
     integer(I4), intent(in) :: l2g_ij(:), l2g_ijk(:)
     ! -- local
-    integer(I4) :: i, ij, ijk, ierr
-    integer(I4), allocatable :: xyblock(:), xyzblock(:), xydis(:), xyzdis(:)
-    integer(I4), allocatable :: xytype(:), xyztype(:)
+    integer(I4) :: i, ierr, tmptype
+    integer(I4), allocatable :: xyblock(:), xyzblock(:), xytype(:), xyztype(:)
+    integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
+    integer(KIND=MPI_ADDRESS_KIND), allocatable :: xydis(:), xyzdis(:)
     !-------------------------------------------------------------------------------------
     ierr = 0
-    allocate(xyblock(loc_ncals+2), xydis(loc_ncals+2), xytype(loc_ncals+2))
+    allocate(xyblock(loc_ncals), xydis(loc_ncals), xytype(loc_ncals))
     !$omp parallel
     !$omp workshare
-    xyblock(:) = 1 ; xydis(:) = 0 ; xytype(:) = MPI_INTEGER
+    xyblock(:) = 1 ; xydis(1) = 0_MPI_ADDRESS_KIND ; xytype(:) = MPI_INTEGER
     !$omp end workshare
 
-    xytype(1) = MPI_LB ; xytype(loc_ncals+2) = MPI_UB
-    xydis(loc_ncals+2) = st_grid%nx*st_grid%ny*I4
-
-    !$omp do private(i, ij)
+    !$omp do private(i)
     do i = 1, loc_ncals
-      ij = i + 1 ; xydis(ij) = (l2g_ij(i)-1)*I4
+      xydis(i) = int((l2g_ij(i)-1)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_ncals+2, xyblock, xydis, xytype, cals_i4view, ierr)
+    call MPI_TYPE_CREATE_STRUCT(loc_ncals, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype without header for within range in xy direction.")
       end if
     end if
 
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int(st_grid%nx*st_grid%ny*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, cals_i4view, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype without header for within range in xy direction.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(cals_i4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype without header for within range in xy direction.")
       end if
     end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype without header for within range in xy direction.")
+      end if
+    end if
 
     deallocate(xyblock, xydis, xytype)
 
-    allocate(xyblock(loc_ncals+2), xydis(loc_ncals+2), xytype(loc_ncals+2))
+    allocate(xyblock(loc_ncals), xydis(loc_ncals), xytype(loc_ncals))
     !$omp parallel
     !$omp workshare
-    xyblock(:) = 1 ; xydis(:) = 0 ; xytype(:) = MPI_REAL4
+    xyblock(:) = 1 ; xydis(1) = 0_MPI_ADDRESS_KIND ; xytype(:) = MPI_REAL4
     !$omp end workshare
 
-    xytype(1) = MPI_LB ; xytype(loc_ncals+2) = MPI_UB
-    xydis(loc_ncals+2) = st_grid%nx*st_grid%ny*I4
-
-    !$omp do private(i, ij)
+    !$omp do private(i)
     do i = 1, loc_ncals
-      ij = i + 1 ; xydis(ij) = (l2g_ij(i)-1)*I4
+      xydis(i) = int((l2g_ij(i)-1)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_ncals+2, xyblock, xydis, xytype, cals_r4view, ierr)
+    call MPI_TYPE_CREATE_STRUCT(loc_ncals, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype without header for within range in xy direction.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int(st_grid%nx*st_grid%ny*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, cals_r4view, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype without header for within range in xy direction.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(cals_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype without header for within range in xy direction.")
       end if
     end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype without header for within range in xy direction.")
+      end if
+    end if
 
     deallocate(xyblock, xydis, xytype)
 
-    allocate(xyblock(loc_ncals+3), xydis(loc_ncals+3), xytype(loc_ncals+3))
+    allocate(xyblock(loc_ncals+1), xydis(loc_ncals+1), xytype(loc_ncals+1))
     !$omp parallel
     !$omp workshare
-    xyblock(:) = 1 ; xydis(:) = 0 ; xytype(:) = MPI_REAL4
+    xyblock(:) = 1 ; xydis(1) = 0_MPI_ADDRESS_KIND ; xytype(:) = MPI_REAL4
     !$omp end workshare
 
-    xytype(1) = MPI_LB ; xytype(loc_ncals+3) = MPI_UB
-    xydis(loc_ncals+3) = (st_grid%nx*st_grid%ny+1)*I4
-
-    !$omp do private(i, ij)
+    !$omp do private(i)
     do i = 1, loc_ncals
-      ij = i + 2 ; xydis(ij) = l2g_ij(i)*I4
+      xydis(i+1) = int(l2g_ij(i)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_ncals+3, xyblock, xydis, xytype, cals_r4hview, ierr)
+    call MPI_TYPE_CREATE_STRUCT(loc_ncals+1, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype with header for within range in xy direction.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int((st_grid%nx*st_grid%ny+1)*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, cals_r4hview, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype with header for within range in xy direction.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(cals_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype with header for within range in xy direction.")
       end if
     end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype with header for within range in xy direction.")
+      end if
+    end if
 
     deallocate(xyblock, xydis, xytype)
 
-    allocate(xyzblock(loc_ncalc+2), xyzdis(loc_ncalc+2), xyztype(loc_ncalc+2))
+    allocate(xyzblock(loc_ncalc), xyzdis(loc_ncalc), xyztype(loc_ncalc))
     !$omp parallel
     !$omp workshare
-    xyzblock(:) = 1 ; xyzdis(:) = 0 ; xyztype(:) = MPI_INTEGER
+    xyzblock(:) = 1 ; xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(:) = MPI_INTEGER
     !$omp end workshare
-
-    xyztype(1) = MPI_LB ; xyztype(loc_ncalc+2) = MPI_UB
-    xyzdis(loc_ncalc+2) = st_grid%nxyz*I4
-
-    !$omp do private(i, ijk)
+    !$omp do private(i)
     do i = 1, loc_ncalc
-      ijk = i + 1 ; xyzdis(ijk) = (l2g_ijk(i)-1)*I4
+      xyzdis(i) = int((l2g_ijk(i)-1)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_ncalc+2, xyzblock, xyzdis, xyztype, calc_i4view, ierr)
+    call MPI_TYPE_CREATE_STRUCT(loc_ncalc, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype without header for in range in xyz direction.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int(st_grid%nxyz*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, calc_i4view, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype without header for in range in xyz direction.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(calc_i4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype without header for in range in xyz direction.")
       end if
     end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype without header for in range in xyz direction.")
+      end if
+    end if
 
     deallocate(xyzblock, xyzdis, xyztype)
 
-    allocate(xyzblock(loc_ncalc+2), xyzdis(loc_ncalc+2), xyztype(loc_ncalc+2))
+    allocate(xyzblock(loc_ncalc), xyzdis(loc_ncalc), xyztype(loc_ncalc))
     !$omp parallel
     !$omp workshare
-    xyzblock(:) = 1 ; xyzdis(:) = 0 ; xyztype(:) = MPI_REAL4
+    xyzblock(:) = 1 ; xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(:) = MPI_REAL4
     !$omp end workshare
 
-    xyztype(1) = MPI_LB ; xyztype(loc_ncalc+2) = MPI_UB
-    xyzdis(loc_ncalc+2) = st_grid%nxyz*I4
-
-    !$omp do private(i, ijk)
+    !$omp do private(i)
     do i = 1, loc_ncalc
-      ijk = i + 1 ; xyzdis(ijk) = (l2g_ijk(i)-1)*I4
+      xyzdis(i) = int((l2g_ijk(i)-1)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_ncalc+2, xyzblock, xyzdis, xyztype, calc_r4view, ierr)
+    call MPI_TYPE_CREATE_STRUCT(loc_ncalc, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype without header for in range in xyz direction.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int(st_grid%nxyz*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, calc_r4view, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype without header for in range in xyz direction.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(calc_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype without header for in range in xyz direction.")
       end if
     end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype without header for in range in xyz direction.")
+      end if
+    end if
 
     deallocate(xyzblock, xyzdis, xyztype)
 
-    allocate(xyzblock(loc_ncalc+3), xyzdis(loc_ncalc+3), xyztype(loc_ncalc+3))
+    allocate(xyzblock(loc_ncalc+1), xyzdis(loc_ncalc+1), xyztype(loc_ncalc+1))
     !$omp parallel
     !$omp workshare
-    xyzblock(:) = 1 ; xyzdis(:) = 0 ; xyztype(:) = MPI_REAL4
+    xyzblock(:) = 1 ; xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(:) = MPI_REAL4
     !$omp end workshare
 
-    xyztype(1) = MPI_LB ; xyztype(loc_ncalc+3) = MPI_UB
-    xyzdis(loc_ncalc+3) = (st_grid%nxyz+1)*I4
-
-    !$omp do private(i, ijk)
+    !$omp do private(i)
     do i = 1, loc_ncalc
-      ijk = i + 2 ; xyzdis(ijk) = l2g_ijk(i)*I4
+      xyzdis(i+1) = int(l2g_ijk(i)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_ncalc+3, xyzblock, xyzdis, xyztype, calc_r4hview, ierr)
+    call MPI_TYPE_CREATE_STRUCT(loc_ncalc+1, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype with header for within range in xyz direction.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int((st_grid%nxyz+1)*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, calc_r4hview, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype with header for within range in xyz direction.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(calc_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype with header for within range in xyz direction.")
+      end if
+    end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype with header for in range in xyz direction.")
       end if
     end if
 
@@ -639,135 +737,175 @@ module mpi_set
     integer(I4), intent(in) :: loc_seas, loc_seac
     integer(I4), intent(in) :: l2g_ij(:), l2g_ijk(:)
     ! -- local
-    integer(I4) :: i, ij, ijk, ierr
-    integer(I4), allocatable :: xyblock(:), xyzblock(:), xydis(:), xyzdis(:)
-    integer(I4), allocatable :: xytype(:), xyztype(:)
+    integer(I4) :: i, ierr, tmptype
+    integer(I4), allocatable :: xyblock(:), xyzblock(:), xytype(:), xyztype(:)
+    integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
+    integer(KIND=MPI_ADDRESS_KIND), allocatable :: xydis(:), xyzdis(:)
     !-------------------------------------------------------------------------------------
     ierr = 0
-    allocate(xyblock(loc_seas+2), xydis(loc_seas+2), xytype(loc_seas+2))
+    allocate(xyblock(loc_seas), xydis(loc_seas), xytype(loc_seas))
     !$omp parallel
     !$omp workshare
-    xyblock(:) = 1 ; xydis(:) = 0 ; xytype(:) = MPI_REAL4
+    xyblock(:) = 1 ; xytype(:) = MPI_REAL4
     !$omp end workshare
 
-    xytype(1) = MPI_LB ; xytype(loc_seas+2) = MPI_UB
-    xydis(loc_seas+2) = st_grid%nx*st_grid%ny*I4
-
-    !$omp do private(i, ij)
+    !$omp do private(i)
     do i = 1, loc_seas
-      ij = i + 1 ; xydis(ij) = (l2g_ij(i)-1)*I4
+      xydis(i) = int((l2g_ij(i)-1)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_seas+2, xyblock, xydis, xytype, surf_r4view, ierr)
+    call MPI_TYPE_CREATE_STRUCT(loc_seas, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype without header for out of range in xy direction.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int(st_grid%nx*st_grid%ny*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, surf_r4view, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype without header for out of range in xy direction.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(surf_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype without header for out of range in xy direction.")
       end if
     end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype without header for in range in xy direction.")
+      end if
+    end if
 
     deallocate(xyblock, xydis, xytype)
 
-    allocate(xyblock(loc_seas+3), xydis(loc_seas+3), xytype(loc_seas+3))
+    allocate(xyblock(loc_seas+1), xydis(loc_seas+1), xytype(loc_seas+1))
     !$omp parallel
     !$omp workshare
-    xyblock(:) = 1 ; xydis(:) = 0 ; xytype(:) = MPI_REAL4
+    xyblock(:) = 1 ; xydis(1) = 0_MPI_ADDRESS_KIND ; xytype(:) = MPI_REAL4
     !$omp end workshare
 
-    xytype(1) = MPI_LB ; xytype(loc_seas+3) = MPI_UB
-    xydis(loc_seas+3) = (st_grid%nx*st_grid%ny+1)*I4
-
-    !$omp do private(i, ij)
+    !$omp do private(i)
     do i = 1, loc_seas
-      ij = i + 2 ; xydis(ij) = l2g_ij(i)*I4
+      xydis(i+1) = int(l2g_ij(i)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_seas+3, xyblock, xydis, xytype, surf_r4hview, ierr)
+    call MPI_TYPE_CREATE_STRUCT(loc_seas+1, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype with header for out of range in xy direction.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int((st_grid%nx*st_grid%ny+1)*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, surf_r4hview, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype with header for out of range in xy direction.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(surf_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype with header for out of range in xy direction.")
       end if
     end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype with header for out of range in xy direction.")
+      end if
+    end if
 
     deallocate(xyblock, xydis, xytype)
 
-
-    allocate(xyzblock(loc_seac+2), xyzdis(loc_seac+2), xyztype(loc_seac+2))
+    allocate(xyzblock(loc_seac), xyzdis(loc_seac), xyztype(loc_seac))
     !$omp parallel
     !$omp workshare
-    xyzblock(:) = 1 ; xyzdis(:) = 0 ; xyztype(:) = MPI_REAL4
+    xyzblock(:) = 1 ; xyztype(:) = MPI_REAL4
     !$omp end workshare
 
-    xyztype(1) = MPI_LB ; xyztype(loc_seac+2) = MPI_UB
-    xyzdis(loc_seac+2) = st_grid%nxyz*I4
-
-    !$omp do private(i, ijk)
+    !$omp do private(i)
     do i = 1, loc_seac
-      ijk = i + 1 ; xyzdis(ijk) = (l2g_ijk(i)-1)*I4
+      xyzdis(i) = int((l2g_ijk(i)-1)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_seac+2, xyzblock, xyzdis, xyztype, cell_r4view, ierr)
+    call MPI_TYPE_CREATE_STRUCT(loc_seac, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype without header for out of range in xyz direction.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int(st_grid%nxyz*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, cell_r4view, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype without header for out of range in xyz direction.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(cell_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype without header for out of range in xyz direction.")
       end if
     end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype without header for out of range in xyz direction.")
+      end if
+    end if
 
     deallocate(xyzblock, xyzdis, xyztype)
 
-    allocate(xyzblock(loc_seac+3), xyzdis(loc_seac+3), xyztype(loc_seac+3))
+    allocate(xyzblock(loc_seac+1), xyzdis(loc_seac+1), xyztype(loc_seac+1))
     !$omp parallel
     !$omp workshare
-    xyzblock(:) = 1 ; xyzdis(:) = 0 ; xyztype(:) = MPI_REAL4
+    xyzblock(:) = 1 ;  xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(:) = MPI_REAL4
     !$omp end workshare
 
-    xyztype(1) = MPI_LB ; xyztype(loc_seac+3) = MPI_UB
-    xyzdis(loc_seac+3) = (st_grid%nxyz+1)*I4
-
-    !$omp do private(i, ijk)
+    !$omp do private(i)
     do i = 1, loc_seac
-      ijk = i + 2 ; xyzdis(ijk) = l2g_ijk(i)*I4
+      xyzdis(i+1) = int(l2g_ijk(i)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_seac+3, xyzblock, xyzdis, xyztype, cell_r4hview, ierr)
+    call MPI_TYPE_CREATE_STRUCT(loc_seac+1, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype with header for out of range in xyz direction.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int((st_grid%nxyz+1)*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, cell_r4hview, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype with header for out of range in xyz direction.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(cell_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype with header for out of range in xyz direction.")
+      end if
+    end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype with header for out of range in xyz direction.")
       end if
     end if
 
@@ -785,134 +923,175 @@ module mpi_set
     integer(I4), intent(in) :: loc_nsurf, loc_ncell
     integer(I4), intent(in) :: l2g_ij(:), l2g_ijk(:)
     ! -- local
-    integer(I4) :: i, ij, ijk, ierr
-    integer(I4), allocatable :: xyblock(:), xyzblock(:), xydis(:), xyzdis(:)
-    integer(I4), allocatable :: xytype(:), xyztype(:)
+    integer(I4) :: i, ierr, tmptype
+    integer(I4), allocatable :: xyblock(:), xyzblock(:), xytype(:), xyztype(:)
+    integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
+    integer(KIND=MPI_ADDRESS_KIND), allocatable :: xydis(:), xyzdis(:)
     !-------------------------------------------------------------------------------------
     ierr = 0
-    allocate(xyblock(loc_nsurf+2), xydis(loc_nsurf+2), xytype(loc_nsurf+2))
+    allocate(xyblock(loc_nsurf), xydis(loc_nsurf), xytype(loc_nsurf))
     !$omp parallel
     !$omp workshare
-    xyblock(:) = 1 ; xydis(:) = 0 ; xytype(:) = MPI_REAL4
+    xyblock(:) = 1 ; xytype(:) = MPI_REAL4
     !$omp end workshare
 
-    xytype(1) = MPI_LB ; xytype(loc_nsurf+2) = MPI_UB
-    xydis(loc_nsurf+2) = st_grid%nx*st_grid%ny*I4
-
-    !$omp do private(i, ij)
+    !$omp do private(i)
     do i = 1, loc_nsurf
-      ij = i + 1 ; xydis(ij) = (l2g_ij(i)-1)*I4
+      xydis(i) = int((l2g_ij(i)-1)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_nsurf+2, xyblock, xydis, xytype, surf_r4view, ierr)
+    call MPI_TYPE_CREATE_STRUCT(loc_nsurf, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype without header for within range and sea in xy direction.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int(st_grid%nx*st_grid%ny*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, surf_r4view, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype with header for out of range in xyz direction.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(surf_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype without header for within range and sea in xy direction.")
       end if
     end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype without header for within range and sea in xy direction.")
+      end if
+    end if
 
     deallocate(xyblock, xydis, xytype)
 
-    allocate(xyblock(loc_nsurf+3), xydis(loc_nsurf+3), xytype(loc_nsurf+3))
+    allocate(xyblock(loc_nsurf+1), xydis(loc_nsurf+1), xytype(loc_nsurf+1))
     !$omp parallel
     !$omp workshare
-    xyblock(:) = 1 ; xydis(:) = 0 ; xytype(:) = MPI_REAL4
+    xyblock(:) = 1 ; xydis(1) = 0_MPI_ADDRESS_KIND ; xytype(:) = MPI_REAL4
     !$omp end workshare
 
-    xytype(1) = MPI_LB ; xytype(loc_nsurf+3) = MPI_UB
-    xydis(loc_nsurf+3) = (st_grid%nx*st_grid%ny+1)*I4
-
-    !$omp do private(i, ij)
+    !$omp do private(i)
     do i = 1, loc_nsurf
-      ij = i + 2 ; xydis(ij) = l2g_ij(i)*I4
+      xydis(i+1) = int(l2g_ij(i)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_nsurf+3, xyblock, xydis, xytype, surf_r4hview, ierr)
+    call MPI_TYPE_CREATE_STRUCT(loc_nsurf+1, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype with header for within range and sea in xy direction.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int((st_grid%nx*st_grid%ny+1)*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, surf_r4hview, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype with header for within range and sea in xy direction.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(surf_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype with header for within range and sea in xy direction.")
       end if
     end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype with header for within range and sea in xy direction.")
+      end if
+    end if
 
     deallocate(xyblock, xydis, xytype)
 
-    allocate(xyzblock(loc_ncell+2), xyzdis(loc_ncell+2), xyztype(loc_ncell+2))
+    allocate(xyzblock(loc_ncell), xyzdis(loc_ncell), xyztype(loc_ncell))
     !$omp parallel
     !$omp workshare
-    xyzblock(:) = 1 ; xyzdis(:) = 0 ; xyztype(:) = MPI_REAL4
+    xyzblock(:) = 1 ; xyztype(:) = MPI_REAL4
     !$omp end workshare
 
-    xyztype(1) = MPI_LB ; xyztype(loc_ncell+2) = MPI_UB
-    xyzdis(loc_ncell+2) = st_grid%nxyz*I4
-
-    !$omp do private(i, ijk)
+    !$omp do private(i)
     do i = 1, loc_ncell
-      ijk = i + 1 ; xyzdis(ijk) = (l2g_ijk(i)-1)*I4
+      xyzdis(i) = int((l2g_ijk(i)-1)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_ncell+2, xyzblock, xyzdis, xyztype, cell_r4view, ierr)
+    call MPI_TYPE_CREATE_STRUCT(loc_ncell, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype without header for within range and sea in xyz direction.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int(st_grid%nxyz*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, cell_r4view, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype without header for within range and sea in xyz direction.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(cell_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype without header for within range and sea in xyz direction.")
       end if
     end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype without header for within range and sea in xyz direction.")
+      end if
+    end if
 
     deallocate(xyzblock, xyzdis, xyztype)
 
-    allocate(xyzblock(loc_ncell+3), xyzdis(loc_ncell+3), xyztype(loc_ncell+3))
+    allocate(xyzblock(loc_ncell+1), xyzdis(loc_ncell+1), xyztype(loc_ncell+1))
     !$omp parallel
     !$omp workshare
-    xyzblock(:) = 1 ; xyzdis(:) = 0 ; xyztype(:) = MPI_REAL4
+    xyzblock(:) = 1 ; xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(:) = MPI_REAL4
     !$omp end workshare
 
-    xyztype(1) = MPI_LB ; xyztype(loc_ncell+3) = MPI_UB
-    xyzdis(loc_ncell+3) = (st_grid%nxyz+1)*I4
-
-    !$omp do private(i, ijk)
+    !$omp do private(i)
     do i = 1, loc_ncell
-      ijk = i + 2 ; xyzdis(ijk) = l2g_ijk(i)*I4
+      xyzdis(i+1) = int(l2g_ijk(i)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_ncell+3, xyzblock, xyzdis, xyztype, cell_r4hview, ierr)
+    call MPI_TYPE_CREATE_STRUCT(loc_ncell+1, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype with header for within range and sea in xyz direction.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int((st_grid%nxyz+1)*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, cell_r4hview, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype with header for within range and sea in xyz direction.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(cell_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype with header for within range and sea in xyz direction.")
+      end if
+    end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype with header for within range and sea in xyz direction.")
       end if
     end if
 
@@ -930,37 +1109,49 @@ module mpi_set
     integer(I4), intent(in) :: loc_ncalc, glob_ncalc
     integer(I4), intent(in) :: l2g_ijk(:)
     ! -- local
-    integer(I4) :: i, ijk, ierr
-    integer(I4), allocatable :: xyzblock(:), xyzdis(:), xyztype(:)
+    integer(I4) :: i, ierr, tmptype
+    integer(I4), allocatable :: xyzblock(:), xyztype(:)
+    integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
+    integer(KIND=MPI_ADDRESS_KIND), allocatable :: xyzdis(:)
     !-------------------------------------------------------------------------------------
     ierr = 0
-    allocate(xyzblock(loc_ncalc+3), xyzdis(loc_ncalc+3), xyztype(loc_ncalc+3))
+    allocate(xyzblock(loc_ncalc+1), xyzdis(loc_ncalc+1), xyztype(loc_ncalc+1))
     !$omp parallel
     !$omp workshare
-    xyzblock(:) = 1 ; xyzdis(:) = 0 ; xyztype(:) = MPI_REAL8
+    xyzblock(:) = 1 ; xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(:) = MPI_REAL8
     !$omp end workshare
 
-    xyztype(1) = MPI_LB ; xyztype(loc_ncalc+3) = MPI_UB
-    xyzdis(loc_ncalc+3) = (glob_ncalc+1)*8
-
-    !$omp do private(i, ijk)
+    !$omp do private(i)
     do i = 1, loc_ncalc
-      ijk = i + 2 ; xyzdis(ijk) = l2g_ijk(i)*8
+      xyzdis(i+1) = int(l2g_ijk(i)*8, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_ncalc+3, xyzblock, xyzdis, xyztype, rest_view, ierr)
+    call MPI_TYPE_CREATE_STRUCT(loc_ncalc+1, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype for restart.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int((glob_ncalc+1)*8, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, rest_view, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype for restart.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(rest_view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype for restart.")
+      end if
+    end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype for restart.")
       end if
     end if
 
@@ -968,7 +1159,7 @@ module mpi_set
 
   end subroutine set_rest_view
 
-  subroutine set_write_fview(cals, calc, l2g_ij, l2g_ijk, l2g_nos, l2g_noc)
+  subroutine set_write_fview(cals, calc, l2g_ij, l2g_ijk, sort_ns, sort_nc)
   !***************************************************************************************
   ! set_write_fview -- Set write file view
   !***************************************************************************************
@@ -976,87 +1167,114 @@ module mpi_set
 
     ! -- inout
     integer(I4), intent(in) :: cals, calc
-    integer(I4), intent(in) :: l2g_ij(:), l2g_ijk(:), l2g_nos(:), l2g_noc(:)
+    integer(I4), intent(in) :: l2g_ij(:), l2g_ijk(:)
+    integer(I4), intent(in) :: sort_ns(:), sort_nc(:)
     ! -- local
-    integer(I4) :: i, ij, ijk, ierr
-    integer(I4) :: no_cals, no_calc, loc_cals, loc_calc
-    integer(I4), allocatable :: xyblock(:), xydis(:), xytype(:)
-    integer(I4), allocatable :: xyzblock(:), xyzdis(:), xyztype(:)
+    integer(I4) :: i, j, ierr, tmptype
+    integer(I4) :: loc_cals, loc_calc
+    integer(I4), allocatable :: xyblock(:), xytype(:)
+    integer(I4), allocatable :: xyzblock(:), xyztype(:)
+    integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
+    integer(KIND=MPI_ADDRESS_KIND), allocatable :: xydis(:), xyzdis(:)
     !-------------------------------------------------------------------------------------
     ierr = 0
-    no_cals = size(l2g_nos(:)) ; no_calc = size(l2g_noc(:))
 
-    loc_cals = cals + no_cals + 3
+    loc_cals = size(sort_ns(:)) + 1
     allocate(xyblock(loc_cals), xydis(loc_cals), xytype(loc_cals))
+    allocate(write_2d_ind(cals))
     !$omp parallel
     !$omp workshare
-    xyblock(:) = 1 ; xydis(:) = 0 ; xytype(:) = MPI_REAL4
+    xyblock(:) = 1 ; xydis(1) = 0_MPI_ADDRESS_KIND ; xytype(:) = MPI_REAL4
     !$omp end workshare
-
-    xytype(1) = MPI_LB ; xytype(loc_cals) = MPI_UB
-    xydis(loc_cals) = (st_grid%nx*st_grid%ny+1)*I4
-
-    !$omp do private(i, ij)
-    do i = 1, cals
-      ij = i + 2 ; xydis(ij) = l2g_ij(i)*I4
-    end do
-    !$omp end do
-    !$omp do private(i, ij)
-    do i = 1, no_cals
-      ij = i + cals + 2 ; xydis(ij) = l2g_nos(i)*I4
+    !$omp do private(i)
+    do i = 1, loc_cals-1
+      xydis(i+1) = int(sort_ns(i)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_cals, xyblock, xydis, xytype, write_2dview, ierr)
+    j = 1
+    do i = 1, loc_cals-1
+      if (j <= cals .and. sort_ns(i) == l2g_ij(j)) then
+        write_2d_ind(j) = i ; j = j + 1
+      end if
+    end do
+
+    call MPI_TYPE_CREATE_STRUCT(loc_cals, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype for 2d output.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int((st_grid%nx*st_grid%ny+1)*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, write_2dview, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype for 2d output.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(write_2dview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype for 2d output.")
       end if
     end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype for 2d output.")
+      end if
+    end if
 
     deallocate(xyblock, xydis, xytype)
 
-    loc_calc = calc + no_calc + 3
+    loc_calc = size(sort_nc(:)) + 1
     allocate(xyzblock(loc_calc), xyzdis(loc_calc), xyztype(loc_calc))
+    allocate(write_3d_ind(calc))
     !$omp parallel
     !$omp workshare
-    xyzblock(:) = 1 ; xyzdis(:) = 0 ; xyztype(:) = MPI_REAL4
+    xyzblock(:) = 1 ; xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(:) = MPI_REAL4
     !$omp end workshare
 
-    xyztype(1) = MPI_LB ; xyztype(loc_calc) = MPI_UB
-    xyzdis(loc_calc) = (st_grid%nxyz+1)*I4
-
-    !$omp do private(i, ijk)
-    do i = 1, calc
-      ijk = i + 2 ; xyzdis(ijk) = l2g_ijk(i)*I4
-    end do
-    !$omp end do
-    !$omp do private(i, ijk)
-    do i = 1, no_calc
-      ijk = i + calc + 2 ; xyzdis(ijk) = l2g_noc(i)*I4
+    !$omp do private(i)
+    do i = 1, loc_calc-1
+      xyzdis(i+1) = int(sort_nc(i)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_TYPE_STRUCT(loc_calc, xyzblock, xyzdis, xyztype, write_3dview, ierr)
+    j = 1
+    do i = 1, loc_calc-1
+      if (j <= calc .and. sort_nc(i) == l2g_ijk(j)) then
+        write_3d_ind(j) = i ; j = j + 1
+      end if
+    end do
+
+    call MPI_TYPE_CREATE_STRUCT(loc_calc, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Create struct datatype for 3d output.")
       end if
     end if
-
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int((st_grid%nxyz+1)*4, kind=MPI_ADDRESS_KIND)
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, write_3dview, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Resize struct datatype for 3d output.")
+      end if
+    end if
     call MPI_TYPE_COMMIT(write_3dview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Commit struct datatype for 3d output.")
+      end if
+    end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Free struct datatype for 3d output.")
       end if
     end if
 
@@ -1269,6 +1487,13 @@ module mpi_set
     end if
 
     char_leng = len_trim(st_sim%cal_unit)
+    call MPI_BCAST(char_leng, 1, MPI_INTEGER, 0, my_comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        call write_err_stop("Broadcast calculation unit length.")
+      end if
+    end if
+
     call MPI_BCAST(st_sim%cal_unit, char_leng, MPI_CHARACTER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -2118,6 +2343,13 @@ module mpi_set
     ierr = 0
     do i = 1, clasn
       char_leng = len_trim(retn_name(i))
+      call MPI_BCAST(char_leng, 1, MPI_INTEGER, 0, my_comm, ierr)
+      if (ierr /= MPI_SUCCESS) then
+        if (my_rank == 0) then
+          call write_err_stop("Broadcast retention name "//retn_name(i)//" length.")
+        end if
+      end if
+
       call MPI_BCAST(retn_name(i), char_leng, MPI_CHARACTER, 0, my_comm, ierr)
       if (ierr /= MPI_SUCCESS) then
         if (my_rank == 0) then
@@ -2165,6 +2397,13 @@ module mpi_set
     ierr = 0
     do i = 1, clasn
       char_leng = len_trim(parm_name(i))
+      call MPI_BCAST(char_leng, 1, MPI_INTEGER, 0, my_comm, ierr)
+      if (ierr /= MPI_SUCCESS) then
+        if (my_rank == 0) then
+          call write_err_stop("Broadcast parameter name "//parm_name(i)//" length.")
+        end if
+      end if
+
       call MPI_BCAST(parm_name(i), char_leng, MPI_CHARACTER, 0, my_comm, ierr)
       if (ierr /= MPI_SUCCESS) then
         if (my_rank == 0) then
@@ -2247,6 +2486,13 @@ module mpi_set
     ierr = 0
     do i = 1, clasn
       char_leng = len_trim(cname(i))
+      call MPI_BCAST(char_leng, 1, MPI_INTEGER, 0, my_comm, ierr)
+      if (ierr /= MPI_SUCCESS) then
+        if (my_rank == 0) then
+          call write_err_stop("Broadcast classification name "//cname(i)//" length.")
+        end if
+      end if
+
       call MPI_BCAST(cname(i), char_leng, MPI_CHARACTER, 0, my_comm, ierr)
       if (ierr /= MPI_SUCCESS) then
         if (my_rank == 0) then

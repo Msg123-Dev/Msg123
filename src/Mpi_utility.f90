@@ -466,6 +466,13 @@ module mpi_utility
     end if
 
     str_len = len_trim(err_mes)
+    call MPI_BCAST(str_len, 1, MPI_INTEGER, send_num, my_comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path length in MPI program."
+      end if
+      call abort_proc(my_rank, log_fnum)
+    end if
     call MPI_BCAST(err_mes, str_len, MPI_CHARACTER, send_num, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -490,6 +497,13 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------
     ierr = 0 ; str_len = len_trim(file_path)
+    call MPI_BCAST(str_len, 1, MPI_INTEGER, 0, my_comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path length in MPI program."
+      end if
+      call abort_proc(my_rank, log_fnum)
+    end if
     call MPI_BCAST(file_path, str_len, MPI_CHARACTER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -523,6 +537,13 @@ module mpi_utility
       call abort_proc(my_rank, log_fnum)
     end if
 
+    call MPI_BCAST(str_len, 1, MPI_INTEGER, 0, my_comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path length in MPI program."
+      end if
+      call abort_proc(my_rank, log_fnum)
+    end if
     call MPI_BCAST(file_path, str_len, MPI_CHARACTER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -547,6 +568,13 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------
     ierr = 0 ; str_len = len_trim(file_path) ; uni_len = len_trim(file_unit)
+    call MPI_BCAST(str_len, 1, MPI_INTEGER, 0, my_comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path length in MPI program."
+      end if
+      call abort_proc(my_rank, log_fnum)
+    end if
     call MPI_BCAST(file_path, str_len, MPI_CHARACTER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -555,6 +583,13 @@ module mpi_utility
       call abort_proc(my_rank, log_fnum)
     end if
 
+    call MPI_BCAST(uni_len, 1, MPI_INTEGER, 0, my_comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file unit length in MPI program."
+      end if
+      call abort_proc(my_rank, log_fnum)
+    end if
     call MPI_BCAST(file_unit, uni_len, MPI_CHARACTER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -580,7 +615,6 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------
     ierr = 0 ; str_len = len_trim(file_path) ; uni_len = len_trim(file_unit)
-
     call MPI_BCAST(file_type, 1, MPI_INTEGER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -589,6 +623,13 @@ module mpi_utility
       call abort_proc(my_rank, log_fnum)
     end if
 
+    call MPI_BCAST(str_len, 1, MPI_INTEGER, 0, my_comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path length in MPI program."
+      end if
+      call abort_proc(my_rank, log_fnum)
+    end if
     call MPI_BCAST(file_path, str_len, MPI_CHARACTER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -597,6 +638,13 @@ module mpi_utility
       call abort_proc(my_rank, log_fnum)
     end if
 
+    call MPI_BCAST(uni_len, 1, MPI_INTEGER, 0, my_comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file unit length in MPI program."
+      end if
+      call abort_proc(my_rank, log_fnum)
+    end if
     call MPI_BCAST(file_unit, uni_len, MPI_CHARACTER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -648,6 +696,13 @@ module mpi_utility
       call abort_proc(my_rank, log_fnum)
     end if
 
+    call MPI_BCAST(str_len, 1, MPI_INTEGER, 0, my_comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (my_rank == 0) then
+        write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path length in MPI program."
+      end if
+      call abort_proc(my_rank, log_fnum)
+    end if
     call MPI_BCAST(extr_path, str_len, MPI_CHARACTER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -749,8 +804,8 @@ module mpi_utility
       rec_count(i-1) = rec_num(i)
     end do
 
-    call MPI_ALLGATHERV(loc_array, in_num, MPI_REAL8, glo_array, rec_count, rec_dis,&
-                        MPI_REAL8, my_comm, ierr)
+    call MPI_ALLGATHERV(loc_array, in_num, MPI_REAL4, glo_array, rec_count, rec_dis,&
+                        MPI_REAL4, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         write(log_fnum,'(a)') "Error!! Allgather "//err_mes//" array in MPI program."

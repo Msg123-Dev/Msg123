@@ -39,3 +39,18 @@
 
 # debug information files
 *.dwo
+
+# MacOS files
+**/.DS_Store
+
+# AI generated files
+.claude/
+.cursor/
+.windsurf/
+.roo/
+.cline/
+.opencode/
+
+# Environment files
+.env
+.env.*

@@ -161,12 +161,23 @@ module allocate_output
     allocate(st_msglo%wel(msout_tnum), st_msglo%rec(msout_tnum), st_msglo%sur(msout_tnum))
     allocate(st_msglo%riv(msout_tnum), st_msglo%lak(msout_tnum), st_msglo%tot(msout_tnum))
     !$omp parallel workshare
-    st_msloc%sto(:) = DZERO ; st_msloc%con(:) = DZERO ; st_msloc%sea(:) = DZERO
-    st_msloc%wel(:) = DZERO ; st_msloc%rec(:) = DZERO ; st_msloc%sur(:) = DZERO
-    st_msloc%riv(:) = DZERO ; st_msloc%lak(:) = DZERO
-    st_msglo%sto(:) = DZERO ; st_msglo%con(:) = DZERO ; st_msglo%sea(:) = DZERO
-    st_msglo%wel(:) = DZERO ; st_msglo%rec(:) = DZERO ; st_msglo%sur(:) = DZERO
-    st_msglo%riv(:) = DZERO ; st_msglo%lak(:) = DZERO ; st_msglo%tot(:) = DZERO
+    st_msloc%sto(:) = DZERO
+    st_msloc%con(:) = DZERO
+    st_msloc%sea(:) = DZERO
+    st_msloc%wel(:) = DZERO
+    st_msloc%rec(:) = DZERO
+    st_msloc%sur(:) = DZERO
+    st_msloc%riv(:) = DZERO
+    st_msloc%lak(:) = DZERO
+    st_msglo%sto(:) = DZERO
+    st_msglo%con(:) = DZERO
+    st_msglo%sea(:) = DZERO
+    st_msglo%wel(:) = DZERO
+    st_msglo%rec(:) = DZERO
+    st_msglo%sur(:) = DZERO
+    st_msglo%riv(:) = DZERO
+    st_msglo%lak(:) = DZERO
+    st_msglo%tot(:) = DZERO
     !$omp end parallel workshare
 
   end subroutine allocate_mass
@@ -184,7 +195,8 @@ module allocate_output
     !-------------------------------------------------------------------------------------
     allocate(pointv(ncalc,3), facev(ncalc,FACE))
     !$omp parallel workshare
-    pointv(:,:) = DZERO ; facev(:,:) = DZERO
+    pointv(:,:) = DZERO
+    facev(:,:) = DZERO
     !$omp end parallel workshare
 
   end subroutine allocate_velc
@@ -282,7 +294,8 @@ module allocate_output
     !-------------------------------------------------------------------------------------
     allocate(res_seal(ncalc), res_snum(ncalc))
     !$omp parallel workshare
-    res_seal(:) = DZERO ; res_snum(:) = 0
+    res_seal(:) = DZERO
+    res_snum(:) = 0
     !$omp end parallel workshare
 
   end subroutine allocate_sear
@@ -300,7 +313,8 @@ module allocate_output
     !-------------------------------------------------------------------------------------
     allocate(res_rech(ncals), res_rnum(ncals))
     !$omp parallel workshare
-    res_rech(:) = DZERO ; res_rnum(:) = 0
+    res_rech(:) = DZERO
+    res_rnum(:) = 0
     !$omp end parallel workshare
 
   end subroutine allocate_recr
@@ -318,7 +332,8 @@ module allocate_output
     !-------------------------------------------------------------------------------------
     allocate(res_well(ncalc), res_wnum(ncalc))
     !$omp parallel workshare
-    res_well(:) = DZERO ; res_wnum(:) = 0
+    res_well(:) = DZERO
+    res_wnum(:) = 0
     !$omp end parallel workshare
 
   end subroutine allocate_welr

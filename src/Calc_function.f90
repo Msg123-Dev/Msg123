@@ -40,9 +40,17 @@ module calc_function
     allocate(funcvs(ncalc), alp_ss(ncalc))
     allocate(recf(ncals), surf(ncals), rivf(ncals), lakf(ncals))
     !$omp parallel workshare
-    stof(:) = DZERO ; conf(:) = DZERO ; welf(:) = DZERO ; seaf(:) = DZERO
-    recf(:) = DZERO ; surf(:) = DZERO ; rivf(:) = DZERO ; lakf(:) = DZERO
-    funcvs(:) = DZERO ; alp_ss(:) = DZERO ; funcv(:) = DZERO
+    stof(:) = DZERO
+    conf(:) = DZERO
+    welf(:) = DZERO
+    seaf(:) = DZERO
+    recf(:) = DZERO
+    surf(:) = DZERO
+    rivf(:) = DZERO
+    lakf(:) = DZERO
+    funcvs(:) = DZERO
+    alp_ss(:) = DZERO
+    funcv(:) = DZERO
     !$omp end parallel workshare
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
@@ -118,7 +126,8 @@ module calc_function
     !-------------------------------------------------------------------------------------
     allocate(alp_ss_new(ncalc), alp_ss_old(ncalc))
     !$omp parallel workshare
-    alp_ss_new(:) = DZERO ; alp_ss_old(:) = DZERO
+    alp_ss_new(:) = DZERO
+    alp_ss_old(:) = DZERO
     !$omp end parallel workshare
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
@@ -163,9 +172,14 @@ module calc_function
 
     if (st_sim%sim_type >= 0) then
       !$omp parallel workshare
-      stom(:) = stom(:)*delt ; conm(:) = conm(:)*delt ; seam(:) = seam(:)*delt
-      welm(:) = welm(:)*delt ; recm(:) = recm(:)*delt ; surm(:) = surm(:)*delt
-      rivm(:) = rivm(:)*delt ; lakm(:) = lakm(:)*delt
+      stom(:) = stom(:)*delt
+      conm(:) = conm(:)*delt
+      seam(:) = seam(:)*delt
+      welm(:) = welm(:)*delt
+      recm(:) = recm(:)*delt
+      surm(:) = surm(:)*delt
+      rivm(:) = rivm(:)*delt
+      lakm(:) = lakm(:)*delt
       !$omp end parallel workshare
     end if
 
@@ -540,7 +554,9 @@ module calc_function
 
     allocate(jcvec(vj_regnum), tempf1(vj_num), tempf2(vj_num))
     !$omp parallel workshare
-    jcvec(:) = DZERO ; tempf1(:) = DZERO ; tempf2(:) = DZERO
+    jcvec(:) = DZERO
+    tempf1(:) = DZERO
+    tempf2(:) = DZERO
     !$omp end parallel workshare
 
     ! -- Calculate function value (func)

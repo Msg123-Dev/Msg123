@@ -314,7 +314,8 @@ module set_condition
       if (my_rank == 0) then
         allocate(array_read(gridx,gridy), array_flat(gridxyz))
         !$omp parallel workshare
-        array_read(:,:) = no_val ; array_flat(:) = no_val
+        array_read(:,:) = no_val
+        array_flat(:) = no_val
         !$omp end parallel workshare
         call read_2dtxt(fnum, gridx, gridy, array_read)
         call flat_2dto3d(gridx, gridy, gridz, array_read, array_flat)
@@ -331,7 +332,8 @@ module set_condition
 #ifdef MPI_MSG
       allocate(array_seas(rsnum), array_flat(gridxyz))
       !$omp parallel workshare
-      array_seas(:) = no_val ; array_flat(:) = no_val
+      array_seas(:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_mpi_file(ftype, int_ft, fnum, rsnum, array_seas)
       !$omp parallel do private(i, j, k, s)
@@ -352,7 +354,8 @@ module set_condition
       dummy = rsnum
       allocate(array_read(gridx,gridy), array_flat(gridxyz))
       !$omp parallel workshare
-      array_read(:,:) = no_val ; array_flat(:) = no_val
+      array_read(:,:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_2dbin(fnum, gridx, gridy, no_val, array_read)
       call flat_2dto3d(gridx, gridy, gridz, array_read, array_flat)
@@ -407,7 +410,8 @@ module set_condition
       if (my_rank == 0) then
         allocate(array_read(gridx,gridy,gridz), array_flat(gridxyz))
         !$omp parallel workshare
-        array_read(:,:,:) = no_val ; array_flat(:) = no_val
+        array_read(:,:,:) = no_val
+        array_flat(:) = no_val
         !$omp end parallel workshare
         call read_3dtxt(fnum, gridx, gridy, gridz, array_read)
         call flat_3dto3d(gridx, gridy, gridz, array_read, array_flat)
@@ -424,7 +428,8 @@ module set_condition
 #ifdef MPI_MSG
       allocate(array_seac(rcnum), array_flat(gridxyz))
       !$omp parallel workshare
-      array_seac(:) = no_val ; array_flat(:) = no_val
+      array_seac(:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_mpi_file(ftype, int_ft, fnum, rcnum, array_seac)
       !$omp parallel do private(i, c)
@@ -442,7 +447,8 @@ module set_condition
       dummy = rcnum
       allocate(array_read(gridx,gridy,gridz), array_flat(gridxyz))
       !$omp parallel workshare
-      array_read(:,:,:) = no_val ; array_flat(:) = no_val
+      array_read(:,:,:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_3dbin(fnum, gridx, gridy, gridz, no_val, array_read)
       call flat_3dto3d(gridx, gridy, gridz, array_read, array_flat)
@@ -522,7 +528,8 @@ module set_condition
 #else
       allocate(array_read(gridx,gridy), array_flat(gridx*gridy))
       !$omp parallel workshare
-      array_read(:,:) = no_val ; array_flat(:) = no_val
+      array_read(:,:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_2dbin(fnum, gridx, gridy, no_val, array_read)
       !$omp parallel workshare
@@ -603,7 +610,8 @@ module set_condition
 #else
       allocate(array_read(gridx,gridy), array_flat(gridx*gridy))
       !$omp parallel workshare
-      array_read(:,:) = no_val ; array_flat(:) = no_val
+      array_read(:,:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_2dbin(fnum, gridx, gridy, no_val, array_read)
       call flat_2dto2d(gridx, gridy, array_read, array_flat)
@@ -682,7 +690,8 @@ module set_condition
 #else
       allocate(array_read(gridx,gridy), array_flat(gridx*gridy))
       !$omp parallel workshare
-      array_read(:,:) = no_val ; array_flat(:) = no_val
+      array_read(:,:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_2dbin(fnum, gridx, gridy, no_val, array_read)
       call flat_2dto2d(gridx, gridy, array_read, array_flat)
@@ -761,7 +770,9 @@ module set_condition
 #ifdef MPI_MSG
       allocate(array_surf(snum), array_temp(gridxyz), array_flat(gridxyz))
       !$omp parallel workshare
-      array_surf(:) = no_val ; array_temp(:) = no_val ; array_flat(:) = no_val
+      array_surf(:) = no_val
+      array_temp(:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_mpi_file(ftype, int_ft, fnum, snum, array_surf)
       !$omp parallel do private(i, j, k, s)
@@ -784,7 +795,8 @@ module set_condition
       dummy = snum
       allocate(array_read(gridx,gridy), array_flat(gridxyz))
       !$omp parallel workshare
-      array_read(:,:) = no_val ; array_flat(:) = no_val
+      array_read(:,:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_2dbin(fnum, gridx, gridy, no_val, array_read)
       !$omp parallel do private(j, k)
@@ -864,7 +876,9 @@ module set_condition
 #ifdef MPI_MSG
       allocate(array_surf(snum), array_temp(gridxyz), array_flat(gridxyz))
       !$omp parallel workshare
-      array_surf(:) = no_val ; array_temp(:) = no_val ; array_flat(:) = no_val
+      array_surf(:) = no_val
+      array_temp(:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_mpi_file(ftype, int_ft, fnum, snum, array_surf)
       !$omp parallel do private(i, j, k, s)
@@ -887,7 +901,8 @@ module set_condition
       dummy = snum
       allocate(array_read(gridx,gridy), array_flat(gridxyz))
       !$omp parallel workshare
-      array_read(:,:) = no_val ; array_flat(:) = no_val
+      array_read(:,:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_2dbin(fnum, gridx, gridy, no_val, array_read)
       call flat_2dto3d(gridx, gridy, gridz, array_read, array_flat)
@@ -962,7 +977,9 @@ module set_condition
 #ifdef MPI_MSG
       allocate(array_surf(snum), array_temp(gridxyz), array_flat(gridxyz))
       !$omp parallel workshare
-      array_surf(:) = no_val ; array_temp(:) = no_val ; array_flat(:) = no_val
+      array_surf(:) = no_val
+      array_temp(:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_mpi_file(ftype, int_ft, fnum, snum, array_surf)
       !$omp parallel do private(i, j, k, s)
@@ -985,7 +1002,8 @@ module set_condition
       dummy = snum
       allocate(array_read(gridx,gridy), array_flat(gridxyz))
       !$omp parallel workshare
-      array_read(:,:) = no_val ; array_flat(:) = no_val
+      array_read(:,:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_2dbin(fnum, gridx, gridy, no_val, array_read)
       call flat_2dto3d(gridx, gridy, gridz, array_read, array_flat)
@@ -1056,7 +1074,8 @@ module set_condition
 #else
       allocate(array_read(gridx,gridy,gridz), array_flat(gridxyz))
       !$omp parallel workshare
-      array_read(:,:,:) = no_val ; array_flat(:) = no_val
+      array_read(:,:,:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_3dbin(fnum, gridx, gridy, gridz, no_val, array_read)
       !$omp parallel workshare
@@ -1128,7 +1147,8 @@ module set_condition
 #else
       allocate(array_read(gridx,gridy,gridz), array_flat(gridxyz))
       !$omp parallel workshare
-      array_read(:,:,:) = no_val ; array_flat(:) = no_val
+      array_read(:,:,:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_3dbin(fnum, gridx, gridy, gridz, no_val, array_read)
       call flat_3dto3d(gridx, gridy, gridz, array_read, array_flat)
@@ -1198,7 +1218,8 @@ module set_condition
 #else
       allocate(array_read(gridx,gridy,gridz), array_flat(gridxyz))
       !$omp parallel workshare
-      array_read(:,:,:) = no_val ; array_flat(:) = no_val
+      array_read(:,:,:) = no_val
+      array_flat(:) = no_val
       !$omp end parallel workshare
       call read_3dbin(fnum, gridx, gridy, gridz, no_val, array_read)
       call flat_3dto3d(gridx, gridy, gridz, array_read, array_flat)
@@ -1243,7 +1264,11 @@ module set_condition
     allocate(rw_id(rwn), rw_i(rwn), rw_j(rwn), rw_ks(rwn), rw_ke(rwn))
     allocate(rw_val(rwn))
     !$omp parallel workshare
-    rw_id(:) = 0 ; rw_i(:) = 0 ; rw_j(:) = 0 ; rw_ks(:) = 0 ; rw_ke(:) = 0
+    rw_id(:) = 0
+    rw_i(:) = 0
+    rw_j(:) = 0
+    rw_ks(:) = 0
+    rw_ke(:) = 0
     rw_val(:) = SZERO
     !$omp end parallel workshare
 
@@ -1259,7 +1284,10 @@ module set_condition
     allocate(w_id(locwn), w_ij(locwn), w_ks(locwn), w_ke(locwn))
     allocate(w_val(locwn))
     !$omp parallel workshare
-    w_id(:) = 0 ; w_ij(:) = 0 ; w_ks(:) = 0 ; w_ke(:) = 0
+    w_id(:) = 0
+    w_ij(:) = 0
+    w_ks(:) = 0
+    w_ke(:) = 0
     w_val(:) = SZERO
     !$omp end parallel workshare
 
@@ -1288,8 +1316,10 @@ module set_condition
       allocate(well_nflag(cwn), st_well%ij(cwn), st_well%ks(cwn), st_well%ke(cwn))
       allocate(st_well%value(cwn))
       !$omp parallel workshare
-      well_nflag(:) = w_id(1:cwn) ; st_well%ij(:) = w_ij(1:cwn)
-      st_well%ks(:) = w_ks(1:cwn) ; st_well%ke(:) = w_ke(1:cwn)
+      well_nflag(:) = w_id(1:cwn)
+      st_well%ij(:) = w_ij(1:cwn)
+      st_well%ks(:) = w_ks(1:cwn)
+      st_well%ke(:) = w_ke(1:cwn)
       st_well%value(:) = w_val(1:cwn)
       !$omp end parallel workshare
     end if
@@ -1316,7 +1346,9 @@ module set_condition
     allocate(w_ij(ncals), w_ks(ncals), w_ke(ncals))
     allocate(w_val(ncals))
     !$omp parallel workshare
-    w_ij(:) = 0 ; w_ks(:) = 0 ; w_ke(:) = 0
+    w_ij(:) = 0
+    w_ks(:) = 0
+    w_ke(:) = 0
     w_val(:) = SZERO
     !$omp end parallel workshare
 
@@ -1356,7 +1388,10 @@ module set_condition
       allocate(st_well%ks(mw_totn), st_well%ke(mw_totn))
       allocate(st_well%value(mw_totn))
       !$omp parallel workshare
-      well_nflag(:) = 0 ; st_well%ij(:) = 0 ; st_well%ks(:) = 0 ; st_well%ke(:) = 0
+      well_nflag(:) = 0
+      st_well%ij(:) = 0
+      st_well%ks(:) = 0
+      st_well%ke(:) = 0
       st_well%value(:) = SZERO
       !$omp end parallel workshare
 
@@ -1452,7 +1487,8 @@ module set_condition
 #else
       allocate(array_read(gridx,gridy,gridz), array_flat(gridxyz))
       !$omp parallel workshare
-      array_read(:,:,:) = SZERO ; array_flat(:) = SZERO
+      array_read(:,:,:) = SZERO
+      array_flat(:) = SZERO
       !$omp end parallel workshare
       call read_3dbin(wfnum, gridx, gridy, gridz, SZERO, array_read)
       call flat_3dto3d(gridx, gridy, gridz, array_read, array_flat)
@@ -1502,7 +1538,8 @@ module set_condition
     !-------------------------------------------------------------------------------------
     allocate(temp_wconn(st_grid%nz*wnum), well_index(0:wnum))
     !$omp parallel workshare
-    temp_wconn(:) = 0 ; well_index(:) = 0
+    temp_wconn(:) = 0
+    well_index(:) = 0
     !$omp end parallel workshare
 
     index_count = 0
@@ -1538,7 +1575,8 @@ module set_condition
     !-------------------------------------------------------------------------------------
     allocate(well_conn(wnum), well_index(0:wnum))
     !$omp parallel workshare
-    well_conn(:) = 0 ; well_index(:) = 0
+    well_conn(:) = 0
+    well_index(:) = 0
     !$omp end parallel workshare
 
     index_count = 0
@@ -1612,19 +1650,28 @@ module set_condition
     allocate(sea_abyd(seal_cnum*FACE), sea_hydf(seal_cnum*FACE))
     allocate(left_off(totn_clac*FACE), right_off(totn_clac*FACE))
     !$omp parallel workshare
-    off_row(:) = 0 ; off_index(:) = 0 ; conn_dir(:) = 0
-    area_dis(:) = DZERO ; sat_hydf(:) = DZERO
-    surf_area(:) = DZERO ; rech_area(:) = DZERO
-    hydf_surf(:) = DZERO ; abyd_surf(:) = DZERO
-    sea_abyd(:) = DZERO ; sea_hydf(:) = DZERO
-    left_off(:) = 0 ; right_off(:) = 0
+    off_row(:) = 0
+    off_index(:) = 0
+    conn_dir(:) = 0
+    area_dis(:) = DZERO
+    sat_hydf(:) = DZERO
+    surf_area(:) = DZERO
+    rech_area(:) = DZERO
+    hydf_surf(:) = DZERO
+    abyd_surf(:) = DZERO
+    sea_abyd(:) = DZERO
+    sea_hydf(:) = DZERO
+    left_off(:) = 0
+    right_off(:) = 0
     !$omp end parallel workshare
 
     if (st_out_type%velc > 0) then
       allocate(conn_dis(totn_clac*FACE))
       allocate(sea_dis(seal_cnum*FACE), sea_dir(seal_cnum*FACE))
       !$omp parallel workshare
-      conn_dis(:) = DZERO ; sea_dis(:) = DZERO ; sea_dir(:) = 0
+      conn_dis(:) = DZERO
+      sea_dis(:) = DZERO
+      sea_dir(:) = 0
       !$omp end parallel workshare
     end if
 
@@ -1632,7 +1679,8 @@ module set_condition
     if (pro_totn /= 1) then
       allocate(reg_dis(totn_clac,FACE), reg_fare(totn_clac,FACE))
       !$omp parallel workshare
-      reg_dis(:,:) = DZERO ; reg_fare(:,:) = DZERO
+      reg_dis(:,:) = DZERO
+      reg_fare(:,:) = DZERO
       !$omp end parallel workshare
       ! -- Send and Receive face value (faceval)
         call senrec_faceval(neib_mpi_totn, neib_num, send_cind, recv_cind, send_citem,&
@@ -1646,7 +1694,8 @@ module set_condition
 
       allocate(reg_cksx(totn_clac), mpi_cksx(totn_clac))
       !$omp parallel workshare
-      reg_cksx(:) = DZERO ; mpi_cksx(:) = SZERO
+      reg_cksx(:) = DZERO
+      mpi_cksx(:) = SZERO
       !$omp end parallel workshare
       ! -- Send and Receive neighbor value (neibval)
         call senrec_neibval(neib_mpi_totn, neib_num, send_cind, recv_cind, send_citem,&
@@ -1659,7 +1708,8 @@ module set_condition
 
       allocate(reg_cksy(totn_clac), mpi_cksy(totn_clac))
       !$omp parallel workshare
-      reg_cksy(:) = DZERO ; mpi_cksy(:) = SZERO
+      reg_cksy(:) = DZERO
+      mpi_cksy(:) = SZERO
       !$omp end parallel workshare
       ! -- Send and Receive neighbor value (neibval)
         call senrec_neibval(neib_mpi_totn, neib_num, send_cind, recv_cind, send_citem,&
@@ -1672,7 +1722,8 @@ module set_condition
 
       allocate(reg_cksz(totn_clac), mpi_cksz(totn_clac))
       !$omp parallel workshare
-      reg_cksz(:) = DZERO ; mpi_cksz(:) = SZERO
+      reg_cksz(:) = DZERO
+      mpi_cksz(:) = SZERO
       !$omp end parallel workshare
       ! -- Send and Receive neighbor value (neibval)
         call senrec_neibval(neib_mpi_totn, neib_num, send_cind, recv_cind, send_citem,&
@@ -1686,8 +1737,11 @@ module set_condition
       allocate(reg_dis(ncalc,FACE), reg_fare(ncalc,FACE))
       allocate(reg_cksx(ncalc), reg_cksy(ncalc), reg_cksz(ncalc))
       !$omp parallel workshare
-      reg_dis(:,:) = dis2face(:,:) ; reg_fare(:,:) = face_area(:,:)
-      reg_cksx(:) = cksx(:) ; reg_cksy(:) = cksy(:) ; reg_cksz(:) = cksz(:)
+      reg_dis(:,:) = dis2face(:,:)
+      reg_fare(:,:) = face_area(:,:)
+      reg_cksx(:) = cksx(:)
+      reg_cksy(:) = cksy(:)
+      reg_cksz(:) = cksz(:)
       !$omp end parallel workshare
       neib_ncalc = 0
     end if
@@ -1695,15 +1749,20 @@ module set_condition
     allocate(reg_dis(ncalc,FACE), reg_fare(ncalc,FACE))
     allocate(reg_cksx(ncalc), reg_cksy(ncalc), reg_cksz(ncalc))
     !$omp parallel workshare
-    reg_dis(:,:) = dis2face(:,:) ; reg_fare(:,:) = face_area(:,:)
-    reg_cksx(:) = cksx(:) ; reg_cksy(:) = cksy(:) ; reg_cksz(:) = cksz(:)
+    reg_dis(:,:) = dis2face(:,:)
+    reg_fare(:,:) = face_area(:,:)
+    reg_cksx(:) = cksx(:)
+    reg_cksy(:) = cksy(:)
+    reg_cksz(:) = cksz(:)
     !$omp end parallel workshare
     neib_ncalc = 0
 #endif
 
     allocate(surf_dis(ncals), sea2cal(seal_cnum*FACE), sea2sea(seal_cnum*FACE))
     !$omp parallel workshare
-    surf_dis(:) = dis2face(1:ncals,1) ; sea2cal(:) = 0 ; sea2sea(:) = 0
+    surf_dis(:) = dis2face(1:ncals,1)
+    sea2cal(:) = 0
+    sea2sea(:) = 0
     !$omp end parallel workshare
     deallocate(dis2face, face_area)
 
@@ -2168,8 +2227,11 @@ module set_condition
     allocate(temp_ij(max_num), temp_ks(max_num), temp_ke(max_num))
     allocate(temp_wflag(max_num), temp_value(max_num))
     !$omp parallel workshare
-    temp_ij(:) = 0 ; temp_ks(:) = 0 ; temp_ke(:) = 0
-    temp_wflag(:) = 0 ; temp_value(:) = SZERO
+    temp_ij(:) = 0
+    temp_ks(:) = 0
+    temp_ke(:) = 0
+    temp_wflag(:) = 0
+    temp_value(:) = SZERO
     !$omp end parallel workshare
 
     nsize = size(well_nflag)
@@ -2203,8 +2265,10 @@ module set_condition
     allocate(st_well%value(np), well_nflag(np))
     !$omp parallel workshare
     st_well%ij(:) = temp_ij(1:np)
-    st_well%ks(:) = temp_ks(1:np) ; st_well%ke(:) = temp_ke(1:np)
-    st_well%value(:) = temp_value(1:np) ; well_nflag(:) = temp_wflag(1:np)
+    st_well%ks(:) = temp_ks(1:np)
+    st_well%ke(:) = temp_ke(1:np)
+    st_well%value(:) = temp_value(1:np)
+    well_nflag(:) = temp_wflag(1:np)
     !$omp end parallel workshare
 
     deallocate(temp_ij, temp_ks, temp_ke)

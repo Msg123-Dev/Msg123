@@ -265,9 +265,7 @@ module ici_module
     if (coupled_cama .and. cama_put) then
       allocate(rive_flux(ncals), lake_flux(ncals), surf_flux(ncals), tot_flux(ncals))
       !$omp parallel workshare
-      rive_flux(:) = DZERO
-      lake_flux(:) = DZERO
-      surf_flux(:) = DZERO
+      rive_flux(:) = DZERO ; lake_flux(:) = DZERO ; surf_flux(:) = DZERO
       tot_flux(:) = DZERO
       !$omp end parallel workshare
       if (st_out_type%rivr /= out_type(2) .and. st_in_type%rive >= 0) then
@@ -295,9 +293,7 @@ module ici_module
       call ici_put_data("runoff_total", tot_flux(:)*len_scal)
 
       !$omp parallel workshare
-      roff_rive(:) = DZERO
-      roff_lake(:) = DZERO
-      roff_surf(:) = DZERO
+      roff_rive(:) = DZERO ; roff_lake(:) = DZERO ; roff_surf(:) = DZERO
       !$omp end parallel workshare
 
       deallocate(tot_flux, rive_flux, lake_flux, surf_flux)
@@ -468,11 +464,8 @@ module ici_module
       allocate(water_in(ncals), roff_a(ncals), roff_b(ncals))
       allocate(evap_s(ncals), evap_v(ncals))
       !$omp parallel workshare
-      water_in(:) = DZERO
-      roff_a(:) = DZERO
-      roff_b(:) = DZERO
-      evap_s(:) = DZERO
-      evap_v(:) = DZERO
+      water_in(:) = DZERO ; roff_a(:) = DZERO ; roff_b(:) = DZERO
+      evap_s(:) = DZERO ; evap_v(:) = DZERO
       !$omp end parallel workshare
     end if
 

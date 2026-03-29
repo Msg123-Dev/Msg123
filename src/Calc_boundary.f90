@@ -69,8 +69,7 @@ module calc_boundary
     !-------------------------------------------------------------------------------------
     allocate(rech2cals(rec_cnum), calc_rech(rec_cnum))
     !$omp parallel workshare
-    rech2cals(:) = 0
-    calc_rech(:) = DZERO
+    rech2cals(:) = 0 ; calc_rech(:) = DZERO
     !$omp end parallel workshare
     call set_bound2calc(ncals, rech_cflag, read_rech, rech2cals, calc_rech)
     deallocate(read_rech, rech_cflag)
@@ -334,9 +333,7 @@ module calc_boundary
     if (riv_cnum > 0) then
       allocate(rive_head(riv_cnum), rive_bott(riv_cnum), rive_area(riv_cnum))
       !$omp parallel workshare
-      rive_head(:) = DZERO
-      rive_bott(:) = DZERO
-      rive_area(:) = DZERO
+      rive_head(:) = DZERO ; rive_bott(:) = DZERO ; rive_area(:) = DZERO
       !$omp end parallel workshare
       call set_bound2calc(ncals, rive_cflag, riv_wi, rive2cals, rive_head)
       call set_bound2calc(ncals, rive_cflag, riv_bl, rive2cals, rive_bott)
@@ -389,9 +386,7 @@ module calc_boundary
     if (lak_cnum > 0) then
       allocate(lake_head(lak_cnum), lake_bott(lak_cnum), lake_area(lak_cnum))
       !$omp parallel workshare
-      lake_head(:) = DZERO
-      lake_bott(:) = DZERO
-      lake_area(:) = DZERO
+      lake_head(:) = DZERO ; lake_bott(:) = DZERO ; lake_area(:) = DZERO
       !$omp end parallel workshare
       call set_bound2calc(ncals, lake_cflag, lak_wi, lake2cals, lake_head)
       call set_bound2calc(ncals, lake_cflag, lak_bl, lake2cals, lake_bott)

@@ -83,10 +83,7 @@ module linear_solution
     allocate(d(reg_size), z(reg_size), p(reg_size), q(d_size))
     allocate(level_d(reg_size), level_lu(lu_size), level_b(reg_size))
     !$omp parallel workshare
-    d(:) = DZERO
-    z(:) = DZERO
-    p(:) = DZERO
-    q(:) = DZERO
+    d(:) = DZERO ; z(:) = DZERO ; p(:) = DZERO ; q(:) = DZERO
     d(:) = array_var(level)%dmat(:)
     level_d(:) = array_var(level)%dmat(:)
     level_lu(:) = array_var(level)%lumat(:)
@@ -261,11 +258,7 @@ module linear_solution
     allocate(d(reg_size), z(reg_size), p(reg_size), v(d_size), rs(d_size), t(d_size))
     allocate(level_d(reg_size), level_lu(lu_size), level_b(reg_size))
     !$omp parallel workshare
-    z(:) = DZERO
-    p(:) = DZERO
-    v(:) = DZERO
-    rs(:) = DZERO
-    t(:) = DZERO
+    z(:) = DZERO ; p(:) = DZERO ; v(:) = DZERO ; rs(:) = DZERO ; t(:) = DZERO
     d(:) = array_var(level)%dmat(:)
     level_d(:) = array_var(level)%dmat(:)
     level_lu(:) = array_var(level)%lumat(:)
@@ -545,10 +538,8 @@ module linear_solution
         allocate(temp_d(reg_size), temp_lu(lu_size), temp_x(reg_size), temp_b(reg_size))
         allocate(temp_r(reg_size))
         !$omp parallel workshare
-        temp_d(:) = array_var(vlevel)%dmat(:)
-        temp_lu(:) = array_var(vlevel)%lumat(:)
-        temp_x(:) = array_var(vlevel)%x(:)
-        temp_b(:) = array_var(vlevel)%rhs(:)
+        temp_d(:) = array_var(vlevel)%dmat(:) ; temp_lu(:) = array_var(vlevel)%lumat(:)
+        temp_x(:) = array_var(vlevel)%x(:) ; temp_b(:) = array_var(vlevel)%rhs(:)
         temp_r(:) = DZERO
         !$omp end parallel workshare
 
@@ -629,10 +620,8 @@ module linear_solution
 
       allocate(temp_d(d_size), temp_lu(lu_size), temp_x(reg_size), temp_b(reg_size))
       !$omp parallel workshare
-      temp_d(:) = array_var(nlevel)%dmat(:)
-      temp_lu(:) = array_var(nlevel)%lumat(:)
-      temp_x(:) = array_var(nlevel)%x(:)
-      temp_b(:) = array_var(nlevel)%rhs(:)
+      temp_d(:) = array_var(nlevel)%dmat(:) ; temp_lu(:) = array_var(nlevel)%lumat(:)
+      temp_x(:) = array_var(nlevel)%x(:) ; temp_b(:) = array_var(nlevel)%rhs(:)
       !$omp end parallel workshare
 
 #ifdef MPI_MSG
@@ -698,10 +687,8 @@ module linear_solution
 
         allocate(temp_d(reg_size), temp_lu(lu_size), temp_x(reg_size), temp_b(reg_size))
         !$omp parallel workshare
-        temp_d(:) = array_var(vlevel)%dmat(:)
-        temp_lu(:) = array_var(vlevel)%lumat(:)
-        temp_x(:) = array_var(vlevel)%x(:)
-        temp_b(:) = array_var(vlevel)%rhs(:)
+        temp_d(:) = array_var(vlevel)%dmat(:) ; temp_lu(:) = array_var(vlevel)%lumat(:)
+        temp_x(:) = array_var(vlevel)%x(:) ; temp_b(:) = array_var(vlevel)%rhs(:)
         !$omp end parallel workshare
 
 #ifdef MPI_MSG
@@ -728,8 +715,7 @@ module linear_solution
 #endif
 
         !$omp parallel workshare
-        array_var(vlevel)%x(:) = temp_x(:)
-        array_var(vlevel)%rhs(:) = temp_b(:)
+        array_var(vlevel)%x(:) = temp_x(:) ; array_var(vlevel)%rhs(:) = temp_b(:)
         !$omp end parallel workshare
 
 #ifdef MPI_MSG
@@ -831,8 +817,7 @@ module linear_solution
     !-------------------------------------------------------------------------------------
     allocate(temp_outx(npre))
     !$omp parallel workshare
-    outx(1:npre) = inrhs(1:npre)
-    temp_outx(:) = DZERO
+    outx(1:npre) = inrhs(1:npre) ; temp_outx(:) = DZERO
     !$omp end parallel workshare
 
     ! Forward Substitution

@@ -264,7 +264,7 @@ module initial_module
     ! -- inout
     integer(I4), intent(in) :: in_stime(:)
     ! -- local
-    integer(I4) :: i
+    integer(I4) :: i, ierr
     character(:), allocatable :: log_file
     10 format(/"Run start date and time(yyyy/mm/dd hh:mm:ss) : ",i4,"/",i2.2,"/",i2.2,1x,&
               i2,":",i2.2,":",i2.2,/)
@@ -273,7 +273,16 @@ module initial_module
     ! -- Open new read text file (new_rtxt)
       call open_new_wtxt(log_file, "msg123 log", log_fnum)
 
+    rewind(log_fnum)
     write(log_fnum,10) (in_stime(i), i = 1, 3), (in_stime(i), i = 5, 7)
+
+    ierr = 0
+    do while(.true.)
+      read(unit=log_fnum,fmt=*,iostat=ierr)
+      if (ierr /= 0) then
+        exit
+      end if
+    end do
 
     deallocate(log_file)
 

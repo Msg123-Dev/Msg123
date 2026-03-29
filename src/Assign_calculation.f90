@@ -45,9 +45,7 @@ module assign_calc
     !-------------------------------------------------------------------------------------
     allocate(read_reta(ncalc), read_retn(ncalc), read_resi(ncalc))
     !$omp parallel workshare
-    read_reta(:) = SNOVAL
-    read_retn(:) = SNOVAL
-    read_resi(:) = SNOVAL
+    read_reta(:) = SNOVAL ; read_retn(:) = SNOVAL ; read_resi(:) = SNOVAL
     !$omp end parallel workshare
 
     if (retn_ftype == in_type(0)) then
@@ -91,9 +89,7 @@ module assign_calc
       allocate(st_retn%r(st_retn%totn))
       !$omp parallel workshare
       st_retn%name(:) = ""
-      st_retn%a(:) = SNOVAL
-      st_retn%n(:) = SNOVAL
-      st_retn%r(:) = SNOVAL
+      st_retn%a(:) = SNOVAL ; st_retn%n(:) = SNOVAL ; st_retn%r(:) = SNOVAL
       !$omp end parallel workshare
 
       if (my_rank == 0) then
@@ -174,11 +170,8 @@ module assign_calc
     allocate(read_ksx(ncalc), read_ksy(ncalc), read_ksz(ncalc))
     allocate(read_ss(ncalc), read_poro(ncalc))
     !$omp parallel workshare
-    read_ksx(:) = SNOVAL
-    read_ksy(:) = SNOVAL
-    read_ksz(:) = SNOVAL
-    read_ss(:) = SNOVAL
-    read_poro(:) = SNOVAL
+    read_ksx(:) = SNOVAL ; read_ksy(:) = SNOVAL ; read_ksz(:) = SNOVAL
+    read_ss(:) = SNOVAL ; read_poro(:) = SNOVAL
     !$omp end parallel workshare
 
     if (parm_ftype == in_type(0)) then
@@ -233,11 +226,8 @@ module assign_calc
       allocate(st_parm%ss(st_parm%totn), st_parm%ts(st_parm%totn))
       !$omp parallel workshare
       st_parm%name(:) = ""
-      st_parm%ksx(:) = SNOVAL
-      st_parm%ksy(:) = SNOVAL
-      st_parm%ksz(:) = SNOVAL
-      st_parm%ss(:) = SNOVAL
-      st_parm%ts(:) = SNOVAL
+      st_parm%ksx(:) = SNOVAL ; st_parm%ksy(:) = SNOVAL ; st_parm%ksz(:) = SNOVAL
+      st_parm%ss(:) = SNOVAL ; st_parm%ts(:) = SNOVAL
       !$omp end parallel workshare
 
       if (my_rank == 0) then
@@ -266,10 +256,8 @@ module assign_calc
     end if
 
     !$omp parallel workshare
-    read_ksx(:) = read_ksx(:)*len_scal_inv
-    read_ksy(:) = read_ksy(:)*len_scal_inv
-    read_ksz(:) = read_ksz(:)*len_scal_inv
-    read_ss(:) = read_ss(:)*len_scal
+    read_ksx(:) = read_ksx(:)*len_scal_inv ; read_ksy(:) = read_ksy(:)*len_scal_inv
+    read_ksz(:) = read_ksz(:)*len_scal_inv ; read_ss(:) = read_ss(:)*len_scal
     !$omp end parallel workshare
 
 #ifdef MPI_MSG
@@ -330,8 +318,7 @@ module assign_calc
     allocate(geo_cflag(ncals), surf_parm(ncals))
     allocate(geo_val(ncals))
     !$omp parallel workshare
-    geo_cflag(:) = 0
-    surf_parm(:) = DZERO
+    geo_cflag(:) = 0 ; surf_parm(:) = DZERO
     !$omp end parallel workshare
 
     geo_fnum(1) = st_geog_fnum%geoz ; geo_fnum(2) = st_geog_fnum%geor
@@ -512,8 +499,7 @@ module assign_calc
     if (pro_totn /= 1) then
       allocate(recv_init(ncalc+neib_ncalc))
       !$omp parallel workshare
-      sum_init = 1
-      recv_init(:) = DNOVAL
+      sum_init = 1 ; recv_init(:) = DNOVAL
       !$omp end parallel workshare
       do while (sum_init /= 0)
         ! -- Send and Receive neighbor value (neibval)
@@ -568,8 +554,7 @@ module assign_calc
     !-------------------------------------------------------------------------------------
     allocate(mass_val(ncalc), mass_cflag(ncalc))
     !$omp parallel workshare
-    mass_val(:) = 0
-    mass_cflag(:) = 0
+    mass_val(:) = 0 ; mass_cflag(:) = 0
     !$omp end parallel workshare
 
     if (mass_ftype == in_type(1)) then
@@ -589,9 +574,7 @@ module assign_calc
       allocate(massout_name(msout_tnum))
       allocate(clas_mass(msout_tnum), real_mass(ncalc))
       !$omp parallel workshare
-      massout_name(:) = ""
-      clas_mass(:) = SZERO
-      real_mass(:) = SZERO
+      massout_name(:) = "" ; clas_mass(:) = SZERO ; real_mass(:) = SZERO
       !$omp end parallel workshare
       if (my_rank == 0) then
         do i = 1, msout_tnum
@@ -638,8 +621,7 @@ module assign_calc
     else
       mass_num = ncalc
       !$omp parallel workshare
-      mass_val(:) = 1
-      mass_cflag(:) = 1
+      mass_val(:) = 1 ; mass_cflag(:) = 1
       !$omp end parallel workshare
     end if
 
@@ -649,14 +631,12 @@ module assign_calc
     if (any(mass_ftype == all_mass_type(:))) then
       allocate(mass2calc(mass_num), calc_mass(mass_num))
       !$omp parallel workshare
-      mass2calc(:) = 0
-      calc_mass(:) = 0
+      mass2calc(:) = 0 ; calc_mass(:) = 0
       !$omp end parallel workshare
       call set_mass2calc(ncalc, mass_cflag, mass_val, mass2calc, calc_mass)
       allocate(int_mass(mass_num))
       !$omp parallel workshare
-      int_mass(:) = 0
-      int_mass(:) = calc_mass(:)
+      int_mass(:) = 0 ; int_mass(:) = calc_mass(:)
       !$omp end parallel workshare
       deallocate(calc_mass, mass_cflag)
 #ifdef MPI_MSG

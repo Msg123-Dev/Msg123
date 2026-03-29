@@ -55,8 +55,7 @@ module make_amg_matrix
 
       allocate(array_var(amglev)%x(ncoase), array_var(amglev)%rhs(ncoase))
       !$omp parallel workshare
-      array_var(amglev)%x(:) = DZERO
-      array_var(amglev)%rhs(:) = DZERO
+      array_var(amglev)%x(:) = DZERO ; array_var(amglev)%rhs(:) = DZERO
       !$omp end parallel workshare
 
     end do amg_level
@@ -82,9 +81,7 @@ module make_amg_matrix
     allocate(aggr_luflag(nfine), nonaggr_lu(nfine*FACE), nonaggr_index(0:nfine))
     !$omp parallel workshare
     temp_dmat(:) = DZERO
-    aggr_luflag(:) = 0
-    nonaggr_lu(:) = 0
-    nonaggr_index(:) = 0
+    aggr_luflag(:) = 0 ; nonaggr_lu(:) = 0 ; nonaggr_index(:) = 0
     !$omp end parallel workshare
 
     nonaggr = 0
@@ -128,12 +125,8 @@ module make_amg_matrix
     allocate(aggr_num(nfine), aggr_index(0:nfine), que_flag(nfine))
     allocate(que2glob(nfine), glob_num(nfine), lay2_num(nfine))
     !$omp parallel workshare
-    aggr_num(:) = 0
-    aggr_index(:) = 0
-    que_flag(:) = 0
-    que2glob(:) = 0
-    glob_num(:) = 0
-    lay2_num(:) = 0
+    aggr_num(:) = 0 ; aggr_index(:) = 0 ; que_flag(:) = 0
+    que2glob(:) = 0 ; glob_num(:) = 0 ; lay2_num(:) = 0
     !$omp end parallel workshare
 
     que_size = 0
@@ -194,8 +187,7 @@ module make_amg_matrix
 
     allocate(aggr_inresult(0:ncoase), aggr_belongnum(nfine))
     !$omp parallel workshare
-    aggr_inresult(:) = 0
-    aggr_belongnum(:) = 0
+    aggr_inresult(:) = 0 ; aggr_belongnum(:) = 0
     !$omp end parallel workshare
 
     !$omp parallel do private(i, j)
@@ -251,9 +243,7 @@ module make_amg_matrix
     allocate(temp_proag(tsapce, nfine), temp_prorow(nfine), glob2aggrn(nfine))
     !$omp parallel workshare
     temp_prov(:,:) = DZERO
-    temp_proag(:,:) = 0
-    temp_prorow(:) = 0
-    glob2aggrn(:) = 0
+    temp_proag(:,:) = 0 ; temp_prorow(:) = 0 ; glob2aggrn(:) = 0
     !$omp end parallel workshare
     !$omp parallel do private(i, k, fine_row)
     do k = 1, ncoase
@@ -365,8 +355,7 @@ module make_amg_matrix
     allocate(pro_var(amglev)%poffrow(k))
     allocate(pro_var(amglev)%pval(k))
     !$omp parallel workshare
-    pro_var(amglev)%poffrow(:) = 0
-    pro_var(amglev)%pval(:) = DZERO
+    pro_var(amglev)%poffrow(:) = 0 ; pro_var(amglev)%pval(:) = DZERO
     !$omp end parallel workshare
     j = 0
     do i = 1, nfine
@@ -415,8 +404,7 @@ module make_amg_matrix
     allocate(res_var(amglev)%rval(kk))
 
     !$omp parallel workshare
-    res_var(amglev)%roffrow(:) = 0
-    res_var(amglev)%rval(:) = DZERO
+    res_var(amglev)%roffrow(:) = 0 ; res_var(amglev)%rval(:) = DZERO
     !$omp end parallel workshare
     do i = 1, ncoase
       res_var(amglev)%rindex(i) = res_var(amglev)%rindex(i) + res_var(amglev)%rindex(i-1)
@@ -460,16 +448,11 @@ module make_amg_matrix
     allocate(temp_aggr(ncoase))
     allocate(temp_val(7,nfine), new_lumat(nfine*7), temp_lumat(ncoase))
     !$omp parallel workshare
-    temp_size(:) = 0
-    temp_f2c(:,:) = 0
-    temp_node(:) = 0
+    temp_size(:) = 0 ; temp_f2c(:,:) = 0 ; temp_node(:) = 0
     crs_index(amglev)%offind(:) = 0
-    new_row(:) = 0
-    new_col(:) = 0
+    new_row(:) = 0 ; new_col(:) = 0
     temp_aggr(:) = 0
-    temp_val(:,:) =  DZERO
-    new_lumat(:) = DZERO
-    temp_lumat(:) = DZERO
+    temp_val(:,:) =  DZERO ; new_lumat(:) = DZERO ; temp_lumat(:) = DZERO
     !$omp end parallel workshare
     new_tconn_num = 0 ; coase_index = 0
 
@@ -626,8 +609,7 @@ module make_amg_matrix
     allocate(array_var(amglev)%lumat(new_tconn_num), array_var(amglev)%dmat(ncoase))
     !$omp parallel workshare
     crs_index(amglev)%offrow(:) = 0
-    array_var(amglev)%lumat(:) = DZERO
-    array_var(amglev)%dmat(:) = DONE
+    array_var(amglev)%lumat(:) = DZERO ; array_var(amglev)%dmat(:) = DONE
     !$omp end parallel workshare
     crs_index(amglev)%lunum = new_tconn_num
     !$omp parallel do private(j, k, row)

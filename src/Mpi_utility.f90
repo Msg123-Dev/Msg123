@@ -743,8 +743,7 @@ module mpi_utility
 
     allocate(rec_count(0:num_prot-1), rec_dis(0:num_prot-1))
     !$omp parallel workshare
-    rec_count(:) = 0
-    rec_dis(:) = 0
+    rec_count(:) = 0 ; rec_dis(:) = 0
     !$omp end parallel workshare
     sum_num = 0
     do i = 1, num_prot
@@ -796,8 +795,7 @@ module mpi_utility
 
     allocate(rec_count(0:num_prot-1), rec_dis(0:num_prot-1))
     !$omp parallel workshare
-    rec_count(:) = 0
-    rec_dis(:) = 0
+    rec_count(:) = 0 ; rec_dis(:) = 0
     !$omp end parallel workshare
     sum_num = 0
     do i = 1, num_prot
@@ -849,8 +847,7 @@ module mpi_utility
 
     allocate(rec_count(0:num_prot-1), rec_dis(0:num_prot-1))
     !$omp parallel workshare
-    rec_count(:) = 0
-    rec_dis(:) = 0
+    rec_count(:) = 0 ; rec_dis(:) = 0
     !$omp end parallel workshare
     sum_num = 0
     do i = 1, num_prot

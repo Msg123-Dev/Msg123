@@ -331,7 +331,8 @@ module mpi_set
     if (my_rank /= 0) then
       allocate(st_clas%name(clas_totn))
       !$omp parallel workshare
-      st_clas%name(:) = "" ; st_clas%name(:) = clas_name(:)
+      st_clas%name(:) = ""
+      st_clas%name(:) = clas_name(:)
       !$omp end parallel workshare
     end if
 
@@ -358,7 +359,8 @@ module mpi_set
     if (my_rank /= 0) then
       allocate(st_clas%num(clas_totn))
       !$omp parallel workshare
-      st_clas%num(:) = 0 ; st_clas%num(:) = clas_num(:)
+      st_clas%num(:) = 0
+      st_clas%num(:) = clas_num(:)
       !$omp end parallel workshare
     end if
 
@@ -374,12 +376,15 @@ module mpi_set
     allocate(clas_i(max_clas,clas_totn), clas_j(max_clas,clas_totn))
     allocate(clas_k(max_clas,clas_totn))
     !$omp parallel workshare
-    clas_i(:,:) = 0 ; clas_j(:,:) = 0 ; clas_k(:,:) = 0
+    clas_i(:,:) = 0
+    clas_j(:,:) = 0
+    clas_k(:,:) = 0
     !$omp end parallel workshare
 
     if (my_rank == 0) then
       !$omp parallel workshare
-      clas_i(:,:) = st_clas%i(:,:) ; clas_j(:,:) = st_clas%j(:,:)
+      clas_i(:,:) = st_clas%i(:,:)
+      clas_j(:,:) = st_clas%j(:,:)
       clas_k(:,:) = st_clas%k(:,:)
       !$omp end parallel workshare
     end if
@@ -411,8 +416,11 @@ module mpi_set
       allocate(st_clas%i(max_clas,clas_totn), st_clas%j(max_clas,clas_totn))
       allocate(st_clas%k(max_clas,clas_totn))
       !$omp parallel workshare
-      st_clas%i(:,:) = 0 ; st_clas%j(:,:) = 0 ; st_clas%k(:,:) = 0
-      st_clas%i(:,:) = clas_i(:,:) ; st_clas%j(:,:) = clas_j(:,:)
+      st_clas%i(:,:) = 0
+      st_clas%j(:,:) = 0
+      st_clas%k(:,:) = 0
+      st_clas%i(:,:) = clas_i(:,:)
+      st_clas%j(:,:) = clas_j(:,:)
       st_clas%k(:,:) = clas_k(:,:)
       !$omp end parallel workshare
     end if

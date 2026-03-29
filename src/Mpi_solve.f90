@@ -40,8 +40,10 @@ module mpi_solve
     allocate(requ_send(neib_mpi_totn), requ_recv(neib_mpi_totn))
     allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
     !$omp parallel workshare
-    requ_send(:) = 0 ; requ_recv(:) = 0
-    stat_s(:,:) = 0 ; stat_r(:,:) = 0
+    requ_send(:) = 0
+    requ_recv(:) = 0
+    stat_s(:,:) = 0
+    stat_r(:,:) = 0
     !$omp end parallel workshare
 
     nsenrev = max(send_cind(neib_mpi_totn), recv_cind(neib_mpi_totn))
@@ -122,8 +124,10 @@ module mpi_solve
     allocate(requ_send(neib_mpi_totn), requ_recv(neib_mpi_totn))
     allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
     !$omp parallel workshare
-    requ_send(:) = 0 ; requ_recv(:) = 0
-    stat_s(:,:) = 0 ; stat_r(:,:) = 0
+    requ_send(:) = 0
+    requ_recv(:) = 0
+    stat_s(:,:) = 0
+    stat_r(:,:) = 0
     !$omp end parallel workshare
 
     nsenrev = max(send_cind(neib_mpi_totn), recv_cind(neib_mpi_totn))
@@ -207,8 +211,10 @@ module mpi_solve
     allocate(fix_flag(nreg_num), offr_flag(off_row_num))
     allocate(temp_pred(nreg_num))
     !$omp parallel workshare
-    fix_flag(:) = 0 ; offr_flag(:) = 0
-    pre_d(:) = pre_ind(:) ; temp_pred(:) = pre_ind(:)
+    fix_flag(:) = 0
+    offr_flag(:) = 0
+    pre_d(:) = pre_ind(:)
+    temp_pred(:) = pre_ind(:)
     !$omp end parallel workshare
     rank_flag = 0 ; allp_flag = 0
     prefix_loop: do while (allp_flag /= pro_totn)
@@ -277,7 +283,9 @@ module mpi_solve
     allocate(fix_flag(nreg_num), offr_flag(off_row_num))
     allocate(temp_outx(nreg_num))
     !$omp parallel workshare
-    fix_flag(:) = 0 ; offr_flag(:) = 0 ; outx(:) = inrhs(:)
+    fix_flag(:) = 0
+    offr_flag(:) = 0
+    outx(:) = inrhs(:)
     temp_outx(:) = inrhs(:)
     !$omp end parallel workshare
     rank_flag = 0 ; allp_flag = 0
@@ -312,7 +320,9 @@ module mpi_solve
     end do forwfix_loop
 
     !$omp parallel workshare
-    fix_flag(:) = 0 ; offr_flag(:) = 0 ; temp_outx(:) = DZERO
+    fix_flag(:) = 0
+    offr_flag(:) = 0
+    temp_outx(:) = DZERO
     !$omp end parallel workshare
     rank_flag = 0 ; allp_flag = 0
     backfix_loop: do while (allp_flag /= pro_totn)

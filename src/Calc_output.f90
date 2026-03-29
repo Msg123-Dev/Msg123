@@ -67,14 +67,8 @@ module calc_output
     allocate(ms_st(ncalc), ms_co(ncalc), ms_se(ncalc), ms_we(ncalc))
     allocate(ms_re(ncals), ms_su(ncals), ms_ri(ncals), ms_la(ncals))
     !$omp parallel workshare
-    ms_st(:) = DZERO
-    ms_co(:) = DZERO
-    ms_se(:) = DZERO
-    ms_we(:) = DZERO
-    ms_re(:) = DZERO
-    ms_su(:) = DZERO
-    ms_ri(:) = DZERO
-    ms_la(:) = DZERO
+    ms_st(:) = DZERO ; ms_co(:) = DZERO ; ms_se(:) = DZERO ; ms_we(:) = DZERO
+    ms_re(:) = DZERO ; ms_su(:) = DZERO ; ms_ri(:) = DZERO ; ms_la(:) = DZERO
     !$omp end parallel workshare
 
     ! -- Calculate massbalance (mass)
@@ -263,8 +257,7 @@ module calc_output
     !-------------------------------------------------------------------------------------
     allocate(rives(ncals), temp_rive(rive_num))
     !$omp parallel workshare
-    rives(:) = DZERO
-    temp_rive(:) = roff_rive(:)
+    rives(:) = DZERO ; temp_rive(:) = roff_rive(:)
     !$omp end parallel workshare
 
     ! -- Function river term (riveterm)
@@ -300,8 +293,7 @@ module calc_output
     !-------------------------------------------------------------------------------------
     allocate(lakes(ncals), temp_lake(lake_num))
     !$omp parallel workshare
-    lakes(:) = DZERO
-    temp_lake(:) = roff_lake(:)
+    lakes(:) = DZERO ; temp_lake(:) = roff_lake(:)
     !$omp end parallel workshare
 
     ! -- Function lake term (laketerm)
@@ -336,8 +328,7 @@ module calc_output
     !-------------------------------------------------------------------------------------
     allocate(surfs(ncals), temp_surf(ncals))
     !$omp parallel workshare
-    surfs(:) = DZERO
-    temp_surf(:) = roff_surf(:)
+    surfs(:) = DZERO ; temp_surf(:) = roff_surf(:)
     !$omp end parallel workshare
 
     ! -- Function surface term (surfterm)
@@ -412,8 +403,7 @@ module calc_output
     !-------------------------------------------------------------------------------------
     allocate(sealr(ncalc), temp_seal(ncalc))
     !$omp parallel workshare
-    sealr(:) = DZERO
-    temp_seal(:) = res_seal(:)
+    sealr(:) = DZERO ; temp_seal(:) = res_seal(:)
     !$omp end parallel workshare
 
     ! -- Function sea level term (sealterm)
@@ -445,8 +435,7 @@ module calc_output
     !-------------------------------------------------------------------------------------
     allocate(rechr(ncals), temp_rech(ncals))
     !$omp parallel workshare
-    rechr(:) = DZERO
-    temp_rech(:) = res_rech(:)
+    rechr(:) = DZERO ; temp_rech(:) = res_rech(:)
     !$omp end parallel workshare
 
     ! -- Function recharge term (rechterm)
@@ -478,8 +467,7 @@ module calc_output
     !-------------------------------------------------------------------------------------
     allocate(wellr(ncalc), temp_well(ncalc))
     !$omp parallel workshare
-    wellr(:) = DZERO
-    temp_well(:) = res_well(:)
+    wellr(:) = DZERO ; temp_well(:) = res_well(:)
     !$omp end parallel workshare
 
     ! -- Function well term (wellterm)

@@ -290,8 +290,7 @@ module read_input
 
     allocate(st_clas%name(st_clas%totn), st_clas%num(st_clas%totn))
     !$omp parallel workshare
-    st_clas%name(:) = ""
-    st_clas%num(:) = 0
+    st_clas%name(:) = "" ; st_clas%num(:) = 0
     !$omp end parallel workshare
     max_clas = 0
 
@@ -314,9 +313,7 @@ module read_input
     allocate(st_clas%i(max_clas,st_clas%totn), st_clas%j(max_clas,st_clas%totn))
     allocate(st_clas%k(max_clas,st_clas%totn))
     !$omp parallel workshare
-    st_clas%i(:,:) = 0
-    st_clas%j(:,:) = 0
-    st_clas%k(:,:) = 0
+    st_clas%i(:,:) = 0 ; st_clas%j(:,:) = 0 ; st_clas%k(:,:) = 0
     !$omp end parallel workshare
 
     rewind(unit=file_num,iostat=ierr)
@@ -462,9 +459,7 @@ module read_input
     allocate(glob_x(nx+1,ny+1), glob_y(nx+1,ny+1))
     allocate(glob_z(nx+1,ny+1,nz+1))
     !$omp parallel workshare
-    glob_x(:,:) = DZERO
-    glob_y(:,:) = DZERO
-    glob_z(:,:,:) = DZERO
+    glob_x(:,:) = DZERO ; glob_y(:,:) = DZERO ; glob_z(:,:,:) = DZERO
     !$omp end parallel workshare
 
     if (gtype == in_type(0)) then
@@ -485,8 +480,7 @@ module read_input
       allocate(read_xy(nx+1,ny+1))
       allocate(read_z(nx+1,ny+1,nz+1))
       !$omp parallel workshare
-      read_xy(:,:) = SZERO
-      read_z(:,:,:) = SZERO
+      read_xy(:,:) = SZERO ; read_z(:,:,:) = SZERO
       !$omp end parallel workshare
 
       do i = 1, 3
@@ -1114,8 +1108,7 @@ module read_input
     len_scal_inv = SONE/len_scal
 
     !$omp parallel workshare
-    glob_x(:,:) = glob_x(:,:)*len_scal_inv
-    glob_y(:,:) = glob_y(:,:)*len_scal_inv
+    glob_x(:,:) = glob_x(:,:)*len_scal_inv ; glob_y(:,:) = glob_y(:,:)*len_scal_inv
     glob_z(:,:,:) = glob_z(:,:,:)*len_scal_inv
     !$omp end parallel workshare
 

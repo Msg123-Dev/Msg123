@@ -86,11 +86,8 @@ module allocate_solution
     allocate(head_old(ncalc), srat_old(ncalc))
     allocate(surf_head(ncals), surf_old(ncals), surf_rati(ncals))
     !$omp parallel workshare
-    head_old(:) = DZERO
-    srat_old(:) = DZERO
-    surf_head(:) = DZERO
-    surf_old(:) = DZERO
-    surf_rati(:) = DZERO
+    head_old(:) = DZERO ; srat_old(:) = DZERO
+    surf_head(:) = DZERO ; surf_old(:) = DZERO ; surf_rati(:) = DZERO
     !$omp end parallel workshare
 
   end subroutine allocate_timeup
@@ -172,22 +169,18 @@ module allocate_solution
     allocate(crs_index(1)%offrow(tconn_num), crs_index(1)%offind(0:nreg_num))
     allocate(left_offr(tconn_num), right_offr(tconn_num))
     !$omp parallel workshare
-    crs_index(1)%offrow(:) = 0
-    crs_index(1)%offind(:) = 0
+    crs_index(1)%offrow(:) = 0 ; crs_index(1)%offind(:) = 0
     crs_index(1)%offrow(:) = off_row(1:tconn_num)
     crs_index(1)%offind(:) = off_index(:)
-    left_offr(:) = 0
-    right_offr(:) = 0
-    left_offr(:) = left_off(1:tconn_num)
-    right_offr(:) = right_off(1:tconn_num)
+    left_offr(:) = 0 ; right_offr(:) = 0
+    left_offr(:) = left_off(1:tconn_num) ; right_offr(:) = right_off(1:tconn_num)
     !$omp end parallel workshare
     crs_index(1)%unknow = ncalc ; crs_index(1)%lunum = tconn_num
 
     allocate(array_var(1)%dmat(nreg_num), array_var(1)%lumat(tconn_num))
     allocate(array_var(1)%rhs(nreg_num))
     !$omp parallel workshare
-    array_var(1)%dmat(:) = DZERO
-    array_var(1)%lumat(:) = DZERO
+    array_var(1)%dmat(:) = DZERO ; array_var(1)%lumat(:) = DZERO
     array_var(1)%rhs(:) = DZERO
     !$omp end parallel workshare
 

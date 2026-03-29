@@ -514,14 +514,10 @@ module write_output
     cubic = len_scal**3
 
     !$omp parallel workshare
-    st_msloc%sto(:) = st_msloc%sto(:)*cubic
-    st_msloc%con(:) = st_msloc%con(:)*cubic
-    st_msloc%sea(:) = st_msloc%sea(:)*cubic
-    st_msloc%wel(:) = st_msloc%wel(:)*cubic
-    st_msloc%rec(:) = st_msloc%rec(:)*cubic
-    st_msloc%sur(:) = st_msloc%sur(:)*cubic
-    st_msloc%riv(:) = st_msloc%riv(:)*cubic
-    st_msloc%lak(:) = st_msloc%lak(:)*cubic
+    st_msloc%sto(:) = st_msloc%sto(:)*cubic ; st_msloc%con(:) = st_msloc%con(:)*cubic
+    st_msloc%sea(:) = st_msloc%sea(:)*cubic ; st_msloc%wel(:) = st_msloc%wel(:)*cubic
+    st_msloc%rec(:) = st_msloc%rec(:)*cubic ; st_msloc%sur(:) = st_msloc%sur(:)*cubic
+    st_msloc%riv(:) = st_msloc%riv(:)*cubic ; st_msloc%lak(:) = st_msloc%lak(:)*cubic
     !$omp end parallel workshare
 
     ! -- Calculate output massbalance (out_mass)
@@ -864,8 +860,7 @@ module write_output
 #endif
 
     !$omp parallel workshare
-    res_snum(:) = 0
-    res_seal(:) = DZERO
+    res_snum(:) = 0 ; res_seal(:) = DZERO
     !$omp end parallel workshare
 
   end subroutine write_out_sealf
@@ -900,8 +895,7 @@ module write_output
 #endif
 
     !$omp parallel workshare
-    res_rnum(:) = 0
-    res_rech(:) = DZERO
+    res_rnum(:) = 0 ; res_rech(:) = DZERO
     !$omp end parallel workshare
 
   end subroutine write_out_rechf
@@ -936,8 +930,7 @@ module write_output
 #endif
 
     !$omp parallel workshare
-    res_wnum(:) = 0
-    res_well(:) = DZERO
+    res_wnum(:) = 0 ; res_well(:) = DZERO
     !$omp end parallel workshare
 
   end subroutine write_out_wellf

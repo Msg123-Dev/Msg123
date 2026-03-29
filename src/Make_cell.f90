@@ -38,9 +38,7 @@ module make_cell
       allocate(glob_x(st_grid%nx+1,st_grid%ny+1), glob_y(st_grid%nx+1,st_grid%ny+1))
       allocate(glob_z(st_grid%nx+1,st_grid%ny+1,st_grid%nz+1))
       !$omp parallel workshare
-      glob_x(:,:) = DZERO
-      glob_y(:,:) = DZERO
-      glob_z(:,:,:) = DZERO
+      glob_x(:,:) = DZERO ; glob_y(:,:) = DZERO ; glob_z(:,:,:) = DZERO
       !$omp end parallel workshare
     end if
 

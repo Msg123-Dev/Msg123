@@ -129,7 +129,8 @@ module mpi_write
     !-------------------------------------------------------------------------------------
     allocate(istat(MPI_STATUS_SIZE), out_rest(ncalc+1))
     !$omp parallel workshare
-    istat(:) = 0 ; out_rest(:) = DZERO
+    istat(:) = 0
+    out_rest(:) = DZERO
     out_rest(1) = real(out_time, kind=DP)
     out_rest(2:) = out_val(1:ncalc)*real(out_unit, kind=DP)
     !$omp end parallel workshare
@@ -164,8 +165,14 @@ module mpi_write
     allocate(mpi_rec(num_mass), mpi_sur(num_mass), mpi_riv(num_mass), mpi_lak(num_mass))
     allocate(mpi_tot(num_mass))
     !$omp parallel workshare
-    mpi_sto(:) = DZERO ; mpi_con(:) = DZERO ; mpi_sea(:) = DZERO ; mpi_wel(:) = DZERO
-    mpi_rec(:) = DZERO ; mpi_sur(:) = DZERO ; mpi_riv(:) = DZERO ; mpi_lak(:) = DZERO
+    mpi_sto(:) = DZERO
+    mpi_con(:) = DZERO
+    mpi_sea(:) = DZERO
+    mpi_wel(:) = DZERO
+    mpi_rec(:) = DZERO
+    mpi_sur(:) = DZERO
+    mpi_riv(:) = DZERO
+    mpi_lak(:) = DZERO
     mpi_tot(:) = DZERO
     !$omp end parallel workshare
 
@@ -235,10 +242,14 @@ module mpi_write
 
     if (my_rank == 0) then
       !$omp parallel workshare
-      inout_st%sto(:) = mpi_sto(:) ; inout_st%con(:) = mpi_con(:)
-      inout_st%sea(:) = mpi_sea(:) ; inout_st%wel(:) = mpi_wel(:)
-      inout_st%rec(:) = mpi_rec(:) ; inout_st%sur(:) = mpi_sur(:)
-      inout_st%riv(:) = mpi_riv(:) ; inout_st%lak(:) = mpi_lak(:)
+      inout_st%sto(:) = mpi_sto(:)
+      inout_st%con(:) = mpi_con(:)
+      inout_st%sea(:) = mpi_sea(:)
+      inout_st%wel(:) = mpi_wel(:)
+      inout_st%rec(:) = mpi_rec(:)
+      inout_st%sur(:) = mpi_sur(:)
+      inout_st%riv(:) = mpi_riv(:)
+      inout_st%lak(:) = mpi_lak(:)
       inout_st%tot(:) = mpi_tot(:)
       !$omp end parallel workshare
     end if
@@ -271,9 +282,12 @@ module mpi_write
     allocate(temp_send_cind(0:neib_mpi_totn), temp_recv_cind(0:neib_mpi_totn))
     allocate(temp_send_citem(temp_item_num), temp_recv_citem(temp_item_num))
     !$omp parallel workshare
-    temp_wtab_snum(:) = -1 ; temp_wtab_rnum(:) = -1
-    temp_send_cind(:) = 0 ; temp_recv_cind(:) = 0
-    temp_send_citem(:) = 0 ; temp_recv_citem(:) = 0
+    temp_wtab_snum(:) = -1
+    temp_wtab_rnum(:) = -1
+    temp_send_cind(:) = 0
+    temp_recv_cind(:) = 0
+    temp_send_citem(:) = 0
+    temp_recv_citem(:) = 0
     !$omp end parallel workshare
 
     temp_snum = 0 ; temp_rnum = 0
@@ -361,12 +375,22 @@ module mpi_write
     allocate(send_head(wtab_sendn), send_srat(wtab_sendn))
     allocate(recv_head(wtab_recvn), recv_srat(wtab_recvn))
     !$omp parallel workshare
-    send_flag(:) = 0 ; recv_flag(:) = 0 ; flag_send(:) = 0 ; flag_recv(:) = 0
-    head_send(:) = 0 ; head_recv(:) = 0 ; srat_send(:) = 0 ; srat_recv(:) = 0
-    stat_s(:,:) = 0 ; stat_r(:,:) = 0
-    send_head(:) = DZERO ; send_srat(:) = DZERO
-    recv_head(:) = DZERO ; recv_srat(:) = DZERO
-    sum_sendn = sum(send_flag(:)) ; sum_recvn = sum(recv_flag(:))
+    send_flag(:) = 0
+    recv_flag(:) = 0
+    flag_send(:) = 0
+    flag_recv(:) = 0
+    head_send(:) = 0
+    head_recv(:) = 0
+    srat_send(:) = 0
+    srat_recv(:) = 0
+    stat_s(:,:) = 0
+    stat_r(:,:) = 0
+    send_head(:) = DZERO
+    send_srat(:) = DZERO
+    recv_head(:) = DZERO
+    recv_srat(:) = DZERO
+    sum_sendn = sum(send_flag(:))
+    sum_recvn = sum(recv_flag(:))
     !$omp end parallel workshare
 
     rank_flag = 0 ; allp_flag = 0
@@ -422,7 +446,8 @@ module mpi_write
       end if
 
       !$omp parallel workshare
-      sum_sendn = sum(send_flag(:)) ; sum_recvn = sum(recv_flag(:))
+      sum_sendn = sum(send_flag(:))
+      sum_recvn = sum(recv_flag(:))
       !$omp end parallel workshare
       if (sum_sendn == wtab_sendn .and. sum_recvn == wtab_recvn) then
         rank_flag = 1

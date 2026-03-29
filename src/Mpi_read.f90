@@ -184,7 +184,8 @@ module mpi_read
     ierr = 0
     allocate(istat(MPI_STATUS_SIZE), read_rest(calc_num+1))
     !$omp parallel workshare
-    istat(:) = 0 ; read_rest(:) = DZERO
+    istat(:) = 0
+    read_rest(:) = DZERO
     !$omp end parallel workshare
 
     call MPI_FILE_READ_ALL(fileh, read_rest, calc_num+1, MPI_REAL8, istat, ierr)
@@ -311,7 +312,8 @@ module mpi_read
     end if
 
     !$omp parallel workshare
-    istat(:) = 0 ; read_val(:) = INOVAL
+    istat(:) = 0
+    read_val(:) = INOVAL
     !$omp end parallel workshare
 
     call MPI_FILE_READ_ALL(fileh, read_val, mpi_rnum, MPI_INTEGER, istat, ierr)
@@ -361,7 +363,8 @@ module mpi_read
     end if
 
     !$omp parallel workshare
-    istat(:) = 0 ; read_val(:) = SNOVAL
+    istat(:) = 0
+    read_val(:) = SNOVAL
     !$omp end parallel workshare
 
     call MPI_FILE_READ_ALL(fileh, read_val, mpi_rnum, MPI_REAL4, istat, ierr)
@@ -411,7 +414,8 @@ module mpi_read
     end if
 
     !$omp parallel workshare
-    istat(:) = 0 ; read_val(:) = DNOVAL
+    istat(:) = 0
+    read_val(:) = DNOVAL
     !$omp end parallel workshare
 
     call MPI_FILE_READ_ALL(fileh, read_val, mpi_rnum, MPI_REAL8, istat, ierr)

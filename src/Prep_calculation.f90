@@ -178,7 +178,9 @@ module prep_calculation
     !-------------------------------------------------------------------------------------
     allocate(surf_bott(ncals), surf_top(ncals), surf_reli(ncals))
     !$omp parallel workshare
-    surf_bott(:) = surf_elev(:) ; surf_top(:) = surf_elev(:) ; surf_reli(:) = DZERO
+    surf_bott(:) = surf_elev(:)
+    surf_top(:) = surf_elev(:)
+    surf_reli(:) = DZERO
     !$omp end parallel workshare
 
     if (st_in_type%geog == in_type(0)) then

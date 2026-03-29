@@ -86,16 +86,9 @@ module make_linearsystem
     allocate(stod(ncalc), cond(nreg_num), sead(ncalc), dmats(ncalc))
     allocate(rivd(ncals), lakd(ncals), surd(ncals))
     !$omp parallel workshare
-    per_srat(:) = DZERO
-    per_relp(:) = DZERO
-    ss_alp(:) = DZERO
-    stod(:) = DZERO
-    cond(:) = DZERO
-    sead(:) = DZERO
-    dmats(:) = DZERO
-    rivd(:) = DZERO
-    lakd(:) = DZERO
-    surd(:) = DZERO
+    per_srat(:) = DZERO ; per_relp(:) = DZERO ; ss_alp(:) = DZERO
+    stod(:) = DZERO ; cond(:) = DZERO ; sead(:) = DZERO ; dmats(:) = DZERO
+    rivd(:) = DZERO ; lakd(:) = DZERO ; surd(:) = DZERO
     !$omp end parallel workshare
 
     ! -- Calculate saturation and relative permeability (srat_rperm)

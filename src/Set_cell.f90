@@ -94,8 +94,7 @@ module set_cell
 
     allocate(glob_reg_flag(st_grid%nxyz), glob_mpi_flag(st_grid%nxyz))
     !$omp parallel workshare
-    glob_reg_flag(:) = 0
-    glob_mpi_flag(:) = 0
+    glob_reg_flag(:) = 0 ; glob_mpi_flag(:) = 0
     !$omp end parallel workshare
 
     nxy = st_grid%nx*st_grid%ny
@@ -145,10 +144,7 @@ module set_cell
     allocate(glo2loc_ijk(st_grid%nxyz), l2g_ijk(ncalc))
     allocate(glo2loc_ij(nxy), l2g_ij(ncals))
     !$omp parallel workshare
-    glo2loc_ijk(:) = 0
-    l2g_ijk(:) = 0
-    glo2loc_ij(:) = 0
-    l2g_ij(:) = 0
+    glo2loc_ijk(:) = 0 ; l2g_ijk(:) = 0 ; glo2loc_ij(:) = 0 ; l2g_ij(:) = 0
     !$omp end parallel workshare
 
     ! -- Set relationship between global&local (rel_gloloc)
@@ -224,8 +220,7 @@ module set_cell
 #ifdef MPI_MSG
     allocate(cals_glob(ns_unknow), calc_glob(nc_unknow))
     !$omp parallel workshare
-    cals_glob(:) = 0
-    calc_glob(:) = 0
+    cals_glob(:) = 0 ; calc_glob(:) = 0
     !$omp end parallel workshare
     if (pro_totn /= 1) then
       ! -- Gather array (val)
@@ -234,15 +229,13 @@ module set_cell
         call gather_val(pro_totn, ncalc, loc2glo_ijk(1:ncalc), calc_glob, "calculation number")
     else
       !$omp parallel workshare
-      cals_glob(:) = loc2glo_ij(1:ncals)
-      calc_glob(:) = loc2glo_ijk(1:ncalc)
+      cals_glob(:) = loc2glo_ij(1:ncals) ; calc_glob(:) = loc2glo_ijk(1:ncalc)
       !$omp end parallel workshare
     end if
 
     allocate(sort_sglo(ns_unknow), sort_cglo(nc_unknow))
     !$omp parallel workshare
-    sort_sglo(:) = cals_glob(:)
-    sort_cglo(:) = calc_glob(:)
+    sort_sglo(:) = cals_glob(:) ; sort_cglo(:) = calc_glob(:)
     !$omp end parallel workshare
 
     call iquick_sort(sort_sglo, 1, ns_unknow)
@@ -490,8 +483,7 @@ module set_cell
           temp_num = sum(glob_clas_flag(:,j))
           allocate(temp_reg(temp_num))
           !$omp parallel workshare
-          temp_reg(:) = -1
-          mask(:) = (glob_clas_flag(:,j) == 1)
+          temp_reg(:) = -1 ; mask(:) = (glob_clas_flag(:,j) == 1)
           !$omp end parallel workshare
           glob_reg_flag(:) = unpack(temp_reg(:), mask(:), glob_reg_flag(:))
           deallocate(temp_reg)
@@ -502,8 +494,7 @@ module set_cell
             temp_num = sum(glob_clas_flag(:,j))
             allocate(temp_reg(temp_num))
             !$omp parallel workshare
-            temp_reg(:) = i
-            mask(:) = (glob_clas_flag(:,j) == 1)
+            temp_reg(:) = i ; mask(:) = (glob_clas_flag(:,j) == 1)
             !$omp end parallel workshare
             glob_reg_flag(:) = unpack(temp_reg(:), mask(:), glob_reg_flag(:))
             deallocate(temp_reg)
@@ -898,9 +889,7 @@ module set_cell
     allocate(loc_nreg(loc_regn), temp_cend(0:loc_regn))
     allocate(calc2reg(ncalc))
     !$omp parallel workshare
-    loc_nreg(:) = 0
-    temp_cend(:) = 0
-    calc2reg(:) = 0
+    loc_nreg(:) = 0 ; temp_cend(:) = 0 ; calc2reg(:) = 0
     !$omp end parallel workshare
 
     count_reg = 0 ; count_calc = 0 ; count_cals = 0
@@ -1023,12 +1012,8 @@ module set_cell
       allocate(temp_mpi_num(ncalc), neib_locc(ncalc))
       allocate(neib_gloc(ncalc), temp_calc_reg(ncalc))
       !$omp parallel workshare
-      temp_neib_num(:) = 0
-      temp_neib_flag(:) = 0
-      temp_mpi_num(:) = 0
-      neib_locc(:) = 0
-      neib_gloc(:) = 0
-      temp_calc_reg(:) = 0
+      temp_neib_num(:) = 0 ; temp_neib_flag(:) = 0 ; temp_mpi_num(:) = 0
+      neib_locc(:) = 0 ; neib_gloc(:) = 0 ; temp_calc_reg(:) = 0
       !$omp end parallel workshare
 
       do i = 1, ncalc
@@ -1134,8 +1119,7 @@ module set_cell
       allocate(mpi_l2g_ij(ncals+neib_ncals), mpi_l2g_ijk(ncalc+neib_ncalc))
       allocate(mpi_calc2reg(ncalc+neib_ncalc))
       !$omp parallel workshare
-      mpi_l2g_ij(1:ncals) = l2g_ij(:)
-      mpi_l2g_ijk(1:ncalc) = l2g_ijk(:)
+      mpi_l2g_ij(1:ncals) = l2g_ij(:) ; mpi_l2g_ijk(1:ncalc) = l2g_ijk(:)
       mpi_calc2reg(1:ncalc) = calc2reg(:)
       !$omp end parallel workshare
       deallocate(l2g_ij, l2g_ijk, calc2reg)
@@ -1163,8 +1147,7 @@ module set_cell
       allocate(l2g_ij(ncals+neib_ncals), l2g_ijk(ncalc+neib_ncalc))
       allocate(calc2reg(ncalc+neib_ncalc))
       !$omp parallel workshare
-      l2g_ij(:) = mpi_l2g_ij(:)
-      l2g_ijk(:) = mpi_l2g_ijk(:)
+      l2g_ij(:) = mpi_l2g_ij(:) ; l2g_ijk(:) = mpi_l2g_ijk(:)
       calc2reg(:) = mpi_calc2reg(:)
       !$omp end parallel workshare
 
@@ -1177,15 +1160,10 @@ module set_cell
       allocate(temp_sort(neib_ncalc), sort_recv_num(neib_ncalc), sort_mpi_num(neib_ncalc))
       allocate(send2recv(neib_ncalc), loc_send_num(neib_ncalc))
       !$omp parallel workshare
-      send_cind(:) = 0
-      recv_cind(:) = 0
-      send_citem(:) = 0
-      recv_citem(:) = 0
-      temp_sort(:) = neib_gloc(1:neib_ncalc)
-      sort_recv_num(:) = 0
-      sort_mpi_num = 0
-      send2recv(:) = 0
-      loc_send_num(:) = neib_locc(1:neib_ncalc)
+      send_cind(:) = 0 ; recv_cind(:) = 0
+      send_citem(:) = 0 ; recv_citem(:) = 0
+      temp_sort(:) = neib_gloc(1:neib_ncalc) ; sort_recv_num(:) = 0 ; sort_mpi_num = 0
+      send2recv(:) = 0 ; loc_send_num(:) = neib_locc(1:neib_ncalc)
       !$omp end parallel workshare
 
       call iquick_sort(temp_sort, 1, neib_ncalc)

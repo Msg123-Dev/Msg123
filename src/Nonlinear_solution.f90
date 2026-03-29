@@ -112,8 +112,7 @@ module nonlinear_solution
       end if
 
       !$omp parallel workshare
-      head_pre(:) = head_new(:)
-      head_change(:) = DZERO
+      head_pre(:) = head_new(:) ; head_change(:) = DZERO
       !$omp end parallel workshare
 
       conv_flag = 0

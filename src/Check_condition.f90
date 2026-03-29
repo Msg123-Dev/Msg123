@@ -61,8 +61,7 @@ module check_condition
       num_seal = count(greg_flag(:) == 0)
       allocate(temp_seal(num_seal), mask(st_grid%nxyz))
       !$omp parallel workshare
-      temp_seal(:) = SZERO
-      mask(:) = (greg_flag(:) == 0)
+      temp_seal(:) = SZERO ; mask(:) = (greg_flag(:) == 0)
       temp_seal(:) = pack(check_seal(:), mask(:))
       !$omp end parallel workshare
       if (any((temp_seal(:) == SNOVAL))) then
@@ -284,8 +283,7 @@ module check_condition
     if (seal_ftype == in_type(1)) then
       allocate(seal_read(seal_num), seal_name(seal_num))
       !$omp parallel workshare
-      seal_read(:) = SNOVAL
-      seal_name(:) = ""
+      seal_read(:) = SNOVAL ; seal_name(:) = ""
       !$omp end parallel workshare
       call read_clasf(seal_fnum, seal_num, seal_name, seal_read)
       call close_file(seal_fnum)
@@ -297,9 +295,7 @@ module check_condition
       allocate(seal_i(seal_num), seal_j(seal_num), seal_k(seal_num))
       !$omp parallel workshare
       seal_read(:) = SNOVAL
-      seal_i(:) = 0
-      seal_j(:) = 0
-      seal_k(:) = 0
+      seal_i(:) = 0 ; seal_j(:) = 0 ; seal_k(:) = 0
       !$omp end parallel workshare
       call read_3dpointf(seal_fnum, seal_num, seal_i, seal_j, seal_k, seal_read)
       call close_file(seal_fnum)

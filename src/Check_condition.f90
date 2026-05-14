@@ -41,7 +41,7 @@ module check_condition
     integer(I4), intent(in) :: gclas_flag(:,:)
     integer(I4), intent(inout) :: greg_flag(:)
     ! -- local
-    integer(I4) :: num_seal, num_calc
+    integer(I4) :: i, num_seal, num_calc
     integer(I4), allocatable :: temp_greg(:)
     real(SP), allocatable :: check_seal(:), temp_seal(:)
     logical, allocatable :: mask(:)
@@ -53,17 +53,18 @@ module check_condition
 
     if (st_seal%totn > 0) then
       allocate(check_seal(st_grid%nxyz))
-      !$omp parallel workshare
-      check_seal(:) = SNOVAL
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, st_grid%nxyz
+        check_seal(i) = SNOVAL
+      end do
+      !$omp end parallel do
       call read_sealf(st_in_type%seal, st_seal%totn, gclas_flag, check_seal)
 
       num_seal = count(greg_flag(:) == 0)
       allocate(temp_seal(num_seal), mask(st_grid%nxyz))
-      !$omp parallel workshare
-      temp_seal(:) = SZERO ; mask(:) = (greg_flag(:) == 0)
+      temp_seal(:) = SZERO
+      mask(:) = (greg_flag(:) == 0)
       temp_seal(:) = pack(check_seal(:), mask(:))
-      !$omp end parallel workshare
       if (any((temp_seal(:) == SNOVAL))) then
         call write_err_stop("Null value in sea region.")
       end if
@@ -72,11 +73,9 @@ module check_condition
 
       num_calc = count(greg_flag(:) > 0)
       allocate(temp_greg(num_calc))
-      !$omp parallel workshare
       temp_greg(:) = 0
       mask(:) = (greg_flag(:) > 0) .and. (check_seal(:) /= SNOVAL)
       greg_flag(:) = unpack(temp_greg(:), mask(:), greg_flag(:))
-      !$omp end parallel workshare
 
       deallocate(temp_greg, check_seal, mask)
 
@@ -270,7 +269,7 @@ module check_condition
     integer(I4), intent(in) :: seal_clas(:,:)
     real(SP), intent(out) :: seal_val(:)
     ! -- local
-    integer(I4) :: seal_fnum
+    integer(I4) :: i, seal_fnum
     integer(I4), allocatable :: seal_i(:), seal_j(:), seal_k(:)
     integer(I4), allocatable :: type_2d(:), type_3d(:)
     real(SP), allocatable :: seal_read(:)
@@ -282,9 +281,12 @@ module check_condition
 
     if (seal_ftype == in_type(1)) then
       allocate(seal_read(seal_num), seal_name(seal_num))
-      !$omp parallel workshare
-      seal_read(:) = SNOVAL ; seal_name(:) = ""
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, seal_num
+        seal_read(i) = SNOVAL
+        seal_name(i) = ""
+      end do
+      !$omp end parallel do
       call read_clasf(seal_fnum, seal_num, seal_name, seal_read)
       call close_file(seal_fnum)
 
@@ -293,10 +295,12 @@ module check_condition
     else if (seal_ftype == in_type(2)) then
       allocate(seal_read(seal_num))
       allocate(seal_i(seal_num), seal_j(seal_num), seal_k(seal_num))
-      !$omp parallel workshare
-      seal_read(:) = SNOVAL
-      seal_i(:) = 0 ; seal_j(:) = 0 ; seal_k(:) = 0
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, seal_num
+        seal_read(i) = SNOVAL
+        seal_i(i) = 0 ; seal_j(i) = 0 ; seal_k(i) = 0
+      end do
+      !$omp end parallel do
       call read_3dpointf(seal_fnum, seal_num, seal_i, seal_j, seal_k, seal_read)
       call close_file(seal_fnum)
 
@@ -415,9 +419,11 @@ module check_condition
     integer(I4), allocatable :: temp_clas(:)
     !-------------------------------------------------------------------------------------
     allocate(temp_clas(clasn))
-    !$omp parallel workshare
-    temp_clas(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, clasn
+      temp_clas(i) = 0
+    end do
+    !$omp end parallel do
 
     do i = 1, clasn
       do k = 1, st_clas%totn
@@ -502,12 +508,15 @@ module check_condition
     real(SP), intent(in) :: no_val
     real(SP), intent(out) :: tg_val(:)
     ! -- local
+    integer(I4) :: j
     real(SP), allocatable :: array_read(:,:)
     !-------------------------------------------------------------------------------------
     allocate(array_read(st_grid%nx,st_grid%ny))
-    !$omp parallel workshare
-    array_read(:,:) = no_val
-    !$omp end parallel workshare
+    !$omp parallel do private(j)
+    do j = 1, st_grid%ny
+      array_read(:,j) = no_val
+    end do
+    !$omp end parallel do
 
     if (file_type == in_type(3)) then
       call read_2dtxt(fnum, st_grid%nx, st_grid%ny, array_read)
@@ -531,12 +540,15 @@ module check_condition
     real(SP), intent(in) :: no_val
     real(SP), intent(out) :: tg_val(:)
     ! -- local
+    integer(I4) :: k
     real(SP), allocatable :: array_read(:,:,:)
     !-------------------------------------------------------------------------------------
     allocate(array_read(st_grid%nx,st_grid%ny,st_grid%nz))
-    !$omp parallel workshare
-    array_read(:,:,:) = no_val
-    !$omp end parallel workshare
+    !$omp parallel do private(k)
+    do k = 1, st_grid%nz
+      array_read(:,:,k) = no_val
+    end do
+    !$omp end parallel do
 
     if (file_type == in_type(5)) then
       call read_3dtxt(fnum, st_grid%nx, st_grid%ny, st_grid%nz, array_read)

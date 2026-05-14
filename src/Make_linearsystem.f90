@@ -33,19 +33,20 @@ module make_linearsystem
     ! -- inout
 
     ! -- local
+    integer(I4) :: i
     real(DP), allocatable :: temp_rhs(:)
     !-------------------------------------------------------------------------------------
     allocate(temp_rhs(nreg_num))
-    !$omp parallel workshare
-    temp_rhs(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, nreg_num
+      temp_rhs(i) = DZERO
+    end do
+    !$omp end parallel do
 
     ! -- Calculate function value (func)
       call calc_func(head_new, temp_rhs)
 
-    !$omp parallel workshare
     array_var(1)%rhs(:) = -temp_rhs(:)
-    !$omp end parallel workshare
 
     ! -- Make matrix (matrix)
       call make_matrix(array_var(1)%dmat, array_var(1)%lumat)
@@ -85,11 +86,23 @@ module make_linearsystem
     allocate(per_srat(ncalc), per_relp(nreg_num), ss_alp(ncalc))
     allocate(stod(ncalc), cond(nreg_num), sead(ncalc), dmats(ncalc))
     allocate(rivd(ncals), lakd(ncals), surd(ncals))
-    !$omp parallel workshare
-    per_srat(:) = DZERO ; per_relp(:) = DZERO ; ss_alp(:) = DZERO
-    stod(:) = DZERO ; cond(:) = DZERO ; sead(:) = DZERO ; dmats(:) = DZERO
-    rivd(:) = DZERO ; lakd(:) = DZERO ; surd(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      per_srat(i) = DZERO ; ss_alp(i) = DZERO
+      stod(i) = DZERO ; sead(i) = DZERO ; dmats(i) = DZERO
+    end do
+    !$omp end parallel do
+    !$omp parallel do private(i)
+    do i = 1, nreg_num
+      per_relp(i) = DZERO
+      cond(i) = DZERO
+    end do
+    !$omp end parallel do
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      rivd(i) = DZERO ; lakd(i) = DZERO ; surd(i) = DZERO
+    end do
+    !$omp end parallel do
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
       call calc_srat_rperm(ncalc, newper, head_new, per_srat, per_relp, ss_alp)
@@ -162,10 +175,11 @@ module make_linearsystem
     !-------------------------------------------------------------------------------------
     allocate(deri_srat(ncalc), deri_stor(ncalc))
     !$omp parallel
-    !$omp workshare
-    deri_srat(:) = DZERO ; deri_stor(:) = DZERO
-    !$omp end workshare
-
+    !$omp do private(i)
+    do i = 1, ncalc
+      deri_srat(i) = DZERO ; deri_stor(i) = DZERO
+    end do
+    !$omp end do
     !$omp do private(i)
     do i = 1, ncalc
       deri_srat(i) = (per_srat(i)-srat_new(i))*newper_inv
@@ -213,11 +227,12 @@ module make_linearsystem
     allocate(deri_dcon(tot_ind), rel_hyd(tot_ind))
     allocate(deri_lucon(tot_ind), deri_con1(tot_ind), deri_con2(tot_ind))
     !$omp parallel
-    !$omp workshare
-    deri_dcon(:) = DZERO ; rel_hyd(:) = DZERO
-    deri_lucon(:) = DZERO ; deri_con1(:) = DZERO ; deri_con2(:) = DZERO
-    !$omp end workshare
-
+    !$omp do private(i)
+    do i = 1, tot_ind
+      deri_dcon(i) = DZERO ; rel_hyd(i) = DZERO
+      deri_lucon(i) = DZERO ; deri_con1(i) = DZERO ; deri_con2(i) = DZERO
+    end do
+    !$omp end do
     !$omp do private(i, j, k, sta_ind, end_ind, ind, relat, delhead, relp1, relp2)
     do i = 1, nreg_num
       sta_ind = crs_index(1)%offind(i-1) ; end_ind = crs_index(1)%offind(i)
@@ -301,11 +316,12 @@ module make_linearsystem
     allocate(over_riv(rive_num), deri_r(rive_num), deri_ks(rive_num), delh_r(rive_num))
     allocate(per_riv(rive_num), rel_riv(rive_num), tran_riv(rive_num))
     !$omp parallel
-    !$omp workshare
-    over_riv(:) = DZERO ; deri_r(:) = DZERO ; deri_ks(:) = DZERO ; delh_r(:) = DZERO
-    per_riv(:) = DZERO ; rel_riv(:) = DZERO ; tran_riv(:) = DZERO
-    !$omp end workshare
-
+    !$omp do private(i)
+    do i = 1, rive_num
+      over_riv(i) = DZERO ; deri_r(i) = DZERO ; deri_ks(i) = DZERO ; delh_r(i) = DZERO
+      per_riv(i) = DZERO ; rel_riv(i) = DZERO ; tran_riv(i) = DZERO
+    end do
+    !$omp end do
     !$omp do private(i, s)
     do i = 1, rive_num
       s = rive2cals(i)
@@ -363,10 +379,12 @@ module make_linearsystem
     allocate(over_lak(lake_num), deri_l(lake_num), deri_ks(lake_num), delh_l(lake_num))
     allocate(per_lak(lake_num), rel_lak(lake_num), tran_lak(lake_num))
     !$omp parallel
-    !$omp workshare
-    over_lak(:) = DZERO ; deri_l(:) = DZERO ; deri_ks(:) = DZERO ; delh_l(:) = DZERO
-    per_lak(:) = DZERO ; rel_lak(:) =  DZERO ; tran_lak(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, lake_num
+      over_lak(i) = DZERO ; deri_l(i) = DZERO ; deri_ks(i) = DZERO ; delh_l(i) = DZERO
+      per_lak(i) = DZERO ; rel_lak(i) =  DZERO ; tran_lak(i) = DZERO
+    end do
+    !$omp end do
     !$omp do private(i, s)
     do i = 1, lake_num
       s = lake2cals(i)
@@ -425,11 +443,12 @@ module make_linearsystem
     !-------------------------------------------------------------------------------------
     allocate(over_sur(ncals), deri_s(ncals), deri_ks(ncals), delh_s(ncals), tran_sur(ncals))
     !$omp parallel
-    !$omp workshare
-    over_sur(:) = DZERO ; deri_s(:) = DZERO ; deri_ks(:) = DZERO ; delh_s(:) = DZERO
-    tran_sur(:) = DZERO
-    !$omp end workshare
-
+    !$omp do private(i)
+    do i = 1, ncals
+      over_sur(i) = DZERO ; deri_s(i) = DZERO ; deri_ks(i) = DZERO
+      delh_s(i) = DZERO ; tran_sur(i) = DZERO
+    end do
+    !$omp end do
     !$omp do private(i)
     do i = 1, ncals
 !      if (head_new(i) >= surf_elev(i)) then
@@ -514,11 +533,12 @@ module make_linearsystem
     allocate(deri_sea(nseal), deri_ks(nseal), delh_sea(nseal))
     allocate(per_sea(nseal), rel_sea(nseal), tran_sea(nseal))
     !$omp parallel
-    !$omp workshare
-    deri_sea(:) = DZERO ; deri_ks(:) = DZERO ; delh_sea(:) = DZERO
-    per_sea(:) = DZERO ; rel_sea(:) = DZERO ; tran_sea(:) = DZERO
-    !$omp end workshare
-
+    !$omp do private(i)
+    do i = 1, nseal
+      deri_sea(i) = DZERO ; deri_ks(i) = DZERO ; delh_sea(i) = DZERO
+      per_sea(i) = DZERO ; rel_sea(i) = DZERO ; tran_sea(i) = DZERO
+    end do
+    !$omp end do
     !$omp do private(i, c, s)
     do i = 1, nseal
       c = seal2calc(i) ; s = seal2seal(i)

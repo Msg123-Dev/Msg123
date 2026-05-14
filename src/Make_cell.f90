@@ -32,14 +32,24 @@ module make_cell
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: j, k
     !-------------------------------------------------------------------------------------
     if (my_rank /= 0) then
       allocate(glob_x(st_grid%nx+1,st_grid%ny+1), glob_y(st_grid%nx+1,st_grid%ny+1))
       allocate(glob_z(st_grid%nx+1,st_grid%ny+1,st_grid%nz+1))
-      !$omp parallel workshare
-      glob_x(:,:) = DZERO ; glob_y(:,:) = DZERO ; glob_z(:,:,:) = DZERO
-      !$omp end parallel workshare
+      !$omp parallel
+      !$omp do private(j)
+      do j = 1, st_grid%ny+1
+        glob_x(:,j) = DZERO
+        glob_y(:,j) = DZERO
+      end do
+      !$omp end do
+      !$omp do private(k)
+      do k = 1, st_grid%nz+1
+        glob_z(:,:,k) = DZERO
+      end do
+      !$omp end do
+      !$omp end parallel
     end if
 
 #ifdef MPI_MSG
@@ -88,14 +98,15 @@ module make_cell
     allocate(fp_zt(ncalc), fp_zb(ncalc))
     allocate(cp_x(ncalc), cp_y(ncalc), cp_z(ncalc))
     !$omp parallel
-    !$omp workshare
-    fp_xw(:) = DZERO ; fp_yw(:) = DZERO ; fp_xs(:) = DZERO ; fp_ys(:) = DZERO
-    fp_xe(:) = DZERO ; fp_ye(:) = DZERO ; fp_xn(:) = DZERO ; fp_yn(:) = DZERO
-    fp_zw(:) = DZERO ; fp_zs(:) = DZERO ; fp_ze(:) = DZERO ; fp_zn(:) = DZERO
-    fp_zt(:) = DZERO ; fp_zb(:) = DZERO
-    cp_x(:) = DZERO ; cp_y(:) = DZERO ; cp_z(:) = DZERO
-    !$omp end workshare
-
+    !$omp do private(i)
+    do i = 1, ncalc
+      fp_xw(i) = DZERO ; fp_yw(i) = DZERO ; fp_xs(i) = DZERO ; fp_ys(i) = DZERO
+      fp_xe(i) = DZERO ; fp_ye(i) = DZERO ; fp_xn(i) = DZERO ; fp_yn(i) = DZERO
+      fp_zw(i) = DZERO ; fp_zs(i) = DZERO ; fp_ze(i) = DZERO ; fp_zn(i) = DZERO
+      fp_zt(i) = DZERO ; fp_zb(i) = DZERO
+      cp_x(i) = DZERO ; cp_y(i) = DZERO ; cp_z(i) = DZERO
+    end do
+    !$omp end do
     ! make center point for face and cell
     !$omp do private(i, xn, yn, zn)
     do i = 1, ncalc
@@ -137,10 +148,11 @@ module make_cell
     !-------------------------------------------------------------------------------------
     allocate(dis2face(ncalc,FACE))
     !$omp parallel
-    !$omp workshare
-    dis2face(:,:) = DZERO
-    !$omp end workshare
-
+    !$omp do private(i)
+    do i = 1, FACE
+      dis2face(:,i) = DZERO
+    end do
+    !$omp end do
     ! make distance between point and face center
     !$omp do private(i, dis2, dis3, dis4, dis5)
     do i = 1, ncalc
@@ -175,10 +187,11 @@ module make_cell
     !-------------------------------------------------------------------------------------
     allocate(face_area(ncalc,FACE))
     !$omp parallel
-    !$omp workshare
-    face_area(:,:) = DZERO
-    !$omp end workshare
-
+    !$omp do private(i)
+    do i = 1, FACE
+      face_area(:,i) = DZERO
+    end do
+    !$omp end do
     ! make face area
     !$omp do private(i, xn, yn, zn, x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4, z5, z6, z7, z8)
     do i = 1, ncalc
@@ -267,10 +280,11 @@ module make_cell
     !-------------------------------------------------------------------------------------
     allocate(cell_vol(ncalc))
     !$omp parallel
-    !$omp workshare
-    cell_vol(:) = DZERO
-    !$omp end workshare
-
+    !$omp do private(i)
+    do i = 1, ncalc
+      cell_vol(i) = DZERO
+    end do
+    !$omp end do
     ! make cell volume
     !$omp do private(i, xn, yn, zn, cx, cy, cz, x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4, z5, z6, z7, z8)
     do i = 1, ncalc
@@ -340,11 +354,12 @@ module make_cell
     allocate(cell_top(ncalc), cell_cent(ncalc), cell_bot(ncalc))
     allocate(surf_elev(ncals))
     !$omp parallel
-    !$omp workshare
-    cell_top(:) = DZERO ; cell_cent(:) = DZERO ; cell_bot(:) = DZERO
-    surf_elev(:) = DZERO
-    !$omp end workshare
-
+    !$omp do private(i)
+    do i = 1, ncals
+      cell_top(i) = DZERO ; cell_cent(i) = DZERO
+      cell_bot(i) = DZERO ; surf_elev(i) = DZERO
+    end do
+    !$omp end do
     ! make cell top and bottom elevation
     !$omp do private(i)
     do i = 1, ncals
@@ -378,10 +393,11 @@ module make_cell
     !-------------------------------------------------------------------------------------
     allocate(area_r(ncals))
     !$omp parallel
-    !$omp workshare
-    area_r(:) = DZERO
-    !$omp end workshare
-
+    !$omp do private(i)
+    do i = 1, ncals
+      area_r(i) = DZERO
+    end do
+    !$omp end do
     ! make recharge area
     !$omp do private(i, xn, yn, x1, x2, x3, x4, y1, y2, y3, y4)
     do i = 1, ncals

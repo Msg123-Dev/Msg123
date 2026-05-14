@@ -49,10 +49,11 @@ module allocate_output
       if (st_in_type%mass /= in_type(7) .and. st_in_type%mass /= in_type(1)) then
         allocate(massout_name(msout_tnum))
         !$omp parallel
-        !$omp workshare
-        massout_name(:) = ""
-        !$omp end workshare
-
+        !$omp do private(i)
+        do i = 1, msout_tnum
+          massout_name(i) = ""
+        end do
+        !$omp end do
         !$omp do private(i)
         do i = 1, msout_tnum
           write(massout_name(i),*) i
@@ -134,12 +135,14 @@ module allocate_output
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(wtable(ncals))
-    !$omp parallel workshare
-    wtable(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      wtable(i) = DZERO
+    end do
+    !$omp end parallel do
 
   end subroutine allocate_wtab
 
@@ -152,7 +155,7 @@ module allocate_output
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(st_msloc%sto(ncalc), st_msloc%con(ncalc), st_msloc%sea(ncalc))
     allocate(st_msloc%wel(ncalc), st_msloc%rec(ncals), st_msloc%sur(ncals))
@@ -160,14 +163,29 @@ module allocate_output
     allocate(st_msglo%sto(msout_tnum), st_msglo%con(msout_tnum), st_msglo%sea(msout_tnum))
     allocate(st_msglo%wel(msout_tnum), st_msglo%rec(msout_tnum), st_msglo%sur(msout_tnum))
     allocate(st_msglo%riv(msout_tnum), st_msglo%lak(msout_tnum), st_msglo%tot(msout_tnum))
-    !$omp parallel workshare
-    st_msloc%sto(:) = DZERO ; st_msloc%con(:) = DZERO ; st_msloc%sea(:) = DZERO
-    st_msloc%wel(:) = DZERO ; st_msloc%rec(:) = DZERO ; st_msloc%sur(:) = DZERO
-    st_msloc%riv(:) = DZERO ; st_msloc%lak(:) = DZERO
-    st_msglo%sto(:) = DZERO ; st_msglo%con(:) = DZERO ; st_msglo%sea(:) = DZERO
-    st_msglo%wel(:) = DZERO ; st_msglo%rec(:) = DZERO ; st_msglo%sur(:) = DZERO
-    st_msglo%riv(:) = DZERO ; st_msglo%lak(:) = DZERO ; st_msglo%tot(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, ncalc
+      st_msloc%sto(i) = DZERO ; st_msloc%con(i) = DZERO
+      st_msloc%sea(i) = DZERO ; st_msloc%wel(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncals
+      st_msloc%rec(i) = DZERO ; st_msloc%sur(i) = DZERO
+      st_msloc%riv(i) = DZERO ; st_msloc%lak(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, msout_tnum
+      st_msglo%sto(i) = DZERO ; st_msglo%con(i) = DZERO
+      st_msglo%sea(i) = DZERO ; st_msglo%wel(i) = DZERO
+      st_msglo%rec(i) = DZERO ; st_msglo%sur(i) = DZERO
+      st_msglo%riv(i) = DZERO ; st_msglo%lak(i) = DZERO
+      st_msglo%tot(i) = DZERO
+    end do
+    !$omp end do
+    !$omp end parallel
 
   end subroutine allocate_mass
 
@@ -180,12 +198,21 @@ module allocate_output
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: j
     !-------------------------------------------------------------------------------------
     allocate(pointv(ncalc,3), facev(ncalc,FACE))
-    !$omp parallel workshare
-    pointv(:,:) = DZERO ; facev(:,:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(j)
+    do j = 1, 3
+      pointv(:,j) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(j)
+    do j = 1, FACE
+      facev(:,j) = DZERO
+    end do
+    !$omp end do
+    !$omp end parallel
 
   end subroutine allocate_velc
 
@@ -198,12 +225,14 @@ module allocate_output
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(roff_rive(rive_num))
-    !$omp parallel workshare
-    roff_rive(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, rive_num
+      roff_rive(i) = DZERO
+    end do
+    !$omp end parallel do
 
     rive_sumtime = DZERO
 
@@ -218,12 +247,14 @@ module allocate_output
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(roff_lake(lake_num))
-    !$omp parallel workshare
-    roff_lake(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, lake_num
+      roff_lake(i) = DZERO
+    end do
+    !$omp end parallel do
 
     lake_sumtime = DZERO
 
@@ -238,12 +269,14 @@ module allocate_output
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(roff_surf(ncals))
-    !$omp parallel workshare
-    roff_surf(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      roff_surf(i) = DZERO
+    end do
+    !$omp end parallel do
 
     surf_sumtime = DZERO
 
@@ -258,12 +291,14 @@ module allocate_output
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(roff_dunn(rech_num))
-    !$omp parallel workshare
-    roff_dunn(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, rech_num
+      roff_dunn(i) = DZERO
+    end do
+    !$omp end parallel do
 
     dunn_sumtime = DZERO
 
@@ -278,12 +313,15 @@ module allocate_output
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(res_seal(ncalc), res_snum(ncalc))
-    !$omp parallel workshare
-    res_seal(:) = DZERO ; res_snum(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      res_seal(i) = DZERO
+      res_snum(i) = 0
+    end do
+    !$omp end parallel do
 
   end subroutine allocate_sear
 
@@ -296,12 +334,15 @@ module allocate_output
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(res_rech(ncals), res_rnum(ncals))
-    !$omp parallel workshare
-    res_rech(:) = DZERO ; res_rnum(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      res_rech(i) = DZERO
+      res_rnum(i) = 0
+    end do
+    !$omp end parallel do
 
   end subroutine allocate_recr
 
@@ -314,12 +355,15 @@ module allocate_output
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(res_well(ncalc), res_wnum(ncalc))
-    !$omp parallel workshare
-    res_well(:) = DZERO ; res_wnum(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      res_well(i) = DZERO
+      res_wnum(i) = 0
+    end do
+    !$omp end parallel do
 
   end subroutine allocate_welr
 

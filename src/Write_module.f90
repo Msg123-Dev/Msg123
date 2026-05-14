@@ -34,10 +34,11 @@ module write_module
     !-------------------------------------------------------------------------------------
     allocate(array_out(st_grid%nx,st_grid%ny))
     !$omp parallel
-    !$omp workshare
-    array_out(:,:) = SNOVAL
-    !$omp end workshare
-
+    !$omp do private(j)
+    do j = 1, st_grid%ny
+      array_out(:,j) = SNOVAL
+    end do
+    !$omp end do
     !$omp do private(i, xnum, ynum)
     do i = 1, out_totn
       call get_cals_grid(calc_num(i), xnum, ynum)
@@ -76,10 +77,11 @@ module write_module
     !-------------------------------------------------------------------------------------
     allocate(array_out(st_grid%nx,st_grid%ny))
     !$omp parallel
-    !$omp workshare
-    array_out(:,:) = SNOVAL
-    !$omp end workshare
-
+    !$omp do private(j)
+    do j = 1, st_grid%ny
+      array_out(:,j) = SNOVAL
+    end do
+    !$omp end do
     !$omp do private(i, xnum, ynum)
     do i = 1, out_totn
       call get_cals_grid(calc_num(i), xnum, ynum)
@@ -117,10 +119,11 @@ module write_module
     !-------------------------------------------------------------------------------------
     allocate(array_out(st_grid%nx,st_grid%ny,st_grid%nz))
     !$omp parallel
-    !$omp workshare
-    array_out(:,:,:) = SNOVAL
-    !$omp end workshare
-
+    !$omp do private(k)
+    do k = 1, st_grid%nz
+      array_out(:,:,k) = SNOVAL
+    end do
+    !$omp end do
     !$omp do private(i, xnum, ynum, znum)
     do i = 1, out_totn
       call get_calc_grid(calc_num(i), xnum, ynum, znum)
@@ -161,10 +164,11 @@ module write_module
     !-------------------------------------------------------------------------------------
     allocate(array_out(st_grid%nx,st_grid%ny,st_grid%nz))
     !$omp parallel
-    !$omp workshare
-    array_out(:,:,:) = SNOVAL
-    !$omp end workshare
-
+    !$omp do private(k)
+    do k = 1, st_grid%nz
+      array_out(:,:,k) = SNOVAL
+    end do
+    !$omp end do
     !$omp do private(i, xnum, ynum, znum)
     do i = 1, out_totn
       call get_calc_grid(calc_num(i), xnum, ynum, znum)

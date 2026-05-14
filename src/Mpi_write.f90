@@ -26,7 +26,7 @@ module mpi_write
   ! write_mpi_2dbin -- Write MPI 2d binary
   !***************************************************************************************
     ! -- module
-    use set_cell, only: no_ncals
+    use set_cell, only: no_ncals, seal_snum
     use mpi_set, only: write_2d_ind
     ! -- inout
     integer(I4), intent(in) :: out_fh, out_totn
@@ -35,16 +35,24 @@ module mpi_write
     real(DP), intent(in) :: out_val(:)
     ! -- local
     integer(I4) :: i, s, ierr
+    integer(I4) :: all_ncals
     integer(I4), allocatable :: istat(:)
     real(SP), allocatable :: vari_sp(:)
     !-------------------------------------------------------------------------------------
+    all_ncals = ncals + no_ncals + seal_snum + 1
     allocate(istat(MPI_STATUS_SIZE))
-    allocate(vari_sp(ncals+no_ncals+1))
+    allocate(vari_sp(all_ncals))
     !$omp parallel
-    !$omp workshare
-    istat(:) = 0 ; vari_sp(:) = SNOVAL ; vari_sp(1) = ntime
-    !$omp end workshare
-
+    !$omp do private(i)
+    do i = 1, MPI_STATUS_SIZE
+      istat(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, all_ncals
+      vari_sp(i) = SNOVAL
+    end do
+    !$omp end do
     !$omp do private(i, s)
     do i = 1, out_totn
       s = write_2d_ind(calc_num(i)) + 1
@@ -52,9 +60,10 @@ module mpi_write
     end do
     !$omp end do
     !$omp end parallel
+    vari_sp(1) = ntime
 
     ierr = 0
-    call MPI_FILE_WRITE(out_fh, vari_sp, ncals+no_ncals+1, MPI_REAL4, istat, ierr)
+    call MPI_FILE_WRITE(out_fh, vari_sp, all_ncals, MPI_REAL4, istat, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_write(out_fh)
@@ -71,7 +80,7 @@ module mpi_write
   ! write_mpi_3dbin -- Write MPI 3d binary
   !***************************************************************************************
     ! -- module
-    use set_cell, only: no_ncalc
+    use set_cell, only: no_ncalc, seal_cnum
     use mpi_set, only: write_3d_ind
     ! -- inout
     integer(I4), intent(in) :: out_fh, out_totn
@@ -80,16 +89,24 @@ module mpi_write
     real(DP), intent(in) :: out_val(:)
     ! -- local
     integer(I4) :: i, c, ierr
+    integer(I4) :: all_ncalc
     integer(I4), allocatable :: istat(:)
     real(SP), allocatable :: vari_sp(:)
     !-------------------------------------------------------------------------------------
+    all_ncalc = ncalc + no_ncalc + seal_cnum + 1
     allocate(istat(MPI_STATUS_SIZE))
-    allocate(vari_sp(ncalc+no_ncalc+1))
+    allocate(vari_sp(all_ncalc))
     !$omp parallel
-    !$omp workshare
-    istat(:) = 0 ; vari_sp(:) = SNOVAL ; vari_sp(1) = ntime
-    !$omp end workshare
-
+    !$omp do private(i)
+    do i = 1, MPI_STATUS_SIZE
+      istat(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, all_ncalc
+      vari_sp(i) = SNOVAL
+    end do
+    !$omp end do
     !$omp do private(i, c)
     do i = 1, out_totn
       c = write_3d_ind(calc_num(i)) + 1
@@ -97,9 +114,10 @@ module mpi_write
     end do
     !$omp end do
     !$omp end parallel
+    vari_sp(1) = ntime
 
     ierr = 0
-    call MPI_FILE_WRITE(out_fh, vari_sp, ncalc+no_ncalc+1, MPI_REAL4, istat, ierr)
+    call MPI_FILE_WRITE(out_fh, vari_sp, all_ncalc, MPI_REAL4, istat, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_write(out_fh)
@@ -122,17 +140,25 @@ module mpi_write
     real(SP), intent(in) :: out_time, out_unit
     real(DP), intent(in) :: out_val(:)
     ! -- local
-    integer(I4) :: ierr
+    integer(I4) :: i, ierr
     integer(I4), allocatable :: istat(:)
     real(DP), allocatable :: out_rest(:)
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------
     allocate(istat(MPI_STATUS_SIZE), out_rest(ncalc+1))
-    !$omp parallel workshare
-    istat(:) = 0 ; out_rest(:) = DZERO
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, MPI_STATUS_SIZE
+      istat(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncalc
+      out_rest(i+1) = out_val(i)*real(out_unit, kind=DP)
+    end do
+    !$omp end do
+    !$omp end parallel
     out_rest(1) = real(out_time, kind=DP)
-    out_rest(2:) = out_val(1:ncalc)*real(out_unit, kind=DP)
-    !$omp end parallel workshare
 
     ierr = 0 ; head_dis = 0
     call MPI_FILE_WRITE_AT_ALL(out_fh, head_dis, out_rest, ncalc+1, MPI_REAL8, istat, ierr)
@@ -151,23 +177,26 @@ module mpi_write
   ! redu_mpi_mass -- Calculate output massbalance for MPI
   !***************************************************************************************
     ! -- module
+    use assign_calc, only: msout_tnum
     use allocate_output, only: st_msout
     ! -- inout
     integer(I4), intent(in) :: num_mass
     type(st_msout), intent(inout) :: inout_st
     ! -- local
-    integer(I4) :: ierr
+    integer(I4) :: i, ierr
     real(DP), allocatable :: mpi_sto(:), mpi_con(:), mpi_sea(:), mpi_wel(:)
     real(DP), allocatable :: mpi_rec(:), mpi_sur(:), mpi_riv(:), mpi_lak(:), mpi_tot(:)
     !-------------------------------------------------------------------------------------
     allocate(mpi_sto(num_mass), mpi_con(num_mass), mpi_sea(num_mass), mpi_wel(num_mass))
     allocate(mpi_rec(num_mass), mpi_sur(num_mass), mpi_riv(num_mass), mpi_lak(num_mass))
     allocate(mpi_tot(num_mass))
-    !$omp parallel workshare
-    mpi_sto(:) = DZERO ; mpi_con(:) = DZERO ; mpi_sea(:) = DZERO ; mpi_wel(:) = DZERO
-    mpi_rec(:) = DZERO ; mpi_sur(:) = DZERO ; mpi_riv(:) = DZERO ; mpi_lak(:) = DZERO
-    mpi_tot(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, num_mass
+      mpi_sto(i) = DZERO ; mpi_con(i) = DZERO ; mpi_sea(i) = DZERO ; mpi_wel(i) = DZERO
+      mpi_rec(i) = DZERO ; mpi_sur(i) = DZERO ; mpi_riv(i) = DZERO ; mpi_lak(i) = DZERO
+      mpi_tot(i) = DZERO
+    end do
+    !$omp end parallel do
 
     ierr = 0
     call MPI_REDUCE(inout_st%sto(1), mpi_sto(1), num_mass, MPI_REAL8, MPI_SUM, 0, my_comm, ierr)
@@ -234,13 +263,15 @@ module mpi_write
     end if
 
     if (my_rank == 0) then
-      !$omp parallel workshare
-      inout_st%sto(:) = mpi_sto(:) ; inout_st%con(:) = mpi_con(:)
-      inout_st%sea(:) = mpi_sea(:) ; inout_st%wel(:) = mpi_wel(:)
-      inout_st%rec(:) = mpi_rec(:) ; inout_st%sur(:) = mpi_sur(:)
-      inout_st%riv(:) = mpi_riv(:) ; inout_st%lak(:) = mpi_lak(:)
-      inout_st%tot(:) = mpi_tot(:)
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, msout_tnum
+        inout_st%sto(i) = mpi_sto(i) ; inout_st%con(i) = mpi_con(i)
+        inout_st%sea(i) = mpi_sea(i) ; inout_st%wel(i) = mpi_wel(i)
+        inout_st%rec(i) = mpi_rec(i) ; inout_st%sur(i) = mpi_sur(i)
+        inout_st%riv(i) = mpi_riv(i) ; inout_st%lak(i) = mpi_lak(i)
+        inout_st%tot(i) = mpi_tot(i)
+      end do
+      !$omp end parallel do
     end if
 
     deallocate(mpi_sto, mpi_con, mpi_sea, mpi_wel)
@@ -270,11 +301,20 @@ module mpi_write
     allocate(temp_wtab_snum(neib_mpi_totn), temp_wtab_rnum(neib_mpi_totn))
     allocate(temp_send_cind(0:neib_mpi_totn), temp_recv_cind(0:neib_mpi_totn))
     allocate(temp_send_citem(temp_item_num), temp_recv_citem(temp_item_num))
-    !$omp parallel workshare
-    temp_wtab_snum(:) = -1 ; temp_wtab_rnum(:) = -1
-    temp_send_cind(:) = 0 ; temp_recv_cind(:) = 0
-    temp_send_citem(:) = 0 ; temp_recv_citem(:) = 0
-    !$omp end parallel workshare
+    temp_send_cind(0) = 0 ; temp_recv_cind(0) = 0
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, neib_mpi_totn
+      temp_wtab_snum(i) = -1 ; temp_wtab_rnum(i) = -1
+      temp_send_cind(i) = 0 ; temp_recv_cind(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, temp_item_num
+      temp_send_citem(i) = 0 ; temp_recv_citem(i) = 0
+    end do
+    !$omp end do
+    !$omp end parallel
 
     temp_snum = 0 ; temp_rnum = 0
     do i = 1, neib_mpi_totn
@@ -306,12 +346,10 @@ module mpi_write
     allocate(send_wtab_cind(0:neib_wtab_stotn), recv_wtab_cind(0:neib_wtab_rtotn))
     allocate(send_wtab_citem(temp_snum), recv_wtab_citem(temp_rnum))
 
-    !$omp parallel workshare
     neib_wtab_snum(:) = pack(temp_wtab_snum(:), temp_wtab_snum(:) /= -1)
     neib_wtab_rnum(:) = pack(temp_wtab_rnum(:), temp_wtab_rnum(:) /= -1)
     send_wtab_citem(:) = temp_send_citem(1:temp_snum)
     recv_wtab_citem(:) = temp_recv_citem(1:temp_rnum)
-    !$omp end parallel workshare
 
     temp_snum = 0 ; temp_rnum = 0
     do i = 1, neib_mpi_totn
@@ -340,7 +378,7 @@ module mpi_write
     ! -- inout
     real(DP), intent(in) :: hnew(:), snew(:)
     ! -- local
-    integer(I4) :: i, k, ierr, nxyz, loc_n, loc_r, i_num, j_num
+    integer(I4) :: i, j, k, ierr, nxyz, loc_n, loc_r, i_num, j_num
     integer(I4) :: wtab_sendn, wtab_recvn, sum_sendn, sum_recvn
     integer(I4) :: isend_sta, isend_end, irecv_sta, irecv_end
     integer(I4) :: send_len, recv_len
@@ -360,14 +398,55 @@ module mpi_write
     allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
     allocate(send_head(wtab_sendn), send_srat(wtab_sendn))
     allocate(recv_head(wtab_recvn), recv_srat(wtab_recvn))
-    !$omp parallel workshare
-    send_flag(:) = 0 ; recv_flag(:) = 0 ; flag_send(:) = 0 ; flag_recv(:) = 0
-    head_send(:) = 0 ; head_recv(:) = 0 ; srat_send(:) = 0 ; srat_recv(:) = 0
-    stat_s(:,:) = 0 ; stat_r(:,:) = 0
-    send_head(:) = DZERO ; send_srat(:) = DZERO
-    recv_head(:) = DZERO ; recv_srat(:) = DZERO
-    sum_sendn = sum(send_flag(:)) ; sum_recvn = sum(recv_flag(:))
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, wtab_sendn
+      send_flag(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, wtab_recvn
+      recv_flag(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, neib_mpi_totn
+      flag_send(i) = 0 ; flag_recv(i) = 0
+      head_send(i) = 0 ; head_recv(i) = 0
+      srat_send(i) = 0 ; srat_recv(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(j)
+    do j = 1, neib_mpi_totn
+      stat_s(:,j) = 0 ; stat_r(:,j) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, wtab_sendn
+      send_head(i) = DZERO ; send_srat(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, wtab_recvn
+      recv_head(i) = DZERO ; recv_srat(i) = DZERO
+    end do
+    !$omp end do
+    !$omp end parallel
+
+    sum_sendn = 0 ; sum_recvn = 0
+    !$omp parallel
+    !$omp do private(i) reduction(+:sum_sendn)
+    do i = 1, wtab_sendn
+      sum_sendn = sum_sendn + send_flag(i)
+    end do
+    !$omp end do
+
+    !$omp do private(i) reduction(+:sum_recvn)
+    do i = 1, wtab_recvn
+      sum_recvn = sum_recvn + recv_flag(i)
+    end do
+    !$omp end do
+    !$omp end parallel
 
     rank_flag = 0 ; allp_flag = 0
     ! -- Set send flag (send_flag)
@@ -381,11 +460,11 @@ module mpi_write
         isend_sta = send_wtab_cind(i-1)+1 ; isend_end = send_wtab_cind(i)
         send_len = isend_end - isend_sta + 1
         if (send_len /= 0) then
-          call MPI_ISEND(send_flag(isend_sta), send_len, MPI_INTEGER, neib_wtab_snum(i),&
-                         0, my_comm, flag_send(i), ierr)
-          call MPI_ISEND(send_head(isend_sta), send_len, MPI_REAL8, neib_wtab_snum(i), 0,&
+          call MPI_ISEND(send_flag(isend_sta), send_len, MPI_INTEGER, neib_wtab_snum(i), 0,&
+                         my_comm, flag_send(i), ierr)
+          call MPI_ISEND(send_head(isend_sta), send_len, MPI_REAL8, neib_wtab_snum(i), 1,&
                          my_comm, head_send(i), ierr)
-          call MPI_ISEND(send_srat(isend_sta), send_len, MPI_REAL8, neib_wtab_snum(i), 0,&
+          call MPI_ISEND(send_srat(isend_sta), send_len, MPI_REAL8, neib_wtab_snum(i), 2,&
                          my_comm, srat_send(i), ierr)
         end if
       end do
@@ -394,11 +473,11 @@ module mpi_write
         irecv_sta = recv_wtab_cind(i-1)+1 ; irecv_end = recv_wtab_cind(i)
         recv_len = irecv_end - irecv_sta + 1
         if (irecv_end /= 0) then
-          call MPI_IRECV(recv_flag(irecv_sta), recv_len, MPI_INTEGER, neib_wtab_rnum(i),&
-                         0, my_comm, flag_recv(i), ierr)
-          call MPI_IRECV(recv_head(irecv_sta), recv_len, MPI_REAL8, neib_wtab_rnum(i), 0,&
+          call MPI_IRECV(recv_flag(irecv_sta), recv_len, MPI_INTEGER, neib_wtab_rnum(i), 0,&
+                         my_comm, flag_recv(i), ierr)
+          call MPI_IRECV(recv_head(irecv_sta), recv_len, MPI_REAL8, neib_wtab_rnum(i), 1,&
                          my_comm, head_recv(i), ierr)
-          call MPI_IRECV(recv_srat(irecv_sta), recv_len, MPI_REAL8, neib_wtab_rnum(i), 0,&
+          call MPI_IRECV(recv_srat(irecv_sta), recv_len, MPI_REAL8, neib_wtab_rnum(i), 2,&
                          my_comm, srat_recv(i), ierr)
         end if
       end do
@@ -421,9 +500,20 @@ module mpi_write
         end if
       end if
 
-      !$omp parallel workshare
-      sum_sendn = sum(send_flag(:)) ; sum_recvn = sum(recv_flag(:))
-      !$omp end parallel workshare
+      sum_sendn = 0 ; sum_recvn = 0
+      !$omp parallel
+      !$omp do private(i) reduction(+:sum_sendn)
+      do i = 1, wtab_sendn
+        sum_sendn = sum_sendn + send_flag(i)
+      end do
+      !$omp end do
+      !$omp do private(i) reduction(+:sum_recvn)
+      do i = 1, wtab_recvn
+        sum_recvn = sum_recvn + recv_flag(i)
+      end do
+      !$omp end do
+      !$omp end parallel
+
       if (sum_sendn == wtab_sendn .and. sum_recvn == wtab_recvn) then
         rank_flag = 1
       end if

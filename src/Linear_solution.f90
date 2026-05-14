@@ -35,12 +35,14 @@ module linear_solution
     real(DP), intent(inout) :: inx(:)
     real(DP), intent(out) :: last_norm
     ! -- local
-
+    integer(I4) :: n
     !-------------------------------------------------------------------------------------
     allocate(resi(nreg_num))
-    !$omp parallel workshare
-    resi(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(n)
+    do n = 1, nreg_num
+      resi(n) = DZERO
+    end do
+    !$omp end parallel do
 
     bnorm = init_norm
     if (form_switch == 0) then
@@ -82,13 +84,26 @@ module linear_solution
     sk = DZERO ; sk0 = DINFI ; sk2 = DZERO ; alpha = DZERO ; beta = DZERO
     allocate(d(reg_size), z(reg_size), p(reg_size), q(d_size))
     allocate(level_d(reg_size), level_lu(lu_size), level_b(reg_size))
-    !$omp parallel workshare
-    d(:) = DZERO ; z(:) = DZERO ; p(:) = DZERO ; q(:) = DZERO
-    d(:) = array_var(level)%dmat(:)
-    level_d(:) = array_var(level)%dmat(:)
-    level_lu(:) = array_var(level)%lumat(:)
-    level_b(:) = array_var(level)%rhs(:)
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(n)
+    do n = 1, reg_size
+      d(n) = DZERO ; z(n) = DZERO ; p(n) = DZERO
+      d(n) = array_var(level)%dmat(n)
+      level_d(n) = array_var(level)%dmat(n)
+      level_b(n) = array_var(level)%rhs(n)
+    end do
+    !$omp end do
+    !$omp do private(n)
+    do n = 1, d_size
+      q(n) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(n)
+    do n = 1, lu_size
+      level_lu(n) = array_var(level)%lumat(n)
+    end do
+    !$omp end do
+    !$omp end parallel
 
     ! -- Calculate residual (resi)
       call calc_resi(level, d_size, level_d, level_lu, inx, level_b, resi)
@@ -144,9 +159,11 @@ module linear_solution
       end if
 
       sk = DZERO
-      !$omp parallel workshare
-      sk = dot_product(resi(1:d_size), z(1:d_size))
-      !$omp end parallel workshare
+      !$omp parallel do private(n) reduction(+:sk)
+      do n = 1, d_size
+        sk = sk + resi(n)*z(n)
+      end do
+      !$omp end parallel do
 
 #ifdef MPI_MSG
       if (pro_totn /= 1) then
@@ -157,9 +174,11 @@ module linear_solution
 #endif
 
       if (in_iter == 1) then
-        !$omp parallel workshare
-        p(1:d_size) = z(1:d_size)
-        !$omp end parallel workshare
+        !$omp parallel do private(n)
+        do n = 1, d_size
+          p(n) = z(n)
+        end do
+        !$omp end parallel do
       else
         beta = sk/sk0
         !$omp parallel do private(n)
@@ -179,9 +198,11 @@ module linear_solution
         call calc_matvec(level, d_size, p, level_d, level_lu, q)
 
       sk2 = DZERO
-      !$omp parallel workshare
-      sk2 = dot_product(p(1:d_size), q(1:d_size))
-      !$omp end parallel workshare
+      !$omp parallel do private(n) reduction(+:sk2)
+      do n = 1, d_size
+        sk2 = sk2 + p(n)*q(n)
+      end do
+      !$omp end parallel do
 
 #ifdef MPI_MSG
       if (pro_totn /= 1) then
@@ -257,13 +278,26 @@ module linear_solution
     bicgs_omega = DONE ; ts = DZERO ; tt = DZERO
     allocate(d(reg_size), z(reg_size), p(reg_size), v(d_size), rs(d_size), t(d_size))
     allocate(level_d(reg_size), level_lu(lu_size), level_b(reg_size))
-    !$omp parallel workshare
-    z(:) = DZERO ; p(:) = DZERO ; v(:) = DZERO ; rs(:) = DZERO ; t(:) = DZERO
-    d(:) = array_var(level)%dmat(:)
-    level_d(:) = array_var(level)%dmat(:)
-    level_lu(:) = array_var(level)%lumat(:)
-    level_b(:) = array_var(level)%rhs(:)
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(n)
+    do n = 1, reg_size
+      z(n) = DZERO ; p(n) = DZERO
+      d(n) = array_var(level)%dmat(n)
+      level_d(n) = array_var(level)%dmat(n)
+      level_b(n) = array_var(level)%rhs(n)
+    end do
+    !$omp end do
+    !$omp do private(n)
+    do n = 1, d_size
+      v(n) = DZERO ; rs(n) = DZERO ; t(n) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(n)
+    do n = 1, lu_size
+      level_lu(n) = array_var(level)%lumat(n)
+    end do
+    !$omp end do
+    !$omp end parallel
 
     ! -- Calculate residual (resi)
       call calc_resi(level, d_size, level_d, level_lu, inx, level_b, resi)
@@ -294,15 +328,19 @@ module linear_solution
     end if
 #endif
 
-    !$omp parallel workshare
-    rs(1:d_size) = resi(1:d_size)
-    !$omp end parallel workshare
+    !$omp parallel do private(n)
+    do n = 1, d_size
+      rs(n) = resi(n)
+    end do
+    !$omp end parallel do
 
     bicg_inter: do in_iter = 1, maxinn_iter
       sk = DZERO
-      !$omp parallel workshare
-      sk = dot_product(resi(1:d_size), rs(1:d_size))
-      !$omp end parallel workshare
+      !$omp parallel do private(n) reduction(+:sk)
+      do n = 1, d_size
+        sk = sk + resi(n)*rs(n)
+      end do
+      !$omp end parallel do
 #ifdef MPI_MSG
       if (pro_totn /= 1) then
         ! -- Sum value for MPI (val)
@@ -312,9 +350,11 @@ module linear_solution
 #endif
 
       if (in_iter == 1) then
-        !$omp parallel workshare
-        p(1:d_size) = resi(1:d_size)
-        !$omp end parallel workshare
+        !$omp parallel do private(n)
+        do n = 1, d_size
+          p(n) = resi(n)
+        end do
+        !$omp end parallel do
       else
         beta = (sk/sk0)*(alpha/bicgs_omega)
         !$omp parallel do private(n)
@@ -361,9 +401,11 @@ module linear_solution
         call calc_matvec(level, d_size, z, level_d, level_lu, v)
 
       sk2 = DZERO
-      !$omp parallel workshare
-      sk2 = dot_product(v(1:d_size), rs(1:d_size))
-      !$omp end parallel workshare
+      !$omp parallel do private(n) reduction(+:sk2)
+      do n = 1, d_size
+        sk2 = sk2 + v(n)*rs(n)
+      end do
+      !$omp end parallel do
 #ifdef MPI_MSG
       if (pro_totn /= 1) then
         ! -- Sum value for MPI (val)
@@ -434,10 +476,18 @@ module linear_solution
           call calc_matvec(level, d_size, z, level_d, level_lu, t)
 
         ts = DZERO ; tt = DZERO
-        !$omp parallel workshare
-        ts = dot_product(t(1:d_size), resi(1:d_size))
-        tt = dot_product(t(1:d_size), t(1:d_size))
-        !$omp end parallel workshare
+        !$omp parallel
+        !$omp do private(n) reduction(+:ts)
+        do n = 1, d_size
+          ts = ts + t(n)*resi(n)
+        end do
+        !$omp end do
+        !$omp do private(n) reduction(+:tt)
+        do n = 1, d_size
+          tt = tt + t(n)*t(n)
+        end do
+        !$omp end do
+        !$omp end parallel
 
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
@@ -537,11 +587,21 @@ module linear_solution
 
         allocate(temp_d(reg_size), temp_lu(lu_size), temp_x(reg_size), temp_b(reg_size))
         allocate(temp_r(reg_size))
-        !$omp parallel workshare
-        temp_d(:) = array_var(vlevel)%dmat(:) ; temp_lu(:) = array_var(vlevel)%lumat(:)
-        temp_x(:) = array_var(vlevel)%x(:) ; temp_b(:) = array_var(vlevel)%rhs(:)
-        temp_r(:) = DZERO
-        !$omp end parallel workshare
+        !$omp parallel
+        !$omp do private(i)
+        do i = 1, reg_size
+          temp_d(i) = array_var(vlevel)%dmat(i)
+          temp_x(i) = array_var(vlevel)%x(i)
+          temp_b(i) = array_var(vlevel)%rhs(i)
+          temp_r(i) = DZERO
+        end do
+        !$omp end do
+        !$omp do private(i)
+        do i = 1, lu_size
+          temp_lu(i) = array_var(vlevel)%lumat(i)
+        end do
+        !$omp end do
+        !$omp end parallel
 
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
@@ -588,9 +648,11 @@ module linear_solution
         ncoa = crs_index(vlevel+1)%unknow
         allocate(trhs(ncoa))
         !$omp parallel
-        !$omp workshare
-        trhs(:) = DZERO
-        !$omp end workshare
+        !$omp do private(i)
+        do i = 1, ncoa
+          trhs(i) = DZERO
+        end do
+        !$omp end do
         !$omp do private(i, j, k, rst, ren)
         do i = 1, ncoa
           rst = res_var(vlevel+1)%rindex(i-1) + 1
@@ -619,10 +681,24 @@ module linear_solution
       reg_size = size(array_var(nlevel)%x)
 
       allocate(temp_d(d_size), temp_lu(lu_size), temp_x(reg_size), temp_b(reg_size))
-      !$omp parallel workshare
-      temp_d(:) = array_var(nlevel)%dmat(:) ; temp_lu(:) = array_var(nlevel)%lumat(:)
-      temp_x(:) = array_var(nlevel)%x(:) ; temp_b(:) = array_var(nlevel)%rhs(:)
-      !$omp end parallel workshare
+      !$omp parallel
+      !$omp do private(i)
+      do i = 1, d_size
+        temp_d(i) = array_var(nlevel)%dmat(i)
+      end do
+      !$omp end do
+      !$omp do private(i)
+      do i = 1, lu_size
+        temp_lu(i) = array_var(nlevel)%lumat(i)
+      end do
+      !$omp end do
+      !$omp do private(i)
+      do i = 1, reg_size
+        temp_x(i) = array_var(nlevel)%x(i)
+        temp_b(i) = array_var(nlevel)%rhs(i)
+      end do
+      !$omp end do
+      !$omp end parallel
 
 #ifdef MPI_MSG
       if (pro_totn /= 1) then
@@ -653,9 +729,7 @@ module linear_solution
           call senrec_rvectv(temp_x)
       end if
 #endif
-      !$omp parallel workshare
       array_var(nlevel)%x(:) = temp_x(:)
-      !$omp end parallel workshare
 
       deallocate(temp_d, temp_lu, temp_x, temp_b)
 
@@ -663,9 +737,11 @@ module linear_solution
         nfin = crs_index(vlevel+1)%unknow
         allocate(tx(nfin))
         !$omp parallel
-        !$omp workshare
-        tx(:) = DZERO
-        !$omp end workshare
+        !$omp do private(i)
+        do i = 1, nfin
+          tx(i) = DZERO
+        end do
+        !$omp end do
         !$omp do private(i, j, k, pst, pen)
         do i = 1, nfin
           pst = pro_var(vlevel+1)%pindex(i-1) + 1
@@ -686,10 +762,20 @@ module linear_solution
         reg_size = size(array_var(vlevel)%x)
 
         allocate(temp_d(reg_size), temp_lu(lu_size), temp_x(reg_size), temp_b(reg_size))
-        !$omp parallel workshare
-        temp_d(:) = array_var(vlevel)%dmat(:) ; temp_lu(:) = array_var(vlevel)%lumat(:)
-        temp_x(:) = array_var(vlevel)%x(:) ; temp_b(:) = array_var(vlevel)%rhs(:)
-        !$omp end parallel workshare
+        !$omp parallel
+        !$omp do private(i)
+        do i = 1, reg_size
+          temp_d(i) = array_var(vlevel)%dmat(i)
+          temp_x(i) = array_var(vlevel)%x(i)
+          temp_b(i) = array_var(vlevel)%rhs(i)
+        end do
+        !$omp end do
+        !$omp do private(i)
+        do i = 1, lu_size
+          temp_lu(i) = array_var(vlevel)%lumat(i)
+        end do
+        !$omp end do
+        !$omp end parallel
 
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
@@ -714,9 +800,8 @@ module linear_solution
 !        end do
 #endif
 
-        !$omp parallel workshare
-        array_var(vlevel)%x(:) = temp_x(:) ; array_var(vlevel)%rhs(:) = temp_b(:)
-        !$omp end parallel workshare
+        array_var(vlevel)%x(:) = temp_x(:)
+        array_var(vlevel)%rhs(:) = temp_b(:)
 
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
@@ -755,9 +840,11 @@ module linear_solution
     integer(I4) :: offr, offr2
     real(DP) :: d_invk
     !-------------------------------------------------------------------------------------
-    !$omp parallel workshare
-    pre_d(1:npre) = pre_ind(1:npre)
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, npre
+      pre_d(i) = pre_ind(i)
+    end do
+    !$omp end parallel do
     do i = 1, npre
       off_sta = crs_index(plevel)%offind(i-1) + 1
       off_end = crs_index(plevel)%offind(i)
@@ -792,12 +879,13 @@ module linear_solution
 !    real(DP), intent(in) :: pre_ind(:)
 !    real(DP), intent(out) :: pre_d(:)
 !    ! -- local
-!
+!    integer(I4) :: i
 !    !-------------------------------------------------------------------------------------
-!    !$omp parallel workshare
-!    pre_d(1:npre) = DONE/pre_ind(1:npre)
-!    !$omp end parallel workshare
-!
+!    !$omp parallel do private(i)
+!    do i = 1, npre
+!      pre_d(i) = DONE/pre_ind(i)
+!    end do
+!    !$omp end parallel do
 !  end subroutine precon_dscal
 
   subroutine solve_ilu(plevel, npre, inrhs, indmat, inlumat, outx)
@@ -816,9 +904,12 @@ module linear_solution
     real(DP), allocatable :: temp_outx(:)
     !-------------------------------------------------------------------------------------
     allocate(temp_outx(npre))
-    !$omp parallel workshare
-    outx(1:npre) = inrhs(1:npre) ; temp_outx(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, npre
+      outx(i) = inrhs(i)
+      temp_outx(i) = DZERO
+    end do
+    !$omp end parallel do
 
     ! Forward Substitution
 !    !$omp parallel do private(i, k, s, off_sta, off_end, offr)
@@ -865,11 +956,13 @@ module linear_solution
 !    real(DP), intent(in) :: inrhs(:), indmat(:)
 !    real(DP), intent(out) :: outx(:)
 !    ! -- local
-!
+!    integer(I4) :: i
 !    !-------------------------------------------------------------------------------------
-!    !$omp parallel workshare
-!    outx(1:nregpre) = inrhs(1:nregpre)*indmat(1:nregpre)
-!    !$omp end parallel workshare
+!    !$omp parallel do private(i)
+!    do i = 1, nregpre
+!      outx(i) = inrhs(i)*indmat(i)
+!    end do
+!    !$omp end parallel do
 !
 !  end subroutine solve_dsys
 
@@ -894,9 +987,11 @@ module linear_solution
 !      ns = 1
 !    end if
 !    allocate(temp_x(nsmo), temp_d(nsmo))
-!    !$omp parallel workshare
-!    temp_x(:) = DZERO ; temp_d(:) = DONE/ind(1:nsmo)
-!    !$omp end parallel workshare
+!    !$omp parallel do private(i)
+!    do i = 1, nsmo
+!      temp_x(i) = DZERO ; temp_d(i) = DONE/ind(i)
+!    end do
+!    !$omp end parallel do
 !
 !!    !$omp parallel do private(i, n, k, s, off_sta, off_end, offr)
 !    do i = 1, ns
@@ -931,9 +1026,11 @@ module linear_solution
     !-------------------------------------------------------------------------------------
     allocate(temp_vec(nmv))
     !$omp parallel
-    !$omp workshare
-    temp_vec(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, nmv
+      temp_vec(i) = DZERO
+    end do
+    !$omp end do
     !$omp do private(i, j, k, off_sta, off_end)
     do i = 1, nmv
       temp_vec(i) = indmat(i)*invec(i)

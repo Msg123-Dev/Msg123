@@ -34,9 +34,11 @@ module calc_parameter
     real(DP), allocatable :: temp_ss(:)
     !-------------------------------------------------------------------------------------
     allocate(temp_ss(num))
-    !$omp parallel workshare
-    temp_ss(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, num
+      temp_ss(i) = DZERO
+    end do
+    !$omp end parallel do
 
     phead0 = DZERO
 
@@ -67,9 +69,11 @@ module calc_parameter
     !$omp end parallel do
 
     if (present(sstor)) then
-      !$omp parallel workshare
-      sstor(:) = temp_ss(:)
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, num
+        sstor(i) = temp_ss(i)
+      end do
+      !$omp end parallel do
     end if
 
     deallocate(temp_ss)

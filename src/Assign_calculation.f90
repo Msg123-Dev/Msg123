@@ -39,14 +39,16 @@ module assign_calc
     ! -- inout
     integer(I4), intent(in) :: retn_ftype
     ! -- local
-    integer(I4) :: i, ierr
+    integer(I4) :: i, j, ierr
     integer(I4), allocatable :: ret_fnum(:), ret_ftype(:)
     real(SP), allocatable :: ret_val(:)
     !-------------------------------------------------------------------------------------
     allocate(read_reta(ncalc), read_retn(ncalc), read_resi(ncalc))
-    !$omp parallel workshare
-    read_reta(:) = SNOVAL ; read_retn(:) = SNOVAL ; read_resi(:) = SNOVAL
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      read_reta(i) = SNOVAL ; read_retn(i) = SNOVAL ; read_resi(i) = SNOVAL
+    end do
+    !$omp end parallel do
 
     if (retn_ftype == in_type(0)) then
       allocate(ret_fnum(3), ret_ftype(3))
@@ -57,9 +59,11 @@ module assign_calc
       ret_ftype(3) = st_retf_type%resi
 
       do i = 1, 3
-        !$omp parallel workshare
-        ret_val(:) = SNOVAL
-        !$omp end parallel workshare
+        !$omp parallel do private(j)
+        do j = 1, ncalc
+          ret_val(j) = SNOVAL
+        end do
+        !$omp end parallel do
         if (ret_ftype(i) == in_type(3) .or. ret_ftype(i) == in_type(4)) then
           call set_2dfile2calc(ret_fnum(i), ret_ftype(i), 0, ncals, SNOVAL, ret_val)
         else if (ret_ftype(i) == in_type(5) .or. ret_ftype(i) == in_type(6)) then
@@ -68,17 +72,23 @@ module assign_calc
 
         select case (i)
         case(1)
-          !$omp parallel workshare
-          read_reta(:) = ret_val(:)
-          !$omp end parallel workshare
+          !$omp parallel do private(j)
+          do j = 1, ncalc
+            read_reta(j) = ret_val(j)
+          end do
+          !$omp end parallel do
         case(2)
-          !$omp parallel workshare
-          read_retn(:) = ret_val(:)
-          !$omp end parallel workshare
+          !$omp parallel do private(j)
+          do j = 1, ncalc
+            read_retn(j) = ret_val(j)
+          end do
+          !$omp end parallel do
         case(3)
-          !$omp parallel workshare
-          read_resi(:) = ret_val(:)
-          !$omp end parallel workshare
+          !$omp parallel do private(j)
+          do j = 1, ncalc
+            read_resi(j) = ret_val(j)
+          end do
+          !$omp end parallel do
         end select
       end do
       deallocate(ret_val)
@@ -87,10 +97,12 @@ module assign_calc
       allocate(st_retn%name(st_retn%totn))
       allocate(st_retn%a(st_retn%totn), st_retn%n(st_retn%totn))
       allocate(st_retn%r(st_retn%totn))
-      !$omp parallel workshare
-      st_retn%name(:) = ""
-      st_retn%a(:) = SNOVAL ; st_retn%n(:) = SNOVAL ; st_retn%r(:) = SNOVAL
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, st_retn%totn
+        st_retn%name(i) = "" ; st_retn%a(i) = SNOVAL
+        st_retn%n(i) = SNOVAL ; st_retn%r(i) = SNOVAL
+      end do
+      !$omp end parallel do
 
       if (my_rank == 0) then
         ierr = 0
@@ -113,9 +125,11 @@ module assign_calc
       deallocate(st_retn%a, st_retn%n, st_retn%r)
     end if
 
-    !$omp parallel workshare
-    read_reta(:) = read_reta(:)*len_scal
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      read_reta(i) = read_reta(i)*len_scal
+    end do
+    !$omp end parallel do
 
 #ifdef MPI_MSG
     if (my_rank == 0) then
@@ -163,16 +177,18 @@ module assign_calc
     ! -- inout
     integer(I4), intent(in) :: parm_ftype
     ! -- local
-    integer(I4) :: i, ierr
+    integer(I4) :: i, j, ierr
     integer(I4), allocatable :: par_ftype(:), par_fnum(:)
     real(SP), allocatable :: par_val(:)
     !-------------------------------------------------------------------------------------
     allocate(read_ksx(ncalc), read_ksy(ncalc), read_ksz(ncalc))
     allocate(read_ss(ncalc), read_poro(ncalc))
-    !$omp parallel workshare
-    read_ksx(:) = SNOVAL ; read_ksy(:) = SNOVAL ; read_ksz(:) = SNOVAL
-    read_ss(:) = SNOVAL ; read_poro(:) = SNOVAL
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      read_ksx(i) = SNOVAL ; read_ksy(i) = SNOVAL ; read_ksz(i) = SNOVAL
+      read_ss(i) = SNOVAL ; read_poro(i) = SNOVAL
+    end do
+    !$omp end parallel do
 
     if (parm_ftype == in_type(0)) then
       allocate(par_fnum(5), par_ftype(5))
@@ -185,9 +201,11 @@ module assign_calc
       par_ftype(5) = st_parf_type%pats
 
       do i = 1, 5
-        !$omp parallel workshare
-        par_val(:) = SNOVAL
-        !$omp end parallel workshare
+        !$omp parallel do private(j)
+        do j = 1, ncalc
+          par_val(j) = SNOVAL
+        end do
+        !$omp end parallel do
         if (par_ftype(i) == in_type(3) .or. par_ftype(i) == in_type(4)) then
           call set_2dfile2calc(par_fnum(i), par_ftype(i), 0, ncals, SNOVAL, par_val)
         else if (par_ftype(i) == in_type(5) .or. par_ftype(i) == in_type(6)) then
@@ -196,25 +214,35 @@ module assign_calc
 
         select case (i)
         case(1)
-          !$omp parallel workshare
-          read_ksx(:) = par_val(:)
-          !$omp end parallel workshare
+          !$omp parallel do private(j)
+          do j = 1, ncalc
+            read_ksx(j) = par_val(j)
+          end do
+          !$omp end parallel do
         case(2)
-          !$omp parallel workshare
-          read_ksy(:) = par_val(:)
-          !$omp end parallel workshare
+          !$omp parallel do private(j)
+          do j = 1, ncalc
+            read_ksy(j) = par_val(j)
+          end do
+          !$omp end parallel do
         case(3)
-          !$omp parallel workshare
-          read_ksz(:) = par_val(:)
-          !$omp end parallel workshare
+          !$omp parallel do private(j)
+          do j = 1, ncalc
+            read_ksz(j) = par_val(j)
+          end do
+          !$omp end parallel do
         case(4)
-          !$omp parallel workshare
-          read_ss(:) = par_val(:)
-          !$omp end parallel workshare
+          !$omp parallel do private(j)
+          do j = 1, ncalc
+            read_ss(j) = par_val(j)
+          end do
+          !$omp end parallel do
         case(5)
-          !$omp parallel workshare
-          read_poro(:) = par_val(:)
-          !$omp end parallel workshare
+          !$omp parallel do private(j)
+          do j = 1, ncalc
+            read_poro(j) = par_val(j)
+          end do
+          !$omp end parallel do
         end select
       end do
       deallocate(par_val)
@@ -224,11 +252,12 @@ module assign_calc
       allocate(st_parm%ksx(st_parm%totn), st_parm%ksy(st_parm%totn))
       allocate(st_parm%ksz(st_parm%totn))
       allocate(st_parm%ss(st_parm%totn), st_parm%ts(st_parm%totn))
-      !$omp parallel workshare
-      st_parm%name(:) = ""
-      st_parm%ksx(:) = SNOVAL ; st_parm%ksy(:) = SNOVAL ; st_parm%ksz(:) = SNOVAL
-      st_parm%ss(:) = SNOVAL ; st_parm%ts(:) = SNOVAL
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, st_parm%totn
+        st_parm%name(i) = "" ; st_parm%ksx(i) = SNOVAL ; st_parm%ksy(i) = SNOVAL
+        st_parm%ksz(i) = SNOVAL ; st_parm%ss(i) = SNOVAL ; st_parm%ts(i) = SNOVAL
+      end do
+      !$omp end parallel do
 
       if (my_rank == 0) then
         do i = 1, st_parm%totn
@@ -255,10 +284,12 @@ module assign_calc
       deallocate(st_parm%ksx, st_parm%ksy, st_parm%ksz, st_parm%ss, st_parm%ts)
     end if
 
-    !$omp parallel workshare
-    read_ksx(:) = read_ksx(:)*len_scal_inv ; read_ksy(:) = read_ksy(:)*len_scal_inv
-    read_ksz(:) = read_ksz(:)*len_scal_inv ; read_ss(:) = read_ss(:)*len_scal
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      read_ksx(i) = read_ksx(i)*len_scal_inv ; read_ksy(i) = read_ksy(i)*len_scal_inv
+      read_ksz(i) = read_ksz(i)*len_scal_inv ; read_ss(i) = read_ss(i)*len_scal
+    end do
+    !$omp end parallel do
 
 #ifdef MPI_MSG
     if (my_rank == 0) then
@@ -309,7 +340,7 @@ module assign_calc
     ! -- inout
 
     ! -- local
-    integer(I4) :: i
+    integer(I4) :: i, j
     integer(I4), allocatable :: geo_fnum(:), geo_ftype(:)
     integer(I4), allocatable :: geo_cflag(:)
     real(SP), allocatable :: geo_val(:)
@@ -317,9 +348,12 @@ module assign_calc
     allocate(geo_fnum(3), geo_ftype(3))
     allocate(geo_cflag(ncals), surf_parm(ncals))
     allocate(geo_val(ncals))
-    !$omp parallel workshare
-    geo_cflag(:) = 0 ; surf_parm(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      geo_cflag(i) = 0
+      surf_parm(i) = DZERO
+    end do
+    !$omp end parallel do
 
     geo_fnum(1) = st_geog_fnum%geoz ; geo_fnum(2) = st_geog_fnum%geor
     geo_fnum(3) = st_geog_fnum%geoa
@@ -327,34 +361,44 @@ module assign_calc
     geo_ftype(3) = st_geof_type%geoa
 
     do i = 1, 3
-      !$omp parallel workshare
-      geo_val(:) = SNOVAL
-      !$omp end parallel workshare
+      !$omp parallel do private(j)
+      do j = 1, ncals
+        geo_val(j) = SNOVAL
+      end do
+      !$omp end parallel do
 
       call set_2dfile2cals(geo_fnum(i), geo_ftype(i), 0, SNOVAL, geo_val, geo_cflag, geog_num)
 
       select case (i)
       case(1)
-        !$omp parallel workshare
-        surf_bott(:) = geo_val(:)
-        !$omp end parallel workshare
+        !$omp parallel do private(j)
+        do j = 1, ncals
+          surf_bott(j) = geo_val(j)
+        end do
+        !$omp end parallel do
       case(2)
-        !$omp parallel workshare
-        surf_reli(:) = geo_val(:)
-        !$omp end parallel workshare
+        !$omp parallel do private(j)
+        do j = 1, ncals
+          surf_reli(j) = geo_val(j)
+        end do
+        !$omp end parallel do
       case(3)
-        !$omp parallel workshare
-        surf_parm(:) = geo_val(:)
-        !$omp end parallel workshare
+        !$omp parallel do private(j)
+        do j = 1, ncals
+          surf_parm(j) = geo_val(j)
+        end do
+        !$omp end parallel do
       end select
     end do
 
     deallocate(geo_val, geo_cflag)
 
-    !$omp parallel workshare
-    surf_bott(:) = surf_bott(:)*len_scal_inv
-    surf_reli(:) = surf_reli(:)*len_scal_inv
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      surf_bott(i) = surf_bott(i)*len_scal_inv
+      surf_reli(i) = surf_reli(i)*len_scal_inv
+    end do
+    !$omp end parallel do
 
 #ifdef MPI_MSG
     do i = 1, 3
@@ -408,9 +452,11 @@ module assign_calc
 #endif
     !-------------------------------------------------------------------------------------
     allocate(read_init(ncalc))
-    !$omp parallel workshare
-    read_init(:) = DNOVAL
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      read_init(i) = DNOVAL
+    end do
+    !$omp end parallel do
 
     ierr = 0
     if (init_ftype == in_type(0)) then
@@ -430,9 +476,11 @@ module assign_calc
       call close_file(st_init%fnum)
 #endif
     st_init%rest_time = real(temp_end, kind=SP)
-    !$omp parallel workshare
-    read_init(:) = read_init(:)*len_scal_inv
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      read_init(i) = read_init(i)*len_scal_inv
+    end do
+    !$omp end parallel do
 
     else if (init_ftype /= in_type(7)) then
       init_fnum = st_init%fnum
@@ -468,9 +516,11 @@ module assign_calc
       else if (init_ftype == in_type(5) .or. init_ftype == in_type(6)) then
         call set_3dfile2calc(init_fnum, init_ftype, 0, DNOVAL, read_init)
       end if
-      !$omp parallel workshare
-      read_init(:) = read_init(:)*len_scal_inv
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncalc
+        read_init(i) = read_init(i)*len_scal_inv
+      end do
+      !$omp end parallel do
       if (init_ftype == in_type(3) .or. init_ftype == in_type(5)) then
         if (my_rank == 0) then
           call close_file(init_fnum)
@@ -497,10 +547,13 @@ module assign_calc
 
 #ifdef MPI_MSG
     if (pro_totn /= 1) then
+      sum_init = 1
       allocate(recv_init(ncalc+neib_ncalc))
-      !$omp parallel workshare
-      sum_init = 1 ; recv_init(:) = DNOVAL
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncalc+neib_ncalc
+        recv_init(i) = DNOVAL
+      end do
+      !$omp end parallel do
       do while (sum_init /= 0)
         ! -- Send and Receive neighbor value (neibval)
           call senrec_neibval(neib_mpi_totn, neib_num, send_cind, recv_cind, send_citem,&
@@ -553,9 +606,12 @@ module assign_calc
     real(SP), allocatable :: clas_mass(:), real_mass(:)
     !-------------------------------------------------------------------------------------
     allocate(mass_val(ncalc), mass_cflag(ncalc))
-    !$omp parallel workshare
-    mass_val(:) = 0 ; mass_cflag(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      mass_val(i) = 0
+      mass_cflag(i) = 0
+    end do
+    !$omp end parallel do
 
     if (mass_ftype == in_type(1)) then
       if (my_rank == 0) then
@@ -573,9 +629,19 @@ module assign_calc
 #endif
       allocate(massout_name(msout_tnum))
       allocate(clas_mass(msout_tnum), real_mass(ncalc))
-      !$omp parallel workshare
-      massout_name(:) = "" ; clas_mass(:) = SZERO ; real_mass(:) = SZERO
-      !$omp end parallel workshare
+      !$omp parallel
+      !$omp do private(i)
+      do i = 1, msout_tnum
+        massout_name(i) = ""
+        clas_mass(i) = SZERO
+      end do
+      !$omp end do
+      !$omp do private(i)
+      do i = 1, ncalc
+        real_mass(i) = SZERO
+      end do
+      !$omp end do
+      !$omp end parallel
       if (my_rank == 0) then
         do i = 1, msout_tnum
           read(unit=inmas_fnum,fmt=*,iostat=ierr) massout_name(i)
@@ -594,9 +660,11 @@ module assign_calc
 #endif
 
       call set_clas2calc(msout_tnum, massout_name, clas_mass, real_mass, mass_cflag, mass_num)
-      !$omp parallel workshare
-      mass_val(:) = nint(real_mass(:))
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncalc
+        mass_val(i) = nint(real_mass(i))
+      end do
+      !$omp end parallel do
       deallocate(clas_mass, real_mass)
 
     else if (mass_ftype /= in_type(7)) then
@@ -620,9 +688,11 @@ module assign_calc
       end if
     else
       mass_num = ncalc
-      !$omp parallel workshare
-      mass_val(:) = 1 ; mass_cflag(:) = 1
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncalc
+        mass_val(i) = 1 ; mass_cflag(i) = 1
+      end do
+      !$omp end parallel do
     end if
 
     allocate(all_mass_type(6))
@@ -630,14 +700,19 @@ module assign_calc
 
     if (any(mass_ftype == all_mass_type(:))) then
       allocate(mass2calc(mass_num), calc_mass(mass_num))
-      !$omp parallel workshare
-      mass2calc(:) = 0 ; calc_mass(:) = 0
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, mass_num
+        mass2calc(i) = 0 ; calc_mass(i) = 0
+      end do
+      !$omp end parallel do
       call set_mass2calc(ncalc, mass_cflag, mass_val, mass2calc, calc_mass)
       allocate(int_mass(mass_num))
-      !$omp parallel workshare
-      int_mass(:) = 0 ; int_mass(:) = calc_mass(:)
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, mass_num
+        int_mass(i) = 0
+        int_mass(i) = calc_mass(i)
+      end do
+      !$omp end parallel do
       deallocate(calc_mass, mass_cflag)
 #ifdef MPI_MSG
       ! -- Max value for MPI (val)

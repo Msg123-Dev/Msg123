@@ -258,7 +258,7 @@ module mpi_set
     ! -- inout
 
     ! -- local
-    integer(I4) :: i, ierr
+    integer(I4) :: i, j, ierr
     integer(I4) :: char_leng
     integer(I4) :: clas_totn, max_clas, clas_len
     integer(I4), allocatable :: clas_num(:)
@@ -298,9 +298,11 @@ module mpi_set
 
     allocate(clas_name(clas_totn))
     !$omp parallel
-    !$omp workshare
-    clas_name(:) = ""
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, clas_totn
+      clas_name(i) = ""
+    end do
+    !$omp end do
 
     if (my_rank == 0) then
       !$omp do private(i)
@@ -330,15 +332,20 @@ module mpi_set
 
     if (my_rank /= 0) then
       allocate(st_clas%name(clas_totn))
-      !$omp parallel workshare
-      st_clas%name(:) = "" ; st_clas%name(:) = clas_name(:)
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, clas_totn
+        st_clas%name(i) = ""
+        st_clas%name(i) = clas_name(i)
+      end do
+      !$omp end parallel do
     end if
 
     allocate(clas_num(clas_totn))
-    !$omp parallel workshare
-    clas_num(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, clas_totn
+      clas_num(i) = 0
+    end do
+    !$omp end parallel do
 
     if (my_rank == 0) then
       !$omp parallel do private(i)
@@ -357,9 +364,12 @@ module mpi_set
 
     if (my_rank /= 0) then
       allocate(st_clas%num(clas_totn))
-      !$omp parallel workshare
-      st_clas%num(:) = 0 ; st_clas%num(:) = clas_num(:)
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, clas_totn
+        st_clas%num(i) = 0
+        st_clas%num(i) = clas_num(i)
+      end do
+      !$omp end parallel do
     end if
 
     max_clas = 0
@@ -373,15 +383,18 @@ module mpi_set
 
     allocate(clas_i(max_clas,clas_totn), clas_j(max_clas,clas_totn))
     allocate(clas_k(max_clas,clas_totn))
-    !$omp parallel workshare
-    clas_i(:,:) = 0 ; clas_j(:,:) = 0 ; clas_k(:,:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(j)
+    do j = 1, clas_totn
+      clas_i(:,j) = 0 ; clas_j(:,j) = 0 ; clas_k(:,j) = 0
+    end do
+    !$omp end parallel do
 
     if (my_rank == 0) then
-      !$omp parallel workshare
-      clas_i(:,:) = st_clas%i(:,:) ; clas_j(:,:) = st_clas%j(:,:)
-      clas_k(:,:) = st_clas%k(:,:)
-      !$omp end parallel workshare
+      !$omp parallel do private(j)
+      do j = 1, clas_totn
+        clas_i(:,j) = st_clas%i(:,j) ; clas_j(:,j) = st_clas%j(:,j) ; clas_k(:,j) = st_clas%k(:,j)
+      end do
+      !$omp end parallel do
     end if
 
     clas_len = max_clas*clas_totn
@@ -410,11 +423,12 @@ module mpi_set
     if (my_rank /= 0) then
       allocate(st_clas%i(max_clas,clas_totn), st_clas%j(max_clas,clas_totn))
       allocate(st_clas%k(max_clas,clas_totn))
-      !$omp parallel workshare
-      st_clas%i(:,:) = 0 ; st_clas%j(:,:) = 0 ; st_clas%k(:,:) = 0
-      st_clas%i(:,:) = clas_i(:,:) ; st_clas%j(:,:) = clas_j(:,:)
-      st_clas%k(:,:) = clas_k(:,:)
-      !$omp end parallel workshare
+      !$omp parallel do private(j)
+      do j = 1, clas_totn
+        st_clas%i(:,j) = 0 ; st_clas%j(:,j) = 0 ; st_clas%k(:,j) = 0
+        st_clas%i(:,j) = clas_i(:,j) ; st_clas%j(:,j) = clas_j(:,j) ; st_clas%k(:,j) = clas_k(:,j)
+      end do
+      !$omp end parallel do
     end if
 
     deallocate(clas_name, clas_num, clas_i, clas_j, clas_k)
@@ -475,9 +489,12 @@ module mpi_set
     ierr = 0
     allocate(xyblock(loc_ncals), xydis(loc_ncals), xytype(loc_ncals))
     !$omp parallel
-    !$omp workshare
-    xyblock(:) = 1 ; xydis(1) = 0_MPI_ADDRESS_KIND ; xytype(:) = MPI_INTEGER
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_ncals
+      xyblock(i) = 1
+      xytype(i) = MPI_INTEGER
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, loc_ncals
@@ -518,9 +535,12 @@ module mpi_set
 
     allocate(xyblock(loc_ncals), xydis(loc_ncals), xytype(loc_ncals))
     !$omp parallel
-    !$omp workshare
-    xyblock(:) = 1 ; xydis(1) = 0_MPI_ADDRESS_KIND ; xytype(:) = MPI_REAL4
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_ncals
+      xyblock(i) = 1
+      xytype(i) = MPI_REAL4
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, loc_ncals
@@ -559,10 +579,14 @@ module mpi_set
     deallocate(xyblock, xydis, xytype)
 
     allocate(xyblock(loc_ncals+1), xydis(loc_ncals+1), xytype(loc_ncals+1))
+    xydis(1) = 0_MPI_ADDRESS_KIND
     !$omp parallel
-    !$omp workshare
-    xyblock(:) = 1 ; xydis(1) = 0_MPI_ADDRESS_KIND ; xytype(:) = MPI_REAL4
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_ncals+1
+      xyblock(i) = 1
+      xytype(i) = MPI_REAL4
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, loc_ncals
@@ -602,9 +626,12 @@ module mpi_set
 
     allocate(xyzblock(loc_ncalc), xyzdis(loc_ncalc), xyztype(loc_ncalc))
     !$omp parallel
-    !$omp workshare
-    xyzblock(:) = 1 ; xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(:) = MPI_INTEGER
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_ncalc
+      xyzblock(i) = 1
+      xyztype(i) = MPI_INTEGER
+    end do
+    !$omp end do
     !$omp do private(i)
     do i = 1, loc_ncalc
       xyzdis(i) = int((l2g_ijk(i)-1)*4, kind=MPI_ADDRESS_KIND)
@@ -643,9 +670,12 @@ module mpi_set
 
     allocate(xyzblock(loc_ncalc), xyzdis(loc_ncalc), xyztype(loc_ncalc))
     !$omp parallel
-    !$omp workshare
-    xyzblock(:) = 1 ; xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(:) = MPI_REAL4
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_ncalc
+      xyzblock(i) = 1
+      xyztype(i) = MPI_REAL4
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, loc_ncalc
@@ -684,10 +714,14 @@ module mpi_set
     deallocate(xyzblock, xyzdis, xyztype)
 
     allocate(xyzblock(loc_ncalc+1), xyzdis(loc_ncalc+1), xyztype(loc_ncalc+1))
+    xyzdis(1) = 0_MPI_ADDRESS_KIND
     !$omp parallel
-    !$omp workshare
-    xyzblock(:) = 1 ; xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(:) = MPI_REAL4
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_ncalc+1
+      xyzblock(i) = 1
+      xyztype(i) = MPI_REAL4
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, loc_ncalc
@@ -745,9 +779,12 @@ module mpi_set
     ierr = 0
     allocate(xyblock(loc_seas), xydis(loc_seas), xytype(loc_seas))
     !$omp parallel
-    !$omp workshare
-    xyblock(:) = 1 ; xytype(:) = MPI_REAL4
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_seas
+      xyblock(i) = 1
+      xytype(i) = MPI_REAL4
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, loc_seas
@@ -786,10 +823,14 @@ module mpi_set
     deallocate(xyblock, xydis, xytype)
 
     allocate(xyblock(loc_seas+1), xydis(loc_seas+1), xytype(loc_seas+1))
+    xydis(1) = 0_MPI_ADDRESS_KIND
     !$omp parallel
-    !$omp workshare
-    xyblock(:) = 1 ; xydis(1) = 0_MPI_ADDRESS_KIND ; xytype(:) = MPI_REAL4
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_seas+1
+      xyblock(i) = 1
+      xytype(i) = MPI_REAL4
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, loc_seas
@@ -829,9 +870,12 @@ module mpi_set
 
     allocate(xyzblock(loc_seac), xyzdis(loc_seac), xyztype(loc_seac))
     !$omp parallel
-    !$omp workshare
-    xyzblock(:) = 1 ; xyztype(:) = MPI_REAL4
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_seac
+      xyzblock(i) = 1
+      xyztype(i) = MPI_REAL4
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, loc_seac
@@ -870,10 +914,14 @@ module mpi_set
     deallocate(xyzblock, xyzdis, xyztype)
 
     allocate(xyzblock(loc_seac+1), xyzdis(loc_seac+1), xyztype(loc_seac+1))
+    xyzdis(1) = 0_MPI_ADDRESS_KIND
     !$omp parallel
-    !$omp workshare
-    xyzblock(:) = 1 ;  xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(:) = MPI_REAL4
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_seac+1
+      xyzblock(i) = 1
+      xyztype(i) = MPI_REAL4
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, loc_seac
@@ -931,9 +979,12 @@ module mpi_set
     ierr = 0
     allocate(xyblock(loc_nsurf), xydis(loc_nsurf), xytype(loc_nsurf))
     !$omp parallel
-    !$omp workshare
-    xyblock(:) = 1 ; xytype(:) = MPI_REAL4
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_nsurf
+      xyblock(i) = 1
+      xytype(i) = MPI_REAL4
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, loc_nsurf
@@ -972,10 +1023,14 @@ module mpi_set
     deallocate(xyblock, xydis, xytype)
 
     allocate(xyblock(loc_nsurf+1), xydis(loc_nsurf+1), xytype(loc_nsurf+1))
+    xydis(1) = 0_MPI_ADDRESS_KIND
     !$omp parallel
-    !$omp workshare
-    xyblock(:) = 1 ; xydis(1) = 0_MPI_ADDRESS_KIND ; xytype(:) = MPI_REAL4
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_nsurf+1
+      xyblock(i) = 1
+      xytype(i) = MPI_REAL4
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, loc_nsurf
@@ -1015,9 +1070,12 @@ module mpi_set
 
     allocate(xyzblock(loc_ncell), xyzdis(loc_ncell), xyztype(loc_ncell))
     !$omp parallel
-    !$omp workshare
-    xyzblock(:) = 1 ; xyztype(:) = MPI_REAL4
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_ncell
+      xyzblock(i) = 1
+      xyztype(i) = MPI_REAL4
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, loc_ncell
@@ -1056,10 +1114,14 @@ module mpi_set
     deallocate(xyzblock, xyzdis, xyztype)
 
     allocate(xyzblock(loc_ncell+1), xyzdis(loc_ncell+1), xyztype(loc_ncell+1))
+    xyzdis(1) = 0_MPI_ADDRESS_KIND
     !$omp parallel
-    !$omp workshare
-    xyzblock(:) = 1 ; xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(:) = MPI_REAL4
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_ncell+1
+      xyzblock(i) = 1
+      xyztype(i) = MPI_REAL4
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, loc_ncell
@@ -1116,10 +1178,14 @@ module mpi_set
     !-------------------------------------------------------------------------------------
     ierr = 0
     allocate(xyzblock(loc_ncalc+1), xyzdis(loc_ncalc+1), xyztype(loc_ncalc+1))
+    xyzdis(1) = 0_MPI_ADDRESS_KIND
     !$omp parallel
-    !$omp workshare
-    xyzblock(:) = 1 ; xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(:) = MPI_REAL8
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_ncalc+1
+      xyzblock(i) = 1
+      xyztype(i) = MPI_REAL8
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, loc_ncalc
@@ -1182,10 +1248,15 @@ module mpi_set
     loc_cals = size(sort_ns(:)) + 1
     allocate(xyblock(loc_cals), xydis(loc_cals), xytype(loc_cals))
     allocate(write_2d_ind(cals))
+    xydis(1) = 0_MPI_ADDRESS_KIND
     !$omp parallel
-    !$omp workshare
-    xyblock(:) = 1 ; xydis(1) = 0_MPI_ADDRESS_KIND ; xytype(:) = MPI_REAL4
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_cals
+      xyblock(i) = 1
+      xytype(i) = MPI_REAL4
+    end do
+    !$omp end do
+
     !$omp do private(i)
     do i = 1, loc_cals-1
       xydis(i+1) = int(sort_ns(i)*4, kind=MPI_ADDRESS_KIND)
@@ -1232,10 +1303,14 @@ module mpi_set
     loc_calc = size(sort_nc(:)) + 1
     allocate(xyzblock(loc_calc), xyzdis(loc_calc), xyztype(loc_calc))
     allocate(write_3d_ind(calc))
+    xyzdis(1) = 0_MPI_ADDRESS_KIND
     !$omp parallel
-    !$omp workshare
-    xyzblock(:) = 1 ; xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(:) = MPI_REAL4
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, loc_calc
+      xyzblock(i) = 1
+      xyztype(i) = MPI_REAL4
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, loc_calc-1
@@ -1293,15 +1368,17 @@ module mpi_set
     integer(I4), intent(in) :: s_nreg(:)
     integer(I4), allocatable, intent(out) :: r_nreg(:)
     ! -- local
-    integer(I4) :: ierr
+    integer(I4) :: i, ierr
     integer(I4) :: nreg
     integer(I4), allocatable :: istat(:)
     !-------------------------------------------------------------------------------------
     ierr = 0
     allocate(istat(MPI_STATUS_SIZE))
-    !$omp parallel workshare
-    istat(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, MPI_STATUS_SIZE
+      istat(i) = 0
+    end do
+    !$omp end parallel do
 
     if (pron == my_rank+1) then
       call MPI_SEND(size(s_nreg), 1, MPI_INTEGER, 0, 0, my_comm, ierr)
@@ -1319,9 +1396,11 @@ module mpi_set
       call MPI_SEND(s_nreg(1), size(s_nreg), MPI_INTEGER, 0, 0, my_comm, ierr)
     else if (my_rank == 0) then
       allocate(r_nreg(nreg))
-      !$omp parallel workshare
-      r_nreg(:) = 0
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, nreg
+        r_nreg(i) = 0
+      end do
+      !$omp end parallel do
       call MPI_RECV(r_nreg(1), nreg, MPI_INTEGER, pron-1, 0, my_comm, istat, ierr)
     end if
 
@@ -1345,14 +1424,16 @@ module mpi_set
     integer(I4), intent(in) :: pron
     integer(I4), intent(inout) :: x_num, y_num, z_num
     ! -- local
-    integer(I4) :: ierr
+    integer(I4) :: i, ierr
     integer(I4), allocatable :: istat(:)
     !-------------------------------------------------------------------------------------
     ierr = 0
     allocate(istat(MPI_STATUS_SIZE))
-    !$omp parallel workshare
-    istat(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, MPI_STATUS_SIZE
+      istat(i) = 0
+    end do
+    !$omp end parallel do
 
     if (pron == my_rank+1) then
       call MPI_SEND(x_num, 1, MPI_INTEGER, 0, 1, my_comm, ierr)
@@ -1701,13 +1782,16 @@ module mpi_set
     allocate(requ_send(nbtot), requ_recv(nbtot))
     allocate(stat_send(MPI_STATUS_SIZE,nbtot), stat_recv(MPI_STATUS_SIZE,nbtot))
     !$omp parallel
-    !$omp workshare
-    requ_send(:) = 0 ; requ_recv(:) = 0
-    stat_send(:,:) = 0 ; stat_recv(:,:) = 0
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, nbtot
+      requ_send(i) = 0 ; requ_recv(i) = 0
+      stat_send(:,i) = 0 ; stat_recv(:,i) = 0
+    end do
+    !$omp end do
+    !$omp end parallel
 
     send_count = 0 ; recv_count = 0
-    !$omp do private(i, j, k) reduction(+:send_count, recv_count)
+    !$omp parallel do private(i, j, k) reduction(+:send_count, recv_count)
     do i = 1, nbtot
       do j = sind(i-1)+1, sind(i)
         send_count = send_count + 1
@@ -1716,13 +1800,19 @@ module mpi_set
         recv_count = recv_count + 1
       end do
     end do
-    !$omp end do
-    !$omp end parallel
+    !$omp end parallel do
     allocate(sbufint(send_count), rbufint(recv_count))
     !$omp parallel
-    !$omp workshare
-    sbufint(:) = 0 ; rbufint(:) = 0
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, send_count
+      sbufint(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, recv_count
+      rbufint(i) = 0
+    end do
+    !$omp end do
 
     !$omp do private(i, j, jj)
     do i = 1, nbtot
@@ -1732,8 +1822,10 @@ module mpi_set
       end do
     end do
     !$omp end do
+    !$omp end parallel
 
     ierr = 0
+    !$omp parallel
     !$omp do private(i, is_sta, is_end, sbuflen)
     do i = 1, nbtot
       is_sta = sind(i-1)+1 ; is_end = sind(i)
@@ -1805,13 +1897,15 @@ module mpi_set
     !-------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
     allocate(stat_send(MPI_STATUS_SIZE,nbtot), stat_recv(MPI_STATUS_SIZE,nbtot))
-    !$omp parallel
-    !$omp workshare
-    requ_send(:) = 0 ; requ_recv(:) = 0
-    stat_send(:,:) = 0 ; stat_recv(:,:) = 0
-    !$omp end workshare
-
     send_count = 0 ; recv_count = 0
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, nbtot
+      requ_send(i) = 0 ; requ_recv(i) = 0
+      stat_send(:,i) = 0 ; stat_recv(:,i) = 0
+    end do
+    !$omp end do
+
     !$omp do private(i, j, k) reduction(+:send_count, recv_count)
     do i = 1, nbtot
       do j = sind(i-1)+1, sind(i)
@@ -1825,9 +1919,16 @@ module mpi_set
     !$omp end parallel
     allocate(sbufreal(send_count), rbufreal(recv_count))
     !$omp parallel
-    !$omp workshare
-    sbufreal(:) = SZERO ; rbufreal(:) = SZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, send_count
+      sbufreal(i) = SZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, recv_count
+      rbufreal(i) = SZERO
+    end do
+    !$omp end do
 
     !$omp do private(i, j, jj)
     do i = 1, nbtot
@@ -1837,8 +1938,10 @@ module mpi_set
       end do
     end do
     !$omp end do
+    !$omp end parallel
 
     ierr = 0
+    !$omp parallel
     !$omp do private(i, is_sta, is_end, sbuflen)
     do i = 1, nbtot
       is_sta = sind(i-1)+1 ; is_end = sind(i)
@@ -1910,13 +2013,15 @@ module mpi_set
     !-------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
     allocate(stat_send(MPI_STATUS_SIZE,nbtot), stat_recv(MPI_STATUS_SIZE,nbtot))
-    !$omp parallel
-    !$omp workshare
-    requ_send(:) = 0 ; requ_recv(:) = 0
-    stat_send(:,:) = 0 ; stat_recv(:,:) = 0
-    !$omp end workshare
-
     send_count = 0 ; recv_count = 0
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, nbtot
+      requ_send(i) = 0 ; requ_recv(i) = 0
+      stat_send(:,i) = 0 ; stat_recv(:,i) = 0
+    end do
+    !$omp end do
+
     !$omp do private(i, j, k) reduction(+:send_count, recv_count)
     do i = 1, nbtot
       do j = sind(i-1)+1, sind(i)
@@ -1930,9 +2035,16 @@ module mpi_set
     !$omp end parallel
     allocate(sbufreal(send_count), rbufreal(recv_count))
     !$omp parallel
-    !$omp workshare
-    sbufreal(:) = DZERO ; rbufreal(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, send_count
+      sbufreal(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, recv_count
+      rbufreal(i) = DZERO
+    end do
+    !$omp end do
 
     !$omp do private(i, j, jj)
     do i = 1, nbtot
@@ -1942,8 +2054,10 @@ module mpi_set
       end do
     end do
     !$omp end do
+    !$omp end parallel
 
     ierr = 0
+    !$omp parallel
     !$omp do private(i, is_sta, is_end, sbuflen)
     do i = 1, nbtot
       is_sta = sind(i-1)+1 ; is_end = sind(i)
@@ -2015,13 +2129,15 @@ module mpi_set
     !-------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
     allocate(stat_send(MPI_STATUS_SIZE,nbtot), stat_recv(MPI_STATUS_SIZE,nbtot))
-    !$omp parallel
-    !$omp workshare
-    stat_send(:,:) = 0 ; stat_recv(:,:) = 0
-    requ_send(:) = 0 ; requ_recv(:) = 0
-    !$omp end workshare
-
     send_count = 0 ; recv_count = 0
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, nbtot
+      requ_send(i) = 0 ; requ_recv(i) = 0
+      stat_send(:,i) = 0 ; stat_recv(:,i) = 0
+    end do
+    !$omp end do
+
     !$omp do private(i, j, k) reduction(+:send_count, recv_count)
     do i = 1, nbtot
       do j = sind(i-1)+1, sind(i)
@@ -2035,9 +2151,16 @@ module mpi_set
     !$omp end parallel
     allocate(sbufreal(send_count*FACE), rbufreal(recv_count*FACE))
     !$omp parallel
-    !$omp workshare
-    sbufreal(:) = 0 ; rbufreal(:) = 0
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, send_count*FACE
+      sbufreal(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, recv_count*FACE
+      rbufreal(i) = 0
+    end do
+    !$omp end do
 
     !$omp do private(i, j, jj, k, kk)
     do i = 1, nbtot
@@ -2050,8 +2173,10 @@ module mpi_set
       end do
     end do
     !$omp end do
+    !$omp end parallel
 
     ierr = 0
+    !$omp parallel
     !$omp do private(i, is_sta, is_end, sbuflen)
     do i = 1, nbtot
       is_sta = sind(i-1)*FACE+1 ; is_end = sind(i)*FACE
@@ -2126,13 +2251,15 @@ module mpi_set
     !-------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
     allocate(stat_send(MPI_STATUS_SIZE,nbtot), stat_recv(MPI_STATUS_SIZE,nbtot))
-    !$omp parallel
-    !$omp workshare
-    stat_send(:,:) = 0 ; stat_recv(:,:) = 0
-    requ_send(:) = 0 ; requ_recv(:) = 0
-    !$omp end workshare
-
     send_count = 0 ; recv_count = 0
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, nbtot
+      stat_send(:,i) = 0 ; stat_recv(:,i) = 0
+      requ_send(i) = 0 ; requ_recv(i) = 0
+    end do
+    !$omp end do
+
     !$omp do private(i, j, k) reduction(+:send_count, recv_count)
     do i = 1, nbtot
       do j = sind(i-1)+1, sind(i)
@@ -2146,9 +2273,16 @@ module mpi_set
     !$omp end parallel
     allocate(sbufreal(send_count*FACE), rbufreal(recv_count*FACE))
     !$omp parallel
-    !$omp workshare
-    sbufreal(:) = SZERO ; rbufreal(:) = SZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, send_count*FACE
+      sbufreal(i) = SZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, recv_count*FACE
+      rbufreal(i) = SZERO
+    end do
+    !$omp end do
 
     !$omp do private(i, j, jj, k, kk)
     do i = 1, nbtot
@@ -2161,8 +2295,10 @@ module mpi_set
       end do
     end do
     !$omp end do
+    !$omp end parallel
 
     ierr = 0
+    !$omp parallel
     !$omp do private(i, is_sta, is_end, sbuflen)
     do i = 1, nbtot
       is_sta = sind(i-1)*FACE+1 ; is_end = sind(i)*FACE
@@ -2237,13 +2373,15 @@ module mpi_set
     !-------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
     allocate(stat_send(MPI_STATUS_SIZE,nbtot), stat_recv(MPI_STATUS_SIZE,nbtot))
-    !$omp parallel
-    !$omp workshare
-    stat_send(:,:) = 0 ; stat_recv(:,:) = 0
-    requ_send(:) = 0 ; requ_recv(:) = 0
-    !$omp end workshare
-
     send_count = 0 ; recv_count = 0
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, nbtot
+      requ_send(i) = 0 ; requ_recv(i) = 0
+      stat_send(:,i) = 0 ; stat_recv(:,i) = 0
+    end do
+    !$omp end do
+
     !$omp do private(i, j, k) reduction(+:send_count, recv_count)
     do i = 1, nbtot
       do j = sind(i-1)+1, sind(i)
@@ -2257,9 +2395,16 @@ module mpi_set
     !$omp end parallel
     allocate(sbufreal(send_count*FACE), rbufreal(recv_count*FACE))
     !$omp parallel
-    !$omp workshare
-    sbufreal(:) = DZERO ; rbufreal(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, send_count*FACE
+      sbufreal(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, recv_count*FACE
+      rbufreal(i) = DZERO
+    end do
+    !$omp end do
 
     !$omp do private(i, j, jj, k, kk)
     do i = 1, nbtot
@@ -2272,8 +2417,10 @@ module mpi_set
       end do
     end do
     !$omp end do
+    !$omp end parallel
 
     ierr = 0
+    !$omp parallel
     !$omp do private(i, is_sta, is_end, sbuflen)
     do i = 1, nbtot
       is_sta = sind(i-1)*FACE+1 ; is_end = sind(i)*FACE

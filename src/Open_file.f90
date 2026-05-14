@@ -1118,7 +1118,8 @@ module open_file
         call open_new_rbin(1, 1, prec_path, "input "//vname, st_prec%fnum)
 #endif
     else if (prec_type == in_type(7)) then
-      intpr_type = 0 ; err_mes = vname//" time interval"
+      intpr_type = 0 ; err_mes = ""
+      err_mes = vname//" time interval"
       if (my_rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, prec_path, "input "//vname, intpr_fnum)
@@ -1282,7 +1283,8 @@ module open_file
         call open_new_rbin(1, 1, evap_path, "input "//vname, st_evap%fnum)
 #endif
     else if (evap_type == in_type(7)) then
-      intev_type = 0 ; err_mes = vname//" time interval"
+      intev_type = 0 ; err_mes = ""
+      err_mes = vname//" time interval"
       if (my_rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, evap_path, "input "//vname, intev_fnum)

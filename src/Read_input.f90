@@ -289,9 +289,12 @@ module read_input
     end if
 
     allocate(st_clas%name(st_clas%totn), st_clas%num(st_clas%totn))
-    !$omp parallel workshare
-    st_clas%name(:) = "" ; st_clas%num(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, st_clas%totn
+      st_clas%name(i) = ""
+      st_clas%num(i) = 0
+    end do
+    !$omp end parallel do
     max_clas = 0
 
     do i = 1, st_clas%totn
@@ -312,9 +315,11 @@ module read_input
 
     allocate(st_clas%i(max_clas,st_clas%totn), st_clas%j(max_clas,st_clas%totn))
     allocate(st_clas%k(max_clas,st_clas%totn))
-    !$omp parallel workshare
-    st_clas%i(:,:) = 0 ; st_clas%j(:,:) = 0 ; st_clas%k(:,:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(j)
+    do j = 1, st_clas%totn
+      st_clas%i(:,j) = 0 ; st_clas%j(:,j) = 0 ; st_clas%k(:,j) = 0
+    end do
+    !$omp end parallel do
 
     rewind(unit=file_num,iostat=ierr)
     if (ierr /= 0) then
@@ -458,9 +463,18 @@ module read_input
     ierr = 0
     allocate(glob_x(nx+1,ny+1), glob_y(nx+1,ny+1))
     allocate(glob_z(nx+1,ny+1,nz+1))
-    !$omp parallel workshare
-    glob_x(:,:) = DZERO ; glob_y(:,:) = DZERO ; glob_z(:,:,:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(j)
+    do j = 1, ny+1
+      glob_x(:,j) = DZERO ; glob_y(:,j) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(k)
+    do k = 1, nz+1
+      glob_z(:,:,k) = DZERO
+    end do
+    !$omp end do
+    !$omp end parallel
 
     if (gtype == in_type(0)) then
       read(unit=file_num,nml=ingrid_type,iostat=ierr)
@@ -479,9 +493,18 @@ module read_input
 
       allocate(read_xy(nx+1,ny+1))
       allocate(read_z(nx+1,ny+1,nz+1))
-      !$omp parallel workshare
-      read_xy(:,:) = SZERO ; read_z(:,:,:) = SZERO
-      !$omp end parallel workshare
+      !$omp parallel
+      !$omp do private(j)
+      do j = 1, ny+1
+        read_xy(:,j) = SZERO
+      end do
+      !$omp end do
+      !$omp do private(k)
+      do k = 1, nz+1
+        read_z(:,:,k) = SZERO
+      end do
+      !$omp end do
+      !$omp end parallel
 
       do i = 1, 3
         select case (i)
@@ -1040,9 +1063,16 @@ module read_input
     allocate(gxnum(nx+1,ny+1), gynum(nx+1,ny+1))
     allocate(gznum(nx+1,ny+1,nz+1))
     !$omp parallel
-    !$omp workshare
-    gxnum(:,:) = 0 ; gynum(:,:) = 0 ; gznum(:,:,:) = 0
-    !$omp end workshare
+    !$omp do private(j)
+    do j = 1, ny+1
+      gxnum(:,j) = 0 ; gynum(:,j) = 0
+    end do
+    !$omp end do
+    !$omp do private(k)
+    do k = 1, nz+1
+      gznum(:,:,k) = 0
+    end do
+    !$omp end do
 
     !$omp do private(i, j)
     do j = 1, ny+1
@@ -1075,9 +1105,10 @@ module read_input
       end do
     end do
     !$omp end do
+    !$omp end parallel
 
     minz = -DNOVAL ; maxz = DNOVAL
-    !$omp do private(i, j, k) reduction(min:minz) reduction(max:maxz)
+    !$omp parallel do private(i, j, k) reduction(min:minz) reduction(max:maxz)
     do k = 1, nz+1
       do j = 1, ny+1
         do i = 1, nx+1
@@ -1090,8 +1121,7 @@ module read_input
         end do
       end do
     end do
-    !$omp end do
-    !$omp end parallel
+    !$omp end parallel do
 
     grid_xnum = sum(gxnum) ; grid_ynum = sum(gynum) ; grid_znum = sum(gznum)
     deallocate(gxnum, gynum, gznum)
@@ -1107,10 +1137,19 @@ module read_input
 
     len_scal_inv = SONE/len_scal
 
-    !$omp parallel workshare
-    glob_x(:,:) = glob_x(:,:)*len_scal_inv ; glob_y(:,:) = glob_y(:,:)*len_scal_inv
-    glob_z(:,:,:) = glob_z(:,:,:)*len_scal_inv
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(j)
+    do j = 1, ny+1
+      glob_x(:,j) = glob_x(:,j)*len_scal_inv
+      glob_y(:,j) = glob_y(:,j)*len_scal_inv
+    end do
+    !$omp end do
+    !$omp do private(k)
+    do k = 1, nz+1
+      glob_z(:,:,k) = glob_z(:,:,k)*len_scal_inv
+    end do
+    !$omp end do
+    !$omp end parallel
 
   end subroutine check_grid_loc
 
@@ -1126,13 +1165,16 @@ module read_input
     character(*), intent(in) :: tinp_path, tinp_name
     character(*), intent(in), optional :: tinp_unit
     ! -- local
+    integer(I4) :: i
     character(:), allocatable :: err_mes
     logical, allocatable :: tinp_mask(:)
     !-------------------------------------------------------------------------------------
     allocate(tinp_mask(size(all_type)))
-    !$omp parallel workshare
-    tinp_mask(:) = (tinp_type /= all_type(:))
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, size(all_type)
+      tinp_mask(i) = (tinp_type /= all_type(i))
+    end do
+    !$omp end parallel do
 
     if (all(tinp_mask)) then
       err_mes = "Specify correct number for "//tinp_name//" in timeseries input file."

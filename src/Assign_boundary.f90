@@ -6,6 +6,7 @@ module assign_boundary
   use utility_module, only: close_file
   use read_module, only: read_clasf
   use read_input, only: len_scal_inv
+  use set_cell, only: ncals
   use set_condition, only: set_clas2calc, set_2dfile2cals
 #ifdef MPI_MSG
   use mpi_read, only: close_mpi_file
@@ -43,7 +44,7 @@ module assign_boundary
     ! -- inout
     integer(I4), intent(in) :: seal_ftype
     ! -- local
-    integer(I4) :: sealn, intse_type, temp_ftype
+    integer(I4) :: i, sealn, intse_type, temp_ftype
     integer(I4), allocatable :: seal_cflag(:), seal2cell(:)
     integer(I4), allocatable :: seal_all_type(:)
     real(DP), allocatable :: cell_seal(:)
@@ -53,17 +54,29 @@ module assign_boundary
     if (st_seal%totn > 0) then
       allocate(read_seal(ncell), seal_cflag(ncell))
       allocate(seal_all_type(7), seal_all_mask(7))
-      !$omp parallel workshare
-      read_seal(:) = SNOVAL ; seal_cflag(:) = 0
-      seal_all_type(:) = [in_type(1:7)]
-      seal_all_mask(:) = (st_in_type%seal == seal_all_type(:))
-      !$omp end parallel workshare
+      !$omp parallel
+      !$omp do private(i)
+      do i = 1, ncell
+        read_seal(i) = SNOVAL
+        seal_cflag(i) = 0
+      end do
+      !$omp end do
+      !$omp do private(i)
+      do i = 1, 7
+        seal_all_type(i) = in_type(i)
+        seal_all_mask(i) = (st_in_type%seal == seal_all_type(i))
+      end do
+      !$omp end do
+      !$omp end parallel
 
       if (seal_ftype == in_type(1)) then
         allocate(st_seal%value(st_seal%totn), st_seal%name(st_seal%totn))
-        !$omp parallel workshare
-        st_seal%value(:) = SNOVAL ; st_seal%name(:) = ""
-        !$omp end parallel workshare
+        !$omp parallel do private(i)
+        do i = 1, st_seal%totn
+          st_seal%value(i) = SNOVAL
+          st_seal%name(i) = ""
+        end do
+        !$omp end parallel do
         if (my_rank == 0) then
           call read_clasf(st_seal%fnum, st_seal%totn, st_seal%name, st_seal%value)
         end if
@@ -78,10 +91,12 @@ module assign_boundary
       else if (seal_ftype == in_type(2)) then
         allocate(st_seal%value(st_seal%totn))
         allocate(st_seal%i(st_seal%totn), st_seal%j(st_seal%totn), st_seal%k(st_seal%totn))
-        !$omp parallel workshare
-        st_seal%value(:) = SNOVAL
-        st_seal%i(:) = 0 ; st_seal%j(:) = 0 ; st_seal%k(:) = 0
-        !$omp end parallel workshare
+        !$omp parallel do private(i)
+        do i = 1, st_seal%totn
+          st_seal%value(i) = SNOVAL
+          st_seal%i(i) = 0 ; st_seal%j(i) = 0 ; st_seal%k(i) = 0
+        end do
+        !$omp end parallel do
         if (my_rank == 0) then
           call read_3dpointf(st_seal%fnum, st_seal%totn, st_seal%i, st_seal%j, st_seal%k,&
                              st_seal%value)
@@ -148,15 +163,20 @@ module assign_boundary
 
       if (any(seal_all_mask)) then
         allocate(seal2cell(sealn), cell_seal(sealn))
-        !$omp parallel workshare
-        seal2cell(:) = 0 ; cell_seal(:) = DZERO
-        !$omp end parallel workshare
+        !$omp parallel do private(i)
+        do i = 1, sealn
+          seal2cell(i) = 0
+          cell_seal(i) = DZERO
+        end do
+        !$omp end parallel do
         call set_bound2calc(ncell, seal_cflag, read_seal, seal2cell, cell_seal)
         deallocate(read_seal)
         allocate(read_seal(sealn))
-        !$omp parallel workshare
-        read_seal(:) = real(cell_seal(:), kind=SP)*len_scal_inv
-        !$omp end parallel workshare
+        !$omp parallel do private(i)
+        do i = 1, sealn
+          read_seal(i) = real(cell_seal(i), kind=SP)*len_scal_inv
+        end do
+        !$omp end parallel do
         deallocate(seal_cflag, seal2cell, cell_seal)
       end if
       deallocate(seal_all_type, seal_all_mask)
@@ -177,16 +197,19 @@ module assign_boundary
     integer(I4), intent(out) :: sb_cflag(:)
     real(SP), intent(out) :: read_sb(:)
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     sb_num = 0
 
     if (sb_st%totn > 0) then
       if (sb_ftype == in_type(1)) then
         allocate(sb_st%value(sb_st%totn), sb_st%name(sb_st%totn))
-        !$omp parallel workshare
-        sb_st%value(:) = SNOVAL ; sb_st%name(:) = ""
-        !$omp end parallel workshare
+        !$omp parallel do private(i)
+        do i = 1, sb_st%totn
+          sb_st%value(i) = SNOVAL
+          sb_st%name(i) = ""
+        end do
+        !$omp end parallel do
         if (my_rank == 0) then
           call read_clasf(sb_st%fnum, sb_st%totn, sb_st%name, sb_st%value)
         end if
@@ -214,9 +237,11 @@ module assign_boundary
         end if
       end if
 
-      !$omp parallel workshare
-      read_sb(:) = read_sb(:)*len_scal_inv*sb_st%uni_conv
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        read_sb(i) = read_sb(i)*len_scal_inv*sb_st%uni_conv
+      end do
+      !$omp end parallel do
 
     end if
 
@@ -236,7 +261,7 @@ module assign_boundary
     integer(I4), intent(in) :: well_ftype, weks_ftype, weke_ftype
     integer(I4), intent(inout) :: num_well
     ! -- local
-    integer(I4) :: intwe_type
+    integer(I4) :: i, intwe_type
     integer(I4), allocatable :: well2calc(:)
     integer(I4), allocatable :: type_2d(:), type_3d(:)
     !-------------------------------------------------------------------------------------
@@ -246,9 +271,11 @@ module assign_boundary
       type_2d(:) = [in_type(3), in_type(4)] ; type_3d(:) = [in_type(5), in_type(6)]
       if (any(well_ftype == type_3d) .or. any(intwe_type == type_3d)) then
         allocate(well2calc(ncalc))
-        !$omp parallel workshare
-        well2calc(:) = 0
-        !$omp end parallel workshare
+        !$omp parallel do private(i)
+        do i = 1, ncalc
+          well2calc(i) = 0
+        end do
+        !$omp end parallel do
       end if
 
       if (well_ftype == in_type(2)) then
@@ -296,16 +323,26 @@ module assign_boundary
       if (well_ftype == in_type(2) .or. any(well_ftype == type_2d) .or. &
           any(well_ftype == type_3d) .or. well_ftype == in_type(7)) then
         allocate(well_top(num_well), well_bott(num_well), read_well(num_well))
-        !$omp parallel workshare
-        well_top(:) = DZERO ; well_bott(:) = DZERO ; read_well(:) = st_well%value(:)
-        !$omp end parallel workshare
+        !$omp parallel do private(i)
+        do i = 1, num_well
+          well_top(i) = DZERO ; well_bott(i) = DZERO ; read_well(i) = st_well%value(i)
+        end do
+        !$omp end parallel do
         call set_wellprop(num_well, well_top, well_bott)
         allocate(calc_well(ncalc))
         deallocate(st_well%value)
-        !$omp parallel workshare
-        calc_well(:) = DZERO
-        read_well(:) = read_well(:)*(len_scal_inv**3)*st_well%uni_conv
-        !$omp end parallel workshare
+        !$omp parallel
+        !$omp do private(i)
+        do i = 1, ncalc
+          calc_well(i) = DZERO
+        end do
+        !$omp end do
+        !$omp do private(i)
+        do i = 1, num_well
+          read_well(i) = read_well(i)*(len_scal_inv**3)*st_well%uni_conv
+        end do
+        !$omp end do
+        !$omp end parallel
       end if
       deallocate(type_2d, type_3d)
     end if
@@ -330,6 +367,7 @@ module assign_boundary
     integer(I4), intent(out) :: rl_cflag(:)
     real(SP), intent(out) :: calc_rl(:)
     ! -- local
+    integer(I4) :: i
     real(SP) :: nodim_unit
     !-------------------------------------------------------------------------------------
     rl_num = 0
@@ -337,9 +375,12 @@ module assign_boundary
     if (rl_st%totn > 0) then
       if (rl_ftype == in_type(1)) then
         allocate(rl_st%value(rl_st%totn), rl_st%name(rl_st%totn))
-        !$omp parallel workshare
-        rl_st%value(:) = SNOVAL ; rl_st%name(:) = ""
-        !$omp end parallel workshare
+        !$omp parallel do private(i)
+        do i = 1, rl_st%totn
+          rl_st%value(i) = SNOVAL
+          rl_st%name(i) = ""
+        end do
+        !$omp end parallel do
         if (my_rank == 0) then
           call read_clasf(rl_st%fnum, rl_st%totn, rl_st%name, rl_st%value)
         end if
@@ -353,10 +394,12 @@ module assign_boundary
       else if (rl_ftype == in_type(2)) then
         allocate(rl_st%value(rl_st%totn))
         allocate(rl_st%i(rl_st%totn), rl_st%j(rl_st%totn))
-        !$omp parallel workshare
-        rl_st%value(:) = SNOVAL
-        rl_st%i(:) = 0 ; rl_st%j(:) = 0
-        !$omp end parallel workshare
+        !$omp parallel do private(i)
+        do i = 1, rl_st%totn
+          rl_st%value(i) = SNOVAL
+          rl_st%i(i) = 0 ; rl_st%j(i) = 0
+        end do
+        !$omp end parallel do
         if (my_rank == 0) then
           call read_2dpointf(rl_st%fnum, rl_st%totn, rl_st%i, rl_st%j, rl_st%value)
         end if
@@ -391,9 +434,11 @@ module assign_boundary
       else
         nodim_unit = len_scal_inv*len_scal_inv
       end if
-      !$omp parallel workshare
-      calc_rl(:) = calc_rl(:)*nodim_unit
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        calc_rl(i) = calc_rl(i)*nodim_unit
+      end do
+      !$omp end parallel do
 
     end if
 

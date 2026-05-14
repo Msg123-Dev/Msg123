@@ -11,21 +11,21 @@ ${SOURCEDIR}
 
 .SUFFIXES: .f90 .o
 
-# Define the Fortran compile flags (gfortran or ifort)
-FC = ifort
+# Define the Fortran compile flags (gfortran, ifort or ifx)
+FC = gfortran
 
 # Define the mode (release or debug)
 MODE = release
 
 # Define the parallel (MPI, OpenMP, Hybrid)
-# PARA = OpenMP
+PARA = OpenMP
 
 #for gfortran
 ifeq ($(FC),gfortran)
 	ifeq ($(MODE),debug)
 		FFLAGS = -cpp -Wall -g -fbacktrace -fbounds-check  -Wuninitialized -pedantic -ffpe-trap=invalid,zero,overflow
 	else
-		FFLAGS = -cpp -Wall -O3 -Wno-unused-function -fmax-stack-var-size=65535
+		FFLAGS = -cpp -Wall -O3 -Wno-unused-function
 	endif
 	ifeq ($(PARA),Hybrid)
 		FC = mpif90
@@ -46,7 +46,7 @@ ifeq ($(FC),ifort)
 	ifeq ($(MODE),debug)
 		FFLAGS = -fpp -warn all -g -traceback -check bounds -fpe0 -check all -std -ftrapuv -gen_interfaces
 	else
-		FFLAGS = -fpp -warn all -O3 -heap-arrays
+		FFLAGS = -fpp -warn all -O3
 	endif
 	ifeq ($(PARA),Hybrid)
 		FC = mpif90

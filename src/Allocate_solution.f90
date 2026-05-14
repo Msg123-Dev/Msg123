@@ -81,14 +81,25 @@ module allocate_solution
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(head_old(ncalc), srat_old(ncalc))
     allocate(surf_head(ncals), surf_old(ncals), surf_rati(ncals))
-    !$omp parallel workshare
-    head_old(:) = DZERO ; srat_old(:) = DZERO
-    surf_head(:) = DZERO ; surf_old(:) = DZERO ; surf_rati(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, ncalc
+      head_old(i) = DZERO
+      srat_old(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncals
+      surf_head(i) = DZERO
+      surf_old(i) = DZERO
+      surf_rati(i) = DZERO
+    end do
+    !$omp end do
+    !$omp end parallel
 
   end subroutine allocate_timeup
 
@@ -116,14 +127,23 @@ module allocate_solution
     allocate(seal2calc(nseal), seal2seal(nseal))
     allocate(dir_conn(tconn_num))
     !$omp parallel
-    !$omp workshare
-    head_new(:) = DZERO ; head_pre(:) = DZERO ; head_change(:) = DZERO
-    srat_new(:) = DZERO ; rel_perm(:) = DZERO
-    abyd_conn(:) = DZERO ; hydf_conn(:) = DZERO
-    abyd_seal(:) = DZERO ; hydf_seal(:) = DZERO
-    seal2calc(:) = 0 ; seal2seal(:) = 0 ; dir_conn(:) = 0
-    !$omp end workshare
-
+    !$omp do private(i)
+    do i = 1, nreg_num
+      head_new(i) = DZERO ; head_pre(i) = DZERO ; head_change(i) = DZERO
+      srat_new(i) = DZERO ; rel_perm(i) = DZERO ; dir_conn(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, tconn_num
+      abyd_conn(i) = DZERO ; hydf_conn(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, nseal
+      abyd_seal(i) = DZERO ; hydf_seal(i) = DZERO
+      abyd_seal(i) = DZERO ; hydf_seal(i) = DZERO
+    end do
+    !$omp end do
     !$omp do private(i, k)
     do i = 1, nreg_num
       do k = off_index(i-1)+1, off_index(i)
@@ -168,28 +188,40 @@ module allocate_solution
     allocate(crs_index(amg_nlevel), array_var(amg_nlevel))
     allocate(crs_index(1)%offrow(tconn_num), crs_index(1)%offind(0:nreg_num))
     allocate(left_offr(tconn_num), right_offr(tconn_num))
-    !$omp parallel workshare
-    crs_index(1)%offrow(:) = 0 ; crs_index(1)%offind(:) = 0
-    crs_index(1)%offrow(:) = off_row(1:tconn_num)
-    crs_index(1)%offind(:) = off_index(:)
-    left_offr(:) = 0 ; right_offr(:) = 0
-    left_offr(:) = left_off(1:tconn_num) ; right_offr(:) = right_off(1:tconn_num)
-    !$omp end parallel workshare
-    crs_index(1)%unknow = ncalc ; crs_index(1)%lunum = tconn_num
-
     allocate(array_var(1)%dmat(nreg_num), array_var(1)%lumat(tconn_num))
     allocate(array_var(1)%rhs(nreg_num))
-    !$omp parallel workshare
-    array_var(1)%dmat(:) = DZERO ; array_var(1)%lumat(:) = DZERO
-    array_var(1)%rhs(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, tconn_num
+      crs_index(1)%offrow(i) = 0
+      crs_index(1)%offrow(i) = off_row(i)
+      left_offr(i) = 0
+      left_offr(i) = left_off(i)
+      right_offr(i) = 0
+      right_offr(i) = right_off(i)
+      array_var(1)%lumat(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, nreg_num
+      crs_index(1)%offind(i) = 0
+      crs_index(1)%offind(i) = off_index(i)
+      array_var(1)%dmat(i) = DZERO
+      array_var(1)%rhs(i) = DZERO
+    end do
+    !$omp end do
+    !$omp end parallel
+    crs_index(1)%unknow = ncalc ; crs_index(1)%lunum = tconn_num
+    crs_index(1)%offind(0) = off_index(0)
 
     if (precon_type == 1) then
       allocate(pro_var(amg_nlevel), res_var(amg_nlevel))
       allocate(array_var(1)%x(nreg_num))
-      !$omp parallel workshare
-      array_var(1)%x(:) = DZERO
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, nreg_num
+        array_var(1)%x(i) = DZERO
+      end do
+      !$omp end parallel do
     end if
 
     deallocate(off_row, off_index)

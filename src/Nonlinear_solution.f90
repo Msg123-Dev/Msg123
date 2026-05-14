@@ -7,7 +7,7 @@ module nonlinear_solution
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc
   use prep_calculation, only: out_iter
-  use allocate_solution, only: array_var, head_new, head_pre, head_change
+  use allocate_solution, only: nreg_num, array_var, head_new, head_pre, head_change
   use time_module, only: now_time
   use calc_simulation, only: calc_l2norm2
   use calc_function, only: calc_func
@@ -48,6 +48,7 @@ module nonlinear_solution
     ! -- inout
 
     ! -- local
+    integer(I4) :: i
     integer(I4) :: maxnun, conv_fnum
     character(VARLEN) :: cxyzn
     real(DP) :: maxunk, check_val
@@ -78,9 +79,11 @@ module nonlinear_solution
         end if
         form_switch = 1
         allocate(new_f(ncalc))
-        !$omp parallel workshare
-        new_f(:) = DZERO
-        !$omp end parallel workshare
+        !$omp parallel do private(i)
+        do i = 1, ncalc
+          new_f(i) = DZERO
+        end do
+        !$omp end parallel do
       else
         l2_pre = l2_new
       end if
@@ -111,9 +114,12 @@ module nonlinear_solution
         l2_pre = l2_new ; eta = DHALF
       end if
 
-      !$omp parallel workshare
-      head_pre(:) = head_new(:) ; head_change(:) = DZERO
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, nreg_num
+        head_pre(i) = head_new(i)
+        head_change(i) = DZERO
+      end do
+      !$omp end parallel do
 
       conv_flag = 0
       if (st_sim%sim_type /= -1) then
@@ -124,9 +130,11 @@ module nonlinear_solution
       ! -- Solve linear algebra (linalg)
         call solve_linalg(l2_pre, head_change, l2_jnorm)
 
-      !$omp parallel workshare
-      head_new(:) = head_pre(:) + head_change(:)
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, nreg_num
+        head_new(i) = head_pre(i) + head_change(i)
+      end do
+      !$omp end parallel do
 
       ! -- Check absolute error max norm
         call check_abserrmax(head_new, head_pre, maxvar, maxunk, maxnun)
@@ -306,11 +314,9 @@ module nonlinear_solution
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------
-    !$omp parallel workshare
     array_var(1)%lumat(:) = DZERO
     array_var(1)%dmat(:) = DZERO
     array_var(1)%rhs(:) = DZERO
-    !$omp end parallel workshare
 
     if (precon_type == 1 .and. amg_setflag == 1) then
       do i = 2, nlevel
@@ -344,10 +350,18 @@ module nonlinear_solution
     !-------------------------------------------------------------------------------------
 !    allocate(sst_ms(ncalc), sco_ms(ncalc), sse_ms(ncalc), swe_ms(ncalc))
 !    allocate(sre_ms(ncals), ssu_ms(ncals), sri_ms(ncals), sla_ms(ncals))
-!    !$omp parallel workshare
-!    sst_ms(:) = DZERO ; sco_ms(:) = DZERO ; sse_ms(:) = DZERO ; swe_ms(:) = DZERO
-!    sre_ms(:) = DZERO ; ssu_ms(:) = DZERO ; sri_ms(:) = DZERO ; sla_ms(:) = DZERO
-!    !$omp end parallel workshare
+!    !$omp parallel
+!    !$omp do private(i)
+!    do i = 1, ncals
+!      sre_ms(:) = DZERO ; ssu_ms(:) = DZERO ; sri_ms(:) = DZERO ; sla_ms(:) = DZERO
+!    end do
+!    !$omp end do
+!    !$omp do private(i)
+!    do i = 1, ncalc
+!      sst_ms(:) = DZERO ; sco_ms(:) = DZERO ; sse_ms(:) = DZERO ; swe_ms(:) = DZERO
+!    end do
+!    !$omp end do
+!    !$omp end parallel
 !    ! -- Calculate massbalance (mass)
 !      call calc_mass(1, head_new, head_pre, sst_ms, sco_ms, sse_ms, swe_ms, sre_ms, ssu_ms, sri_ms, sla_ms)
 
@@ -464,9 +478,11 @@ module nonlinear_solution
     !-------------------------------------------------------------------------------------
     l2_new2 = l2_new ; lam = DONE ; lam2 = DONE ; maxpnorm = DONE ; lam_length = DONE
     allocate(jacvec(ncalc))
-    !$omp parallel workshare
-    jacvec(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      jacvec(i) = DZERO
+    end do
+    !$omp end parallel do
     ! -- Calculate function value (func)
       call calc_func(head_new, new_f)
     ! -- Calculate l2 norm square (resl2norm2)
@@ -494,11 +510,14 @@ module nonlinear_solution
     end if
     step_len = sql2_pnorm
 
+    l2_new = DZERO ; slope = DZERO
     !$omp parallel
-    !$omp workshare
-    l2_new = dot_product(new_f(1:ncalc), new_f(1:ncalc))
-    slope = dot_product(array_var(1)%rhs(1:ncalc), jacvec(1:ncalc))*maxpnorm
-    !$omp end workshare
+    !$omp do private(i) reduction(+:l2_new, slope)
+    do i = 1, ncalc
+      l2_new = l2_new + new_f(i)*new_f(i)
+      slope = slope + array_var(1)%rhs(i)*jacvec(i)*maxpnorm
+    end do
+    !$omp end do
 
     !$omp do private(i, temp_lam) reduction(max:lam_length)
     do i = 1, ncalc
@@ -687,9 +706,11 @@ module nonlinear_solution
 !    !-------------------------------------------------------------------------------------
 !    if (.not. allocated(old_w)) then
 !      allocate(old_w(ncalc), weight_x(ncalc), old_del_x(ncalc))
-!      !$omp parallel workshare
-!      old_w(:) = DZERO ; weight_x(:) = DZERO ; old_del_x(:) = DZERO
-!      !$omp end parallel workshare
+!      !$omp parallel do private(i)
+!      do i = 1, ncalc
+!        old_w(i) = DZERO ; weight_x(i) = DZERO ; old_del_x(i) = DZERO
+!      end do
+!      !$omp end parallel do
 !    end if
 !
 !    !$omp parallel do private(i, w, mom, del_x)
@@ -762,7 +783,7 @@ module nonlinear_solution
   ! calc_funcl2norm -- Calculate function and l2norm2
   !***************************************************************************************
     ! -- modules
-    use allocate_solution, only: nreg_num
+
     ! -- inout
     real(DP), intent(in) :: in_lam
     ! -- local

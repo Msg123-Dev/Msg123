@@ -93,9 +93,11 @@ module set_cell
     end if
 
     allocate(glob_reg_flag(st_grid%nxyz), glob_mpi_flag(st_grid%nxyz))
-    !$omp parallel workshare
-    glob_reg_flag(:) = 0 ; glob_mpi_flag(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, st_grid%nxyz
+      glob_reg_flag(i) = 0 ; glob_mpi_flag(i) = 0
+    end do
+    !$omp end parallel do
 
     nxy = st_grid%nx*st_grid%ny
 
@@ -108,10 +110,7 @@ module set_cell
         call div_nocalc_flag_2d()
       ! -- Check the calculation regin (calc_region)
         call check_calc_region(glob_clas_flag, glob_reg_flag)
-!        allocate(glob_num(count(glob_reg_flag(:) == 0)))
-!        glob_num(:) = 0
-!        glob_mpi_flag(:) = unpack(glob_num(:), glob_reg_flag(:) == 0, glob_mpi_flag(:))
-!        deallocate(glob_num)
+        where (glob_reg_flag(:) == 0 .and. glob_mpi_flag(:) > 0) glob_mpi_flag(:) = 0
 !      if (st_sim%reg_neib == 1) then
 !        ! -- Divide calculation region for 2d (calc_reg_2d)
 !          call div_calc_reg_2d()
@@ -143,9 +142,28 @@ module set_cell
 
     allocate(glo2loc_ijk(st_grid%nxyz), l2g_ijk(ncalc))
     allocate(glo2loc_ij(nxy), l2g_ij(ncals))
-    !$omp parallel workshare
-    glo2loc_ijk(:) = 0 ; l2g_ijk(:) = 0 ; glo2loc_ij(:) = 0 ; l2g_ij(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, st_grid%nxyz
+      glo2loc_ijk(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncalc
+      l2g_ijk(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, nxy
+      glo2loc_ij(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncals
+      l2g_ij(i) = 0
+    end do
+    !$omp end do
+    !$omp end parallel
 
     ! -- Set relationship between global&local (rel_gloloc)
       call set_rel_gloloc()
@@ -154,9 +172,11 @@ module set_cell
 
 #ifdef MPI_MSG
     allocate(calc2recv(ncalc))
-    !$omp parallel workshare
-    calc2recv(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      calc2recv(i) = 0
+    end do
+    !$omp end parallel do
 
     ! -- Set mpi relationship (mpi_rel)
       call set_mpi_rel()
@@ -174,15 +194,33 @@ module set_cell
     allocate(glob_num(st_grid%nxyz))
     allocate(temp_locs(seal_snum), temp_locc(seal_cnum))
     !$omp parallel
-    !$omp workshare
-    loc2glo_ij(:) = 0 ; loc2glo_ijk(:) = 0 ; temp_locs(:) = 0 ; temp_locc(:) = 0
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, nsurf
+      loc2glo_ij(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncell
+      loc2glo_ijk(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, seal_snum
+      temp_locs(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, seal_cnum
+      temp_locc(i) = 0
+    end do
+    !$omp end do
     !$omp do private(i)
     do i = 1, st_grid%nxyz
       glob_num(i) = i
     end do
     !$omp end do
-    !$omp workshare
+    !$omp end parallel
+
     loc2glo_ij(:mpi_ncals) = l2g_ij(:)
     loc2glo_ijk(:mpi_ncalc) = l2g_ijk(:)
 
@@ -190,8 +228,6 @@ module set_cell
     loc2glo_ij((/ temp_locs /)) = pack(glob_num(1:nxy), glo2loc_ij(:) > mpi_ncals)
     temp_locc(:) = pack(glo2loc_ijk(:), glo2loc_ijk(:) > mpi_ncalc)
     loc2glo_ijk((/ temp_locc /)) = pack(glob_num(:), glo2loc_ijk(:) > mpi_ncalc)
-    !$omp end workshare
-    !$omp end parallel
 
     no_ncals = count(glob_mpi_flag(1:nxy) == -(my_rank+1))
     no_ncalc = count(glob_mpi_flag(:) == -(my_rank+1))
@@ -219,24 +255,51 @@ module set_cell
 
 #ifdef MPI_MSG
     allocate(cals_glob(ns_unknow), calc_glob(nc_unknow))
-    !$omp parallel workshare
-    cals_glob(:) = 0 ; calc_glob(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, ns_unknow
+      cals_glob(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, nc_unknow
+      calc_glob(i) = 0
+    end do
+    !$omp end do
+    !$omp end parallel
     if (pro_totn /= 1) then
       ! -- Gather array (val)
         call gather_val(pro_totn, ncals, loc2glo_ij(1:ncals), cals_glob, "calculation number")
       ! -- Gather array (val)
         call gather_val(pro_totn, ncalc, loc2glo_ijk(1:ncalc), calc_glob, "calculation number")
     else
-      !$omp parallel workshare
-      cals_glob(:) = loc2glo_ij(1:ncals) ; calc_glob(:) = loc2glo_ijk(1:ncalc)
-      !$omp end parallel workshare
+      !$omp parallel
+      !$omp do private(i)
+      do i = 1, ncals
+        cals_glob(i) = loc2glo_ij(i)
+      end do
+      !$omp end do
+      !$omp do private(i)
+      do i = 1, ncalc
+        calc_glob(i) = loc2glo_ijk(i)
+      end do
+      !$omp end do
+      !$omp end parallel
     end if
 
     allocate(sort_sglo(ns_unknow), sort_cglo(nc_unknow))
-    !$omp parallel workshare
-    sort_sglo(:) = cals_glob(:) ; sort_cglo(:) = calc_glob(:)
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, ns_unknow
+      sort_sglo(i) = cals_glob(i)
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, nc_unknow
+      sort_cglo(i) = calc_glob(i)
+    end do
+    !$omp end do
+    !$omp end parallel
 
     call iquick_sort(sort_sglo, 1, ns_unknow)
     call iquick_sort(sort_cglo, 1, nc_unknow)
@@ -249,31 +312,79 @@ module set_cell
     do i = 1, ns_unknow
       nsun_num(i) = i
     end do
+    !$omp end do
+    !$omp do private(i)
     do i = 1, nc_unknow
       ncun_num(i) = i
     end do
     !$omp end do
-    !$omp workshare
-    loc2unk_ij(:) = 0 ; glo2unk_ij(:) = 0 ; loc2unk_ijk(:) = 0 ; glo2unk_ijk(:) = 0
+    !$omp do private(i)
+    do i = 1, ncals
+      loc2unk_ij(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncalc
+      loc2unk_ijk(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, nxy
+      glo2unk_ij(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, st_grid%nxyz
+      glo2unk_ijk(i) = 0
+    end do
+    !$omp end do
+    !$omp end parallel
+
     glo2unk_ij((/ sort_sglo /)) = nsun_num(:)
     glo2unk_ijk((/ sort_cglo /)) = ncun_num(:)
     loc2unk_ij(:) = pack(glo2unk_ij(:), (glo2loc_ij(:) > 0 .and. glo2loc_ij(:) <= ncals))
     loc2unk_ijk(:) = pack(glo2unk_ijk(:), (glo2loc_ijk(:) > 0 .and. glo2loc_ijk(:) <= ncalc))
-    !$omp end workshare
-    !$omp end parallel
+
     deallocate(sort_sglo, nsun_num, glo2unk_ij)
     deallocate(sort_cglo, ncun_num, glo2unk_ijk)
 
-    allocate(sort_sglo(ncals+no_ncals), sort_cglo(ncalc+no_ncalc))
+    allocate(sort_sglo(ncals+no_ncals+seal_snum), sort_cglo(ncalc+no_ncalc+seal_cnum))
     !$omp parallel
-    !$omp workshare
-    sort_sglo(1:ncals) = loc2glo_ij(1:ncals) ; sort_sglo(ncals+1:ncals+no_ncals) = loc2glo_nos(1:no_ncals)
-    sort_cglo(1:ncalc) = loc2glo_ijk(1:ncalc) ; sort_cglo(ncalc+1:ncalc+no_ncalc) = loc2glo_noc(1:no_ncalc)
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, ncals
+      sort_sglo(i) = loc2glo_ij(i)
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, no_ncals
+      sort_sglo(ncals+i) = loc2glo_nos(i)
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, seal_snum
+      sort_sglo(ncals+no_ncals+i) = loc2glo_ij(mpi_ncals+i)
+    end do
+    !$omp end do
+
+    !$omp do private(i)
+    do i = 1, ncalc
+      sort_cglo(i) = loc2glo_ijk(i)
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, no_ncalc
+      sort_cglo(ncalc+i) = loc2glo_noc(i)
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, seal_cnum
+      sort_cglo(ncalc+no_ncalc+i) = loc2glo_ijk(mpi_ncalc+i)
+    end do
+    !$omp end do
     !$omp end parallel
 
-    call iquick_sort(sort_sglo, 1, ncals+no_ncals)
-    call iquick_sort(sort_cglo, 1, ncalc+no_ncalc)
+    call iquick_sort(sort_sglo, 1, ncals+no_ncals+seal_snum)
+    call iquick_sort(sort_cglo, 1, ncalc+no_ncalc+seal_cnum)
 
     ! -- Set calculation view (calc_view)
       call set_calc_view(ncals, ncalc, loc2glo_ij, loc2glo_ijk)
@@ -315,16 +426,20 @@ module set_cell
         else
           pro_nreg = loc_regn
           allocate(cur_nreg(pro_nreg))
-          !$omp parallel workshare
-          cur_nreg(:) = loc_nreg(:)
-          !$omp end parallel workshare
+          !$omp parallel do private(i)
+          do i = 1, pro_nreg
+            cur_nreg(i) = loc_nreg(i)
+          end do
+          !$omp end parallel do
         end if
 #else
         pro_nreg = loc_regn
         allocate(cur_nreg(pro_nreg))
-        !$omp parallel workshare
-        cur_nreg(:) = loc_nreg(:)
-        !$omp end parallel workshare
+        !$omp parallel do private(i)
+        do i = 1, pro_nreg
+          cur_nreg(i) = loc_nreg(i)
+        end do
+        !$omp end parallel do
 #endif
         if (my_rank == 0) then
           write(calg_num,'(a,i0)') "Rank", n-1
@@ -377,9 +492,11 @@ module set_cell
     integer(I4) :: i, j, ii, jj, kk, c_num
     integer(I4) :: clasi, clasj, clask
     !-------------------------------------------------------------------------------------
-    !$omp parallel workshare
-    glob_clas_flag(:,:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(j)
+    do j = 1, st_clas%totn
+      glob_clas_flag(:,j) = 0
+    end do
+    !$omp end parallel do
 
     do j = 1, st_clas%totn
       do i = 1, st_clas%num(j)
@@ -445,7 +562,7 @@ module set_cell
     ! -- inout
 
     ! -- local
-    integer(I4) :: i, j
+    integer(I4) :: i, j, k
     integer(I4) :: reg_type, glob_ncalc, calreg_fnum
     integer(I4) :: len_char, first_pos, sta_pos, end_pos, temp_num
     integer(I4), allocatable :: temp_reg(:), type_2d(:), type_3d(:)
@@ -482,9 +599,18 @@ module set_cell
         if (trim(adjustl(st_sim%inact_name)) == trim(adjustl(st_clas%name(j)))) then
           temp_num = sum(glob_clas_flag(:,j))
           allocate(temp_reg(temp_num))
-          !$omp parallel workshare
-          temp_reg(:) = -1 ; mask(:) = (glob_clas_flag(:,j) == 1)
-          !$omp end parallel workshare
+          !$omp parallel
+          !$omp do private(i)
+          do i = 1, temp_num
+            temp_reg(i) = -1
+          end do
+          !$omp end do
+          !$omp do private(i)
+          do i = 1, st_grid%nxyz
+            mask(i) = (glob_clas_flag(i,j) == 1)
+          end do
+          !$omp end do
+          !$omp end parallel
           glob_reg_flag(:) = unpack(temp_reg(:), mask(:), glob_reg_flag(:))
           deallocate(temp_reg)
         end if
@@ -493,9 +619,18 @@ module set_cell
           if (trim(adjustl(reg_name(i))) == trim(adjustl(st_clas%name(j)))) then
             temp_num = sum(glob_clas_flag(:,j))
             allocate(temp_reg(temp_num))
-            !$omp parallel workshare
-            temp_reg(:) = i ; mask(:) = (glob_clas_flag(:,j) == 1)
-            !$omp end parallel workshare
+            !$omp parallel
+            !$omp do private(k)
+            do k = 1, temp_num
+              temp_reg(k) = k
+            end do
+            !$omp end do
+            !$omp do private(k)
+            do k = 1, st_grid%nxyz
+              mask(k) = (glob_clas_flag(k,j) == 1)
+            end do
+            !$omp end do
+            !$omp end parallel
             glob_reg_flag(:) = unpack(temp_reg(:), mask(:), glob_reg_flag(:))
             deallocate(temp_reg)
           end if
@@ -552,10 +687,13 @@ module set_cell
     nxy = st_grid%nx*st_grid%ny
     allocate(reg_ncals(totnreg), reg_remain(totnreg))
     allocate(reg_mpi_num(totnreg), reg_mpi_end(0:totnreg))
+    reg_mpi_end(0) = 0
     !$omp parallel
-    !$omp workshare
-    reg_ncals(:) = 0 ; reg_remain(:) = 0 ; reg_mpi_num(:) = 0 ; reg_mpi_end(:) = 0
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, totnreg
+      reg_ncals(i) = 0 ; reg_remain(i) = 0 ; reg_mpi_num(i) = 0 ; reg_mpi_end(i) = 0
+    end do
+    !$omp end do
     !$omp do private(i)
     do i = 1, totnreg
       reg_ncals(i) = count(glob_reg_flag(1:nxy) == i)
@@ -659,10 +797,13 @@ module set_cell
 !    !-------------------------------------------------------------------------------------
 !    allocate(reg_ncalc(totnreg), reg_remain(totnreg))
 !    allocate(reg_mpi_num(totnreg), reg_mpi_end(0:totnreg))
+!    reg_mpi_end(0) = 0
 !    !$omp parallel
-!    !$omp workshare
-!    reg_ncalc(:) = 0 ; reg_remain(:) = 0 ; reg_mpi_num(:) = 0 ; reg_mpi_end(:) = 0
-!    !$omp end workshare
+!    !$omp do private(i)
+!    do i = 1, totnreg
+!      reg_ncalc(i) = 0 ; reg_remain(i) = 0 ; reg_mpi_num(i) = 0 ; reg_mpi_end(i) = 0
+!    end do
+!    !$omp end do
 !    !$omp do private(i)
 !    do i = 1, totnreg
 !      reg_ncalc(i) = count(glob_reg_flag(:) == i)
@@ -764,9 +905,11 @@ module set_cell
       rough_divn = glo_nocals/pro_totn ; nocals_remain = mod(glo_nocals, pro_totn)
       allocate(nocals_mpi_num(pro_totn), grid_num(nxy), nocals_glo_num(glo_nocals))
       !$omp parallel
-      !$omp workshare
-      nocals_mpi_num(:) = rough_divn
-      !$omp end workshare
+      !$omp do private(i)
+      do i = 1, pro_totn
+        nocals_mpi_num(i) = rough_divn
+      end do
+      !$omp end do
       !$omp do private(i)
       do i = 1, pro_totn
         if (i <= nocals_remain) then
@@ -779,10 +922,9 @@ module set_cell
         grid_num(i) = nxy*(k-1) + i
       end do
       !$omp end do
-      !$omp workshare
-      nocals_glo_num(:) = pack(grid_num(:), glob_mpi_flag(nxyz0:nxyz1) == 0)
-      !$omp end workshare
       !$omp end parallel
+      nocals_glo_num(:) = pack(grid_num(:), glob_mpi_flag(nxyz0:nxyz1) == 0)
+
       deallocate(grid_num)
 
       nocals_sta = 0 ; nocals_end = 0
@@ -821,9 +963,11 @@ module set_cell
 !    rough_divn = glo_nocalc/pro_totn ; nocalc_remain = mod(glo_nocalc, pro_totn)
 !    allocate(nocalc_mpi_num(pro_totn), grid_num(nxyz), nocalc_glo_num(glo_nocalc))
 !    !$omp parallel
-!    !$omp workshare
-!    nocalc_mpi_num(:) = rough_divn
-!    !$omp end workshare
+!    !$omp do private(i)
+!    do i = 1, pro_totn
+!      nocalc_mpi_num(i) = rough_divn
+!    end do
+!    !$omp end do
 !    !$omp do private(i)
 !    do i = 1, pro_totn
 !      if (i <= nocalc_remain) then
@@ -836,10 +980,8 @@ module set_cell
 !      grid_num(i) = i
 !    end do
 !    !$omp end do
-!    !$omp workshare
-!    nocalc_glo_num(:) = pack(grid_num(:), glob_mpi_flag(:) == 0)
-!    !$omp end workshare
 !    !$omp end parallel
+!    nocalc_glo_num(:) = pack(grid_num(:), glob_mpi_flag(:) == 0)
 !
 !    deallocate(grid_num)
 !
@@ -874,7 +1016,7 @@ module set_cell
     allocate(temp_mpi_reg(ncalc), mask(ncalc))
     temp_mpi_reg(:) = pack(glob_reg_flag(:), glob_mpi_flag(:) == my_rank+1)
     count_reg = 0
-    !$omp parallel do private(i), reduction(+:count_reg)
+    !$omp parallel do private(i, mask), reduction(+:count_reg)
     do i = 1, totnreg
       mask(:) = (temp_mpi_reg(:) == i)
       if (any(mask)) then
@@ -888,9 +1030,19 @@ module set_cell
 
     allocate(loc_nreg(loc_regn), temp_cend(0:loc_regn))
     allocate(calc2reg(ncalc))
-    !$omp parallel workshare
-    loc_nreg(:) = 0 ; temp_cend(:) = 0 ; calc2reg(:) = 0
-    !$omp end parallel workshare
+    temp_cend(0) = 0
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, loc_regn
+      loc_nreg(i) = 0 ; temp_cend(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncalc
+      calc2reg(i) = 0
+    end do
+    !$omp end do
+    !$omp end parallel
 
     count_reg = 0 ; count_calc = 0 ; count_cals = 0
     do k = 1, st_grid%nz
@@ -923,16 +1075,12 @@ module set_cell
     end do
 
     allocate(calc_end(0:loc_regn))
-    !$omp parallel
-    !$omp workshare
-    calc_end(:) = 0
-    !$omp end workshare
-    !$omp do private(i)
+    calc_end(0) = 0
+    !$omp parallel do private(i)
     do i = 1, loc_regn
       calc_end(i) = calc_end(i-1) + temp_cend(i)
     end do
-    !$omp end do
-    !$omp end parallel
+    !$omp end parallel do
 
     deallocate(temp_cend)
 
@@ -961,9 +1109,11 @@ module set_cell
     !-------------------------------------------------------------------------------------
     if (pro_totn /= 1) then
       allocate(neib_glos(ncals))
-      !$omp parallel workshare
-      neib_glos(:) = 0
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        neib_glos(i) = 0
+      end do
+      !$omp end parallel do
       do i = 1, ncals
         g_num = l2g_ij(i)
         k_num = (g_num-1)/(st_grid%nx*st_grid%ny) + 1
@@ -1011,10 +1161,18 @@ module set_cell
       allocate(temp_neib_num(pro_totn), temp_neib_flag(pro_totn))
       allocate(temp_mpi_num(ncalc), neib_locc(ncalc))
       allocate(neib_gloc(ncalc), temp_calc_reg(ncalc))
-      !$omp parallel workshare
-      temp_neib_num(:) = 0 ; temp_neib_flag(:) = 0 ; temp_mpi_num(:) = 0
-      neib_locc(:) = 0 ; neib_gloc(:) = 0 ; temp_calc_reg(:) = 0
-      !$omp end parallel workshare
+      !$omp parallel
+      !$omp do private(i)
+      do i = 1, pro_totn
+        temp_neib_num(i) = 0 ; temp_neib_flag(i) = 0
+      end do
+      !$omp end do
+      !$omp do private(i)
+      do i = 1, ncalc
+        temp_mpi_num(i) = 0 ; neib_locc(i) = 0 ; neib_gloc(i) = 0 ; temp_calc_reg(i) = 0
+      end do
+      !$omp end do
+      !$omp end parallel
 
       do i = 1, ncalc
         g_num = l2g_ijk(i)
@@ -1118,10 +1276,19 @@ module set_cell
 
       allocate(mpi_l2g_ij(ncals+neib_ncals), mpi_l2g_ijk(ncalc+neib_ncalc))
       allocate(mpi_calc2reg(ncalc+neib_ncalc))
-      !$omp parallel workshare
-      mpi_l2g_ij(1:ncals) = l2g_ij(:) ; mpi_l2g_ijk(1:ncalc) = l2g_ijk(:)
-      mpi_calc2reg(1:ncalc) = calc2reg(:)
-      !$omp end parallel workshare
+      !$omp parallel
+      !$omp do private(i)
+      do i = 1, ncals
+        mpi_l2g_ij(i) = l2g_ij(i)
+      end do
+      !$omp end do
+      !$omp do private(i)
+      do i = 1, ncalc
+        mpi_l2g_ijk(i) = l2g_ijk(i)
+        mpi_calc2reg(i) = calc2reg(i)
+      end do
+      !$omp end do
+      !$omp end parallel
       deallocate(l2g_ij, l2g_ijk, calc2reg)
 
       !$omp parallel
@@ -1146,10 +1313,19 @@ module set_cell
 
       allocate(l2g_ij(ncals+neib_ncals), l2g_ijk(ncalc+neib_ncalc))
       allocate(calc2reg(ncalc+neib_ncalc))
-      !$omp parallel workshare
-      l2g_ij(:) = mpi_l2g_ij(:) ; l2g_ijk(:) = mpi_l2g_ijk(:)
-      calc2reg(:) = mpi_calc2reg(:)
-      !$omp end parallel workshare
+      !$omp parallel
+      !$omp do private(i)
+      do i = 1, ncals+neib_ncals
+        l2g_ij(i) = mpi_l2g_ij(i)
+      end do
+      !$omp end do
+      !$omp do private(i)
+      do i = 1, ncalc+neib_ncalc
+        l2g_ijk(i) = mpi_l2g_ijk(i)
+        calc2reg(i) = mpi_calc2reg(i)
+      end do
+      !$omp end do
+      !$omp end parallel
 
       deallocate(mpi_l2g_ij, mpi_l2g_ijk, mpi_calc2reg)
 
@@ -1159,12 +1335,26 @@ module set_cell
       allocate(send_citem(sendrecv_num), recv_citem(sendrecv_num))
       allocate(temp_sort(neib_ncalc), sort_recv_num(neib_ncalc), sort_mpi_num(neib_ncalc))
       allocate(send2recv(neib_ncalc), loc_send_num(neib_ncalc))
-      !$omp parallel workshare
-      send_cind(:) = 0 ; recv_cind(:) = 0
-      send_citem(:) = 0 ; recv_citem(:) = 0
-      temp_sort(:) = neib_gloc(1:neib_ncalc) ; sort_recv_num(:) = 0 ; sort_mpi_num = 0
-      send2recv(:) = 0 ; loc_send_num(:) = neib_locc(1:neib_ncalc)
-      !$omp end parallel workshare
+      send_cind(0) = 0 ; recv_cind(0) = 0
+      !$omp parallel
+      !$omp do private(i)
+      do i = 1, neib_mpi_totn
+        send_cind(i) = 0 ; recv_cind(i) = 0
+      end do
+      !$omp end do
+      !$omp do private(i)
+      do i = 1, sendrecv_num
+        send_citem(i) = 0 ; recv_citem(i) = 0
+      end do
+      !$omp end do
+      !$omp do private(i)
+      do i = 1, neib_ncalc
+        temp_sort(i) = neib_gloc(i)
+        sort_recv_num(i) = 0 ; send2recv(i) = 0
+        loc_send_num(i) = neib_locc(i)
+      end do
+      !$omp end do
+      !$omp end parallel
 
       call iquick_sort(temp_sort, 1, neib_ncalc)
       !$omp parallel
@@ -1325,9 +1515,11 @@ module set_cell
     !-------------------------------------------------------------------------------------
     allocate(clas_flag(ncell,st_clas%totn))
     !$omp parallel
-    !$omp workshare
-    clas_flag(:,:) = 0
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, ncell
+      clas_flag(i,:) = 0
+    end do
+    !$omp end do
     !$omp do private(i)
     do i = 1, st_grid%nxyz
       if (glo2loc_ijk(i) > 0) then

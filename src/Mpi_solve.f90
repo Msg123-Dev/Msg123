@@ -39,18 +39,22 @@ module mpi_solve
     !-------------------------------------------------------------------------------------
     allocate(requ_send(neib_mpi_totn), requ_recv(neib_mpi_totn))
     allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
-    !$omp parallel workshare
-    requ_send(:) = 0 ; requ_recv(:) = 0
-    stat_s(:,:) = 0 ; stat_r(:,:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, neib_mpi_totn
+      requ_send(i) = 0 ; requ_recv(i) = 0
+      stat_s(:,i) = 0 ; stat_r(:,i) = 0
+    end do
+    !$omp end parallel do
 
+    ierr = 0
     nsenrev = max(send_cind(neib_mpi_totn), recv_cind(neib_mpi_totn))
-
     allocate(sbufint(nsenrev), rbufint(nsenrev))
     !$omp parallel
-    !$omp workshare
-    sbufint(:) = 0 ; rbufint(:) = 0
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, nsenrev
+      sbufint(i) = 0 ; rbufint(i) = 0
+    end do
+    !$omp end do
 
     !$omp do private(i, j, jj)
     do i = 1, neib_mpi_totn
@@ -61,7 +65,7 @@ module mpi_solve
     end do
     !$omp end do
 
-    !$omp do private(i, isend_sta, isend_end, buflen_send)
+    !$omp do private(i, isend_sta, isend_end, buflen_send, ierr)
     do i = 1, neib_mpi_totn
       isend_sta = send_cind(i-1)+1
       isend_end = send_cind(i)
@@ -73,7 +77,7 @@ module mpi_solve
     end do
     !$omp end do
 
-    !$omp do private(i, irecv_sta, irecv_end, buflen_recv)
+    !$omp do private(i, irecv_sta, irecv_end, buflen_recv, ierr)
     do i = 1, neib_mpi_totn
       irecv_sta = recv_cind(i-1)+1
       irecv_end = recv_cind(i)
@@ -121,18 +125,22 @@ module mpi_solve
     !-------------------------------------------------------------------------------------
     allocate(requ_send(neib_mpi_totn), requ_recv(neib_mpi_totn))
     allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
-    !$omp parallel workshare
-    requ_send(:) = 0 ; requ_recv(:) = 0
-    stat_s(:,:) = 0 ; stat_r(:,:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, neib_mpi_totn
+      requ_send(i) = 0 ; requ_recv(i) = 0
+      stat_s(:,i) = 0 ; stat_r(:,i) = 0
+    end do
+    !$omp end parallel do
 
+    ierr = 0
     nsenrev = max(send_cind(neib_mpi_totn), recv_cind(neib_mpi_totn))
-
     allocate(sbufreal(nsenrev), rbufreal(nsenrev))
     !$omp parallel
-    !$omp workshare
-    sbufreal(:) = DZERO ; rbufreal(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, nsenrev
+      sbufreal(i) = DZERO ; rbufreal(i) = DZERO
+    end do
+    !$omp end do
 
     !$omp do private(i, j, jj)
     do i = 1, neib_mpi_totn
@@ -143,7 +151,7 @@ module mpi_solve
     end do
     !$omp end do
 
-    !$omp do private(i, isend_sta, isend_end, buflen_send)
+    !$omp do private(i, isend_sta, isend_end, buflen_send, ierr)
     do i = 1, neib_mpi_totn
       isend_sta = send_cind(i-1)+1
       isend_end = send_cind(i)
@@ -155,7 +163,7 @@ module mpi_solve
     end do
     !$omp end do
 
-    !$omp do private(i, irecv_sta, irecv_end, buflen_recv)
+    !$omp do private(i, irecv_sta, irecv_end, buflen_recv, ierr)
     do i = 1, neib_mpi_totn
       irecv_sta = recv_cind(i-1)+1
       irecv_end = recv_cind(i)
@@ -206,10 +214,24 @@ module mpi_solve
     off_row_num = crs_index(1)%offind(nreg_num)
     allocate(fix_flag(nreg_num), offr_flag(off_row_num))
     allocate(temp_pred(nreg_num))
-    !$omp parallel workshare
-    fix_flag(:) = 0 ; offr_flag(:) = 0
-    pre_d(:) = pre_ind(:) ; temp_pred(:) = pre_ind(:)
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, nreg_num
+      fix_flag(i) = 0
+      temp_pred(i) = pre_ind(i)
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, off_row_num
+      offr_flag(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncalc
+      pre_d(i) = pre_ind(i)
+    end do
+    !$omp end do
+    !$omp end parallel
     rank_flag = 0 ; allp_flag = 0
     prefix_loop: do while (allp_flag /= pro_totn)
       do i = 1, ncalc
@@ -276,10 +298,24 @@ module mpi_solve
     off_row_num = crs_index(1)%offind(nreg_num)
     allocate(fix_flag(nreg_num), offr_flag(off_row_num))
     allocate(temp_outx(nreg_num))
-    !$omp parallel workshare
-    fix_flag(:) = 0 ; offr_flag(:) = 0 ; outx(:) = inrhs(:)
-    temp_outx(:) = inrhs(:)
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, nreg_num
+      fix_flag(i) = 0
+      temp_outx(i) = inrhs(i)
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, off_row_num
+      offr_flag(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncalc
+      outx(i) = inrhs(i)
+    end do
+    !$omp end do
+    !$omp end parallel
     rank_flag = 0 ; allp_flag = 0
     forwfix_loop: do while (allp_flag /= pro_totn)
       do i = 1, ncalc
@@ -311,9 +347,19 @@ module mpi_solve
         call mpisum_val(rank_flag, "forward substitution", allp_flag)
     end do forwfix_loop
 
-    !$omp parallel workshare
-    fix_flag(:) = 0 ; offr_flag(:) = 0 ; temp_outx(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, nreg_num
+      fix_flag(i) = 0
+      temp_outx(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, off_row_num
+      offr_flag(i) = 0
+    end do
+    !$omp end do
+    !$omp end parallel
     rank_flag = 0 ; allp_flag = 0
     backfix_loop: do while (allp_flag /= pro_totn)
       do i = ncalc, 1, -1

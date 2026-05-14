@@ -108,6 +108,7 @@ module ici_module
     ! -- inout
 
     ! -- local
+    integer(I4) :: i
     real(DP), allocatable :: rive_wd(:)
     logical :: wain_get, runa_get, runb_get, evas_get, evav_get, rivd_get
     !-------------------------------------------------------------------------------------
@@ -121,15 +122,19 @@ module ici_module
       if (.not. allocated(read_rech)) then
         rech_num = ncals
         allocate(read_rech(ncals))
-        !$omp parallel workshare
-        read_rech(:) = SZERO
-        !$omp end parallel workshare
+        !$omp parallel do private(i)
+        do i = 1, ncals
+          read_rech(i) = SZERO
+        end do
+        !$omp end parallel do
       end if
       if (.not. allocated(rech_cflag)) then
         allocate(rech_cflag(ncals))
-        !$omp parallel workshare
-        rech_cflag(:) = 1
-        !$omp end parallel workshare
+        !$omp parallel do private(i)
+        do i = 1, ncals
+          rech_cflag(i) = 1
+        end do
+        !$omp end parallel do
       end if
       call ici_get_data("water_input", water_in, IS_GET_OK=wain_get)
       call ici_get_data("runoff_all", roff_a, IS_GET_OK=runa_get)
@@ -155,20 +160,26 @@ module ici_module
     if (coupled_cama .and. cama_get) then
       if (.not. allocated(criv%wd)) then
         allocate(criv%wd(ncals))
-        !$omp parallel workshare
-        criv%wd(:) = SZERO
-        !$omp end parallel workshare
+        !$omp parallel do private(i)
+        do i = 1, ncals
+          criv%wd(i) = SZERO
+        end do
+        !$omp end parallel do
       end if
       if (.not. allocated(cflag_riv%wd)) then
         allocate(cflag_riv%wd(ncals))
-        !$omp parallel workshare
-        cflag_riv%wd(:) = 1
-        !$omp end parallel workshare
+        !$omp parallel do private(i)
+        do i = 1, ncals
+          cflag_riv%wd(i) = 1
+        end do
+        !$omp end parallel do
       end if
       allocate(rive_wd(ncals))
-      !$omp parallel workshare
-      rive_wd(:) = DZERO
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        rive_wd(i) = DZERO
+      end do
+      !$omp end parallel do
       call ici_get_data("rive_wdep", rive_wd, IS_GET_OK=rivd_get)
       if (current_t == DZERO) then
         cama_noval = ici_get_get_fill_value('rive_wdep')
@@ -241,9 +252,11 @@ module ici_module
     real(DP), allocatable :: rive_flux(:), lake_flux(:), surf_flux(:), tot_flux(:)
     !-------------------------------------------------------------------------------------
     allocate(head_ici(ncalc))
-    !$omp parallel workshare
-    head_ici(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      head_ici(i) = DZERO
+    end do
+    !$omp end parallel do
 
     call change_ici_put(head_new, head_ici)
     call ici_put_data("hyd_head", reshape([head_ici(:)*len_scal], [ncals,st_grid%nz]))
@@ -264,10 +277,12 @@ module ici_module
 
     if (coupled_cama .and. cama_put) then
       allocate(rive_flux(ncals), lake_flux(ncals), surf_flux(ncals), tot_flux(ncals))
-      !$omp parallel workshare
-      rive_flux(:) = DZERO ; lake_flux(:) = DZERO ; surf_flux(:) = DZERO
-      tot_flux(:) = DZERO
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        rive_flux(i) = DZERO ; lake_flux(i) = DZERO
+        surf_flux(i) = DZERO ; tot_flux(i) = DZERO
+      end do
+      !$omp end parallel do
       if (st_out_type%rivr /= out_type(2) .and. st_in_type%rive >= 0) then
         ! -- Calculate river runoff (rive_roff)
           call calc_rivr_off()
@@ -286,15 +301,31 @@ module ici_module
         ! -- Calculate surface flux (surf_flux)
           call calc_surf_flux(roff_surf, surf_flux)
       end if
-      !$omp parallel workshare
-      tot_flux(:) = rive_flux(:) + lake_flux(:) + surf_flux(:)
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        tot_flux(i) = rive_flux(i) + lake_flux(i) + surf_flux(i)
+      end do
+      !$omp end parallel do
 
       call ici_put_data("runoff_total", tot_flux(:)*len_scal)
 
-      !$omp parallel workshare
-      roff_rive(:) = DZERO ; roff_lake(:) = DZERO ; roff_surf(:) = DZERO
-      !$omp end parallel workshare
+      !$omp parallel
+      !$omp do private(i)
+      do i = 1, rive_num
+        roff_rive(i) = DZERO
+      end do
+      !$omp end do
+      !$omp do private(i)
+      do i = 1, lake_num
+        roff_lake(i) = DZERO
+      end do
+      !$omp end do
+      !$omp do private(i)
+      do i = 1, ncals
+        roff_surf(i) = DZERO
+      end do
+      !$omp end do
+      !$omp end parallel
 
       deallocate(tot_flux, rive_flux, lake_flux, surf_flux)
     end if
@@ -359,9 +390,11 @@ module ici_module
     !-------------------------------------------------------------------------------------
     allocate(msg_idex(ncals))
     !$omp parallel
-    !$omp workshare
-    msg_idex(:) = 0
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, ncals
+      msg_idex(i) = 0
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, ncals
@@ -391,9 +424,11 @@ module ici_module
     real(DP), allocatable :: init_val(:), dummy_var(:)
     !-------------------------------------------------------------------------------------
     allocate(init_val(ncalc))
-    !$omp parallel workshare
-    init_val(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      init_val(i) = DZERO
+    end do
+    !$omp end parallel do
 
     call make_ici_put()
     call change_ici_put(read_init, init_val)
@@ -403,9 +438,11 @@ module ici_module
 
     if (coupled_matsiro .and. mat_put) then
       allocate(dummy_var(ncals))
-      !$omp parallel workshare
-      dummy_var(:) = DZERO
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        dummy_var(i) = DZERO
+      end do
+      !$omp end parallel do
       call ici_put_data("wtab_depth", dummy_var)
 
       deallocate(dummy_var)
@@ -413,9 +450,11 @@ module ici_module
 
     if (coupled_cama .and. cama_put) then
       allocate(dummy_var(ncals))
-      !$omp parallel workshare
-      dummy_var(:) = DZERO
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        dummy_var(i) = DZERO
+      end do
+      !$omp end parallel do
       call ici_put_data("runoff_total", dummy_var)
 
       deallocate(dummy_var)
@@ -463,10 +502,12 @@ module ici_module
 
       allocate(water_in(ncals), roff_a(ncals), roff_b(ncals))
       allocate(evap_s(ncals), evap_v(ncals))
-      !$omp parallel workshare
-      water_in(:) = DZERO ; roff_a(:) = DZERO ; roff_b(:) = DZERO
-      evap_s(:) = DZERO ; evap_v(:) = DZERO
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        water_in(i) = DZERO ; roff_a(i) = DZERO ; roff_b(i) = DZERO
+        evap_s(i) = DZERO ; evap_v(i) = DZERO
+      end do
+      !$omp end parallel do
     end if
 
     if (coupled_cama .and. cama_get) then
@@ -491,9 +532,11 @@ module ici_module
     integer(I4) :: coun_cals
     !-------------------------------------------------------------------------------------
     allocate(xy2cals(st_grid%nx*st_grid%ny))
-    !$omp parallel workshare
-    xy2cals(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, st_grid%nx*st_grid%ny
+      xy2cals(i) = 0
+    end do
+    !$omp end parallel do
 
     coun_cals = 0
     do i = 1, ncalc
@@ -593,9 +636,11 @@ module ici_module
     integer(I4) :: i
     !-------------------------------------------------------------------------------------
     !$omp parallel
-    !$omp workshare
-    wtab_depth(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, ncals
+      wtab_depth(:) = DZERO
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, ncals

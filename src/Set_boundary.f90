@@ -231,9 +231,12 @@ module set_boundary
     if (sum_riwin > 0 .and. sum_rilen > 0) then
       allocate(cflag_riv%ar(ncals))
       allocate(criv%ar(ncals))
-      !$omp parallel workshare
-      cflag_riv%ar(:) = 0 ; criv%ar(:) = SNOVAL
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        cflag_riv%ar(i) = 0
+        criv%ar(i) = SNOVAL
+      end do
+      !$omp end parallel do
       ! -- Calculate river area (rivea)
         call calc_rivea(cflag_riv%wi, cflag_riv%le, criv%wi, criv%le, cflag_riv%ar,&
                         criv%ar, rivnum%ar)
@@ -322,18 +325,22 @@ module set_boundary
 
     if (rive_num /= 0) then
       allocate(abyd_rive(rive_num))
-      !$omp parallel workshare
-      abyd_rive(:) = DZERO
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, rive_num
+        abyd_rive(i) = DZERO
+      end do
+      !$omp end parallel do
       ! -- Set surface&recharge area and area by distance (srabyd)
         call set_srabyd(rive_num, rive_bott, rive_area, rive2cals, abyd_rive)
     end if
 
     if (lake_num /= 0) then
       allocate(abyd_lake(lake_num))
-      !$omp parallel workshare
-      abyd_lake(:) = DZERO
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, lake_num
+        abyd_lake(i) = DZERO
+      end do
+      !$omp end parallel do
       ! -- Set surface&recharge area and area by distance (srabyd)
         call set_srabyd(lake_num, lake_bott, lake_area, lake2cals, abyd_lake)
     end if
@@ -343,9 +350,11 @@ module set_boundary
 
     allocate(read_head(ncalc))
     !$omp parallel
-    !$omp workshare
-    read_head(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, ncalc
+      read_head(:) = DZERO
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, ncalc
@@ -446,6 +455,7 @@ module set_boundary
     ! -- inout
 
     ! -- local
+    integer(I4) :: i
     integer(I4), allocatable :: all_rech_type(:)
     logical, allocatable :: all_rech_mask(:)
     !-------------------------------------------------------------------------------------
@@ -481,9 +491,12 @@ module set_boundary
     if (st_rech%totn > 0) then
       allocate(rech_cflag(ncals))
       allocate(read_rech(ncals))
-      !$omp parallel workshare
-      rech_cflag(:) = 0 ; read_rech(:) = SNOVAL
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        rech_cflag(i) = 0
+        read_rech(i) = SNOVAL
+      end do
+      !$omp end parallel do
       ! -- Assign recharge value
         call assign_surfbv(st_in_type%rech, st_intre%type, st_rech, rech_num, rech_cflag,&
                            read_rech)
@@ -578,6 +591,7 @@ module set_boundary
     ! -- inout
 
     ! -- local
+    integer(I4) :: i
     integer(I4), allocatable :: all_prec_type(:)
     logical, allocatable :: all_prec_mask(:)
     !-------------------------------------------------------------------------------------
@@ -613,9 +627,12 @@ module set_boundary
     if (st_prec%totn > 0) then
       allocate(prec_cflag(ncals))
       allocate(read_prec(ncals))
-      !$omp parallel workshare
-      prec_cflag(:) = 0 ; read_prec(:) = SNOVAL
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        prec_cflag(i) = 0
+        read_prec(i) = SNOVAL
+      end do
+      !$omp end parallel do
       ! -- Assign precipitation value
         call assign_surfbv(st_in_type%prec, st_intpr%type, st_prec, prec_num, prec_cflag,&
                            read_prec)
@@ -637,6 +654,7 @@ module set_boundary
     ! -- inout
 
     ! -- local
+    integer(I4) :: i
     integer(I4), allocatable :: all_evap_type(:)
     logical, allocatable :: all_evap_mask(:)
     !-------------------------------------------------------------------------------------
@@ -672,9 +690,12 @@ module set_boundary
     if (st_evap%totn > 0) then
       allocate(evap_cflag(ncals))
       allocate(read_evap(ncals))
-      !$omp parallel workshare
-      evap_cflag(:) = 0 ; read_evap(:) = SNOVAL
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        evap_cflag(i) = 0
+        read_evap(i) = SNOVAL
+      end do
+      !$omp end parallel do
       ! -- Assign evapotranspiration value
         call assign_surfbv(st_in_type%evap, st_intev%type, st_evap, evap_num, evap_cflag,&
                            read_evap)
@@ -694,13 +715,16 @@ module set_boundary
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(cflag_riv%wl(ncals))
     allocate(criv%wl(ncals))
-    !$omp parallel workshare
-    cflag_riv%wl(:) = 0 ; criv%wl(:) = SNOVAL
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      cflag_riv%wl(i) = 0
+      criv%wl(i) = SNOVAL
+    end do
+    !$omp end parallel do
     ! -- Assign river water level value
       call assign_rilav(st_rivf_type%wlev, 0, st_riwl, rivnum%wl, cflag_riv%wl, criv%wl)
 
@@ -715,13 +739,16 @@ module set_boundary
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(cflag_riv%bl(ncals))
     allocate(criv%bl(ncals))
-    !$omp parallel workshare
-    cflag_riv%bl(:) = 0 ; criv%bl(:) = SNOVAL
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      cflag_riv%bl(i) = 0
+      criv%bl(i) = SNOVAL
+    end do
+    !$omp end parallel do
     ! -- Assign river bottom level value
       call assign_rilav(st_rivf_type%blev, 0, st_ribl, rivnum%bl, cflag_riv%bl, criv%bl)
 
@@ -736,14 +763,17 @@ module set_boundary
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     if (st_riwd%totn > 0) then
       allocate(cflag_riv%wd(ncals))
       allocate(criv%wd(ncals))
-      !$omp parallel workshare
-      cflag_riv%wd(:) = 0 ; criv%wd(:) = SNOVAL
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        cflag_riv%wd(i) = 0
+        criv%wd(i) = SNOVAL
+      end do
+      !$omp end parallel do
       ! -- Assign river water depth value
         call assign_rilav(st_rivf_type%wdep, 0, st_riwd, rivnum%wd, cflag_riv%wd, criv%wd)
     end if
@@ -759,14 +789,17 @@ module set_boundary
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     if (st_ride%totn > 0) then
       allocate(cflag_riv%de(ncals))
       allocate(criv%de(ncals))
-      !$omp parallel workshare
-      cflag_riv%de(:) = 0 ; criv%de(:) = SNOVAL
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        cflag_riv%de(i) = 0
+        criv%de(i) = SNOVAL
+      end do
+      !$omp end parallel do
       ! -- Assign river depth value
         call assign_rilav(st_rivf_type%dept, 0, st_ride, rivnum%de, cflag_riv%de, criv%de)
     end if
@@ -782,14 +815,17 @@ module set_boundary
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     if (st_riwi%totn > 0) then
       allocate(cflag_riv%wi(ncals))
       allocate(criv%wi(ncals))
-      !$omp parallel workshare
-      cflag_riv%wi(:) = 0 ; criv%wi(:) = SNOVAL
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        cflag_riv%wi(i) = 0
+        criv%wi(i) = SNOVAL
+      end do
+      !$omp end parallel do
       ! -- Assign river width value
         call assign_rilav(st_rivf_type%widt, 0, st_riwi, rivnum%wi, cflag_riv%wi, criv%wi)
     end if
@@ -805,14 +841,17 @@ module set_boundary
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     if (st_rile%totn > 0) then
       allocate(cflag_riv%le(ncals))
       allocate(criv%le(ncals))
-      !$omp parallel workshare
-      cflag_riv%le(:) = 0 ; criv%le(:) = SNOVAL
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        cflag_riv%le(i) = 0
+        criv%le(i) = SNOVAL
+      end do
+      !$omp end parallel do
       ! -- Assign river length value
         call assign_rilav(st_rivf_type%leng, 0, st_rile, rivnum%le, cflag_riv%le, criv%le)
     end if
@@ -828,13 +867,16 @@ module set_boundary
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(cflag_lak%wl(ncals))
     allocate(clak%wl(ncals))
-    !$omp parallel workshare
-    cflag_lak%wl(:) = 0 ; clak%wl(:) = SNOVAL
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      cflag_lak%wl(i) = 0
+      clak%wl(i) = SNOVAL
+    end do
+    !$omp end parallel do
     ! -- Assign lake water level value
       call assign_rilav(st_lakf_type%wlev, 0, st_lawl, laknum%wl, cflag_lak%wl, clak%wl)
 
@@ -849,13 +891,16 @@ module set_boundary
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(cflag_lak%bl(ncals))
     allocate(clak%bl(ncals))
-    !$omp parallel workshare
-    cflag_lak%bl(:) = 0 ; clak%bl(:) = SNOVAL
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      cflag_lak%bl(i) = 0
+      clak%bl(i) = SNOVAL
+    end do
+    !$omp end parallel do
     ! -- Assign lake bottom level value
       call assign_rilav(st_lakf_type%blev, 0, st_labl, laknum%bl, cflag_lak%bl, clak%bl)
 
@@ -870,14 +915,17 @@ module set_boundary
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     if (st_lawd%totn > 0) then
       allocate(cflag_lak%wd(ncals))
       allocate(clak%wd(ncals))
-      !$omp parallel workshare
-      cflag_lak%wd(:) = 0 ; clak%wd(:) = SNOVAL
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        cflag_lak%wd(i) = 0
+        clak%wd(i) = SNOVAL
+      end do
+      !$omp end parallel do
       ! -- Assign lake water depth value
         call assign_rilav(st_lakf_type%wdep, 0, st_lawd, laknum%wd, cflag_lak%wd, clak%wd)
     end if
@@ -893,14 +941,17 @@ module set_boundary
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     if (st_laar%totn > 0) then
       allocate(cflag_lak%ar(ncals))
       allocate(clak%ar(ncals))
-      !$omp parallel workshare
-      cflag_lak%ar(:) = 0 ; clak%ar(:) = SNOVAL
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        cflag_lak%ar(i) = 0
+        clak%ar(i) = SNOVAL
+      end do
+      !$omp end parallel do
       ! -- Assign lake area value
         call assign_rilav(st_lakf_type%area, 1, st_laar, laknum%ar, cflag_lak%ar, clak%ar)
     end if

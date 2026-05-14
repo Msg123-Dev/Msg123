@@ -177,9 +177,13 @@ module prep_calculation
     integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(surf_bott(ncals), surf_top(ncals), surf_reli(ncals))
-    !$omp parallel workshare
-    surf_bott(:) = surf_elev(:) ; surf_top(:) = surf_elev(:) ; surf_reli(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      surf_bott(i) = surf_elev(i)
+      surf_top(i) = surf_elev(i)
+      surf_reli(i) = DZERO
+    end do
+    !$omp end parallel do
 
     if (st_in_type%geog == in_type(0)) then
 #ifdef MPI_MSG

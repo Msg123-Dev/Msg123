@@ -245,9 +245,11 @@ module read_module
     !-------------------------------------------------------------------------------------
     ierr = 0
     allocate(array_in(inx,iny))
-    !$omp parallel workshare
-    array_in(:,:) = no_val
-    !$omp end parallel workshare
+    !$omp parallel do private(j)
+    do j = 1, iny
+      array_in(:,j) = no_val
+    end do
+    !$omp end parallel do
 
     read(unit=fnum,iostat=ierr) ((array_in(i,j), i = 1, inx), j = 1, iny)
 
@@ -255,9 +257,11 @@ module read_module
       call write_err_read(fnum)
     end if
 
-    !$omp parallel workshare
-    array_val(:,:) = array_in(:,:)
-    !$omp end parallel workshare
+    !$omp parallel do private(j)
+    do j = 1, iny
+      array_val(:,j) = array_in(:,j)
+    end do
+    !$omp end parallel do
 
     deallocate(array_in)
 
@@ -280,9 +284,11 @@ module read_module
     !-------------------------------------------------------------------------------------
     ierr = 0
     allocate(array_in(inx,iny))
-    !$omp parallel workshare
-    array_in(:,:) = no_val
-    !$omp end parallel workshare
+    !$omp parallel do private(j)
+    do j = 1, iny
+      array_in(:,j) = no_val
+    end do
+    !$omp end parallel do
 
     read(unit=fnum,iostat=ierr) ((array_in(i,j), i = 1, inx), j = 1, iny)
 
@@ -290,9 +296,11 @@ module read_module
       call write_err_read(fnum)
     end if
 
-    !$omp parallel workshare
-    array_val(:,:) = array_in(:,:)
-    !$omp end parallel workshare
+    !$omp parallel do private(j)
+    do j = 1, iny
+      array_val(:,j) = array_in(:,j)
+    end do
+    !$omp end parallel do
 
     deallocate(array_in)
 
@@ -315,9 +323,11 @@ module read_module
     !-------------------------------------------------------------------------------------
     ierr = 0
     allocate(array_in(inx,iny))
-    !$omp parallel workshare
-    array_in(:,:) = no_val
-    !$omp end parallel workshare
+    !$omp parallel do private(j)
+    do j = 1, iny
+      array_in(:,j) = no_val
+    end do
+    !$omp end parallel do
 
     read(unit=fnum,iostat=ierr) ((array_in(i,j), i = 1, inx), j = 1, iny)
 
@@ -325,9 +335,11 @@ module read_module
       call write_err_read(fnum)
     end if
 
-    !$omp parallel workshare
-    array_val(:,:) = array_in(:,:)
-    !$omp end parallel workshare
+    !$omp parallel do private(j)
+    do j = 1, iny
+      array_val(:,j) = array_in(:,j)
+    end do
+    !$omp end parallel do
 
     deallocate(array_in)
 
@@ -425,9 +437,11 @@ module read_module
     !-------------------------------------------------------------------------------------
     ierr = 0
     allocate(array_in(inx,iny,inz))
-    !$omp parallel workshare
-    array_in(:,:,:) = no_val
-    !$omp end parallel workshare
+    !$omp parallel do private(k)
+    do k = 1, inz
+      array_in(:,:,k) = no_val
+    end do
+    !$omp end parallel do
 
     read(unit=fnum,iostat=ierr) (((array_in(i,j,k), i = 1, inx), j = 1, iny), k = 1, inz)
 
@@ -435,9 +449,11 @@ module read_module
       call write_err_read(fnum)
     end if
 
-    !$omp parallel workshare
-    array_val(:,:,:) = array_in(:,:,:)
-    !$omp end parallel workshare
+    !$omp parallel do private(k)
+    do k = 1, inz
+      array_val(:,:,k) = array_in(:,:,k)
+    end do
+    !$omp end parallel do
 
     deallocate(array_in)
 
@@ -460,9 +476,11 @@ module read_module
     !-------------------------------------------------------------------------------------
     ierr = 0
     allocate(array_in(inx,iny,inz))
-    !$omp parallel workshare
-    array_in(:,:,:) = no_val
-    !$omp end parallel workshare
+    !$omp parallel do private(k)
+    do k = 1, inz
+      array_in(:,:,k) = no_val
+    end do
+    !$omp end parallel do
 
     read(unit=fnum,iostat=ierr) (((array_in(i,j,k), i = 1, inx), j = 1, iny), k = 1, inz)
 
@@ -470,9 +488,11 @@ module read_module
       call write_err_read(fnum)
     end if
 
-    !$omp parallel workshare
-    array_val(:,:,:) = array_in(:,:,:)
-    !$omp end parallel workshare
+    !$omp parallel do private(k)
+    do k = 1, inz
+      array_val(:,:,k) = array_in(:,:,k)
+    end do
+    !$omp end parallel do
 
     deallocate(array_in)
 
@@ -495,9 +515,11 @@ module read_module
     !-------------------------------------------------------------------------------------
     ierr = 0
     allocate(array_in(inx,iny,inz))
-    !$omp parallel workshare
-    array_in(:,:,:) = no_val
-    !$omp end parallel workshare
+    !$omp parallel do private(k)
+    do k = 1, inz
+      array_in(:,:,k) = no_val
+    end do
+    !$omp end parallel do
 
     read(unit=fnum,iostat=ierr) (((array_in(i,j,k), i = 1, inx), j = 1, iny), k = 1, inz)
 
@@ -505,9 +527,11 @@ module read_module
       call write_err_read(fnum)
     end if
 
-    !$omp parallel workshare
-    array_val(:,:,:) = array_in(:,:,:)
-    !$omp end parallel workshare
+    !$omp parallel do private(k)
+    do k = 1, inz
+      array_val(:,:,k) = array_in(:,:,k)
+    end do
+    !$omp end parallel do
 
     deallocate(array_in)
 
@@ -1003,7 +1027,8 @@ module read_module
     allocate(type_txt(2), type_bin(2))
     type_txt(:) = [in_type(3), in_type(5)] ; type_bin(:) = [in_type(4), in_type(6)]
 
-    ierr = 0 ; err_mes = "Read final step in "//mess//" file."
+    ierr = 0
+    err_mes = "Read final step in "//mess//" file."
     if (ftype == in_type(1) .or. ftype == in_type(2)) then
       if (my_rank == 0) then
         read(unit=fnum,fmt=*,iostat=ierr) nx_totn, etime
@@ -1088,7 +1113,8 @@ module read_module
     allocate(type_txt(2), type_bin(2))
     type_txt(:) = [in_type(3), in_type(5)] ; type_bin(:) = [in_type(4), in_type(6)]
 
-    ierr = 0 ; err_mes = "Read final step in "//mess//" timeseries file."
+    ierr = 0
+    err_mes = "Read final step in "//mess//" timeseries file."
     if (my_rank == 0) then
       read(unit=fnum,fmt='(a)',iostat=ierr) nxi_path
       if (ierr /= 0) then
@@ -1154,9 +1180,11 @@ module read_module
     integer(I4), allocatable :: array_read(:,:)
     !-------------------------------------------------------------------------------------
     allocate(array_read(st_grid%nx,st_grid%ny))
-    !$omp parallel workshare
-    array_read(:,:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(j)
+    do j = 1, st_grid%ny
+      array_read(:,j) = 0
+    end do
+    !$omp end parallel do
 
     ierr = 0
     if (ftype == in_type(3)) then
@@ -1207,9 +1235,11 @@ module read_module
     integer(I4), allocatable :: array_read(:,:,:)
     !-------------------------------------------------------------------------------------
     allocate(array_read(st_grid%nx,st_grid%ny,st_grid%nz))
-    !$omp parallel workshare
-    array_read(:,:,:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(k)
+    do k = 1, st_grid%nz
+      array_read(:,:,k) = 0
+    end do
+    !$omp end parallel do
 
     ierr = 0
     if (ftype == in_type(5)) then

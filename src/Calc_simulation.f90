@@ -23,13 +23,16 @@ module calc_simulation
     real(DP), intent(in) :: inbr(:)
     real(DP), intent(out) :: l2norm2
     ! -- local
-    integer(I4) :: l2_num
+    integer(I4) :: i, l2_num
     !-------------------------------------------------------------------------------------
     l2_num = crs_index(l2level)%unknow
 
-    !$omp parallel workshare
-    l2norm2 = dot_product(inbr(1:l2_num), inbr(1:l2_num))
-    !$omp end parallel workshare
+    l2norm2 = DZERO
+    !$omp parallel do private(i) reduction(+:l2norm2)
+    do i = 1, l2_num
+      l2norm2 = l2norm2 + inbr(i)*inbr(i)
+    end do
+    !$omp end parallel do
 
   end subroutine calc_l2norm2
 
@@ -50,9 +53,11 @@ module calc_simulation
     !-------------------------------------------------------------------------------------
     allocate(axsum(nres))
     !$omp parallel
-    !$omp workshare
-    axsum(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, nres
+      axsum(i) = DZERO
+    end do
+    !$omp end do
 
     !$omp do private(i, j, k, off_sta, off_end)
     do i = 1, nres
@@ -90,9 +95,12 @@ module calc_simulation
     nres2 = crs_index(rlevel)%unknow
     allocate(res2sum(nres2), temp_l2(nres2))
     !$omp parallel
-    !$omp workshare
-    res2sum(:) = DZERO ; temp_l2(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, nres2
+      res2sum(i) = DZERO
+      temp_l2(i) = DZERO
+    end do
+    !$omp end do
 
     !$omp do private(i, j, k, off_sta, off_end)
     do i = 1, nres2
@@ -106,9 +114,11 @@ module calc_simulation
       temp_l2(i) = (res2b(i)-res2sum(i))**DTWO
     end do
     !$omp end do
-    !$omp workshare
-    resl2 = sum(temp_l2)
-    !$omp end workshare
+    !$omp do private(i) reduction(+:resl2)
+    do i = 1, nres2
+      resl2 = resl2 + temp_l2(i)
+    end do
+    !$omp end do
     !$omp end parallel
 
     deallocate(res2sum, temp_l2)

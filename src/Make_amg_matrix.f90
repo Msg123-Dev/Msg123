@@ -27,7 +27,7 @@ module make_amg_matrix
     ! -- inout
 
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     amg_setflag = 0
 
@@ -54,9 +54,12 @@ module make_amg_matrix
         call make_galerkin()
 
       allocate(array_var(amglev)%x(ncoase), array_var(amglev)%rhs(ncoase))
-      !$omp parallel workshare
-      array_var(amglev)%x(:) = DZERO ; array_var(amglev)%rhs(:) = DZERO
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, ncoase
+        array_var(amglev)%x(i) = DZERO
+        array_var(amglev)%rhs(i) = DZERO
+      end do
+      !$omp end parallel do
 
     end do amg_level
 
@@ -79,10 +82,19 @@ module make_amg_matrix
     !-------------------------------------------------------------------------------------
     allocate(temp_dmat(nfine))
     allocate(aggr_luflag(nfine), nonaggr_lu(nfine*FACE), nonaggr_index(0:nfine))
-    !$omp parallel workshare
-    temp_dmat(:) = DZERO
-    aggr_luflag(:) = 0 ; nonaggr_lu(:) = 0 ; nonaggr_index(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, nfine
+      temp_dmat(i) = DZERO
+      aggr_luflag(i) = 0 ; nonaggr_index(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, nfine*FACE
+      nonaggr_lu(i) = 0
+    end do
+    !$omp end do
+    !$omp end parallel
 
     nonaggr = 0
 
@@ -124,10 +136,13 @@ module make_amg_matrix
     !-------------------------------------------------------------------------------------
     allocate(aggr_num(nfine), aggr_index(0:nfine), que_flag(nfine))
     allocate(que2glob(nfine), glob_num(nfine), lay2_num(nfine))
-    !$omp parallel workshare
-    aggr_num(:) = 0 ; aggr_index(:) = 0 ; que_flag(:) = 0
-    que2glob(:) = 0 ; glob_num(:) = 0 ; lay2_num(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, nfine
+      aggr_num(i) = 0 ; aggr_index(i) = 0
+      que_flag(i) = 0 ; que2glob(i) = 0 ; glob_num(i) = 0 ; lay2_num(i) = 0
+    end do
+    !$omp end parallel do
+    aggr_index(0) = 0
 
     que_size = 0
 
@@ -186,25 +201,32 @@ module make_amg_matrix
     end do aggre_check
 
     allocate(aggr_inresult(0:ncoase), aggr_belongnum(nfine))
-    !$omp parallel workshare
-    aggr_inresult(:) = 0 ; aggr_belongnum(:) = 0
-    !$omp end parallel workshare
+    aggr_inresult(0) = 0
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, ncoase
+      aggr_inresult(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, nfine
+      aggr_belongnum(i) = 0
+    end do
+    !$omp end do
+    !$omp end parallel
 
-    !$omp parallel do private(i, j)
     do i = 1, nfine
       j = aggr_num(i)
       if (j > 0) then
         aggr_index(j) = aggr_index(j) + 1
       end if
     end do
-    !$omp end parallel do
 
     do i = 1, ncoase
       aggr_index(i) = aggr_index(i) + aggr_index(i-1)
       aggr_inresult(i) = aggr_index(i-1)
     end do
 
-    !$omp parallel do private(i, j, k)
     do i = 1, nfine
       j = aggr_num(i)
       if (j > 0) then
@@ -213,7 +235,6 @@ module make_amg_matrix
         aggr_belongnum(k) = i
       end if
     end do
-    !$omp end parallel do
 
 !    write(*,*) ncoase, " aggregates are selected from ", aggr_inresult(ncoase)
 
@@ -241,18 +262,28 @@ module make_amg_matrix
 
     allocate(temp_prov(tsapce, nfine))
     allocate(temp_proag(tsapce, nfine), temp_prorow(nfine), glob2aggrn(nfine))
-    !$omp parallel workshare
-    temp_prov(:,:) = DZERO
-    temp_proag(:,:) = 0 ; temp_prorow(:) = 0 ; glob2aggrn(:) = 0
-    !$omp end parallel workshare
-    !$omp parallel do private(i, k, fine_row)
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, nfine
+      temp_prorow(i) = 0
+      glob2aggrn(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(j)
+    do j = 1, nfine
+      temp_prov(:,j) = DZERO
+      temp_proag(:,j) = 0
+    end do
+    !$omp end do
+    !$omp do private(i, k, fine_row)
     do k = 1, ncoase
       do i = aggr_inresult(k-1)+1, aggr_inresult(k)
         fine_row = aggr_belongnum(i)
         glob2aggrn(fine_row) = k
       end do
     end do
-    !$omp end parallel do
+    !$omp end do
+    !$omp end parallel
 
     do i = 1, nfine
       do kk = nonaggr_index(i-1)+1, nonaggr_index(i)
@@ -343,9 +374,7 @@ module make_amg_matrix
     deallocate(nonaggr_lu, nonaggr_index, temp_dmat)
 
     allocate(pro_var(amglev)%pindex(0:nfine))
-    !$omp parallel workshare
     pro_var(amglev)%pindex(:) = 0
-    !$omp end parallel workshare
 
     do i = 1, nfine
       pro_var(amglev)%pindex(i) = pro_var(amglev)%pindex(i-1) + temp_prorow(i)
@@ -354,9 +383,8 @@ module make_amg_matrix
 
     allocate(pro_var(amglev)%poffrow(k))
     allocate(pro_var(amglev)%pval(k))
-    !$omp parallel workshare
-    pro_var(amglev)%poffrow(:) = 0 ; pro_var(amglev)%pval(:) = DZERO
-    !$omp end parallel workshare
+    pro_var(amglev)%poffrow(:) = 0
+    pro_var(amglev)%pval(:) = DZERO
     j = 0
     do i = 1, nfine
       do k = 1, temp_prorow(i)
@@ -382,11 +410,9 @@ module make_amg_matrix
     integer(I4) :: i, j, k, kk, psta, pend
     !-------------------------------------------------------------------------------------
     allocate(res_var(amglev)%rindex(0:ncoase))
-    !$omp parallel workshare
     res_var(amglev)%rindex(:) = 0
-    !$omp end parallel workshare
     kk = 0
-    !$omp parallel do private(i, j, k, psta, pend) reduction(+:kk)
+
     do i = 1, nfine
       psta = pro_var(amglev)%pindex(i-1) + 1
       pend = pro_var(amglev)%pindex(i)
@@ -398,14 +424,12 @@ module make_amg_matrix
         end if
       end do
     end do
-    !$omp end parallel do
 
     allocate(res_var(amglev)%roffrow(kk))
     allocate(res_var(amglev)%rval(kk))
 
-    !$omp parallel workshare
-    res_var(amglev)%roffrow(:) = 0 ; res_var(amglev)%rval(:) = DZERO
-    !$omp end parallel workshare
+    res_var(amglev)%roffrow(:) = 0
+    res_var(amglev)%rval(:) = DZERO
     do i = 1, ncoase
       res_var(amglev)%rindex(i) = res_var(amglev)%rindex(i) + res_var(amglev)%rindex(i-1)
     end do
@@ -447,13 +471,33 @@ module make_amg_matrix
     allocate(new_row(nfine*7), new_col(nfine*7))
     allocate(temp_aggr(ncoase))
     allocate(temp_val(7,nfine), new_lumat(nfine*7), temp_lumat(ncoase))
-    !$omp parallel workshare
-    temp_size(:) = 0 ; temp_f2c(:,:) = 0 ; temp_node(:) = 0
-    crs_index(amglev)%offind(:) = 0
-    new_row(:) = 0 ; new_col(:) = 0
-    temp_aggr(:) = 0
-    temp_val(:,:) =  DZERO ; new_lumat(:) = DZERO ; temp_lumat(:) = DZERO
-    !$omp end parallel workshare
+    crs_index(amglev)%offind(0) = 0
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, nfine
+      temp_size(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncoase
+      temp_node(i) = 0 ; temp_aggr(i) = 0
+      crs_index(amglev)%offind(i) = 0
+      temp_lumat(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, nfine*7
+      new_row(i) = 0 ; new_col(i) = 0
+      new_lumat(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(j)
+    do j = 1, nfine
+      temp_f2c(:,j) = 0
+      temp_val(:,j) = DZERO
+    end do
+    !$omp end do
+    !$omp end parallel
     new_tconn_num = 0 ; coase_index = 0
 
     gal_loop: do
@@ -607,12 +651,11 @@ module make_amg_matrix
 
     allocate(crs_index(amglev)%offrow(new_tconn_num))
     allocate(array_var(amglev)%lumat(new_tconn_num), array_var(amglev)%dmat(ncoase))
-    !$omp parallel workshare
     crs_index(amglev)%offrow(:) = 0
-    array_var(amglev)%lumat(:) = DZERO ; array_var(amglev)%dmat(:) = DONE
-    !$omp end parallel workshare
+    array_var(amglev)%lumat(:) = DZERO
+    array_var(amglev)%dmat(:) = DONE
     crs_index(amglev)%lunum = new_tconn_num
-    !$omp parallel do private(j, k, row)
+
     do j = 1, coase_index
       row = new_row(j)
       if (row /= new_col(j)) then
@@ -624,7 +667,6 @@ module make_amg_matrix
         array_var(amglev)%dmat(row) = new_lumat(j)
       end if
     end do
-    !$omp end parallel do
 
     deallocate(new_row, new_col, new_lumat)
 

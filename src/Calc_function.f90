@@ -39,11 +39,19 @@ module calc_function
     allocate(stof(ncalc), conf(ncalc), welf(ncalc), seaf(ncalc))
     allocate(funcvs(ncalc), alp_ss(ncalc))
     allocate(recf(ncals), surf(ncals), rivf(ncals), lakf(ncals))
-    !$omp parallel workshare
-    stof(:) = DZERO ; conf(:) = DZERO ; welf(:) = DZERO ; seaf(:) = DZERO
-    recf(:) = DZERO ; surf(:) = DZERO ; rivf(:) = DZERO ; lakf(:) = DZERO
-    funcvs(:) = DZERO ; alp_ss(:) = DZERO ; funcv(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, ncalc
+      stof(i) = DZERO ; conf(i) = DZERO ; welf(i) = DZERO ; seaf(i) = DZERO
+      funcvs(i) = DZERO ; alp_ss(i) = DZERO ; funcv(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncals
+      recf(i) = DZERO ; surf(i) = DZERO ; rivf(i) = DZERO ; lakf(i) = DZERO
+    end do
+    !$omp end do
+    !$omp end parallel
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
       call calc_srat_rperm(ncalc, DZERO, infx, srat_new, rel_perm, alp_ss)
@@ -114,12 +122,15 @@ module calc_function
     real(DP), intent(out) :: stom(:), conm(:), seam(:), welm(:)
     real(DP), intent(out) :: recm(:), surm(:), rivm(:), lakm(:)
     ! -- local
+    integer(I4) :: i
     real(DP), allocatable :: alp_ss_new(:), alp_ss_old(:)
     !-------------------------------------------------------------------------------------
     allocate(alp_ss_new(ncalc), alp_ss_old(ncalc))
-    !$omp parallel workshare
-    alp_ss_new(:) = DZERO ; alp_ss_old(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      alp_ss_new(i) = DZERO ; alp_ss_old(i) = DZERO
+    end do
+    !$omp end parallel do
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
       call calc_srat_rperm(ncalc, DZERO, inmxo, srat_new, rel_perm, alp_ss_old)
@@ -162,11 +173,20 @@ module calc_function
       call func_sealterm(inmxn, seam)
 
     if (st_sim%sim_type >= 0) then
-      !$omp parallel workshare
-      stom(:) = stom(:)*delt ; conm(:) = conm(:)*delt ; seam(:) = seam(:)*delt
-      welm(:) = welm(:)*delt ; recm(:) = recm(:)*delt ; surm(:) = surm(:)*delt
-      rivm(:) = rivm(:)*delt ; lakm(:) = lakm(:)*delt
-      !$omp end parallel workshare
+      !$omp parallel
+      !$omp do private(i)
+      do i = 1, ncalc
+        stom(i) = stom(i)*delt ; conm(i) = conm(i)*delt
+        seam(i) = seam(i)*delt ; welm(i) = welm(i)*delt
+      end do
+      !$omp end do
+      !$omp do private(i)
+      do i = 1, ncals
+        recm(i) = recm(i)*delt ; surm(i) = surm(i)*delt
+        rivm(i) = rivm(i)*delt ; lakm(i) = lakm(i)*delt
+      end do
+      !$omp end do
+      !$omp end parallel
     end if
 
     deallocate(alp_ss_new, alp_ss_old)
@@ -191,9 +211,11 @@ module calc_function
     !-------------------------------------------------------------------------------------
     allocate(ch_stor1(ncalc), ch_stor2(ncalc), ch_stor(ncalc))
     !$omp parallel
-    !$omp workshare
-    ch_stor1(:) = DZERO ; ch_stor2(:) = DZERO ; ch_stor(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, ncalc
+      ch_stor1(i) = DZERO ; ch_stor2(i) = DZERO ; ch_stor(i) = DZERO
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, ncalc
@@ -227,9 +249,11 @@ module calc_function
     !-------------------------------------------------------------------------------------
     allocate(conn_flow(ncalc))
     !$omp parallel
-    !$omp workshare
-    conn_flow(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, ncalc
+      conn_flow(i) = DZERO
+    end do
+    !$omp end do
 
     !$omp do private(i, j, k, sta_ind, end_ind, ind, delhead, relp1, relp2, relat)
     do i = 1, ncalc
@@ -320,9 +344,11 @@ module calc_function
     !-------------------------------------------------------------------------------------
     allocate(delh_s(ncals), elev_rati(ncals))
     !$omp parallel
-    !$omp workshare
-    delh_s(:) = DZERO ; elev_rati(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, ncals
+      delh_s(i) = DZERO ; elev_rati(i) = DZERO
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, ncals
@@ -406,9 +432,11 @@ module calc_function
     !-------------------------------------------------------------------------------------
     allocate(delh_r(rive_num))
     !$omp parallel
-    !$omp workshare
-    delh_r(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, rive_num
+      delh_r(i) = DZERO
+    end do
+    !$omp end do
 
     !$omp do private(i, s)
     do i = 1, rive_num
@@ -447,9 +475,11 @@ module calc_function
     !-------------------------------------------------------------------------------------
     allocate(delh_l(lake_num))
     !$omp parallel
-    !$omp workshare
-    delh_l(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, lake_num
+      delh_l(i) = DZERO
+    end do
+    !$omp end do
 
     !$omp do private(i, s)
     do i = 1, lake_num
@@ -490,9 +520,11 @@ module calc_function
     !-------------------------------------------------------------------------------------
     allocate(seal_flow(nseal))
     !$omp parallel
-    !$omp workshare
-    seal_flow(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, nseal
+      seal_flow(i) = DZERO
+    end do
+    !$omp end do
 
     !$omp do private(i, c, s, delhead)
     do i = 1, nseal
@@ -539,9 +571,18 @@ module calc_function
     vj_regnum = size(injx)
 
     allocate(jcvec(vj_regnum), tempf1(vj_num), tempf2(vj_num))
-    !$omp parallel workshare
-    jcvec(:) = DZERO ; tempf1(:) = DZERO ; tempf2(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, vj_regnum
+      jcvec(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, vj_num
+      tempf1(i) = DZERO ; tempf2(i) = DZERO
+    end do
+    !$omp end do
+    !$omp end parallel
 
     ! -- Calculate function value (func)
       call calc_func(injx, tempf1)
@@ -566,10 +607,12 @@ module calc_function
     ! Brown and Saad version
     l2_v = DZERO ; l2_x = DZERO ; l1_v = DZERO
     !$omp parallel
-    !$omp workshare
-    l2_v = dot_product(injvec(1:vj_num), injvec(1:vj_num))
-    l2_x = dot_product(injx(1:vj_num), injvec(1:vj_num))
-    !$omp end workshare
+    !$omp do private(i) reduction(+:l2_v, l2_x)
+    do i = 1, vj_num
+      l2_v = l2_v + injvec(i)*injvec(i)
+      l2_x = l2_x + injx(i)*injvec(i)
+    end do
+    !$omp end do
     !$omp do private(i) reduction(+:l1_v)
     do i = 1, vj_num
       l1_v = l1_v + abs(injvec(i))

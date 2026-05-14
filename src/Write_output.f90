@@ -331,17 +331,11 @@ module write_output
     integer(I4), allocatable :: calc2calc(:)
     !-------------------------------------------------------------------------------------
     allocate(calc2calc(ncalc))
-    !$omp parallel
-    !$omp workshare
-    calc2calc(:) = 0
-    !$omp end workshare
-
-    !$omp do private(i)
+    !$omp parallel do private(i)
     do i = 1, ncalc
       calc2calc(i) = i
     end do
-    !$omp end do
-    !$omp end parallel
+    !$omp end parallel do
 
     head_fnum = st_out_fnum%head
 
@@ -378,17 +372,11 @@ module write_output
     integer(I4), allocatable :: calc2calc(:)
     !-------------------------------------------------------------------------------------
     allocate(calc2calc(ncalc))
-    !$omp parallel
-    !$omp workshare
-    calc2calc(:) = 0
-    !$omp end workshare
-
-    !$omp do private(i)
+    !$omp parallel do private(i)
     do i = 1, ncalc
       calc2calc(i) = i
     end do
-    !$omp end do
-    !$omp end parallel
+    !$omp end parallel do
 
     srat_fnum = st_out_fnum%srat
 
@@ -461,17 +449,11 @@ module write_output
 #endif
 
     allocate(cals2cals(ncals))
-    !$omp parallel
-    !$omp workshare
-    cals2cals(:) = 0
-    !$omp end workshare
-
-    !$omp do private(i)
+    !$omp parallel do private(i)
     do i = 1, ncals
       cals2cals(i) = i
     end do
-    !$omp end do
-    !$omp end parallel
+    !$omp end parallel do
 
     wtab_fnum = st_out_fnum%wtab
 
@@ -512,13 +494,24 @@ module write_output
     real(SP) :: cubic
     !-------------------------------------------------------------------------------------
     cubic = len_scal**3
-
-    !$omp parallel workshare
-    st_msloc%sto(:) = st_msloc%sto(:)*cubic ; st_msloc%con(:) = st_msloc%con(:)*cubic
-    st_msloc%sea(:) = st_msloc%sea(:)*cubic ; st_msloc%wel(:) = st_msloc%wel(:)*cubic
-    st_msloc%rec(:) = st_msloc%rec(:)*cubic ; st_msloc%sur(:) = st_msloc%sur(:)*cubic
-    st_msloc%riv(:) = st_msloc%riv(:)*cubic ; st_msloc%lak(:) = st_msloc%lak(:)*cubic
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, ncalc
+      st_msloc%sto(i) = st_msloc%sto(i)*cubic
+      st_msloc%con(i) = st_msloc%con(i)*cubic
+      st_msloc%sea(i) = st_msloc%sea(i)*cubic
+      st_msloc%wel(i) = st_msloc%wel(i)*cubic
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncals
+      st_msloc%rec(i) = st_msloc%rec(i)*cubic
+      st_msloc%sur(i) = st_msloc%sur(i)*cubic
+      st_msloc%riv(i) = st_msloc%riv(i)*cubic
+      st_msloc%lak(i) = st_msloc%lak(i)*cubic
+    end do
+    !$omp end do
+    !$omp end parallel
 
     ! -- Calculate output massbalance (out_mass)
       call calc_out_mass()
@@ -556,21 +549,14 @@ module write_output
 
     allocate(calc2calc(ncalc))
     allocate(velcx(ncalc), velcy(ncalc), velcz(ncalc))
-    !$omp parallel
-    !$omp workshare
-    calc2calc(:) = 0
-    velcx(:) = DZERO ; velcy(:) = DZERO ; velcz(:) = DZERO
-    !$omp end workshare
-
-    !$omp do private(i)
+    !$omp parallel do private(i)
     do i = 1, ncalc
       calc2calc(i) = i
       velcx(i) = pointv(i,1)
       velcy(i) = pointv(i,2)
       velcz(i) = pointv(i,3)
     end do
-    !$omp end do
-    !$omp end parallel
+    !$omp end parallel do
 
     velx_fnum = st_out_fnum%velx
     vely_fnum = st_out_fnum%vely
@@ -624,18 +610,12 @@ module write_output
     real(DP), allocatable :: rive_flux(:)
     !-------------------------------------------------------------------------------------
     allocate(rive_flux(rive_num))
-    !$omp parallel
-    !$omp workshare
-    rive_flux(:) = DZERO
-    !$omp end workshare
-
-    !$omp do private(i, s)
+    !$omp parallel do private(i, s)
     do i = 1, rive_num
       s = rive2cals(i)
       rive_flux(i) = roff_rive(i)/rech_area(s)/rive_sumtime
     end do
-    !$omp end do
-    !$omp end parallel
+    !$omp end parallel do
 
     rivr_fnum = st_out_fnum%rivr
 
@@ -655,9 +635,11 @@ module write_output
     end if
 #endif
 
-    !$omp parallel workshare
-    roff_rive(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, rive_num
+      roff_rive(i) = DZERO
+    end do
+    !$omp end parallel do
     rive_sumtime = DZERO
 
     deallocate(rive_flux)
@@ -679,18 +661,12 @@ module write_output
     real(DP), allocatable :: lake_flux(:)
     !-------------------------------------------------------------------------------------
     allocate(lake_flux(lake_num))
-    !$omp parallel
-    !$omp workshare
-    lake_flux(:) = DZERO
-    !$omp end workshare
-
-    !$omp do private(i, s)
+    !$omp parallel do private(i, s)
     do i = 1, lake_num
       s = lake2cals(i)
       lake_flux(i) = roff_lake(i)/rech_area(s)/lake_sumtime
     end do
-    !$omp end do
-    !$omp end parallel
+    !$omp end parallel do
 
     lakr_fnum = st_out_fnum%lakr
 
@@ -710,9 +686,11 @@ module write_output
     end if
 #endif
 
-    !$omp parallel workshare
-    roff_lake(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, lake_num
+      roff_lake(i) = DZERO
+    end do
+    !$omp end parallel do
     lake_sumtime = DZERO
 
     deallocate(lake_flux)
@@ -734,19 +712,12 @@ module write_output
     !-------------------------------------------------------------------------------------
     allocate(cals2cals(ncals))
     allocate(surf_flux(ncals))
-    !$omp parallel
-    !$omp workshare
-    cals2cals(:) = 0
-    surf_flux(:) = DZERO
-    !$omp end workshare
-
-    !$omp do private(i)
+    !$omp parallel do private(i)
     do i = 1, ncals
       cals2cals(i) = i
       surf_flux(i) = roff_surf(i)/rech_area(i)/surf_sumtime
     end do
-    !$omp end do
-    !$omp end parallel
+    !$omp end parallel do
 
     sufr_fnum = st_out_fnum%sufr
 
@@ -766,9 +737,11 @@ module write_output
     end if
 #endif
 
-    !$omp parallel workshare
-    roff_surf(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      roff_surf(i) = DZERO
+    end do
+    !$omp end parallel do
     surf_sumtime = DZERO
 
     deallocate(cals2cals)
@@ -791,17 +764,11 @@ module write_output
     real(DP), allocatable :: dunn_flux(:)
     !-------------------------------------------------------------------------------------
     allocate(dunn_flux(rech_num))
-    !$omp parallel
-    !$omp workshare
-    dunn_flux(:) = DZERO
-    !$omp end workshare
-
-    !$omp do private(i)
+    !$omp parallel do private(i)
     do i = 1, rech_num
       dunn_flux(i) = roff_dunn(i)/dunn_sumtime
     end do
-    !$omp end do
-    !$omp end parallel
+    !$omp end parallel do
 
     dunr_file = st_out_fnum%dunr
 
@@ -821,9 +788,11 @@ module write_output
     end if
 #endif
 
-    !$omp parallel workshare
-    roff_dunn(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, rech_num
+      roff_dunn(i) = DZERO
+    end do
+    !$omp end parallel do
     dunn_sumtime = DZERO
 
     deallocate(dunn_flux)
@@ -839,7 +808,7 @@ module write_output
     ! -- inout
     real(SP), intent(in) :: time_out
     ! -- local
-    integer(I4) :: seal_fnum
+    integer(I4) :: i, seal_fnum
     real(SP) :: cubic
     !-------------------------------------------------------------------------------------
     seal_fnum = st_out_fnum%seal ; cubic = len_scal**3
@@ -859,9 +828,12 @@ module write_output
     end if
 #endif
 
-    !$omp parallel workshare
-    res_snum(:) = 0 ; res_seal(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      res_snum(i) = 0
+      res_seal(i) = DZERO
+    end do
+    !$omp end parallel do
 
   end subroutine write_out_sealf
 
@@ -874,6 +846,7 @@ module write_output
     ! -- inout
     real(SP), intent(in) :: time_out
     ! -- local
+    integer(I4) :: i
     integer(I4) :: rech_fnum
     real(SP) :: cubic
     !-------------------------------------------------------------------------------------
@@ -894,9 +867,12 @@ module write_output
     end if
 #endif
 
-    !$omp parallel workshare
-    res_rnum(:) = 0 ; res_rech(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      res_rnum(i) = 0
+      res_rech(i) = DZERO
+    end do
+    !$omp end parallel do
 
   end subroutine write_out_rechf
 
@@ -909,7 +885,7 @@ module write_output
     ! -- inout
     real(SP), intent(in) :: time_out
     ! -- local
-    integer(I4) :: well_fnum
+    integer(I4) :: i, well_fnum
     real(SP) :: cubic
     !-------------------------------------------------------------------------------------
     well_fnum = st_out_fnum%well ; cubic = len_scal**3
@@ -929,9 +905,12 @@ module write_output
     end if
 #endif
 
-    !$omp parallel workshare
-    res_wnum(:) = 0 ; res_well(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      res_wnum(i) = 0
+      res_well(i) = DZERO
+    end do
+    !$omp end parallel do
 
   end subroutine write_out_wellf
 

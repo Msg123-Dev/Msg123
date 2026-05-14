@@ -177,15 +177,24 @@ module mpi_read
     real(DP), intent(out) :: rest_time
     real(DP), intent(out) :: calc_init(:)
     ! -- local
-    integer(I4) :: ierr
+    integer(I4) :: i, ierr
     integer(I4), allocatable :: istat(:)
     real(DP), allocatable :: read_rest(:)
     !-------------------------------------------------------------------------------------
     ierr = 0
     allocate(istat(MPI_STATUS_SIZE), read_rest(calc_num+1))
-    !$omp parallel workshare
-    istat(:) = 0 ; read_rest(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, MPI_STATUS_SIZE
+      istat(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, calc_num+1
+      read_rest(i) = DZERO
+    end do
+    !$omp end do
+    !$omp end parallel
 
     call MPI_FILE_READ_ALL(fileh, read_rest, calc_num+1, MPI_REAL8, istat, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -196,9 +205,11 @@ module mpi_read
 
     rest_time = read_rest(1)
 
-    !$omp parallel workshare
-    calc_init(:) = read_rest(2:)
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, calc_num
+      calc_init(i) = read_rest(i+1)
+    end do
+    !$omp end parallel do
 
     deallocate(istat, read_rest)
 
@@ -215,13 +226,16 @@ module mpi_read
     integer(I4), intent(out) :: ierr
     integer(I4), intent(out) :: head_out
     ! -- local
+    integer(I4) :: i
     integer(I4), allocatable :: istat(:)
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------
     allocate(istat(MPI_STATUS_SIZE))
-    !$omp parallel workshare
-    istat(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, MPI_STATUS_SIZE
+      istat(i) = 0
+    end do
+    !$omp end parallel do
 
     call MPI_FILE_GET_POSITION(fileh, head_dis, ierr)
 
@@ -242,13 +256,16 @@ module mpi_read
     integer(I4), intent(out) :: ierr
     real(SP), intent(out) :: head_out
     ! -- local
+    integer(I4) :: i
     integer(I4), allocatable :: istat(:)
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------
     allocate(istat(MPI_STATUS_SIZE))
-    !$omp parallel workshare
-    istat(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, MPI_STATUS_SIZE
+      istat(i) = 0
+    end do
+    !$omp end parallel do
 
     call MPI_FILE_GET_POSITION(fileh, head_dis, ierr)
 
@@ -269,13 +286,16 @@ module mpi_read
     integer(I4), intent(out) :: ierr
     real(DP), intent(out) :: head_out
     ! -- local
+    integer(I4) :: i
     integer(I4), allocatable :: istat(:)
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------
     allocate(istat(MPI_STATUS_SIZE))
-    !$omp parallel workshare
-    istat(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, MPI_STATUS_SIZE
+      istat(i) = 0
+    end do
+    !$omp end parallel do
 
     call MPI_FILE_GET_POSITION(fileh, head_dis, ierr)
 
@@ -295,7 +315,7 @@ module mpi_read
     integer(I4), intent(in) :: ftype, int_ftype, fileh, read_num
     integer(I4), intent(out) :: read_out(:)
     ! -- local
-    integer(I4) :: ierr, mpi_rnum
+    integer(I4) :: i, ierr, mpi_rnum
     integer(I4), allocatable :: istat(:)
     integer(I4), allocatable :: read_val(:)
     !-------------------------------------------------------------------------------------
@@ -310,9 +330,18 @@ module mpi_read
       allocate(read_val(mpi_rnum))
     end if
 
-    !$omp parallel workshare
-    istat(:) = 0 ; read_val(:) = INOVAL
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, MPI_STATUS_SIZE
+      istat(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, mpi_rnum
+      read_val(i) = INOVAL
+    end do
+    !$omp end do
+    !$omp end parallel
 
     call MPI_FILE_READ_ALL(fileh, read_val, mpi_rnum, MPI_INTEGER, istat, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -322,13 +351,17 @@ module mpi_read
     end if
 
     if (ftype == in_type(7) .or. int_ftype == 0) then
-      !$omp parallel workshare
-      read_out(:) = read_val(:)
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, mpi_rnum
+        read_out(i) = read_val(i)
+      end do
+      !$omp end parallel do
     else
-      !$omp parallel workshare
-      read_out(:) = read_val(2:)
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, mpi_rnum
+        read_out(i) = read_val(i+1)
+      end do
+      !$omp end parallel do
     end if
 
     deallocate(istat, read_val)
@@ -345,7 +378,7 @@ module mpi_read
     integer(I4), intent(in) :: ftype, int_ftype, fileh, read_num
     real(SP), intent(out) :: read_out(:)
     ! -- local
-    integer(I4) :: ierr, mpi_rnum
+    integer(I4) :: i, ierr, mpi_rnum
     integer(I4), allocatable :: istat(:)
     real(SP), allocatable :: read_val(:)
     !-------------------------------------------------------------------------------------
@@ -360,9 +393,18 @@ module mpi_read
       allocate(read_val(mpi_rnum))
     end if
 
-    !$omp parallel workshare
-    istat(:) = 0 ; read_val(:) = SNOVAL
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, MPI_STATUS_SIZE
+      istat(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, mpi_rnum
+      read_val(i) = SNOVAL
+    end do
+    !$omp end do
+    !$omp end parallel
 
     call MPI_FILE_READ_ALL(fileh, read_val, mpi_rnum, MPI_REAL4, istat, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -372,13 +414,17 @@ module mpi_read
     end if
 
     if (ftype == in_type(7) .or. int_ftype == 0) then
-      !$omp parallel workshare
-      read_out(:) = read_val(:)
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, mpi_rnum
+        read_out(i) = read_val(i)
+      end do
+      !$omp end parallel do
     else
-      !$omp parallel workshare
-      read_out(:) = read_val(2:)
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, mpi_rnum
+        read_out(i) = read_val(i+1)
+      end do
+      !$omp end parallel do
     end if
 
     deallocate(istat, read_val)
@@ -395,7 +441,7 @@ module mpi_read
     integer(I4), intent(in) :: ftype, int_ftype, fileh, read_num
     real(DP), intent(out) :: read_out(:)
     ! -- local
-    integer(I4) :: ierr, mpi_rnum
+    integer(I4) :: i, ierr, mpi_rnum
     integer(I4), allocatable :: istat(:)
     real(DP), allocatable :: read_val(:)
     !-------------------------------------------------------------------------------------
@@ -410,9 +456,18 @@ module mpi_read
       allocate(read_val(mpi_rnum))
     end if
 
-    !$omp parallel workshare
-    istat(:) = 0 ; read_val(:) = DNOVAL
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, MPI_STATUS_SIZE
+      istat(i) = 0
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, mpi_rnum
+      read_val(i) = DNOVAL
+    end do
+    !$omp end do
+    !$omp end parallel
 
     call MPI_FILE_READ_ALL(fileh, read_val, mpi_rnum, MPI_REAL8, istat, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -422,13 +477,17 @@ module mpi_read
     end if
 
     if (ftype == in_type(7) .or. int_ftype == 0) then
-      !$omp parallel workshare
-      read_out(:) = read_val(:)
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, mpi_rnum
+        read_out(i) = read_val(i)
+      end do
+      !$omp end parallel do
     else
-      !$omp parallel workshare
-      read_out(:) = read_val(2:)
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, mpi_rnum
+        read_out(i) = read_val(i+1)
+      end do
+      !$omp end parallel do
     end if
 
     deallocate(istat, read_val)
@@ -447,7 +506,7 @@ module mpi_read
     real(SP), intent(in) :: fmulti
     real(SP), intent(out) :: fetime
     ! -- local
-    integer(I4) :: ierr, time_flag, read_count
+    integer(I4) :: i, ierr, time_flag, read_count
     integer(I4), allocatable :: istat(:)
     integer(KIND=MPI_OFFSET_KIND) :: head_dis, read_head
     real(SP) :: read_etime
@@ -455,9 +514,11 @@ module mpi_read
     !-------------------------------------------------------------------------------------
     ierr = 0 ; head_dis = 0
     allocate(istat(MPI_STATUS_SIZE))
-    !$omp parallel workshare
-    istat(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, MPI_STATUS_SIZE
+      istat(i) = 0
+    end do
+    !$omp end parallel do
 
     str_fnum = conv_i2s(fnum)
 

@@ -730,9 +730,11 @@ module mpi_utility
     !-------------------------------------------------------------------------------------
     ierr = 0
     allocate(rec_num(num_prot))
-    !$omp parallel workshare
-    rec_num(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, num_prot
+      rec_num(i) = 0
+    end do
+    !$omp end parallel do
     call MPI_ALLGATHER(in_num, 1, MPI_INTEGER, rec_num, 1, MPI_INTEGER, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -742,9 +744,13 @@ module mpi_utility
     end if
 
     allocate(rec_count(0:num_prot-1), rec_dis(0:num_prot-1))
-    !$omp parallel workshare
-    rec_count(:) = 0 ; rec_dis(:) = 0
-    !$omp end parallel workshare
+    rec_count(0) = 0 ; rec_dis(0) = 0
+    !$omp parallel do private(i)
+    do i = 1, num_prot-1
+      rec_count(i) = 0
+      rec_dis(i) = 0
+    end do
+    !$omp end parallel do
     sum_num = 0
     do i = 1, num_prot
       rec_dis(i-1) = sum_num
@@ -782,9 +788,11 @@ module mpi_utility
     !-------------------------------------------------------------------------------------
     ierr = 0
     allocate(rec_num(num_prot))
-    !$omp parallel workshare
-    rec_num(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, num_prot
+      rec_num(i) = 0
+    end do
+    !$omp end parallel do
     call MPI_ALLGATHER(in_num, 1, MPI_INTEGER, rec_num, 1, MPI_INTEGER, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -794,9 +802,13 @@ module mpi_utility
     end if
 
     allocate(rec_count(0:num_prot-1), rec_dis(0:num_prot-1))
-    !$omp parallel workshare
-    rec_count(:) = 0 ; rec_dis(:) = 0
-    !$omp end parallel workshare
+    rec_count(0) = 0 ; rec_dis(0) = 0
+    !$omp parallel do private(i)
+    do i = 1, num_prot-1
+      rec_count(i) = 0
+      rec_dis(i) = 0
+    end do
+    !$omp end parallel do
     sum_num = 0
     do i = 1, num_prot
       rec_dis(i-1) = sum_num
@@ -834,9 +846,11 @@ module mpi_utility
     !-------------------------------------------------------------------------------------
     ierr = 0
     allocate(rec_num(num_prot))
-    !$omp parallel workshare
-    rec_num(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, num_prot
+      rec_num(i) = 0
+    end do
+    !$omp end parallel do
     call MPI_ALLGATHER(in_num, 1, MPI_INTEGER, rec_num, 1, MPI_INTEGER, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
@@ -846,9 +860,13 @@ module mpi_utility
     end if
 
     allocate(rec_count(0:num_prot-1), rec_dis(0:num_prot-1))
-    !$omp parallel workshare
-    rec_count(:) = 0 ; rec_dis(:) = 0
-    !$omp end parallel workshare
+    rec_count(0) = 0 ; rec_dis(0) = 0
+    !$omp parallel do private(i)
+    do i = 1, num_prot-1
+      rec_count(i) = 0
+      rec_dis(i) = 0
+    end do
+    !$omp end parallel do
     sum_num = 0
     do i = 1, num_prot
       rec_dis(i-1) = sum_num

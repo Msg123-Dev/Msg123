@@ -61,30 +61,46 @@ module calc_output
     ! -- inout
 
     ! -- local
+    integer(I4) :: i
     real(DP), allocatable :: ms_st(:), ms_co(:), ms_se(:), ms_we(:)
     real(DP), allocatable :: ms_re(:), ms_su(:), ms_ri(:), ms_la(:)
     !-------------------------------------------------------------------------------------
     allocate(ms_st(ncalc), ms_co(ncalc), ms_se(ncalc), ms_we(ncalc))
     allocate(ms_re(ncals), ms_su(ncals), ms_ri(ncals), ms_la(ncals))
-    !$omp parallel workshare
-    ms_st(:) = DZERO ; ms_co(:) = DZERO ; ms_se(:) = DZERO ; ms_we(:) = DZERO
-    ms_re(:) = DZERO ; ms_su(:) = DZERO ; ms_ri(:) = DZERO ; ms_la(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, ncalc
+      ms_st(i) = DZERO ; ms_co(i) = DZERO ; ms_se(i) = DZERO ; ms_we(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncals
+      ms_re(i) = DZERO ; ms_su(i) = DZERO ; ms_ri(i) = DZERO ; ms_la(i) = DZERO
+    end do
+    !$omp end do
+    !$omp end parallel
 
     ! -- Calculate massbalance (mass)
       call calc_mass(0, head_new, head_old, ms_st, ms_co, ms_se, ms_we, ms_re, ms_su,&
                      ms_ri, ms_la)
-
-    !$omp parallel workshare
-    st_msloc%sto(:) = st_msloc%sto(:) + ms_st(:)
-    st_msloc%con(:) = st_msloc%con(:) + ms_co(:)
-    st_msloc%sea(:) = st_msloc%sea(:) + ms_se(:)
-    st_msloc%wel(:) = st_msloc%wel(:) + ms_we(:)
-    st_msloc%rec(:) = st_msloc%rec(:) + ms_re(:)
-    st_msloc%sur(:) = st_msloc%sur(:) + ms_su(:)
-    st_msloc%riv(:) = st_msloc%riv(:) + ms_ri(:)
-    st_msloc%lak(:) = st_msloc%lak(:) + ms_la(:)
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, ncalc
+      st_msloc%sto(i) = st_msloc%sto(i) + ms_st(i)
+      st_msloc%con(i) = st_msloc%con(i) + ms_co(i)
+      st_msloc%sea(i) = st_msloc%sea(i) + ms_se(i)
+      st_msloc%wel(i) = st_msloc%wel(i) + ms_we(i)
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncals
+      st_msloc%rec(i) = st_msloc%rec(i) + ms_re(i)
+      st_msloc%sur(i) = st_msloc%sur(i) + ms_su(i)
+      st_msloc%riv(i) = st_msloc%riv(i) + ms_ri(i)
+      st_msloc%lak(i) = st_msloc%lak(i) + ms_la(i)
+    end do
+    !$omp end do
+    !$omp end parallel
 
     deallocate(ms_re, ms_we, ms_st, ms_co, ms_su, ms_ri, ms_la)
 
@@ -108,16 +124,19 @@ module calc_output
     allocate(ms_sto(msout_tnum), ms_con(msout_tnum), ms_sea(msout_tnum), ms_wel(msout_tnum))
     allocate(ms_rec(msout_tnum), ms_sur(msout_tnum), ms_riv(msout_tnum), ms_lak(msout_tnum))
     !$omp parallel
-    !$omp workshare
-    st_msglo%sto(:) = DZERO ; st_msglo%con(:) = DZERO ; st_msglo%sea(:) = DZERO
-    st_msglo%wel(:) = DZERO ; st_msglo%rec(:) = DZERO ; st_msglo%sur(:) = DZERO
-    st_msglo%riv(:) = DZERO ; st_msglo%lak(:) = DZERO ; st_msglo%tot(:) = DZERO
-    ms_sto(:) = DZERO ; ms_con(:) = DZERO ; ms_sea(:) = DZERO ; ms_wel(:) = DZERO
-    ms_rec(:) = DZERO ; ms_sur(:) = DZERO ; ms_riv(:) = DZERO ; ms_lak(:) = DZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, msout_tnum
+      st_msglo%sto(i) = DZERO ; st_msglo%con(i) = DZERO
+      st_msglo%sea(i) = DZERO ; st_msglo%wel(i) = DZERO
+      st_msglo%rec(i) = DZERO ; st_msglo%sur(i) = DZERO
+      st_msglo%riv(i) = DZERO ; st_msglo%lak(i) = DZERO ; st_msglo%tot(i) = DZERO
+      ms_sto(i) = DZERO ; ms_con(i) = DZERO ; ms_sea(i) = DZERO ; ms_wel(i) = DZERO
+      ms_rec(i) = DZERO ; ms_sur(i) = DZERO ; ms_riv(i) = DZERO ; ms_lak(i) = DZERO
+    end do
+    !$omp end do
+    !$omp end parallel
 
     if (st_in_type%mass /= in_type(7)) then
-      !$omp do private(i, j, k)
       do i = 1, mass_num
         j = mass2calc(i) ; k = int_mass(i)
         if (j <= ncals) then
@@ -131,34 +150,45 @@ module calc_output
         ms_sea(k) = ms_sea(k) + st_msloc%sea(j)
         ms_wel(k) = ms_wel(k) + st_msloc%wel(j)
       end do
-      !$omp end do
 
     else if (st_in_type%mass == in_type(7)) then
-      !$omp workshare
-      ms_sto(:) = sum(st_msloc%sto) ; ms_con(:) = sum(st_msloc%con)
-      ms_sea(:) = sum(st_msloc%sea) ; ms_wel(:) = sum(st_msloc%wel)
-      ms_rec(:) = sum(st_msloc%rec) ; ms_sur(:) = sum(st_msloc%sur)
-      ms_riv(:) = sum(st_msloc%riv) ; ms_lak(:) = sum(st_msloc%lak)
-      !$omp end workshare
+      !$omp parallel do private(i)
+      do i = 1, msout_tnum
+        ms_sto(i) = ms_sto(i) + st_msloc%sto(i) ; ms_con(i) = ms_con(i) + st_msloc%con(i)
+        ms_sea(i) = ms_sea(i) + st_msloc%sea(i) ; ms_wel(i) = ms_wel(i) + st_msloc%wel(i)
+        ms_rec(i) = ms_rec(i) + st_msloc%rec(i) ; ms_sur(i) = ms_sur(i) + st_msloc%sur(i)
+        ms_riv(i) = ms_riv(i) + st_msloc%riv(i) ; ms_lak(i) = ms_lak(i) + st_msloc%lak(i)
+      end do
+      !$omp end parallel do
     end if
 
-    !$omp workshare
-    st_msglo%sto(:) = ms_sto(:) ; st_msglo%con(:) = ms_con(:)
-    st_msglo%sea(:) = ms_sea(:) ; st_msglo%wel(:) = ms_wel(:)
-    st_msglo%rec(:) = ms_rec(:) ; st_msglo%sur(:) = ms_sur(:)
-    st_msglo%riv(:) = ms_riv(:) ; st_msglo%lak(:) = ms_lak(:)
-    !$omp end workshare
-
-    !$omp workshare
-    st_msglo%tot(:) = ms_sto(:) + ms_con(:) + ms_sea(:) + ms_wel(:) + ms_rec(:) +&
-                      ms_sur(:) + ms_riv(:) + ms_lak(:)
-    !$omp end workshare
-
-    !$omp workshare
-    st_msloc%sto(:) = DZERO ; st_msloc%con(:) = DZERO ; st_msloc%sea(:) = DZERO
-    st_msloc%wel(:) = DZERO ; st_msloc%rec(:) = DZERO ; st_msloc%sur(:) = DZERO
-    st_msloc%riv(:) = DZERO ; st_msloc%lak(:) = DZERO
-    !$omp end workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, msout_tnum
+      st_msglo%sto(i) = ms_sto(i) ; st_msglo%con(i) = ms_con(i)
+      st_msglo%sea(i) = ms_sea(i) ; st_msglo%wel(i) = ms_wel(i)
+      st_msglo%rec(i) = ms_rec(i) ; st_msglo%sur(i) = ms_sur(i)
+      st_msglo%riv(i) = ms_riv(i) ; st_msglo%lak(i) = ms_lak(i)
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, msout_tnum
+      st_msglo%tot(i) = ms_sto(i) + ms_con(i) + ms_sea(i) + ms_wel(i) + ms_rec(i) +&
+                        ms_sur(i) + ms_riv(i) + ms_lak(i)
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncalc
+      st_msloc%sto(i) = DZERO ; st_msloc%con(i) = DZERO
+      st_msloc%sea(i) = DZERO ; st_msloc%wel(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncals
+      st_msloc%rec(i) = DZERO ; st_msloc%sur(i) = DZERO
+      st_msloc%riv(i) = DZERO ; st_msloc%lak(i) = DZERO
+    end do
+    !$omp end do
     !$omp end parallel
 
     deallocate(ms_sto, ms_con, ms_sea, ms_wel, ms_rec, ms_sur, ms_riv, ms_lak)
@@ -256,9 +286,18 @@ module calc_output
     real(DP), allocatable :: rives(:), temp_rive(:)
     !-------------------------------------------------------------------------------------
     allocate(rives(ncals), temp_rive(rive_num))
-    !$omp parallel workshare
-    rives(:) = DZERO ; temp_rive(:) = roff_rive(:)
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, ncals
+      rives(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, rive_num
+      temp_rive(i) = roff_rive(i)
+    end do
+    !$omp end do
+    !$omp end parallel
 
     ! -- Function river term (riveterm)
       call func_riveterm(head_new, rives)
@@ -292,9 +331,18 @@ module calc_output
     real(DP), allocatable :: lakes(:), temp_lake(:)
     !-------------------------------------------------------------------------------------
     allocate(lakes(ncals), temp_lake(lake_num))
-    !$omp parallel workshare
-    lakes(:) = DZERO ; temp_lake(:) = roff_lake(:)
-    !$omp end parallel workshare
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, ncals
+      lakes(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, lake_num
+      temp_lake(i) = roff_lake(i)
+    end do
+    !$omp end do
+    !$omp end parallel
 
     ! -- Function lake term (laketerm)
       call func_laketerm(head_new, lakes)
@@ -327,9 +375,12 @@ module calc_output
     real(DP), allocatable :: surfs(:), temp_surf(:)
     !-------------------------------------------------------------------------------------
     allocate(surfs(ncals), temp_surf(ncals))
-    !$omp parallel workshare
-    surfs(:) = DZERO ; temp_surf(:) = roff_surf(:)
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      surfs(i) = DZERO
+      temp_surf(i) = roff_surf(i)
+    end do
+    !$omp end parallel do
 
     ! -- Function surface term (surfterm)
       call func_surfterm(head_new, surf_old, surfs)
@@ -364,9 +415,12 @@ module calc_output
     !-------------------------------------------------------------------------------------
     allocate(dunns(rech_num), temp_dunn(rech_num))
     !$omp parallel
-    !$omp workshare
-    dunns(:) = DZERO ; temp_dunn(:) = roff_dunn(:)
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, rech_num
+      dunns(i) = DZERO
+      temp_dunn(i) = roff_dunn(i)
+    end do
+    !$omp end do
 
     !$omp do private(i, s)
     do i = 1, rech_num
@@ -402,9 +456,12 @@ module calc_output
     real(DP), allocatable :: sealr(:), temp_seal(:)
     !-------------------------------------------------------------------------------------
     allocate(sealr(ncalc), temp_seal(ncalc))
-    !$omp parallel workshare
-    sealr(:) = DZERO ; temp_seal(:) = res_seal(:)
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      sealr(i) = DZERO
+      temp_seal(i) = res_seal(i)
+    end do
+    !$omp end parallel do
 
     ! -- Function sea level term (sealterm)
       call func_sealterm(head_new, sealr)
@@ -430,21 +487,24 @@ module calc_output
     ! -- inout
 
     ! -- local
-    integer(I4) :: s
+    integer(I4) :: i
     real(DP), allocatable :: rechr(:), temp_rech(:)
     !-------------------------------------------------------------------------------------
     allocate(rechr(ncals), temp_rech(ncals))
-    !$omp parallel workshare
-    rechr(:) = DZERO ; temp_rech(:) = res_rech(:)
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      rechr(i) = DZERO
+      temp_rech(i) = res_rech(i)
+    end do
+    !$omp end parallel do
 
     ! -- Function recharge term (rechterm)
       call func_rechterm(rechr)
 
-    !$omp parallel do private(s)
-    do s = 1, ncals
-      res_rech(s) = temp_rech(s) + rechr(s)*delt
-      res_rnum(s) = s
+    !$omp parallel do private(i)
+    do i = 1, ncals
+      res_rech(i) = temp_rech(i) + rechr(i)*delt
+      res_rnum(i) = i
     end do
     !$omp end parallel do
 
@@ -466,9 +526,12 @@ module calc_output
     real(DP), allocatable :: wellr(:), temp_well(:)
     !-------------------------------------------------------------------------------------
     allocate(wellr(ncalc), temp_well(ncalc))
-    !$omp parallel workshare
-    wellr(:) = DZERO ; temp_well(:) = res_well(:)
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      wellr(i) = DZERO
+      temp_well(i) = res_well(i)
+    end do
+    !$omp end parallel do
 
     ! -- Function well term (wellterm)
       call func_wellterm(wellr)

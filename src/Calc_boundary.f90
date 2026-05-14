@@ -40,10 +40,12 @@ module calc_boundary
     evap_noval = no_val*st_evap%uni_conv
     allocate(rech_cflag(ncals), read_rech(ncals))
     !$omp parallel
-    !$omp workshare
-    rech_cflag(:) = 0 ; read_rech(:) = SZERO
-    !$omp end workshare
-
+    !$omp do private(i)
+    do i = 1, ncals
+      rech_cflag(i) = 0
+      read_rech(i) = SZERO
+    end do
+    !$omp end do
     !$omp do private(i) reduction(+:rec_num)
     do i = 1, ncals
       if (read_prec(i) > prec_noval .and. read_evap(i) > evap_noval) then
@@ -65,18 +67,23 @@ module calc_boundary
     ! -- inout
     integer(I4), intent(in) :: rec_cnum
     ! -- local
-
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------
     allocate(rech2cals(rec_cnum), calc_rech(rec_cnum))
-    !$omp parallel workshare
-    rech2cals(:) = 0 ; calc_rech(:) = DZERO
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, rec_cnum
+      rech2cals(i) = 0
+      calc_rech(i) = DZERO
+    end do
+    !$omp end parallel do
     call set_bound2calc(ncals, rech_cflag, read_rech, rech2cals, calc_rech)
     deallocate(read_rech, rech_cflag)
     allocate(read_rech(rec_cnum))
-    !$omp parallel workshare
-    read_rech(:) = real(calc_rech(:), kind=SP)
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, rec_cnum
+      read_rech(i) = real(calc_rech(i), kind=SP)
+    end do
+    !$omp end parallel do
 
   end subroutine conv_rech2calc
 
@@ -97,9 +104,12 @@ module calc_boundary
     !-------------------------------------------------------------------------------------
     wl_num = 0
     !$omp parallel
-    !$omp workshare
-    wl_flag(:) = 0 ; wl_calc(:) = SZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, ncals
+      wl_flag(i) = 0
+      wl_calc(i) = SZERO
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, ncals
@@ -110,9 +120,11 @@ module calc_boundary
     end do
     !$omp end do
 
-    !$omp workshare
-    wl_num = sum(wl_flag)
-    !$omp end workshare
+    !$omp do private(i) reduction(+:wl_num)
+    do i = 1, ncals
+      wl_num = wl_num + wl_flag(i)
+    end do
+    !$omp end do
     !$omp end parallel
 
   end subroutine calc_wlbd
@@ -134,9 +146,12 @@ module calc_boundary
     !-------------------------------------------------------------------------------------
     wb_num = 0
     !$omp parallel
-    !$omp workshare
-    bl_flag(:) = 0 ; bl_calc(:) = SZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, ncals
+      bl_flag(i) = 0
+      bl_calc(i) = SZERO
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, ncals
@@ -147,9 +162,11 @@ module calc_boundary
     end do
     !$omp end do
 
-    !$omp workshare
-    wb_num = sum(bl_flag)
-    !$omp end workshare
+    !$omp do private(i) reduction(+:wb_num)
+    do i = 1, ncals
+      wb_num = wb_num + bl_flag(i)
+    end do
+    !$omp end do
     !$omp end parallel
 
   end subroutine calc_blld
@@ -169,9 +186,12 @@ module calc_boundary
     integer(I4) :: i
     !-------------------------------------------------------------------------------------
     !$omp parallel
-    !$omp workshare
-    wl_flag(:) = 0 ; wl_calc(:) = SZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, ncals
+      wl_flag(i) = 0
+      wl_calc(i) = SZERO
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, ncals
@@ -202,9 +222,12 @@ module calc_boundary
     !-------------------------------------------------------------------------------------
     bl_num = 0
     !$omp parallel
-    !$omp workshare
-    bl_flag(:) = 0 ; bl_calc(:) = SZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, ncals
+      bl_flag(i) = 0
+      bl_calc(i) = SZERO
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, ncals
@@ -215,9 +238,11 @@ module calc_boundary
     end do
     !$omp end do
 
-    !$omp workshare
-    bl_num = sum(bl_flag)
-    !$omp end workshare
+    !$omp do private(i) reduction(+:bl_num)
+    do i = 1, ncals
+      bl_num = bl_num + bl_flag(i)
+    end do
+    !$omp end do
     !$omp end parallel
 
   end subroutine calc_blsl
@@ -238,9 +263,12 @@ module calc_boundary
     !-------------------------------------------------------------------------------------
     out_num = 0
     !$omp parallel
-    !$omp workshare
-    out_flag(:) = 0 ; surf_out(:) = SZERO
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, ncals
+      out_flag(i) = 0
+      surf_out(i) = SZERO
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, ncals
@@ -251,9 +279,11 @@ module calc_boundary
     end do
     !$omp end do
 
-    !$omp workshare
-    out_num = sum(out_flag)
-    !$omp end workshare
+    !$omp do private(i) reduction(+:out_num)
+    do i = 1, ncals
+      out_num = out_num + out_flag(i)
+    end do
+    !$omp end do
     !$omp end parallel
 
   end subroutine calc_lsurf
@@ -284,9 +314,11 @@ module calc_boundary
     end do
     !$omp end do
 
-    !$omp workshare
-    riar_num = sum(ar_flag)
-    !$omp end workshare
+    !$omp do private(i) reduction(+:riar_num)
+    do i = 1, ncals
+      riar_num = riar_num + ar_flag(i)
+    end do
+    !$omp end do
     !$omp end parallel
 
   end subroutine calc_rivea
@@ -308,9 +340,11 @@ module calc_boundary
     riv_cnum = 0
     allocate(rive_cflag(ncals))
     !$omp parallel
-    !$omp workshare
-    rive_cflag(:) = 0
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, ncals
+      rive_cflag(i) = 0
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, ncals
@@ -320,21 +354,27 @@ module calc_boundary
     end do
     !$omp end do
 
-    !$omp workshare
-    riv_cnum = sum(rive_cflag)
-    !$omp end workshare
+    !$omp do private(i) reduction(+:riv_cnum)
+    do i = 1, ncals
+      riv_cnum = riv_cnum + rive_cflag(i)
+    end do
+    !$omp end do
     !$omp end parallel
 
     allocate(rive2cals(riv_cnum))
-    !$omp parallel workshare
-    rive2cals(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, riv_cnum
+      rive2cals(i) = 0
+    end do
+    !$omp end parallel do
 
     if (riv_cnum > 0) then
       allocate(rive_head(riv_cnum), rive_bott(riv_cnum), rive_area(riv_cnum))
-      !$omp parallel workshare
-      rive_head(:) = DZERO ; rive_bott(:) = DZERO ; rive_area(:) = DZERO
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, riv_cnum
+        rive_head(i) = DZERO ; rive_bott(i) = DZERO ; rive_area(i) = DZERO
+      end do
+      !$omp end parallel do
       call set_bound2calc(ncals, rive_cflag, riv_wi, rive2cals, rive_head)
       call set_bound2calc(ncals, rive_cflag, riv_bl, rive2cals, rive_bott)
       call set_bound2calc(ncals, rive_cflag, riv_ar, rive2cals, rive_area)
@@ -361,9 +401,11 @@ module calc_boundary
     lak_cnum = 0
     allocate(lake_cflag(ncals))
     !$omp parallel
-    !$omp workshare
-    lake_cflag(:) = 0
-    !$omp end workshare
+    !$omp do private(i)
+    do i = 1, ncals
+      lake_cflag(i) = 0
+    end do
+    !$omp end do
 
     !$omp do private(i)
     do i = 1, ncals
@@ -373,21 +415,27 @@ module calc_boundary
     end do
     !$omp end do
 
-    !$omp workshare
-    lak_cnum = sum(lake_cflag)
-    !$omp end workshare
+    !$omp do private(i) reduction(+:lak_cnum)
+    do i = 1, ncals
+      lak_cnum = lak_cnum + lake_cflag(i)
+    end do
+    !$omp end do
     !$omp end parallel
 
     allocate(lake2cals(lak_cnum))
-    !$omp parallel workshare
-    lake2cals(:) = 0
-    !$omp end parallel workshare
+    !$omp parallel do private(i)
+    do i = 1, lak_cnum
+      lake2cals(i) = 0
+    end do
+    !$omp end parallel do
 
     if (lak_cnum > 0) then
       allocate(lake_head(lak_cnum), lake_bott(lak_cnum), lake_area(lak_cnum))
-      !$omp parallel workshare
-      lake_head(:) = DZERO ; lake_bott(:) = DZERO ; lake_area(:) = DZERO
-      !$omp end parallel workshare
+      !$omp parallel do private(i)
+      do i = 1, lak_cnum
+        lake_head(i) = DZERO ; lake_bott(i) = DZERO ; lake_area(i) = DZERO
+      end do
+      !$omp end parallel do
       call set_bound2calc(ncals, lake_cflag, lak_wi, lake2cals, lake_head)
       call set_bound2calc(ncals, lake_cflag, lak_bl, lake2cals, lake_bott)
       call set_bound2calc(ncals, lake_cflag, lak_ar, lake2cals, lake_area)

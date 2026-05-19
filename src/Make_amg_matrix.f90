@@ -571,8 +571,8 @@ module make_amg_matrix
               temp_f2c(kk,fin_num) = i
               temp_val(kk,fin_num) = rest_v*array_var(amglev-1)%dmat(fin_num)
             else
-              temp_val(kk,fin_num) = temp_val(kk,fin_num) +&
-                　　　　　　　　　　　　　　　　　　　　　rest_v*array_var(amglev-1)%dmat(fin_num)
+              temp_val(kk,fin_num) = temp_val(kk,fin_num) + &
+                                     rest_v*array_var(amglev-1)%dmat(fin_num)
             end if
           end if
 

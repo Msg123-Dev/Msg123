@@ -33,9 +33,9 @@ module set_cell
   contains
 
   subroutine set_cell_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_cell_info -- Set cell information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use utility_module, only: open_new_wtxt, close_file
     use initial_module, only: precon_type, amg_nlevel, st_out_type, st_out_path,&
@@ -61,7 +61,7 @@ module set_cell
     integer(I4), allocatable :: glo2unk_ij(:)
     integer(I4), allocatable :: loc2unk_ijk(:), glo2unk_ijk(:)
 #endif
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
 #ifdef MPI_MSG
     if (pro_totn /= 1) then
       ! -- Bcast simulation flag (sim_flag)
@@ -389,7 +389,8 @@ module set_cell
     ! -- Set calculation view (calc_view)
       call set_calc_view(ncals, ncalc, loc2glo_ij, loc2glo_ijk)
     ! -- Set seal view (seal_view)
-      call set_seal_view(seal_snum, seal_cnum, loc2glo_ij(mpi_ncals+1:), loc2glo_ijk(mpi_ncalc+1:))
+      call set_seal_view(seal_snum, seal_cnum, loc2glo_ij(mpi_ncals+1:),&
+                         loc2glo_ijk(mpi_ncalc+1:))
     ! -- Set restart view (rest_view)
       call set_rest_view(ncalc, nc_unknow, loc2unk_ijk)
     ! -- Set write file view (write_fview)
@@ -481,9 +482,9 @@ module set_cell
   end subroutine set_cell_info
 
   subroutine set_glob_cell_clas()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_glob_cell_clas -- Set global cell classification
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -491,7 +492,7 @@ module set_cell
     ! -- local
     integer(I4) :: i, j, ii, jj, kk, c_num
     integer(I4) :: clasi, clasj, clask
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(j)
     do j = 1, st_clas%totn
       glob_clas_flag(:,j) = 0
@@ -551,9 +552,9 @@ module set_cell
   end subroutine set_glob_cell_clas
 
   subroutine set_glob_reg()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_glob_reg -- Set global region
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: VARLEN
     use utility_module, only: open_new_rtxt, open_new_rbin, write_err_stop
@@ -569,7 +570,7 @@ module set_cell
     character(1), allocatable :: temp_char(:)
     character(VARLEN), allocatable :: reg_name(:)
     logical, allocatable :: mask(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     reg_type = st_sim%reg_type
     allocate(type_2d(2), type_3d(2))
     type_2d(:) = [in_type(3:4)] ; type_3d(:) = [in_type(5:6)]
@@ -668,9 +669,9 @@ module set_cell
   end subroutine set_glob_reg
 
   subroutine div_calc_reg_2d()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! div_calc_reg_2d -- Divide calculation region for 2d
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -683,7 +684,7 @@ module set_cell
     integer(I4), allocatable :: reg_mpi_num(:), reg_mpi_end(:)
     integer(I4), allocatable :: reg_num(:), grid_num(:), reg_num_mpi(:)
 !    logical, allocatable :: mask(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     nxy = st_grid%nx*st_grid%ny
     allocate(reg_ncals(totnreg), reg_remain(totnreg))
     allocate(reg_mpi_num(totnreg), reg_mpi_end(0:totnreg))
@@ -884,9 +885,9 @@ module set_cell
 !  end subroutine div_calc_reg_3d
 
   subroutine div_nocalc_flag_2d()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! div_nocalc_flag_2d -- Divide no calculation flag for 2d
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -897,7 +898,7 @@ module set_cell
     integer(I4) :: nocals_sta, nocals_end
     integer(I4), allocatable :: nocals_mpi_num(:), grid_num(:), nocals_glo_num(:)
     integer(I4), allocatable :: nocals_mpi_glo(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     nxy = st_grid%nx*st_grid%ny
     do k = 1, st_grid%nz
       nxyz0 = nxy*(k-1)+1 ; nxyz1 = nxy*k
@@ -1000,9 +1001,9 @@ module set_cell
 !  end subroutine div_nocalc_flag_3d
 
   subroutine set_rel_gloloc()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_rel_gloloc -- Set relationship global&local
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1012,7 +1013,7 @@ module set_cell
     integer(I4) :: count_calc, count_cals
     integer(I4), allocatable :: temp_mpi_reg(:), temp_cend(:)
     logical, allocatable :: mask(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(temp_mpi_reg(ncalc), mask(ncalc))
     temp_mpi_reg(:) = pack(glob_reg_flag(:), glob_mpi_flag(:) == my_rank+1)
     count_reg = 0
@@ -1088,9 +1089,9 @@ module set_cell
 
 #ifdef MPI_MSG
   subroutine set_mpi_rel()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_mpi_rel -- Set mpi relationship
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1106,7 +1107,7 @@ module set_cell
     integer(I4), allocatable :: recv_num(:), send_num(:)
     integer(I4), allocatable :: temp_sort(:), sort_mpi_num(:), loc_send_num(:)
     integer(I4), allocatable :: mpi_l2g_ij(:), mpi_l2g_ijk(:), mpi_calc2reg(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (pro_totn /= 1) then
       allocate(neib_glos(ncals))
       !$omp parallel do private(i)
@@ -1398,9 +1399,9 @@ module set_cell
 #endif
 
   subroutine set_rel_seareg()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_rel_seareg -- Set relationship of sea region
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1408,7 +1409,7 @@ module set_cell
     ! -- local
     integer(I4) :: i, ij, nxy
     integer(I4) :: i_num, j_num, k_num, g_num, n_num, w_num, e_num, s_num, u_num, d_num
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     seal_snum = 0
     nxy = st_grid%nx*st_grid%ny
 
@@ -1503,16 +1504,16 @@ module set_cell
   end subroutine set_rel_seareg
 
   subroutine set_loc_cell_clas()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_loc_cell_clas -- Set local cell classification
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(clas_flag(ncell,st_clas%totn))
     !$omp parallel
     !$omp do private(i)
@@ -1532,9 +1533,9 @@ module set_cell
   end subroutine set_loc_cell_clas
 
   subroutine get_cals_grid(cal_num, x_num, y_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! get_cals_grid -- Get surface number from grid number
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1542,7 +1543,7 @@ module set_cell
     integer(I4), intent(out) :: x_num, y_num
     ! -- local
     integer(I4) :: s_num
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     s_num = loc2glo_ij(cal_num)
     y_num = (s_num-1)/st_grid%nx + 1
     x_num = s_num - (y_num-1)*st_grid%nx
@@ -1550,9 +1551,9 @@ module set_cell
   end subroutine get_cals_grid
 
   subroutine get_calc_grid(cal_num, x_num, y_num, z_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! get_calc_grid -- Get calculation number from grid number
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1560,7 +1561,7 @@ module set_cell
     integer(I4), intent(out) :: x_num, y_num, z_num
     ! -- local
     integer(I4) :: c_num, xy_num
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     c_num = loc2glo_ijk(cal_num)
     z_num = (c_num-1)/(st_grid%nx*st_grid%ny) + 1
     xy_num = c_num - st_grid%nx*st_grid%ny*(z_num-1)

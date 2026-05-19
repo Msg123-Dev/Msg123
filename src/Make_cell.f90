@@ -20,9 +20,9 @@ module make_cell
   contains
 
   subroutine make_cell_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! make_cell_info -- Make cell information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: my_rank, st_grid
 #ifdef MPI_MSG
@@ -33,7 +33,7 @@ module make_cell
 
     ! -- local
     integer(I4) :: j, k
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (my_rank /= 0) then
       allocate(glob_x(st_grid%nx+1,st_grid%ny+1), glob_y(st_grid%nx+1,st_grid%ny+1))
       allocate(glob_z(st_grid%nx+1,st_grid%ny+1,st_grid%nz+1))
@@ -82,16 +82,16 @@ module make_cell
   end subroutine make_cell_info
 
   subroutine make_cent_point()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! make_cent_point -- Make center point information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: DQUA
     ! -- inout
 
     ! -- local
     integer(I4) :: i, xn, yn, zn
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(fp_xw(ncalc), fp_yw(ncalc), fp_xs(ncalc), fp_ys(ncalc))
     allocate(fp_xe(ncalc), fp_ye(ncalc), fp_xn(ncalc), fp_yn(ncalc))
     allocate(fp_zw(ncalc), fp_zs(ncalc), fp_ze(ncalc), fp_zn(ncalc))
@@ -121,12 +121,18 @@ module make_cell
       fp_ys(i) = DHALF*(glob_y(xn,yn+1)+glob_y(xn+1,yn+1))
       cp_x(i) = DQUA*(glob_x(xn,yn)+glob_x(xn,yn+1)+glob_x(xn+1,yn)+glob_x(xn+1,yn+1))
       cp_y(i) = DQUA*(glob_y(xn,yn)+glob_y(xn,yn+1)+glob_y(xn+1,yn)+glob_y(xn+1,yn+1))
-      fp_zw(i) = DQUA*(glob_z(xn,yn,zn)+glob_z(xn,yn,zn+1)+glob_z(xn,yn+1,zn)+glob_z(xn,yn+1,zn+1))
-      fp_ze(i) = DQUA*(glob_z(xn+1,yn,zn)+glob_z(xn+1,yn+1,zn)+glob_z(xn+1,yn,zn+1)+glob_z(xn+1,yn+1,zn+1))
-      fp_zn(i) = DQUA*(glob_z(xn,yn,zn)+glob_z(xn,yn,zn+1)+glob_z(xn+1,yn,zn)+glob_z(xn+1,yn,zn+1))
-      fp_zs(i) = DQUA*(glob_z(xn,yn+1,zn)+glob_z(xn+1,yn+1,zn)+glob_z(xn,yn+1,zn+1)+glob_z(xn+1,yn+1,zn+1))
-      fp_zt(i) = DQUA*(glob_z(xn,yn,zn)+glob_z(xn,yn+1,zn)+glob_z(xn+1,yn,zn)+glob_z(xn+1,yn+1,zn))
-      fp_zb(i) = DQUA*(glob_z(xn,yn,zn+1)+glob_z(xn,yn+1,zn+1)+glob_z(xn+1,yn,zn+1)+glob_z(xn+1,yn+1,zn+1))
+      fp_zw(i) = DQUA*(glob_z(xn,yn,zn)+glob_z(xn,yn,zn+1)+glob_z(xn,yn+1,zn)+&
+                       glob_z(xn,yn+1,zn+1))
+      fp_ze(i) = DQUA*(glob_z(xn+1,yn,zn)+glob_z(xn+1,yn+1,zn)+glob_z(xn+1,yn,zn+1)+&
+                       glob_z(xn+1,yn+1,zn+1))
+      fp_zn(i) = DQUA*(glob_z(xn,yn,zn)+glob_z(xn,yn,zn+1)+glob_z(xn+1,yn,zn)+&
+                       glob_z(xn+1,yn,zn+1))
+      fp_zs(i) = DQUA*(glob_z(xn,yn+1,zn)+glob_z(xn+1,yn+1,zn)+glob_z(xn,yn+1,zn+1)+&
+                       glob_z(xn+1,yn+1,zn+1))
+      fp_zt(i) = DQUA*(glob_z(xn,yn,zn)+glob_z(xn,yn+1,zn)+glob_z(xn+1,yn,zn)+&
+                       glob_z(xn+1,yn+1,zn))
+      fp_zb(i) = DQUA*(glob_z(xn,yn,zn+1)+glob_z(xn,yn+1,zn+1)+glob_z(xn+1,yn,zn+1)+&
+                       glob_z(xn+1,yn+1,zn+1))
       cp_z(i) = DHALF*(fp_zt(i)+fp_zb(i))
     end do
     !$omp end do
@@ -135,9 +141,9 @@ module make_cell
   end subroutine make_cent_point
 
   subroutine make_dis_point2face()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! make_dis_point2face -- Make distance between point and face center
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -145,7 +151,7 @@ module make_cell
     ! -- local
     integer(I4) :: i
     real(DP) :: dis2, dis3, dis4, dis5
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(dis2face(ncalc,FACE))
     !$omp parallel
     !$omp do private(i)
@@ -174,9 +180,9 @@ module make_cell
   end subroutine make_dis_point2face
 
   subroutine make_face_area()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! meke_face_area -- Make face area
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -184,7 +190,7 @@ module make_cell
     ! -- local
     integer(I4) :: i, xn, yn, zn
     real(DP) :: x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4, z5, z6, z7, z8
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(face_area(ncalc,FACE))
     !$omp parallel
     !$omp do private(i)
@@ -193,7 +199,8 @@ module make_cell
     end do
     !$omp end do
     ! make face area
-    !$omp do private(i, xn, yn, zn, x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4, z5, z6, z7, z8)
+    !$omp do private(i, xn, yn, zn, x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4, z5, z6,&
+    !$omp&           z7, z8)
     do i = 1, ncalc
       call get_calc_grid(i, xn, yn, zn)
       x1 = glob_x(xn,yn) ; x2 = glob_x(xn+1,yn) ; x3 = glob_x(xn+1,yn+1)
@@ -238,9 +245,9 @@ module make_cell
 !  end function fa_diag
 
   function fa_2tri(x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4) result(triarea)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! fa_2tri -- Calculate face area using cross product with two triangle
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -248,7 +255,7 @@ module make_cell
     ! -- local
     real(DP) :: triarea, triarea1, triarea2
     real(DP) :: vec3d1(3), vec3d2(3)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     vec3d1(1) = x1 - x2 ; vec3d1(2) = y1 - y2 ; vec3d1(3) = z1 - z2
     vec3d2(1) = x3 - x2 ; vec3d2(2) = y3 - y2 ; vec3d2(3) = z3 - z2
     triarea1 = (vec3d1(2)*vec3d2(3) - vec3d1(3)*vec3d2(2))**2&
@@ -266,9 +273,9 @@ module make_cell
   end function fa_2tri
 
   subroutine make_cell_vol()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! meke_cell_vol -- Make cell volume
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -277,7 +284,7 @@ module make_cell
     integer(I4) :: i, xn, yn, zn
     real(DP) :: cx, cy, cz
     real(DP) :: x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4, z5, z6, z7, z8
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(cell_vol(ncalc))
     !$omp parallel
     !$omp do private(i)
@@ -286,7 +293,8 @@ module make_cell
     end do
     !$omp end do
     ! make cell volume
-    !$omp do private(i, xn, yn, zn, cx, cy, cz, x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4, z5, z6, z7, z8)
+    !$omp do private(i, xn, yn, zn, cx, cy, cz, x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3,&
+    !$omp&           z4, z5, z6, z7, z8)
     do i = 1, ncalc
       call get_calc_grid(i, xn, yn, zn)
       cx = cp_x(i) ; cy = cp_y(i) ; cz = cp_z(i)
@@ -318,9 +326,9 @@ module make_cell
   end subroutine make_cell_vol
 
   function vol(x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4) result(trivol)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! vol -- Calculate cell vol using cross product with a focus on cell center
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -328,7 +336,7 @@ module make_cell
     ! -- local
     real(DP) :: trivol
     real(DP) :: vec3d1(3), vec3d2(3), vec3d3(3), cropro12(3)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     vec3d1(1) = x2 - x3 ; vec3d1(2) = y2 - y3 ; vec3d1(3) = z2 - z3
     vec3d2(1) = x4 - x3 ; vec3d2(2) = y4 - y3 ; vec3d2(3) = z4 - z3
     vec3d3(1) = x1 - x3 ; vec3d3(2) = y1 - y3 ; vec3d3(3) = z1 - z3
@@ -341,16 +349,16 @@ module make_cell
   end function vol
 
   subroutine make_cell_surfelev()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! make_cell_surfelev -- Make cell surface elevation
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(cell_top(ncalc), cell_cent(ncalc), cell_bot(ncalc))
     allocate(surf_elev(ncals))
     !$omp parallel
@@ -380,9 +388,9 @@ module make_cell
   end subroutine make_cell_surfelev
 
   subroutine make_rech_area()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! make_rech_area -- Make recharge area
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use set_cell, only: get_cals_grid
     ! -- inout
@@ -390,7 +398,7 @@ module make_cell
     ! -- local
     integer(I4) :: i, xn, yn
     real(DP) :: x1, x2, x3, x4, y1, y2, y3, y4
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(area_r(ncals))
     !$omp parallel
     !$omp do private(i)
@@ -414,9 +422,9 @@ module make_cell
   end subroutine make_rech_area
 
   function rarea(x1, x2, x3, x4, y1, y2, y3, y4) result(r_area)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! rarea -- Calculate recharge area using Heron's formula
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -424,7 +432,7 @@ module make_cell
     ! -- local
     real(DP) :: r_area, side1, side2, side3, side4, dialog, s1, s2
     real(DP) :: tri(2)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     side1 = sqrt((x1-x2)**2 + (y1-y2)**2) ; side2 = sqrt((x2-x3)**2 + (y2-y3)**2)
     side3 = sqrt((x3-x4)**2 + (y3-y4)**2) ; side4 = sqrt((x4-x1)**2 + (y4-y1)**2)
     dialog = sqrt((x1-x3)**2 + (y1-y3)**2)

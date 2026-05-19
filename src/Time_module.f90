@@ -32,9 +32,9 @@ module time_module
   contains
 
   subroutine update_tstep()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! update_tstep -- Update time step
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use constval_module, only: DSMAL
     use utility_module, only: write_err_stop
@@ -47,7 +47,7 @@ module time_module
 
     ! -- local
     integer(I4) :: i, s
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ! -- Calculate next time step (nextst)
       call calc_nextst()
 
@@ -112,9 +112,9 @@ module time_module
   end subroutine update_tstep
 
   subroutine calc_nextst()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_nextst -- Calculate next time step
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: DNOVAL
     use utility_module, only: conv_unit
@@ -138,7 +138,7 @@ module time_module
     integer(I4), allocatable :: calc2calc(:)
     real(SP), save :: resi_time
     real(DP), allocatable :: cell_srat(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (current_t == DZERO) then
       timestep_num = 0 ; boundstep = 0
       delt_old1 = DZERO ; resi_time = SZERO
@@ -278,9 +278,9 @@ module time_module
   end subroutine calc_nextst
 
   subroutine set_nextet()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_nextet -- Set next end time
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use utility_module, only: write_logf
     use initial_module, only: in_type
@@ -296,7 +296,8 @@ module time_module
     ! -- local
     integer(I4) :: ierr
     character(:), allocatable :: bound_name, err_mes, str_time
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
+    allocate(character(0) :: str_time, err_mes, bound_name)
     ierr = 0 ; str_time = "" ; err_mes = "" ; bound_name = ""
     if (st_step_flag%seal == 1) then
       bound_name = "sea level"
@@ -317,7 +318,8 @@ module time_module
       if (ierr /= 0) then
         if (my_rank == 0) then
           write(str_time,'(f0.3)') now_time
-          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//trim(st_sim%cal_unit)
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
           call write_logf(err_mes)
         end if
         st_step_flag%seal = 0
@@ -346,7 +348,8 @@ module time_module
       if (ierr /= 0) then
         if (my_rank == 0) then
           write(str_time,'(f0.3)') now_time
-          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//trim(st_sim%cal_unit)
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
           call write_logf(err_mes)
         end if
         st_step_flag%rech = 0
@@ -377,7 +380,8 @@ module time_module
       if (ierr /= 0) then
         if (my_rank == 0) then
           write(str_time,'(f0.3)') now_time
-          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//trim(st_sim%cal_unit)
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
           call write_logf(err_mes)
         end if
         st_step_flag%well = 0
@@ -411,7 +415,8 @@ module time_module
       if (ierr /= 0) then
         if (my_rank == 0) then
           write(str_time,'(f0.3)') now_time
-          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//trim(st_sim%cal_unit)
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
           call write_logf(err_mes)
         end if
         st_step_flag%prec = 0
@@ -444,7 +449,8 @@ module time_module
       if (ierr /= 0) then
         if (my_rank == 0) then
           write(str_time,'(f0.3)') now_time
-          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//trim(st_sim%cal_unit)
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
           call write_logf(err_mes)
         end if
         st_step_flag%evap = 0
@@ -478,7 +484,8 @@ module time_module
       if (ierr /= 0) then
         if (my_rank == 0) then
           write(str_time,'(f0.3)') now_time
-          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//trim(st_sim%cal_unit)
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
           call write_logf(err_mes)
         end if
         st_step_flag%riwl = 0
@@ -508,7 +515,8 @@ module time_module
       if (ierr /= 0) then
         if (my_rank == 0) then
           write(str_time,'(f0.3)') now_time
-          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//trim(st_sim%cal_unit)
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
           call write_logf(err_mes)
         end if
         st_step_flag%riwd = 0
@@ -536,7 +544,8 @@ module time_module
       if (ierr /= 0) then
         if (my_rank == 0) then
           write(str_time,'(f0.3)') now_time
-          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//trim(st_sim%cal_unit)
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
           call write_logf(err_mes)
         end if
         st_step_flag%ribl = 0
@@ -566,7 +575,8 @@ module time_module
       if (ierr /= 0) then
         if (my_rank == 0) then
           write(str_time,'(f0.3)') now_time
-          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//trim(st_sim%cal_unit)
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
           call write_logf(err_mes)
         end if
         st_step_flag%ride = 0
@@ -598,7 +608,8 @@ module time_module
       if (ierr /= 0) then
         if (my_rank == 0) then
           write(str_time,'(f0.3)') now_time
-          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//trim(st_sim%cal_unit)
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
           call write_logf(err_mes)
         end if
         st_step_flag%riwi = 0
@@ -630,7 +641,8 @@ module time_module
       if (ierr /= 0) then
         if (my_rank == 0) then
           write(str_time,'(f0.3)') now_time
-          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//trim(st_sim%cal_unit)
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
           call write_logf(err_mes)
         end if
         st_step_flag%rile = 0
@@ -662,7 +674,8 @@ module time_module
       if (ierr /= 0) then
         if (my_rank == 0) then
           write(str_time,'(f0.3)') now_time
-          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//trim(st_sim%cal_unit)
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
           call write_logf(err_mes)
         end if
         st_step_flag%lawl = 0
@@ -692,7 +705,8 @@ module time_module
       if (ierr /= 0) then
         if (my_rank == 0) then
           write(str_time,'(f0.3)') now_time
-          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//trim(st_sim%cal_unit)
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
           call write_logf(err_mes)
         end if
         st_step_flag%lawd = 0
@@ -724,7 +738,8 @@ module time_module
       if (ierr /= 0) then
         if (my_rank == 0) then
           write(str_time,'(f0.3)') now_time
-          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//trim(st_sim%cal_unit)
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
           call write_logf(err_mes)
         end if
         st_step_flag%labl = 0
@@ -754,7 +769,8 @@ module time_module
       if (ierr /= 0) then
         if (my_rank == 0) then
           write(str_time,'(f0.3)') now_time
-          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//trim(st_sim%cal_unit)
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
           call write_logf(err_mes)
         end if
         st_step_flag%laar = 0
@@ -773,16 +789,16 @@ module time_module
   end subroutine set_nextet
 
   subroutine set_delt()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_delt -- Set delta time
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
 
     ! -- local
     real(SP) :: min_step
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     min_step = min(st_rech%etime, st_well%etime, st_seal%etime, st_prec%etime,&
                    st_evap%etime, st_riwl%etime, st_riwd%etime, st_ribl%etime,&
                    st_ride%etime, st_riwi%etime, st_rile%etime, st_lawl%etime,&
@@ -805,9 +821,9 @@ module time_module
   end subroutine set_delt
 
   subroutine set_nextvar()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_nextvar -- Set next variable
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use assign_calc, only: read_ksx, read_ksy
     use set_condition, only: set_srabyd, set_chabyd, set_wellconn
@@ -828,7 +844,7 @@ module time_module
     integer(I4) :: prec_stepflag, evap_stepflag, rive_stepflag, lake_stepflag
     integer(I4) :: rive_aflag, sum_ribln, sum_riwln, sum_lawln, sum_labln
     real(DP), allocatable :: temp_area(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_step_flag%seal == 1) then
       ! -- Assign sea level value (sealv)
         call assign_sealv(st_in_type%seal)
@@ -1184,16 +1200,16 @@ module time_module
   end subroutine set_nextvar
 
   subroutine set_vwell_head()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_vwell_head -- Set virtual well head
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ! -- Calculate virtual well head without well pumping (vheadout)
       call calc_vheadout()
 
@@ -1209,9 +1225,9 @@ module time_module
   end subroutine set_vwell_head
 
   subroutine change_recharge()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! change_recharge -- Change the recharge volume
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use assign_calc, only: surf_bott, surf_parm, surf_reli
     ! -- inout
@@ -1220,7 +1236,7 @@ module time_module
     integer(I4) :: i, s
     real(DP) :: norm_elev
     real(DP), allocatable :: water_dep(:), rech_rati(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(water_dep(ncals), rech_rati(rech_num))
     !$omp parallel
     !$omp do private(i)
@@ -1311,9 +1327,9 @@ module time_module
 !  end subroutine set_est_head
 
   subroutine calc_vheadout()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_vheadout -- Calculate virtual well head without well pumping
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1321,7 +1337,7 @@ module time_module
     ! -- local
     integer(I4) :: i, j, k
     real(DP) :: tot_cond, tot_flux
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(whead_new(well_num))
     !$omp parallel
     !$omp do private(i)
@@ -1348,9 +1364,9 @@ module time_module
   end subroutine calc_vheadout
 
   subroutine calc_vheadin()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_vheadin -- Calculate virtual well head with well pumping
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1359,7 +1375,7 @@ module time_module
     integer(I4) :: i, j, k
     real(DP) :: tot_cond
     real(DP), allocatable :: temp_whead(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(temp_whead(well_num))
     !$omp parallel
     !$omp do private(i)
@@ -1400,9 +1416,9 @@ module time_module
   end subroutine calc_vheadin
 
   subroutine set_valexc(excn, exc_inval, exc_outval)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_valexc -- Set value exchange
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1411,7 +1427,7 @@ module time_module
     real(DP), intent(out) :: exc_outval(:)
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, excn
       exc_outval(i) = exc_inval(i)
@@ -1421,9 +1437,9 @@ module time_module
   end subroutine set_valexc
 
   subroutine write_bound_change(bchange)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_bound_change -- Write boundary change information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1431,7 +1447,7 @@ module time_module
     ! -- local
     integer(I4) :: conv_fnum
     character(9) :: cond_format
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     bchange = st_step_flag%rech + st_step_flag%well + st_step_flag%seal +&
               st_step_flag%prec + st_step_flag%evap + st_step_flag%riwl +&
               st_step_flag%riwd + st_step_flag%ribl + st_step_flag%ride +&
@@ -1490,16 +1506,16 @@ module time_module
   end subroutine write_bound_change
 
   subroutine reset_stepf()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! reset_stepf -- Reset stepflag
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
 
     ! -- local
 
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel sections
     !$omp section
     if (st_step_flag%rech == 1) then
@@ -1562,9 +1578,9 @@ module time_module
   end subroutine reset_stepf
 
   subroutine reset_value(targn, targ_value)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! reset_value -- Reset cell value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1572,7 +1588,7 @@ module time_module
     real(SP), intent(out) :: targ_value(:)
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, targn
       targ_value(i) = SZERO
@@ -1582,9 +1598,9 @@ module time_module
   end subroutine reset_value
 
   subroutine apply_heuri(out_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! apply_heuri -- Apply heuristic time stepping
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: maxout_iter
     ! -- inout
@@ -1592,7 +1608,7 @@ module time_module
     ! -- local
     integer(I4) :: incr_num, decr_num
     real(DP) :: incr_fac = 1.2E+00_DP, decr_fac = 0.8E+00_DP
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     incr_num = int(maxout_iter*0.4) ; decr_num = int(maxout_iter*0.8)
     if (out_num <= incr_num) then
       delt = delt_old1*incr_fac
@@ -1706,9 +1722,9 @@ module time_module
 !  end subroutine calc_trunerr
 
   subroutine set_date(inttime, ndate, restime)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_date -- Set next date
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: MINSEC, HOURSEC, DAYSEC
     use utility_module, only: get_days
@@ -1720,7 +1736,7 @@ module time_module
     integer(I4) :: i, monday
     integer(I4) :: isec, imin, ihour, iday
     real(SP) :: rsec
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     iday = int(inttime/DAYSEC) ; rsec = inttime - iday*DAYSEC
     ihour = int(rsec/HOURSEC) ; rsec = rsec - ihour*HOURSEC
     imin = int(rsec/MINSEC) ; rsec = rsec - imin*MINSEC

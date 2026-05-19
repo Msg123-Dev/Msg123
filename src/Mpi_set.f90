@@ -55,9 +55,9 @@ module mpi_set
   contains
 
   subroutine bcast_ici_set(mcomp, mgrid, ici_file, get_mat, put_mat, get_cama, put_cama)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_ici_set -- Bcast ici set
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -66,7 +66,7 @@ module mpi_set
     ! -- local
     integer(I4) :: ierr
     integer(I4) :: length
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     length = len_trim(mcomp)
     call MPI_BCAST(length, 1, MPI_INTEGER, 0, my_comm, ierr)
@@ -144,16 +144,16 @@ module mpi_set
   end subroutine bcast_ici_set
 
   subroutine bcast_sim_flag()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_sim_flag -- Bcast simulation flag
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use initial_module, only: noclas_flag
     ! -- inout
 
     ! -- local
     integer(I4) :: ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(st_sim%sim_type, 1, MPI_INTEGER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -207,16 +207,16 @@ module mpi_set
   end subroutine bcast_sim_flag
 
   subroutine bcast_xyz_num()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_xyz_num -- Bcast xyz number
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
 
     ! -- local
     integer(I4) :: ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(st_grid%nx, 1, MPI_INTEGER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -249,9 +249,9 @@ module mpi_set
   end subroutine bcast_xyz_num
 
   subroutine bcast_clas_set()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_clas_set -- Bcast classification setting
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use constval_module, only: VARLEN
     use initial_module, only: st_clas
@@ -264,7 +264,7 @@ module mpi_set
     integer(I4), allocatable :: clas_num(:)
     integer(I4), allocatable :: clas_i(:,:), clas_j(:,:), clas_k(:,:)
     character(VARLEN), allocatable :: clas_name(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (my_rank == 0) then
       clas_totn = st_clas%totn
     end if
@@ -392,7 +392,8 @@ module mpi_set
     if (my_rank == 0) then
       !$omp parallel do private(j)
       do j = 1, clas_totn
-        clas_i(:,j) = st_clas%i(:,j) ; clas_j(:,j) = st_clas%j(:,j) ; clas_k(:,j) = st_clas%k(:,j)
+        clas_i(:,j) = st_clas%i(:,j) ; clas_j(:,j) = st_clas%j(:,j)
+        clas_k(:,j) = st_clas%k(:,j)
       end do
       !$omp end parallel do
     end if
@@ -426,7 +427,8 @@ module mpi_set
       !$omp parallel do private(j)
       do j = 1, clas_totn
         st_clas%i(:,j) = 0 ; st_clas%j(:,j) = 0 ; st_clas%k(:,j) = 0
-        st_clas%i(:,j) = clas_i(:,j) ; st_clas%j(:,j) = clas_j(:,j) ; st_clas%k(:,j) = clas_k(:,j)
+        st_clas%i(:,j) = clas_i(:,j) ; st_clas%j(:,j) = clas_j(:,j)
+        st_clas%k(:,j) = clas_k(:,j)
       end do
       !$omp end parallel do
     end if
@@ -436,9 +438,9 @@ module mpi_set
   end subroutine bcast_clas_set
 
   subroutine bcast_glob_flag(totreg_num, reg_flag, mpi_flag)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_glob_flag -- Bcast global flag value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -446,7 +448,7 @@ module mpi_set
     integer(I4), intent(inout) :: reg_flag(:), mpi_flag(:)
     ! -- local
     integer(I4) :: ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(totreg_num, 1, MPI_INTEGER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -472,9 +474,9 @@ module mpi_set
   end subroutine bcast_glob_flag
 
   subroutine set_calc_view(loc_ncals, loc_ncalc, l2g_ij, l2g_ijk)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_calc_view -- Set calculation view
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -485,7 +487,7 @@ module mpi_set
     integer(I4), allocatable :: xyblock(:), xyzblock(:), xytype(:), xyztype(:)
     integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
     integer(KIND=MPI_ADDRESS_KIND), allocatable :: xydis(:), xyzdis(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     allocate(xyblock(loc_ncals), xydis(loc_ncals), xytype(loc_ncals))
     !$omp parallel
@@ -506,7 +508,8 @@ module mpi_set
     call MPI_TYPE_CREATE_STRUCT(loc_ncals, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Create struct datatype without header for within range in xy direction.")
+        call write_err_stop("Create struct datatype without header for within range in xy"//&
+                            " direction.")
       end if
     end if
 
@@ -515,19 +518,22 @@ module mpi_set
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, cals_i4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Resize struct datatype without header for within range in xy direction.")
+        call write_err_stop("Resize struct datatype without header for within range in xy"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_COMMIT(cals_i4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Commit struct datatype without header for within range in xy direction.")
+        call write_err_stop("Commit struct datatype without header for within range in xy"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_FREE(tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Free struct datatype without header for within range in xy direction.")
+        call write_err_stop("Free struct datatype without header for within range in xy"//&
+                            " direction.")
       end if
     end if
 
@@ -552,7 +558,8 @@ module mpi_set
     call MPI_TYPE_CREATE_STRUCT(loc_ncals, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Create struct datatype without header for within range in xy direction.")
+        call write_err_stop("Create struct datatype without header for within range in xy"//&
+                            " direction.")
       end if
     end if
     lb = 0_MPI_ADDRESS_KIND
@@ -560,19 +567,22 @@ module mpi_set
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, cals_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Resize struct datatype without header for within range in xy direction.")
+        call write_err_stop("Resize struct datatype without header for within range in xy"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_COMMIT(cals_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Commit struct datatype without header for within range in xy direction.")
+        call write_err_stop("Commit struct datatype without header for within range in xy"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_FREE(tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Free struct datatype without header for within range in xy direction.")
+        call write_err_stop("Free struct datatype without header for within range in xy"//&
+                            " direction.")
       end if
     end if
 
@@ -598,7 +608,8 @@ module mpi_set
     call MPI_TYPE_CREATE_STRUCT(loc_ncals+1, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Create struct datatype with header for within range in xy direction.")
+        call write_err_stop("Create struct datatype with header for within range in xy"//&
+                            " direction.")
       end if
     end if
     lb = 0_MPI_ADDRESS_KIND
@@ -606,19 +617,22 @@ module mpi_set
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, cals_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Resize struct datatype with header for within range in xy direction.")
+        call write_err_stop("Resize struct datatype with header for within range in xy"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_COMMIT(cals_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Commit struct datatype with header for within range in xy direction.")
+        call write_err_stop("Commit struct datatype with header for within range in xy"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_FREE(tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Free struct datatype with header for within range in xy direction.")
+        call write_err_stop("Free struct datatype with header for within range in xy"//&
+                            " direction.")
       end if
     end if
 
@@ -642,7 +656,8 @@ module mpi_set
     call MPI_TYPE_CREATE_STRUCT(loc_ncalc, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Create struct datatype without header for in range in xyz direction.")
+        call write_err_stop("Create struct datatype without header for in range in xyz"//&
+                            " direction.")
       end if
     end if
     lb = 0_MPI_ADDRESS_KIND
@@ -650,19 +665,22 @@ module mpi_set
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, calc_i4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Resize struct datatype without header for in range in xyz direction.")
+        call write_err_stop("Resize struct datatype without header for in range in xyz"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_COMMIT(calc_i4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Commit struct datatype without header for in range in xyz direction.")
+        call write_err_stop("Commit struct datatype without header for in range in xyz"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_FREE(tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Free struct datatype without header for in range in xyz direction.")
+        call write_err_stop("Free struct datatype without header for in range in xyz"//&
+                            " direction.")
       end if
     end if
 
@@ -687,7 +705,8 @@ module mpi_set
     call MPI_TYPE_CREATE_STRUCT(loc_ncalc, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Create struct datatype without header for in range in xyz direction.")
+        call write_err_stop("Create struct datatype without header for in range in xyz"//&
+                            " direction.")
       end if
     end if
     lb = 0_MPI_ADDRESS_KIND
@@ -695,19 +714,22 @@ module mpi_set
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, calc_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Resize struct datatype without header for in range in xyz direction.")
+        call write_err_stop("Resize struct datatype without header for in range in xyz"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_COMMIT(calc_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Commit struct datatype without header for in range in xyz direction.")
+        call write_err_stop("Commit struct datatype without header for in range in xyz"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_FREE(tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Free struct datatype without header for in range in xyz direction.")
+        call write_err_stop("Free struct datatype without header for in range in xyz"//&
+                            " direction.")
       end if
     end if
 
@@ -733,7 +755,8 @@ module mpi_set
     call MPI_TYPE_CREATE_STRUCT(loc_ncalc+1, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Create struct datatype with header for within range in xyz direction.")
+        call write_err_stop("Create struct datatype with header for within range in xyz"//&
+                            " direction.")
       end if
     end if
     lb = 0_MPI_ADDRESS_KIND
@@ -741,13 +764,15 @@ module mpi_set
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, calc_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Resize struct datatype with header for within range in xyz direction.")
+        call write_err_stop("Resize struct datatype with header for within range in xyz"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_COMMIT(calc_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Commit struct datatype with header for within range in xyz direction.")
+        call write_err_stop("Commit struct datatype with header for within range in xyz"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_FREE(tmptype, ierr)
@@ -762,9 +787,9 @@ module mpi_set
   end subroutine set_calc_view
 
   subroutine set_seal_view(loc_seas, loc_seac, l2g_ij, l2g_ijk)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_seal_view -- Set seal view
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -775,7 +800,7 @@ module mpi_set
     integer(I4), allocatable :: xyblock(:), xyzblock(:), xytype(:), xyztype(:)
     integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
     integer(KIND=MPI_ADDRESS_KIND), allocatable :: xydis(:), xyzdis(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     allocate(xyblock(loc_seas), xydis(loc_seas), xytype(loc_seas))
     !$omp parallel
@@ -796,7 +821,8 @@ module mpi_set
     call MPI_TYPE_CREATE_STRUCT(loc_seas, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Create struct datatype without header for out of range in xy direction.")
+        call write_err_stop("Create struct datatype without header for out of range in xy"//&
+                            " direction.")
       end if
     end if
     lb = 0_MPI_ADDRESS_KIND
@@ -804,13 +830,15 @@ module mpi_set
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, surf_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Resize struct datatype without header for out of range in xy direction.")
+        call write_err_stop("Resize struct datatype without header for out of range in xy"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_COMMIT(surf_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Commit struct datatype without header for out of range in xy direction.")
+        call write_err_stop("Commit struct datatype without header for out of range in xy"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_FREE(tmptype, ierr)
@@ -842,7 +870,8 @@ module mpi_set
     call MPI_TYPE_CREATE_STRUCT(loc_seas+1, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Create struct datatype with header for out of range in xy direction.")
+        call write_err_stop("Create struct datatype with header for out of range in xy"//&
+                            " direction.")
       end if
     end if
     lb = 0_MPI_ADDRESS_KIND
@@ -850,19 +879,22 @@ module mpi_set
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, surf_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Resize struct datatype with header for out of range in xy direction.")
+        call write_err_stop("Resize struct datatype with header for out of range in xy"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_COMMIT(surf_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Commit struct datatype with header for out of range in xy direction.")
+        call write_err_stop("Commit struct datatype with header for out of range in xy"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_FREE(tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Free struct datatype with header for out of range in xy direction.")
+        call write_err_stop("Free struct datatype with header for out of range in xy"//&
+                            " direction.")
       end if
     end if
 
@@ -887,7 +919,8 @@ module mpi_set
     call MPI_TYPE_CREATE_STRUCT(loc_seac, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Create struct datatype without header for out of range in xyz direction.")
+        call write_err_stop("Create struct datatype without header for out of range in xyz"//&
+                            " direction.")
       end if
     end if
     lb = 0_MPI_ADDRESS_KIND
@@ -895,19 +928,22 @@ module mpi_set
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, cell_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Resize struct datatype without header for out of range in xyz direction.")
+        call write_err_stop("Resize struct datatype without header for out of range in xyz"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_COMMIT(cell_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Commit struct datatype without header for out of range in xyz direction.")
+        call write_err_stop("Commit struct datatype without header for out of range in xyz"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_FREE(tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Free struct datatype without header for out of range in xyz direction.")
+        call write_err_stop("Free struct datatype without header for out of range in xyz"//&
+                            " direction.")
       end if
     end if
 
@@ -933,7 +969,8 @@ module mpi_set
     call MPI_TYPE_CREATE_STRUCT(loc_seac+1, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Create struct datatype with header for out of range in xyz direction.")
+        call write_err_stop("Create struct datatype with header for out of range in xyz"//&
+                            " direction.")
       end if
     end if
     lb = 0_MPI_ADDRESS_KIND
@@ -941,19 +978,22 @@ module mpi_set
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, cell_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Resize struct datatype with header for out of range in xyz direction.")
+        call write_err_stop("Resize struct datatype with header for out of range in xyz"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_COMMIT(cell_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Commit struct datatype with header for out of range in xyz direction.")
+        call write_err_stop("Commit struct datatype with header for out of range in xyz"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_FREE(tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Free struct datatype with header for out of range in xyz direction.")
+        call write_err_stop("Free struct datatype with header for out of range in xyz"//&
+                            " direction.")
       end if
     end if
 
@@ -962,9 +1002,9 @@ module mpi_set
   end subroutine set_seal_view
 
   subroutine set_cell_view(loc_nsurf, loc_ncell, l2g_ij, l2g_ijk)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_cell_view -- Set cell view
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -975,7 +1015,7 @@ module mpi_set
     integer(I4), allocatable :: xyblock(:), xyzblock(:), xytype(:), xyztype(:)
     integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
     integer(KIND=MPI_ADDRESS_KIND), allocatable :: xydis(:), xyzdis(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     allocate(xyblock(loc_nsurf), xydis(loc_nsurf), xytype(loc_nsurf))
     !$omp parallel
@@ -996,7 +1036,8 @@ module mpi_set
     call MPI_TYPE_CREATE_STRUCT(loc_nsurf, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Create struct datatype without header for within range and sea in xy direction.")
+        call write_err_stop("Create struct datatype without header for within range and sea"//&
+                            " in xy direction.")
       end if
     end if
     lb = 0_MPI_ADDRESS_KIND
@@ -1004,19 +1045,22 @@ module mpi_set
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, surf_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Resize struct datatype with header for out of range in xyz direction.")
+        call write_err_stop("Resize struct datatype with header for out of range in xyz"//&
+                            " direction.")
       end if
     end if
     call MPI_TYPE_COMMIT(surf_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Commit struct datatype without header for within range and sea in xy direction.")
+        call write_err_stop("Commit struct datatype without header for within range and sea"//&
+                            " in xy direction.")
       end if
     end if
     call MPI_TYPE_FREE(tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Free struct datatype without header for within range and sea in xy direction.")
+        call write_err_stop("Free struct datatype without header for within range and sea"//&
+                            " in xy direction.")
       end if
     end if
 
@@ -1042,7 +1086,8 @@ module mpi_set
     call MPI_TYPE_CREATE_STRUCT(loc_nsurf+1, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Create struct datatype with header for within range and sea in xy direction.")
+        call write_err_stop("Create struct datatype with header for within range and sea in"//&
+                            " xy direction.")
       end if
     end if
     lb = 0_MPI_ADDRESS_KIND
@@ -1050,19 +1095,22 @@ module mpi_set
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, surf_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Resize struct datatype with header for within range and sea in xy direction.")
+        call write_err_stop("Resize struct datatype with header for within range and sea in"//&
+                            " xy direction.")
       end if
     end if
     call MPI_TYPE_COMMIT(surf_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Commit struct datatype with header for within range and sea in xy direction.")
+        call write_err_stop("Commit struct datatype with header for within range and sea in"//&
+                            " xy direction.")
       end if
     end if
     call MPI_TYPE_FREE(tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Free struct datatype with header for within range and sea in xy direction.")
+        call write_err_stop("Free struct datatype with header for within range and sea"//&
+                            " in xy direction.")
       end if
     end if
 
@@ -1087,7 +1135,8 @@ module mpi_set
     call MPI_TYPE_CREATE_STRUCT(loc_ncell, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Create struct datatype without header for within range and sea in xyz direction.")
+        call write_err_stop("Create struct datatype without header for within range and sea"//&
+                            " in xyz direction.")
       end if
     end if
     lb = 0_MPI_ADDRESS_KIND
@@ -1095,19 +1144,22 @@ module mpi_set
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, cell_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Resize struct datatype without header for within range and sea in xyz direction.")
+        call write_err_stop("Resize struct datatype without header for within range and sea"//&
+                            " in xyz direction.")
       end if
     end if
     call MPI_TYPE_COMMIT(cell_r4view, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Commit struct datatype without header for within range and sea in xyz direction.")
+        call write_err_stop("Commit struct datatype without header for within range and sea"//&
+                            " in xyz direction.")
       end if
     end if
     call MPI_TYPE_FREE(tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Free struct datatype without header for within range and sea in xyz direction.")
+        call write_err_stop("Free struct datatype without header for within range and sea"//&
+                            " in xyz direction.")
       end if
     end if
 
@@ -1133,7 +1185,8 @@ module mpi_set
     call MPI_TYPE_CREATE_STRUCT(loc_ncell+1, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Create struct datatype with header for within range and sea in xyz direction.")
+        call write_err_stop("Create struct datatype with header for within range and sea in"//&
+                            " xyz direction.")
       end if
     end if
     lb = 0_MPI_ADDRESS_KIND
@@ -1141,19 +1194,22 @@ module mpi_set
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, cell_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Resize struct datatype with header for within range and sea in xyz direction.")
+        call write_err_stop("Resize struct datatype with header for within range and sea in"//&
+                            " xyz direction.")
       end if
     end if
     call MPI_TYPE_COMMIT(cell_r4hview, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Commit struct datatype with header for within range and sea in xyz direction.")
+        call write_err_stop("Commit struct datatype with header for within range and sea in"//&
+                            " xyz direction.")
       end if
     end if
     call MPI_TYPE_FREE(tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
-        call write_err_stop("Free struct datatype with header for within range and sea in xyz direction.")
+        call write_err_stop("Free struct datatype with header for within range and sea in"//&
+                            " xyz direction.")
       end if
     end if
 
@@ -1162,9 +1218,9 @@ module mpi_set
   end subroutine set_cell_view
 
   subroutine set_rest_view(loc_ncalc, glob_ncalc, l2g_ijk)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_rest_view -- Set restart view
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -1175,7 +1231,7 @@ module mpi_set
     integer(I4), allocatable :: xyzblock(:), xyztype(:)
     integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
     integer(KIND=MPI_ADDRESS_KIND), allocatable :: xyzdis(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     allocate(xyzblock(loc_ncalc+1), xyzdis(loc_ncalc+1), xyztype(loc_ncalc+1))
     xyzdis(1) = 0_MPI_ADDRESS_KIND
@@ -1226,9 +1282,9 @@ module mpi_set
   end subroutine set_rest_view
 
   subroutine set_write_fview(cals, calc, l2g_ij, l2g_ijk, sort_ns, sort_nc)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_write_fview -- Set write file view
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -1242,7 +1298,7 @@ module mpi_set
     integer(I4), allocatable :: xyzblock(:), xyztype(:)
     integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
     integer(KIND=MPI_ADDRESS_KIND), allocatable :: xydis(:), xyzdis(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
 
     loc_cals = size(sort_ns(:)) + 1
@@ -1358,9 +1414,9 @@ module mpi_set
   end subroutine set_write_fview
 
   subroutine senrec_reg_info(pron, s_nreg, r_nreg)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! senrec_reg_info -- Send and Receive region information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -1371,7 +1427,7 @@ module mpi_set
     integer(I4) :: i, ierr
     integer(I4) :: nreg
     integer(I4), allocatable :: istat(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     allocate(istat(MPI_STATUS_SIZE))
     !$omp parallel do private(i)
@@ -1415,9 +1471,9 @@ module mpi_set
   end subroutine senrec_reg_info
 
   subroutine senrec_grid_num(pron, x_num, y_num, z_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! senrec_grid_num -- Send and Receive grid number
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -1426,7 +1482,7 @@ module mpi_set
     ! -- local
     integer(I4) :: i, ierr
     integer(I4), allocatable :: istat(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     allocate(istat(MPI_STATUS_SIZE))
     !$omp parallel do private(i)
@@ -1456,16 +1512,16 @@ module mpi_set
   end subroutine senrec_grid_num
 
   subroutine bcast_calc_ftype()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_calc_ftype -- Bcast calculation file type
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
 
     ! -- local
     integer(I4) :: ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(st_in_type%retn, 1, MPI_INTEGER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -1512,9 +1568,9 @@ module mpi_set
   end subroutine bcast_calc_ftype
 
   subroutine bcast_sim_val()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_sim_val -- Bcast simulation value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use initial_module, only: nlevel
     use read_input, only: len_scal, len_scal_inv
@@ -1523,7 +1579,7 @@ module mpi_set
     ! -- local
     integer(I4) :: ierr
     integer(I4) :: char_leng
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(st_sim%sta_date, 6, MPI_INTEGER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -1585,16 +1641,16 @@ module mpi_set
   end subroutine bcast_sim_val
 
   subroutine bcast_glob_xyzv()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_glob_xyzv -- Bcast global xyz value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use read_input, only: glob_x, glob_y, glob_z
     ! -- inout
 
     ! -- local
     integer(I4) :: ierr, nxy, nxyz
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     nxy = (st_grid%nx+1)*(st_grid%ny+1) ; nxyz = nxy*(st_grid%nz+1)
 
@@ -1622,16 +1678,16 @@ module mpi_set
   end subroutine bcast_glob_xyzv
 
   subroutine bcast_bound_ftype()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_bound_ftype -- Bcast boundary file type
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
 
     ! -- local
     integer(I4) :: ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(st_in_type%seal, 1, MPI_INTEGER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -1685,16 +1741,16 @@ module mpi_set
   end subroutine bcast_bound_ftype
 
   subroutine bcast_out_type()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_out_type -- Bcast output file number
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
 
     ! -- local
     integer(I4) :: ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(st_out_type%wtab, 1, MPI_INTEGER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -1762,9 +1818,9 @@ module mpi_set
   end subroutine bcast_out_type
 
   subroutine senrec_neib_i4(nbtot, nbnum, sind, rind, sitem, ritem, inv, outv)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! senrec_neib_i4 -- Send and Receive neighbor integer value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -1778,7 +1834,7 @@ module mpi_set
     integer(I4), allocatable :: requ_send(:), requ_recv(:)
     integer(I4), allocatable :: stat_send(:,:), stat_recv(:,:)
     integer(I4), allocatable :: sbufint(:), rbufint(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
     allocate(stat_send(MPI_STATUS_SIZE,nbtot), stat_recv(MPI_STATUS_SIZE,nbtot))
     !$omp parallel
@@ -1877,9 +1933,9 @@ module mpi_set
   end subroutine senrec_neib_i4
 
   subroutine senrec_neib_r4(nbtot, nbnum, sind, rind, sitem, ritem, inv, outv)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! senrec_neib_r4 -- Send and Receive neighbor real4 value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -1894,7 +1950,7 @@ module mpi_set
     integer(I4), allocatable :: requ_send(:), requ_recv(:)
     integer(I4), allocatable :: stat_send(:,:), stat_recv(:,:)
     real(SP), allocatable :: sbufreal(:), rbufreal(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
     allocate(stat_send(MPI_STATUS_SIZE,nbtot), stat_recv(MPI_STATUS_SIZE,nbtot))
     send_count = 0 ; recv_count = 0
@@ -1993,9 +2049,9 @@ module mpi_set
   end subroutine senrec_neib_r4
 
   subroutine senrec_neib_r8(nbtot, nbnum, sind, rind, sitem, ritem, inv, outv)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! senrec_neib_r8 -- Send and Receive neighbor real8 value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -2010,7 +2066,7 @@ module mpi_set
     integer(I4), allocatable :: requ_send(:), requ_recv(:)
     integer(I4), allocatable :: stat_send(:,:), stat_recv(:,:)
     real(DP), allocatable :: sbufreal(:), rbufreal(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
     allocate(stat_send(MPI_STATUS_SIZE,nbtot), stat_recv(MPI_STATUS_SIZE,nbtot))
     send_count = 0 ; recv_count = 0
@@ -2109,9 +2165,9 @@ module mpi_set
   end subroutine senrec_neib_r8
 
   subroutine senrec_face_i4(nbtot, nbnum, sind, rind, sitem, ritem, ind, outd)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! senrec_face_i4 -- Send and Receive face integer value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use constval_module, only: FACE
     ! -- inout
@@ -2126,7 +2182,7 @@ module mpi_set
     integer(I4), allocatable :: requ_send(:), requ_recv(:)
     integer(I4), allocatable :: stat_send(:,:), stat_recv(:,:)
     integer(I4), allocatable :: sbufreal(:), rbufreal(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
     allocate(stat_send(MPI_STATUS_SIZE,nbtot), stat_recv(MPI_STATUS_SIZE,nbtot))
     send_count = 0 ; recv_count = 0
@@ -2231,9 +2287,9 @@ module mpi_set
   end subroutine senrec_face_i4
 
   subroutine senrec_face_r4(nbtot, nbnum, sind, rind, sitem, ritem, ind, outd)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! senrec_face_r4 -- Send and Receive face real4 value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -2248,7 +2304,7 @@ module mpi_set
     integer(I4), allocatable :: requ_send(:), requ_recv(:)
     integer(I4), allocatable :: stat_send(:,:), stat_recv(:,:)
     real(SP), allocatable :: sbufreal(:), rbufreal(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
     allocate(stat_send(MPI_STATUS_SIZE,nbtot), stat_recv(MPI_STATUS_SIZE,nbtot))
     send_count = 0 ; recv_count = 0
@@ -2353,9 +2409,9 @@ module mpi_set
   end subroutine senrec_face_r4
 
   subroutine senrec_face_r8(nbtot, nbnum, sind, rind, sitem, ritem, ind, outd)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! senrec_face_r8 -- Send and Receive face real8 value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -2370,7 +2426,7 @@ module mpi_set
     integer(I4), allocatable :: requ_send(:), requ_recv(:)
     integer(I4), allocatable :: stat_send(:,:), stat_recv(:,:)
     real(DP), allocatable :: sbufreal(:), rbufreal(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
     allocate(stat_send(MPI_STATUS_SIZE,nbtot), stat_recv(MPI_STATUS_SIZE,nbtot))
     send_count = 0 ; recv_count = 0
@@ -2475,9 +2531,9 @@ module mpi_set
   end subroutine senrec_face_r8
 
   subroutine bcast_retn_clas(clasn, retn_name, reta, retn, res)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_retn_clas -- Bcast retention classification value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -2486,7 +2542,7 @@ module mpi_set
     real(SP), intent(inout) :: reta(:), retn(:), res(:)
     ! -- local
     integer(I4) :: i, ierr, char_leng
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     do i = 1, clasn
       char_leng = len_trim(retn_name(i))
@@ -2529,9 +2585,9 @@ module mpi_set
   end subroutine bcast_retn_clas
 
   subroutine bcast_parm_clas(clasn, parm_name, ksx, ksy, ksz, ss, ts)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_parm_clas -- Bcast parameter classification value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -2540,7 +2596,7 @@ module mpi_set
     real(SP), intent(inout) :: ksx(:), ksy(:), ksz(:), ss(:), ts(:)
     ! -- local
     integer(I4) :: i, ierr, char_leng
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     do i = 1, clasn
       char_leng = len_trim(parm_name(i))
@@ -2597,16 +2653,16 @@ module mpi_set
   end subroutine bcast_parm_clas
 
   subroutine bcast_init_dep()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_init_dep -- Bcast initial depth
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use initial_module, only: st_init
     ! -- inout
 
     ! -- local
     integer(I4) :: ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(st_init%depth, 1, MPI_REAL4, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -2618,9 +2674,9 @@ module mpi_set
   end subroutine bcast_init_dep
 
   subroutine bcast_clas_val(clasn, cname, cval)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_clas_val -- Bcast classification value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -2629,7 +2685,7 @@ module mpi_set
     real(SP), intent(inout) :: cval(:)
     ! -- local
     integer(I4) :: i, ierr, char_leng
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     do i = 1, clasn
       char_leng = len_trim(cname(i))
@@ -2658,9 +2714,9 @@ module mpi_set
   end subroutine bcast_clas_val
 
   subroutine bcast_2dpoint(pointn, pi, pj, pval)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_2dpoint -- Bcast 2d point value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -2669,7 +2725,7 @@ module mpi_set
     real(SP), intent(inout) :: pval(:)
     ! -- local
     integer(I4) :: ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(pi, pointn, MPI_INTEGER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -2696,9 +2752,9 @@ module mpi_set
   end subroutine bcast_2dpoint
 
   subroutine bcast_3dpoint(pointn, pi, pj, pk, pval)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_3dpoint -- Bcast 3d point value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -2707,7 +2763,7 @@ module mpi_set
     real(SP), intent(inout) :: pval(:)
     ! -- local
     integer(I4) :: ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(pi, pointn, MPI_INTEGER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -2740,9 +2796,9 @@ module mpi_set
   end subroutine bcast_3dpoint
 
   subroutine bcast_wellpoint(wpn, wid, wi, wj, wks, wke, wval)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_wellpoint -- Bcast well point value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -2751,7 +2807,7 @@ module mpi_set
     real(SP), intent(inout) :: wval(:)
     ! -- local
     integer(I4) :: ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(wid, wpn, MPI_INTEGER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -2798,9 +2854,9 @@ module mpi_set
   end subroutine bcast_wellpoint
 
   subroutine scatter_i4xy(loc_num, l2g_ij, xycell_in, xycalc_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! scatter_i4xy -- Scatter integer xy value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -2810,7 +2866,7 @@ module mpi_set
     integer(I4), intent(out) :: xycalc_out(:)
     ! -- local
     integer(I4) :: i, s_num, ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(xycell_in, st_grid%nx*st_grid%ny, MPI_INTEGER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -2829,9 +2885,9 @@ module mpi_set
   end subroutine scatter_i4xy
 
   subroutine scatter_r4xy(loc_num, l2g_ij, xycell_in, xycalc_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! scatter_r4xy -- Scatter real4 xy value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -2841,7 +2897,7 @@ module mpi_set
     real(SP), intent(out) :: xycalc_out(:)
     ! -- local
     integer(I4) :: i, s_num, ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(xycell_in, st_grid%nx*st_grid%ny, MPI_REAL4, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -2860,9 +2916,9 @@ module mpi_set
   end subroutine scatter_r4xy
 
   subroutine scatter_r8xy(loc_num, l2g_ij, xycell_in, xycalc_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! scatter_r8xy -- Scatter real8 xy value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -2872,7 +2928,7 @@ module mpi_set
     real(DP), intent(out) :: xycalc_out(:)
     ! -- local
     integer(I4) :: i, s_num, ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(xycell_in, st_grid%nx*st_grid%ny, MPI_REAL8, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -2891,9 +2947,9 @@ module mpi_set
   end subroutine scatter_r8xy
 
   subroutine scatter_i4xyz(loc_num, l2g_ijk, xyzcalc_in, xyzcalc_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! scatter_i4xyz -- Scatter integer xyz value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -2903,7 +2959,7 @@ module mpi_set
     integer(I4), intent(out) :: xyzcalc_out(:)
     ! -- local
     integer(I4) :: i, c_num, ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(xyzcalc_in, st_grid%nxyz, MPI_INTEGER, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -2922,9 +2978,9 @@ module mpi_set
   end subroutine scatter_i4xyz
 
   subroutine scatter_r4xyz(loc_num, l2g_ijk, xyzcalc_in, xyzcalc_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! scatter_r4xyz -- Scatter real4 xyz value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -2934,7 +2990,7 @@ module mpi_set
     real(SP), intent(out) :: xyzcalc_out(:)
     ! -- local
     integer(I4) :: i, c_num, ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(xyzcalc_in, st_grid%nxyz, MPI_REAL4, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -2953,9 +3009,9 @@ module mpi_set
   end subroutine scatter_r4xyz
 
   subroutine scatter_r8xyz(loc_num, l2g_ijk, xyzcalc_in, xyzcalc_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! scatter_r8xyz -- Scatter real8 xyz value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -2965,7 +3021,7 @@ module mpi_set
     real(DP), intent(out) :: xyzcalc_out(:)
     ! -- local
     integer(I4) :: i, c_num, ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_BCAST(xyzcalc_in, st_grid%nxyz, MPI_REAL8, 0, my_comm, ierr)
     if (ierr /= MPI_SUCCESS) then
@@ -2984,9 +3040,9 @@ module mpi_set
   end subroutine scatter_r8xyz
 
   subroutine bcast_solval()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_solval -- Bcast solution value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use mpi_utility, only: bcast_val
     use initial_module, only: maxout_iter, maxinn_iter, amg_nlevel, maxvcy_iter,&
@@ -2996,7 +3052,7 @@ module mpi_set
 
     ! -- local
 
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ! -- Bcast scalar value (val)
       call bcast_val(maxout_iter, " maximum outer iteration number")
 

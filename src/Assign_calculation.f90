@@ -28,9 +28,9 @@ module assign_calc
   contains
 
   subroutine assign_retnv(retn_ftype)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! assign_retnv -- Assign retention value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_retf_type, st_retn, st_retn_fnum
 #ifdef MPI_MSG
@@ -42,7 +42,7 @@ module assign_calc
     integer(I4) :: i, j, ierr
     integer(I4), allocatable :: ret_fnum(:), ret_ftype(:)
     real(SP), allocatable :: ret_val(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(read_reta(ncalc), read_retn(ncalc), read_resi(ncalc))
     !$omp parallel do private(i)
     do i = 1, ncalc
@@ -166,9 +166,9 @@ module assign_calc
   end subroutine assign_retnv
 
   subroutine assign_parmv(parm_ftype)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! assign_parmv -- Assign parameter value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_parf_type, st_parm, st_parm_fnum
 #ifdef MPI_MSG
@@ -180,7 +180,7 @@ module assign_calc
     integer(I4) :: i, j, ierr
     integer(I4), allocatable :: par_ftype(:), par_fnum(:)
     real(SP), allocatable :: par_val(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(read_ksx(ncalc), read_ksy(ncalc), read_ksz(ncalc))
     allocate(read_ss(ncalc), read_poro(ncalc))
     !$omp parallel do private(i)
@@ -330,9 +330,9 @@ module assign_calc
   end subroutine assign_parmv
 
   subroutine assign_geogv()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! assign_geogv -- Assign geography value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: DZERO
     use initial_module, only: st_geof_type, st_geog_fnum
@@ -344,7 +344,7 @@ module assign_calc
     integer(I4), allocatable :: geo_fnum(:), geo_ftype(:)
     integer(I4), allocatable :: geo_cflag(:)
     real(SP), allocatable :: geo_val(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(geo_fnum(3), geo_ftype(3))
     allocate(geo_cflag(ncals), surf_parm(ncals))
     allocate(geo_val(ncals))
@@ -426,9 +426,9 @@ module assign_calc
   end subroutine assign_geogv
 
   subroutine assign_initv(init_ftype, init_unit)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! assign_initv -- Assign initial value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use set_cell, only: get_calc_grid
 #ifdef MPI_MSG
@@ -450,7 +450,7 @@ module assign_calc
     integer(I4) :: nov_num, sum_init
     real(DP), allocatable :: recv_init(:)
 #endif
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(read_init(ncalc))
     !$omp parallel do private(i)
     do i = 1, ncalc
@@ -585,9 +585,9 @@ module assign_calc
   end subroutine assign_initv
 
   subroutine assign_massv(mass_ftype)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! assign_massv -- Assign massbalance value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use open_file, only: inmas_fnum
     use set_condition, only: set_mass2calc
@@ -604,7 +604,7 @@ module assign_calc
     integer(I4), allocatable :: all_mass_type(:)
     integer(I4), allocatable :: mass_val(:), calc_mass(:)
     real(SP), allocatable :: clas_mass(:), real_mass(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(mass_val(ncalc), mass_cflag(ncalc))
     !$omp parallel do private(i)
     do i = 1, ncalc
@@ -728,9 +728,9 @@ module assign_calc
   end subroutine assign_massv
 
   subroutine set_init_elev()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_init_elev -- Set initial waterlevel from surface elevation
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use set_cell, only: get_cals_grid
     use make_cell, only: surf_elev
@@ -738,7 +738,7 @@ module assign_calc
 
     ! -- local
     integer(I4) :: i, j, k, xn, yn, xyzn
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i, j, k, xn, yn, xyzn)
     do i = 1, ncals
       call get_cals_grid(i, xn, yn)

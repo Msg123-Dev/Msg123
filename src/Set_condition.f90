@@ -9,7 +9,7 @@ module set_condition
   use make_cell, only: cell_top, cell_bot
 #ifdef MPI_MSG
   use mpi_utility, only: mpimax_val
-  use utility_module, only: conv_i2s
+  use utility_module, only: get_ilen, conv_i2s
   use mpi_read, only: read_mpi_file
   use mpi_set, only: scatter_xyval, scatter_xyzval
 #endif
@@ -59,9 +59,9 @@ module set_condition
   contains
 
   subroutine set_clas2calc(tgn, tg_name, tg_val, calc_val, tg_flag, tg_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_clas2calc -- Set calculation value from classification
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_clas
     use set_cell, only: clas_flag
@@ -76,7 +76,7 @@ module set_condition
     integer(I4) :: i, j, k
     integer(I4) :: out_num
     integer(I4), allocatable :: temp_flag(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     out_num = size(calc_val(:))
     allocate(temp_flag(out_num))
     !$omp parallel do private(i)
@@ -119,9 +119,9 @@ module set_condition
   end subroutine set_clas2calc
 
   subroutine set_point2seal(tgn, p_i, p_j, p_k, tg_val, cell_val, tg_flag, tg_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_point2seal -- Set seal value from point
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -135,7 +135,7 @@ module set_condition
     integer(I4) :: i, c_num, ii, jj, kk, mpi_ncalc, cnum
     integer(I4) :: gridx, gridy, gridz
     integer(I4) :: pi, pj, pk, ist, ien, jst, jen, kst, ken, l_ijk
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     mpi_ncalc = ncalc + neib_ncalc ; cnum = size(cell_val(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz
     !$omp parallel
@@ -188,9 +188,9 @@ module set_condition
   end subroutine set_point2seal
 
   subroutine set_point2surf(tgn, p_i, p_j, tg_val, cell_val, tg_flag, tg_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_point2surf -- Set surface value from point
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -204,7 +204,7 @@ module set_condition
     integer(I4) :: i, s_num, ii, jj
     integer(I4) :: gridx, gridy
     integer(I4) :: pi, pj, ist, ien, jst, jen, l_ij
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     gridx = st_grid%nx ; gridy = st_grid%ny
     !$omp parallel
     !$omp do private(i)
@@ -245,9 +245,9 @@ module set_condition
   end subroutine set_point2surf
 
   subroutine set_bound2calc(bound_num, c_flag, cell_val, bound2calc, b_val)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_bound2calc -- Set boundary value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -258,7 +258,7 @@ module set_condition
     real(DP), intent(out) :: b_val(:)
     ! -- local
     integer(I4) :: i, bc
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     bc = 0
     do i = 1, bound_num
       if (c_flag(i) == 1) then
@@ -271,9 +271,9 @@ module set_condition
   end subroutine set_bound2calc
 
   subroutine set_mass2calc(mass_num, c_flag, cell_val, mass2calc, mass_val)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_mass2calc -- Set massbalance value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -282,7 +282,7 @@ module set_condition
     integer(I4), intent(out) :: mass2calc(:), mass_val(:)
     ! -- local
     integer(I4) :: i, bc
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     bc = 0
     do i = 1, mass_num
       if (c_flag(i) == 1) then
@@ -295,9 +295,9 @@ module set_condition
   end subroutine set_mass2calc
 
   subroutine set_2dfile2seal(fnum, ftype, int_ft, rsnum, no_val, val_out, tg_flag, tg_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_2dfile2seal -- Set sea level value from 2d file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 #ifdef MPI_MSG
     use set_cell, only: neib_ncals
@@ -319,7 +319,7 @@ module set_condition
 #endif
     real(SP), allocatable :: array_flat(:)
     real(SP), allocatable :: array_read(:,:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     cnum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz ; gridxyz = st_grid%nxyz
     if (ftype == in_type(3) .or. int_ft == in_type(3)) then
@@ -415,9 +415,9 @@ module set_condition
   end subroutine set_2dfile2seal
 
   subroutine set_3dfile2seal(fnum, ftype, int_ft, rcnum, no_val, val_out, tg_flag, tg_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_3dfile2seal -- Set sea level from 3d file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 #ifdef MPI_MSG
     use set_cell, only: neib_ncalc
@@ -439,7 +439,7 @@ module set_condition
 #endif
     real(SP), allocatable :: array_flat(:)
     real(SP), allocatable :: array_read(:,:,:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     cnum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz ; gridxyz = st_grid%nxyz
     if (ftype == in_type(5) .or. int_ft == in_type(5)) then
@@ -532,9 +532,9 @@ module set_condition
   end subroutine set_3dfile2seal
 
   subroutine set_2di4_cals(fnum, ftype, int_ft, no_val, val_out, tg_flag, tg_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_2di4_cals -- Set surface calculation value from 2d array integer file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 #ifdef MPI_MSG
     use mpi_set, only: scatter_xyval
@@ -549,7 +549,7 @@ module set_condition
     integer(I4) :: gridx, gridy
     integer(I4), allocatable :: array_flat(:)
     integer(I4), allocatable :: array_read(:,:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     snum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny
     if (ftype == in_type(3) .or. int_ft == in_type(3)) then
@@ -627,9 +627,9 @@ module set_condition
   end subroutine set_2di4_cals
 
   subroutine set_2dr4_cals(fnum, ftype, int_ft, no_val, val_out, tg_flag, tg_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_2dr4_cals -- Set surface calculation value from 2d real4 array file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 #ifdef MPI_MSG
     use mpi_set, only: scatter_xyval
@@ -645,7 +645,7 @@ module set_condition
     integer(I4) :: gridx, gridy
     real(SP), allocatable :: array_flat(:)
     real(SP), allocatable :: array_read(:,:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     snum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny
     if (ftype == in_type(3) .or. int_ft == in_type(3)) then
@@ -723,9 +723,9 @@ module set_condition
   end subroutine set_2dr4_cals
 
   subroutine set_2dr8_cals(fnum, ftype, int_ft, no_val, val_out, tg_flag, tg_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_2dr8_cals -- Set surface calculation value from 2d real8 array file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 #ifdef MPI_MSG
     use mpi_set, only: scatter_xyval
@@ -741,7 +741,7 @@ module set_condition
     integer(I4) :: gridx, gridy
     real(DP), allocatable :: array_flat(:)
     real(DP), allocatable :: array_read(:,:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     snum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny
     if (ftype == in_type(3) .or. int_ft == in_type(3)) then
@@ -819,9 +819,9 @@ module set_condition
   end subroutine set_2dr8_cals
 
   subroutine set_2di4_calc(fnum, ftype, int_ft, snum, no_val, val_out, tg_flag, tg_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_2di4_calc -- Set calculation value from 2d integer file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -841,7 +841,7 @@ module set_condition
 #else
     integer(I4) :: dummy
 #endif
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     cnum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz ; gridxyz = st_grid%nxyz
     if (ftype == in_type(3) .or. int_ft == in_type(3)) then
@@ -902,10 +902,11 @@ module set_condition
         end if
       end do
       !$omp end parallel do
-      str_fnum = conv_i2s(fnum)
+      allocate(character(get_ilen(fnum)) :: str_fnum)
+      call conv_i2s(fnum, str_fnum)
       ! -- MAX value for MPI (val)
         call mpimax_val(array_temp, "file number "//str_fnum, array_flat)
-      deallocate(array_surf, array_temp)
+      deallocate(array_surf, array_temp, str_fnum)
       call set_calci4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
 #else
       dummy = snum
@@ -949,9 +950,9 @@ module set_condition
   end subroutine set_2di4_calc
 
   subroutine set_2dr4_calc(fnum, ftype, int_ft, snum, no_val, val_out, tg_flag, tg_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_2dr4_calc -- Set calculation value from 2d real4 file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -972,7 +973,7 @@ module set_condition
 #else
     integer(I4) :: dummy
 #endif
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     cnum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz ; gridxyz = st_grid%nxyz
     if (ftype == in_type(3) .or. int_ft == in_type(3)) then
@@ -1028,10 +1029,11 @@ module set_condition
         end if
       end do
       !$omp end parallel do
-      str_fnum = conv_i2s(fnum)
+      allocate(character(get_ilen(fnum)) :: str_fnum)
+      call conv_i2s(fnum, str_fnum)
       ! -- MAX value for MPI (val)
         call mpimax_val(array_temp, "file number "//str_fnum, array_flat)
-      deallocate(array_surf, array_temp)
+      deallocate(array_surf, array_temp, str_fnum)
       call set_calcr4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
 #else
       dummy = snum
@@ -1070,9 +1072,9 @@ module set_condition
   end subroutine set_2dr4_calc
 
   subroutine set_2dr8_calc(fnum, ftype, int_ft, snum, no_val, val_out, tg_flag, tg_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_2dr8_calc -- Set calculation value from 2d real8 file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1093,7 +1095,7 @@ module set_condition
 #else
     integer(I4) :: dummy
 #endif
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     cnum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz ; gridxyz = st_grid%nxyz
     if (ftype == in_type(3) .or. int_ft == in_type(3)) then
@@ -1149,10 +1151,11 @@ module set_condition
         end if
       end do
       !$omp end parallel do
-      str_fnum = conv_i2s(fnum)
+      allocate(character(get_ilen(fnum)) :: str_fnum)
+      call conv_i2s(fnum, str_fnum)
       ! -- MAX value for MPI (val)
         call mpimax_val(array_temp, "file number "//str_fnum, array_flat)
-      deallocate(array_surf, array_temp)
+      deallocate(array_surf, array_temp, str_fnum)
       call set_calcr8(cnum, loc2glo_ijk, no_val, array_flat, val_out)
 #else
       dummy = snum
@@ -1191,9 +1194,9 @@ module set_condition
   end subroutine set_2dr8_calc
 
   subroutine set_3di4_calc(fnum, ftype, int_ft, no_val, val_out, tg_flag, tg_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_3di4_calc -- Set calculation value from 3d integer file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1206,7 +1209,7 @@ module set_condition
     integer(I4) :: gridx, gridy, gridz, gridxyz
     integer(I4), allocatable :: array_flat(:)
     integer(I4), allocatable :: array_read(:,:,:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     cnum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz ; gridxyz = st_grid%nxyz
     if (ftype == in_type(5) .or. int_ft == in_type(5)) then
@@ -1273,9 +1276,9 @@ module set_condition
   end subroutine set_3di4_calc
 
   subroutine set_3dr4_calc(fnum, ftype, int_ft, no_val, val_out, tg_flag, tg_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_3dr4_calc -- Set calculation value from 3d real4 file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1289,7 +1292,7 @@ module set_condition
     integer(I4) :: gridx, gridy, gridz, gridxyz
     real(SP), allocatable :: array_flat(:)
     real(SP), allocatable :: array_read(:,:,:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     cnum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz ; gridxyz = st_grid%nxyz
     if (ftype == in_type(5) .or. int_ft == in_type(5)) then
@@ -1356,9 +1359,9 @@ module set_condition
   end subroutine set_3dr4_calc
 
   subroutine set_3dr8_calc(fnum, ftype, int_ft, no_val, val_out, tg_flag, tg_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_3dr8_calc -- Set calculation value from 3d real8 file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1372,7 +1375,7 @@ module set_condition
     integer(I4) :: gridx, gridy, gridz, gridxyz
     real(DP), allocatable :: array_flat(:)
     real(DP), allocatable :: array_read(:,:,:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     cnum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz ; gridxyz = st_grid%nxyz
     if (ftype == in_type(5) .or. int_ft == in_type(5)) then
@@ -1439,9 +1442,9 @@ module set_condition
   end subroutine set_3dr8_calc
 
   subroutine set_point2well(mw_fnum, mw_totn)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_point2well -- Set well from point file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use read_module, only: read_wpointf
 #ifdef MPI_MSG
@@ -1455,7 +1458,7 @@ module set_condition
     integer(I4), allocatable :: rw_id(:), rw_i(:), rw_j(:), rw_ks(:), rw_ke(:)
     integer(I4), allocatable :: w_id(:), w_ij(:), w_ks(:), w_ke(:)
     real(SP), allocatable :: rw_val(:), w_val(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     rwn = st_well%totn
     allocate(rw_id(rwn), rw_i(rwn), rw_j(rwn), rw_ks(rwn), rw_ke(rwn))
     allocate(rw_val(rwn))
@@ -1521,9 +1524,9 @@ module set_condition
   end subroutine set_point2well
 
   subroutine set_2dwell(wfnum, wf_ftype, wf_int_ft, ws_ftype, we_ftype, mw_totn)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_2dwell -- Set well from 2d file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use open_file, only: wells_fnum, welle_fnum
     ! -- inout
@@ -1534,7 +1537,7 @@ module set_condition
     integer(I4), save :: wswe_flag = 0
     integer(I4), allocatable :: w_ij(:), w_ks(:), w_ke(:), cals2well(:)
     real(SP), allocatable :: w_val(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(w_ij(ncals), w_ks(ncals), w_ke(ncals))
     allocate(w_val(ncals))
     !$omp parallel do private(i)
@@ -1605,9 +1608,9 @@ module set_condition
   end subroutine set_2dwell
 
   subroutine set_cals2well(wks, wke, wval, wnum, s2w, wij)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_cals2well -- Set relationship between cals and well
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1618,7 +1621,7 @@ module set_condition
     integer(I4), intent(out) :: wij(:)
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     do i = 1, ncals
       if (wval(i) /= SZERO .and. wks(i) /= 0 .and. wke(i) /= 0) then
         wij(i) = loc2glo_ij(i)
@@ -1632,9 +1635,9 @@ module set_condition
   end subroutine set_cals2well
 
   subroutine set_3dfile2well(wfnum, ftype, int_ft, wnum, w2c)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_3dfile2well -- Set well value from 3d file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1646,7 +1649,7 @@ module set_condition
     integer(I4) :: gridx, gridy, gridz, gridxyz
     real(SP), allocatable :: array_flat(:), val_out(:), array_val(:)
     real(SP), allocatable :: array_read(:,:,:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     cnum = size(w2c(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz ; gridxyz = st_grid%nxyz
     allocate(val_out(cnum))
@@ -1737,9 +1740,9 @@ module set_condition
   end subroutine set_3dfile2well
 
   subroutine set_well2index(wnum)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_well2index -- Set well index
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1747,7 +1750,7 @@ module set_condition
     ! -- local
     integer(I4) :: i, k, index_count, c_num
     integer(I4), allocatable :: temp_wconn(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(temp_wconn(st_grid%nz*wnum), well_index(0:wnum))
     !$omp parallel
     !$omp do private(i)
@@ -1784,9 +1787,9 @@ module set_condition
   end subroutine set_well2index
 
   subroutine set_well3d2index(wnum, w2c)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_well3d2index -- Set well index from 3d well
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1794,7 +1797,7 @@ module set_condition
     integer(I4), intent(in) :: w2c(:)
     ! -- local
     integer(I4) :: i, index_count
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(well_conn(wnum), well_index(0:wnum))
     well_index(0) = 0
     !$omp parallel do private(i)
@@ -1813,9 +1816,9 @@ module set_condition
   end subroutine set_well3d2index
 
   subroutine set_wellprop(wnum, wtop, wbott)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_wellprop -- Set well property (top ,bottom)
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1823,7 +1826,7 @@ module set_condition
     real(DP), intent(out) :: wtop(:), wbott(:)
     ! -- local
     integer(I4) :: i, bott_calc, surf_calc
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i, surf_calc, bott_calc)
     do i = 1, wnum
       surf_calc = well_conn(well_index(i-1)+1)
@@ -1836,9 +1839,9 @@ module set_condition
   end subroutine set_wellprop
 
   subroutine set_connect(cksx, cksy, cksz)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_connect -- Set connectivity
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: FACE
     use initial_module, only: st_out_type
@@ -1864,7 +1867,7 @@ module set_condition
     integer(I4) :: calc_num
     real(SP), allocatable :: mpi_cksx(:), mpi_cksy(:), mpi_cksz(:)
 #endif
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     totn_clac = ncalc + neib_ncalc
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz
     allocate(off_row(totn_clac*FACE), off_index(0:totn_clac), conn_dir(totn_clac*FACE))
@@ -2365,9 +2368,9 @@ module set_condition
   end subroutine set_connect
 
   subroutine set_wellconn(wnum, wksx, wksy)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_wellconn -- Set well connectivity
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: SHALF
     ! -- inout
@@ -2376,7 +2379,7 @@ module set_condition
     ! -- local
     integer(I4) :: i, j, k
     real(SP) :: cksxy
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(abyd_well(well_index(wnum)))
     !$omp parallel
     !$omp do private(i)
@@ -2399,9 +2402,9 @@ module set_condition
   end subroutine set_wellconn
 
   subroutine set_srabyd(surfn, bott_s, area_s, surf2surf, abyd_surftemp)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_srabyd -- Set surface&recharge area and area by distance
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use make_cell, only: cell_cent
     ! -- inout
@@ -2411,7 +2414,7 @@ module set_condition
     ! -- local
     integer(I4) :: i, s
     real(DP) :: dis_s
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i, s, dis_s)
     do i = 1, surfn
       s = surf2surf(i)
@@ -2431,16 +2434,16 @@ module set_condition
   end subroutine set_srabyd
 
   subroutine set_chabyd()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_chabyd -- Set charge area by distance
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, ncals
       abyd_surf(i) = surf_area(i)/surf_dis(i)
@@ -2450,9 +2453,9 @@ module set_condition
   end subroutine set_chabyd
 
   subroutine set_dis_adj(dir, bf, targc, adjac, d1, d2, d12)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_dis_adj -- Set distance between adjacent cell
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -2460,7 +2463,7 @@ module set_condition
     real(DP), intent(out) :: d1, d2, d12
     ! -- local
 
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     d1 = reg_dis(targc,dir)
     if (bf == 1) then
       d2 = d1
@@ -2473,9 +2476,9 @@ module set_condition
   end subroutine set_dis_adj
 
   subroutine set_sat_hyd(bf, hyd_c1, hyd_c2, d1, d2, hydf)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_sat_hyd -- Set saturated hydradulic conductivity by harmonic mean
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -2484,7 +2487,7 @@ module set_condition
     real(DP), intent(out) :: hydf
     ! -- local
     real(DP) :: c1, c2, d12, cd, cd12
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (bf == 1) then
       hydf = hyd_c1
     else
@@ -2499,9 +2502,9 @@ module set_condition
   end subroutine set_sat_hyd
 
   subroutine set_multiwell(max_num, new_num, mw_id, mwij, mwks, mwke, mwv)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_multiwell -- Set existing multi well
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -2513,7 +2516,7 @@ module set_condition
     integer(I4), allocatable :: temp_ij(:), temp_ks(:), temp_ke(:)
     integer(I4), allocatable :: temp_wflag(:)
     real(SP), allocatable :: temp_value(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(temp_ij(max_num), temp_ks(max_num), temp_ke(max_num))
     allocate(temp_wflag(max_num), temp_value(max_num))
     !$omp parallel do private(i)
@@ -2566,9 +2569,9 @@ module set_condition
   end subroutine set_multiwell
 
   subroutine set_calc_flag_int(val_num, nonval, inval, tg_flag)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_calc_flag_int -- Set calculation target flag from integer
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -2578,7 +2581,7 @@ module set_condition
     integer(I4), intent(out) :: tg_flag(:)
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, val_num
       if (inval(i) /= nonval) then
@@ -2590,9 +2593,9 @@ module set_condition
   end subroutine set_calc_flag_int
 
   subroutine set_calc_flag_real4(val_num, nonval, inval, tg_flag)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_calc_flag_real4 -- Set calculation target flag from real4
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -2602,7 +2605,7 @@ module set_condition
     integer(I4), intent(out) :: tg_flag(:)
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, val_num
       if (inval(i) /= nonval) then
@@ -2614,9 +2617,9 @@ module set_condition
   end subroutine set_calc_flag_real4
 
   subroutine set_calc_flag_real8(val_num, nonval, inval, tg_flag)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_calc_flag_real8 -- Set calculation target flag from real8
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -2626,7 +2629,7 @@ module set_condition
     integer(I4), intent(out) :: tg_flag(:)
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, val_num
       if (inval(i) /= nonval) then
@@ -2638,9 +2641,9 @@ module set_condition
   end subroutine set_calc_flag_real8
 
   subroutine count_flag(tg_flag, count)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! count_flag -- Count flag number
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -2648,7 +2651,7 @@ module set_condition
     integer(I4), intent(out) :: count
     ! -- local
     integer(I4) :: i, tg_num
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     count = 0 ; tg_num = 0
     tg_num = size(tg_flag)
     !$omp parallel do private(i) reduction(+:count)
@@ -2660,9 +2663,9 @@ module set_condition
   end subroutine count_flag
 
   subroutine set_calci4(loc_num, cal2glo, noval, in_val, out_val)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_calci4 -- Set calculation integer value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -2673,7 +2676,7 @@ module set_condition
     integer(I4), intent(out) :: out_val(:)
     ! -- local
     integer(I4) :: i, c
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i, c)
     do i = 1, loc_num
       c = cal2glo(i)
@@ -2686,9 +2689,9 @@ module set_condition
   end subroutine set_calci4
 
   subroutine set_calcr4(loc_num, cal2glo, noval, in_val, out_val)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_calcr4 -- Set calculation real4 value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -2699,7 +2702,7 @@ module set_condition
     real(SP), intent(out) :: out_val(:)
     ! -- local
     integer(I4) :: i, c
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i, c)
     do i = 1, loc_num
       c = cal2glo(i)
@@ -2712,9 +2715,9 @@ module set_condition
   end subroutine set_calcr4
 
   subroutine set_calcr8(loc_num, cal2glo, noval, in_val, out_val)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_calcr8 -- Set calculation real8 value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -2725,7 +2728,7 @@ module set_condition
     real(DP), intent(out) :: out_val(:)
     ! -- local
     integer(I4) :: i, c
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i, c)
     do i = 1, loc_num
       c = cal2glo(i)

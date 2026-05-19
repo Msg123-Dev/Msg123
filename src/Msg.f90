@@ -1,7 +1,7 @@
 program msg123
-!*****************************************************************************************
+!***********************************************************************************************
 ! Main program of Multi-scale groundwater 1phase 2resolution 3dimensional model (Msg123)
-!*****************************************************************************************
+!***********************************************************************************************
   ! -- modules
   use kind_module, only: I4, DP
   use utility_module, only: log_fnum
@@ -29,10 +29,11 @@ program msg123
   integer(I4) :: sta_value(8), end_value(8)
   real(DP) :: tot_stime, tot_etime, loop_stime, loop_etime
   ! -- format
-  11 format(/"Run end date and time(yyyy/mm/dd hh:mm:ss) : ",i4,"/",i2.2,"/",i2.2,1x,i2,":",i2.2,":",i2.2,/)
+  11 format(/"Run end date and time(yyyy/mm/dd hh:mm:ss) : ",i4,"/",i2.2,"/",i2.2,1x,i2,":",&
+            i2.2,":",i2.2,/)
   12 format(/"Total cpu time : ", es15.6, " (sec)")
   13 format(/"Time loop cpu time : ", es15.6, " (sec)")
-  !---------------------------------------------------------------------------------------
+  !--------------------------------------------------------------------------------------------
   if (my_rank == 0) then
     ! -- Start time
       call DATE_AND_TIME(values = sta_value)

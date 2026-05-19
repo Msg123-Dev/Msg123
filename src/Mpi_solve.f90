@@ -22,9 +22,9 @@ module mpi_solve
   contains
 
   subroutine senrec_ivectv(ivector)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! senrec_ivectv -- Send and Recieve integer vector value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -36,7 +36,7 @@ module mpi_solve
     integer(I4), allocatable :: requ_send(:), requ_recv(:)
     integer(I4), allocatable :: stat_s(:,:), stat_r(:,:)
     integer(I4), allocatable :: sbufint(:), rbufint(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(requ_send(neib_mpi_totn), requ_recv(neib_mpi_totn))
     allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
     !$omp parallel do private(i)
@@ -108,9 +108,9 @@ module mpi_solve
   end subroutine senrec_ivectv
 
   subroutine senrec_rvectv(rvector)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! senrec_rvectv -- Send and Recieve real vector value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -122,7 +122,7 @@ module mpi_solve
     integer(I4), allocatable :: requ_send(:), requ_recv(:)
     integer(I4), allocatable :: stat_s(:,:), stat_r(:,:)
     real(DP), allocatable :: sbufreal(:), rbufreal(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(requ_send(neib_mpi_totn), requ_recv(neib_mpi_totn))
     allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
     !$omp parallel do private(i)
@@ -194,9 +194,9 @@ module mpi_solve
   end subroutine senrec_rvectv
 
   subroutine precon_mpi_dilu(pre_ind, pre_inlu, pre_d)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! precon_mpi_dilu -- Preconditon mpi incomplete lu diagonal
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use constval_module, only: DONE
     ! -- inout
@@ -210,7 +210,7 @@ module mpi_solve
     real(DP) :: d_invk
     integer(I4), allocatable :: fix_flag(:), offr_flag(:)
     real(DP), allocatable :: temp_pred(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     off_row_num = crs_index(1)%offind(nreg_num)
     allocate(fix_flag(nreg_num), offr_flag(off_row_num))
     allocate(temp_pred(nreg_num))
@@ -279,9 +279,9 @@ module mpi_solve
   end subroutine precon_mpi_dilu
 
   subroutine solve_mpi_ilu(inrhs, indmat, inlumat, outx)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! solve_mpi_ilu -- Solve mpi ilu factorization
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use allocate_solution, only: right_offr
     ! -- inout
@@ -294,7 +294,7 @@ module mpi_solve
     integer(I4) :: rank_flag, allp_flag
     integer(I4), allocatable :: fix_flag(:), offr_flag(:)
     real(DP), allocatable :: temp_outx(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     off_row_num = crs_index(1)%offind(nreg_num)
     allocate(fix_flag(nreg_num), offr_flag(off_row_num))
     allocate(temp_outx(nreg_num))
@@ -397,9 +397,9 @@ module mpi_solve
   end subroutine solve_mpi_ilu
 
   subroutine check_mpimaxerr(change, unknow, abs_max_ch, max_un, max_ch)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_mpimaxerr -- Check mpi max error
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use constval_module, only: DNOVAL
     use mpi_utility, only: mpimax_val
@@ -410,7 +410,7 @@ module mpi_solve
     integer(I4) :: ierr
     integer(I4) :: pnum, wrank
     real(DP) :: mpimax_err
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ! -- MAX value for MPI (val)
       call mpimax_val(abs(change), "absolute change", mpimax_err)
     abs_max_ch = mpimax_err
@@ -444,9 +444,9 @@ module mpi_solve
   end subroutine check_mpimaxerr
 
   subroutine bcast_convinfo(cval, cdmat, crhs, chead, vmax)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! bcast_convinfo -- Bcast converge information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -456,7 +456,7 @@ module mpi_solve
     integer(I4) :: ierr
     integer(I4) :: pnum, wrank
     integer(I4) :: str_len
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     pnum = 0 ; wrank = 0
     if (len_trim(adjustl(cval)) /= 0) then
       pnum = my_rank

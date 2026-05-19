@@ -27,11 +27,11 @@ module assign_boundary
   contains
 
   subroutine assign_sealv(seal_ftype)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! assign_sealv -- Assign sea level value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
-    use utility_module, only: conv_i2s, write_err_stop
+    use utility_module, only: get_ilen, conv_i2s, write_err_stop
     use initial_module, only: st_seal, st_in_type
     use read_module, only: read_3dpointf
     use open_file, only: st_intse
@@ -50,7 +50,7 @@ module assign_boundary
     real(DP), allocatable :: cell_seal(:)
     character(:), allocatable :: err_mes, rank_str
     logical, allocatable :: seal_all_mask(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_seal%totn > 0) then
       allocate(read_seal(ncell), seal_cflag(ncell))
       allocate(seal_all_type(7), seal_all_mask(7))
@@ -142,7 +142,9 @@ module assign_boundary
 
       if (seal_cnum /= sealn .or. my_rank == 0) then
         if (seal_cnum /= sealn) then
-          rank_str = conv_i2s(my_rank)
+          allocate(character(get_ilen(my_rank)) :: rank_str)
+          allocate(character(len=0) :: err_mes)
+          call conv_i2s(my_rank, rank_str)
           err_mes = "The number of sea grids is different in rank "//rank_str//"."
         end if
 #ifdef MPI_MSG
@@ -185,9 +187,9 @@ module assign_boundary
   end subroutine assign_sealv
 
   subroutine assign_surfbv(sb_ftype, int_ftype, sb_st, sb_num, sb_cflag, read_sb)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! assign_surfbv -- Assign surface boundary value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_surfb
     ! -- inout
@@ -198,7 +200,7 @@ module assign_boundary
     real(SP), intent(out) :: read_sb(:)
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     sb_num = 0
 
     if (sb_st%totn > 0) then
@@ -248,9 +250,9 @@ module assign_boundary
   end subroutine assign_surfbv
 
   subroutine assign_wellv(well_ftype, weks_ftype, weke_ftype, num_well)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! assign_wellv -- Assign well value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_well
     use open_file, only: st_intwe
@@ -264,7 +266,7 @@ module assign_boundary
     integer(I4) :: i, intwe_type
     integer(I4), allocatable :: well2calc(:)
     integer(I4), allocatable :: type_2d(:), type_3d(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_well%totn > 0) then
       intwe_type = st_intwe%type
       allocate(type_2d(2), type_3d(2))
@@ -290,7 +292,8 @@ module assign_boundary
       else if (well_ftype == in_type(7)) then
         if (any(intwe_type == type_2d)) then
           ! -- Set well from 2d file (2dwell)
-            call set_2dwell(st_well%fnum, well_ftype, intwe_type, weks_ftype, weke_ftype, num_well)
+            call set_2dwell(st_well%fnum, well_ftype, intwe_type, weks_ftype, weke_ftype,&
+                            num_well)
         else if (any(intwe_type == type_3d)) then
           ! -- Set well value from 3d text file (3dfile2well)
             call set_3dfile2well(st_well%fnum, well_ftype, intwe_type, num_well, well2calc)
@@ -350,9 +353,9 @@ module assign_boundary
   end subroutine assign_wellv
 
   subroutine assign_rilav(rl_ftype, lake_aflag, rl_st, rl_num, rl_cflag, calc_rl)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! assign_rilav -- Assign river and lake value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_surfw
     use read_module, only: read_2dpointf
@@ -369,7 +372,7 @@ module assign_boundary
     ! -- local
     integer(I4) :: i
     real(SP) :: nodim_unit
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     rl_num = 0
 
     if (rl_st%totn > 0) then

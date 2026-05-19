@@ -21,17 +21,18 @@ module read_input
   contains
 
   subroutine read_main_file()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_main_file -- Read main file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
 
     ! -- local
     character(:), allocatable :: main_file
-    !-------------------------------------------------------------------------------------
-    main_file = 'msg123.main'
+    !-------------------------------------------------------------------------------------------
+    allocate(character(0) :: main_file)
+    main_file = "msg123.main"
 
     ! -- Open new read text file (new_rtxt)
       call open_new_rtxt(1, 1, main_file, "msg123 main", main_fnum)
@@ -57,12 +58,14 @@ module read_input
     ! -- Read output setting (out_set)
       call read_out_set()
 
+    deallocate(main_file)
+
   end subroutine read_main_file
 
   subroutine read_inp_set()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_inp_set -- Read input setting
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -71,7 +74,7 @@ module read_input
     integer(I4) :: ierr
     character(CHALEN) :: time_input_file
     namelist/set_time_input/time_input_file
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ! -- Read retention & parameter name list (retn_parm_list)
       call read_retn_parm_list()
 
@@ -99,9 +102,9 @@ module read_input
   end subroutine read_inp_set
 
   subroutine read_out_set()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_out_set -- Read output setting
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -113,7 +116,7 @@ module read_input
     character(1), allocatable :: temp_char(:)
     character(4), allocatable :: out_vari(:)
     namelist/set_out_vari/out_list
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0 ; out_list = ""
     read(unit=main_fnum,nml=set_out_vari,iostat=ierr)
     if (ierr /= 0) then
@@ -146,9 +149,9 @@ module read_input
   end subroutine read_out_set
 
   subroutine read_sim_list()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_sim_list -- Read simulation name list
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -158,7 +161,7 @@ module read_input
     integer(I4) :: sim_type
     character(CHALEN) :: sim_name
     namelist/set_simulation/sim_type, sim_name
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0 ; sim_type = -2 ; sim_name = ""
     read(unit=main_fnum,nml=set_simulation,iostat=ierr)
 
@@ -183,9 +186,9 @@ module read_input
   end subroutine read_sim_list
 
   subroutine read_calc_time_list()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_calc_time_list -- Read calculation time name list
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use utility_module, only: conv_unit
     use initial_module, only: my_rank
@@ -197,7 +200,7 @@ module read_input
     real(SP) :: end_time, calc_multi
     character(TIMELEN) :: calc_unit
     namelist/set_calc_time/stime_type, sdate, edate, end_time, calc_unit
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0 ; stime_type = -1 ; end_time = SZERO ; calc_multi = SZERO ; calc_unit = ""
     read(unit=main_fnum,nml=set_calc_time,iostat=ierr)
 
@@ -227,9 +230,9 @@ module read_input
   end subroutine read_calc_time_list
 
   subroutine read_calc_reg_list()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_calc_reg_list -- Read calculation region name list
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: noclas_flag
     ! -- inout
@@ -239,7 +242,7 @@ module read_input
     integer(I4) :: calc_type, calcreg_neib, clas_fnum
     character(CHALEN) :: calcreg_name, inact_name, clas_file
     namelist/set_calc_reg/calc_type, calcreg_neib, calcreg_name, inact_name, clas_file
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0 ; calc_type = -1 ; calcreg_neib = -1
     calcreg_name = "" ; inact_name = "" ; clas_file = ""
     read(unit=main_fnum,nml=set_calc_reg,iostat=ierr)
@@ -268,9 +271,9 @@ module read_input
   end subroutine read_calc_reg_list
 
   subroutine read_clas_file(file_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_clas_file -- Read classification file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_clas
     ! -- inout
@@ -278,7 +281,7 @@ module read_input
     ! -- local
     integer(I4) :: i, j, ierr
     integer(I4) :: max_clas
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     read(unit=file_num,fmt=*,iostat=ierr) st_clas%totn
 
@@ -341,9 +344,9 @@ module read_input
   end subroutine read_clas_file
 
   subroutine read_sol_list()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_sol_list -- Read solution name list
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: maxout_iter, maxinn_iter, criteria, precon_type, nlevel
     ! -- inout
@@ -353,7 +356,7 @@ module read_input
     real(SP) :: init_step, incr_multi, max_step
     namelist/set_solution/init_step, incr_multi, max_step, maxout_iter, criteria,&
                           maxinn_iter, precon_type
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0 ; init_step = SZERO ; incr_multi = SZERO ; max_step = SZERO
     read(unit=main_fnum,nml=set_solution,iostat=ierr)
 
@@ -382,9 +385,9 @@ module read_input
   end subroutine read_sol_list
 
   subroutine read_amg_parm(file_num)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_amg_parm -- Read amg parameter
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: amg_nlevel, maxvcy_iter, max_sweep, jac_omega, amg_theta
     ! -- inout
@@ -392,7 +395,7 @@ module read_input
     ! -- local
     integer(I4) :: ierr
     namelist/set_amg/amg_nlevel, maxvcy_iter, max_sweep, jac_omega, amg_theta
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     read(unit=file_num,nml=set_amg,iostat=ierr)
     if (ierr /= 0) then
@@ -402,9 +405,9 @@ module read_input
   end subroutine read_amg_parm
 
   subroutine read_grid_list()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_grid_list -- Read grid name list
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_grid
     ! -- inout
@@ -414,7 +417,7 @@ module read_input
     integer(I4) :: gridx, gridy, gridz, gridxyz, grid_type
     character(CHALEN) :: grid_file
     namelist/set_grid/gridx, gridy, gridz, grid_type, grid_file
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     gridx = 0 ; gridy = 0 ; gridz = 0 ; gridxyz = 0 ; grid_type = -1 ; grid_file = ""
     read(unit=main_fnum,nml=set_grid,iostat=ierr)
@@ -438,9 +441,9 @@ module read_input
   end subroutine read_grid_list
 
   subroutine read_grid_file(file_num, nx, ny, nz, gtype)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_grid_file -- Read grid file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: DZERO
     use utility_module, only: open_new_rbin
@@ -459,7 +462,7 @@ module read_input
     character(:), allocatable :: xyz_path, err_mes
     namelist/ingrid_type/grid_xtype, grid_ytype, grid_ztype
     namelist/ingrid_path/in_xpath, in_ypath, in_zpath
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     allocate(glob_x(nx+1,ny+1), glob_y(nx+1,ny+1))
     allocate(glob_z(nx+1,ny+1,nz+1))
@@ -505,6 +508,8 @@ module read_input
       end do
       !$omp end do
       !$omp end parallel
+
+      allocate(character(0) :: xyz_path)
 
       do i = 1, 3
         select case (i)
@@ -612,6 +617,7 @@ module read_input
     ! -- Check grid location (gridloc)
       call check_grid_loc(nx, ny, nz)
 
+    allocate(character(0) :: err_mes)
     err_mes = ""
 
     if (grid_check == 0) then
@@ -639,9 +645,9 @@ module read_input
   end subroutine read_grid_file
 
   subroutine read_retn_parm_list()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_retn_parm_list -- Read retention & parameter name list
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -653,7 +659,7 @@ module read_input
     character(CHALEN) :: retn_file, parm_file
     logical, allocatable :: retn_mask(:), parm_mask(:)
     namelist/set_retn_parm/retn_type, parm_type, retn_file, parm_file
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0 ; retn_type = -1 ; parm_type = -1 ; retn_file = "" ; parm_file = ""
     read(unit=main_fnum,nml=set_retn_parm,iostat=ierr)
 
@@ -686,9 +692,9 @@ module read_input
   end subroutine read_retn_parm_list
 
   subroutine read_init_list()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_init_list -- Read initial name list
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: SNOVAL
     use initial_module, only: st_init
@@ -703,7 +709,7 @@ module read_input
     character(TIMELEN) :: init_unit
     logical, allocatable :: init_mask(:)
     namelist/set_init/init_type, init_file, init_dept, init_unit
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0 ; init_type = -1 ; init_dept = DNOVAL ; init_file = "" ; init_unit = ""
     read(unit=main_fnum,nml=set_init,iostat=ierr)
 
@@ -736,9 +742,9 @@ module read_input
   end subroutine read_init_list
 
   subroutine read_tinp_list(file_path)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_tinp_list -- Read timeseries input name list
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -757,7 +763,7 @@ module read_input
     namelist/tinp_path/seal_path, rech_path, well_path, weks_path, weke_path,&
                        rive_path, lake_path, prec_path, evap_path
     namelist/tinp_unit/seal_unit, rech_unit, well_unit, prec_unit, evap_unit
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ! -- Open new read text file (new_rtxt)
       call open_new_rtxt(1, 1, file_path, "timeseries input", tinp_fnum)
 
@@ -787,7 +793,8 @@ module read_input
 
     if (seal_type > 0) then
       ! -- Check timeseries input file (tinp)
-        call check_tinp(seal_type, all_tinp_type, trim(adjustl(seal_path)), "sea level", seal_unit)
+        call check_tinp(seal_type, all_tinp_type, trim(adjustl(seal_path)), "sea level",&
+                        seal_unit)
     else
       call write_logf("Set not to use sea level boundary.")
     end if
@@ -801,7 +808,8 @@ module read_input
 
     if (rech_type > 0) then
       ! -- Check timeseries input file (tinp)
-        call check_tinp(rech_type, all_tinp_type, trim(adjustl(rech_path)), "recharge", rech_unit)
+        call check_tinp(rech_type, all_tinp_type, trim(adjustl(rech_path)), "recharge",&
+                        rech_unit)
     else
       call write_logf("Set not to use recharge boundary.")
     end if
@@ -879,7 +887,8 @@ module read_input
     all_tinp_type(:) = [in_type(1), in_type(3:4), in_type(7)]
     if (prec_type > 0) then
       ! -- Check timeseries input file (tinp)
-        call check_tinp(prec_type, all_tinp_type, trim(adjustl(prec_path)), "precipitation", prec_unit)
+        call check_tinp(prec_type, all_tinp_type, trim(adjustl(prec_path)), "precipitation",&
+                        prec_unit)
     else
       call write_logf("Set not to use precipitation boundary.")
     end if
@@ -892,7 +901,8 @@ module read_input
     all_tinp_type(:) = [in_type(1), in_type(3:4), in_type(7)]
     if (evap_type > 0) then
       ! -- Check timeseries input file (tinp)
-        call check_tinp(evap_type, all_tinp_type, trim(adjustl(evap_path)), "evapotranspiration", evap_unit)
+        call check_tinp(evap_type, all_tinp_type, trim(adjustl(evap_path)),&
+                        "evapotranspiration", evap_unit)
     else
       call write_logf("Set not to use evapotranspiration boundary.")
     end if
@@ -905,9 +915,9 @@ module read_input
   end subroutine read_tinp_list
 
   subroutine read_geog_list()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_geog_list -- Read geography name list
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -917,7 +927,7 @@ module read_input
     integer(I4) :: geog_type
     character(CHALEN) :: geog_file
     namelist/set_geog/geog_type, geog_file
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0 ; geog_type = -1 ; geog_file = ""
     read(unit=main_fnum,nml=set_geog,iostat=ierr)
 
@@ -934,9 +944,9 @@ module read_input
   end subroutine read_geog_list
 
   subroutine read_wtab_list()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_wtab_list -- Read water table name list
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -945,7 +955,7 @@ module read_input
     integer(I4) :: ierr
     integer(I4) :: wtab_type
     namelist/set_wtab/wtab_type
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0 ; wtab_type = -1
     read(unit=main_fnum,nml=set_wtab,iostat=ierr)
 
@@ -958,9 +968,9 @@ module read_input
   end subroutine read_wtab_list
 
   subroutine read_mass_list()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_mass_list -- Read massbalance name list
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -972,7 +982,7 @@ module read_input
     character(CHALEN) :: mass_file
     logical, allocatable :: mass_mask(:)
     namelist/set_mass/mass_type, mass_file
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0 ; mass_type = -1 ; mass_file = ""
     allocate(all_mass_type(4), mass_mask(4))
     all_mass_type(:) = [in_type(3:6)]
@@ -992,9 +1002,9 @@ module read_input
   end subroutine read_mass_list
 
   subroutine check_date(stad, endd)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_date -- Check calculation date
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1002,7 +1012,7 @@ module read_input
     ! -- local
     integer(I4) :: staday, endday
     logical :: date_flag = .false.
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     staday = get_days(stad(1), stad(2)) ; endday = get_days(endd(1), endd(2))
     if (stad(1) <= 0 .or. endd(1) <= 0) then
       date_flag = .true.
@@ -1047,9 +1057,9 @@ module read_input
   end subroutine check_date
 
   subroutine check_grid_loc(nx, ny, nz)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_grid_loc -- Check grid location
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1058,7 +1068,7 @@ module read_input
     integer(I4) :: i, j, k
     integer(I4), allocatable :: gxnum(:,:), gynum(:,:), gznum(:,:,:)
     real(DP) :: minz, maxz, real_scal
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     grid_check = 0 ; grid_xnum = 0 ; grid_ynum = 0 ; grid_znum = 0
     allocate(gxnum(nx+1,ny+1), gynum(nx+1,ny+1))
     allocate(gznum(nx+1,ny+1,nz+1))
@@ -1154,9 +1164,9 @@ module read_input
   end subroutine check_grid_loc
 
   subroutine check_tinp(tinp_type, all_type, tinp_path, tinp_name, tinp_unit)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_tinp -- Check timeseries input file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1168,13 +1178,15 @@ module read_input
     integer(I4) :: i
     character(:), allocatable :: err_mes
     logical, allocatable :: tinp_mask(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(tinp_mask(size(all_type)))
     !$omp parallel do private(i)
     do i = 1, size(all_type)
       tinp_mask(i) = (tinp_type /= all_type(i))
     end do
     !$omp end parallel do
+
+    allocate(character(0) :: err_mes)
 
     if (all(tinp_mask)) then
       err_mes = "Specify correct number for "//tinp_name//" in timeseries input file."
@@ -1198,9 +1210,9 @@ module read_input
   end subroutine check_tinp
 
   subroutine calc_etime(stad, endd, etime)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_etime -- Calculate end time
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: MINSEC, HOURSEC, DAYSEC
     ! -- inout
@@ -1208,7 +1220,7 @@ module read_input
     real(SP), intent(out) :: etime
     ! -- local
     integer(I4) :: stayear, stamonth, endmonth, temp_day
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     etime = SZERO
     ! plus second
     etime = etime + (endd(6)-stad(6))*SONE
@@ -1260,9 +1272,9 @@ module read_input
   end subroutine calc_etime
 
   subroutine get_out_vari(outv_num, out_vari, vari_name)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! get_out_vari -- Get output variables
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1272,7 +1284,7 @@ module read_input
     ! -- local
     integer(I4) :: i
     integer(I4) :: first_pos, sta_pos, end_pos
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     vari_name(1:3) = ['conv', 'head', 'rest']
     first_pos = index(out_vari, ",")
     sta_pos = 1 ; end_pos = first_pos
@@ -1288,9 +1300,9 @@ module read_input
   end subroutine get_out_vari
 
   subroutine set_output(outv_num, vari_name)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_output -- Set output
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: out_type, st_out_type, st_out_path, st_out_unit, st_out_time
     ! -- inout
@@ -1311,7 +1323,7 @@ module read_input
     namelist/set_out_time/head_time, rest_time, srat_time, wtab_time, mass_time,&
                           velc_time, rivr_time, lakr_time, sufr_time, dunr_time,&
                           seal_time, well_time, rech_time
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     head_unit = "" ; rest_unit = "" ; srat_unit = "" ; wtab_unit = "" ; mass_unit = ""
     velc_unit = "" ; rivr_unit = "" ; lakr_unit = "" ; sufr_unit = "" ; dunr_unit = ""
@@ -1325,6 +1337,8 @@ module read_input
     if (ierr /= 0) then
       call write_err_stop("While reading output interval time section in main file.")
     end if
+
+    allocate(character(0) :: str_sim_type, str_sim_name)
 
     if (st_sim%sim_type == -1) then
       str_sim_type = "stat"

@@ -31,9 +31,9 @@ module nonlinear_solution
   contains
 
   subroutine calc_numsol()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_numsol -- Calculate numerical solution
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: XMAX, XMAX_INV, VARLEN
     use utility_module, only: log_fnum
@@ -59,14 +59,16 @@ module nonlinear_solution
     ! -- format
     10 format(//1x,"CURRENT TIME : ",es12.5,1x,"(",a,")",20x,"TIME STEP : ",&
               es12.5,1x,"(SEC)",/,1x,84("-"),/,1x,&
-              " OUTER INNER  BACK     MAXIMUM           MAXIMUM    DIAGONAL  RIGHT HAND     UNKNOWN",/,1x,&
-              "                        CHANGE              CELL      MATRIX      VECTOR       VALUE",/,1x,84("-"))
+              " OUTER INNER  BACK     MAXIMUM           MAXIMUM    DIAGONAL  RIGHT HAND     &
+              &UNKNOWN",/,1x,&
+              "                        CHANGE              CELL      MATRIX      VECTOR&
+              &       VALUE",/,1x,84("-"))
     11 format(1X,3(i6),es12.3,a18,4(es12.3))
     12 format(1X,"Didn't converge due to maximum value or change")
     13 format(1X,"Stop due to maximum value or change in backtracking")
     14 format(1X,"Stop due to maximum number of nonlinear iteration")
     15 format(1X,"Didn't converge in steady state calculation")
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     conv_fnum = st_out_fnum%conv
     ! -- Set for backtracking (backtr)
       call set_backtr()
@@ -302,9 +304,9 @@ module nonlinear_solution
   end subroutine calc_numsol
 
   subroutine reset_matvec
-  !***************************************************************************************
+  !*********************************************************************************************
   ! reset_matvec -- Reset coefficients matrix and constant vector
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: precon_type, nlevel
     use set_cell, only: amg_setflag
@@ -313,7 +315,7 @@ module nonlinear_solution
 
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     array_var(1)%lumat(:) = DZERO
     array_var(1)%dmat(:) = DZERO
     array_var(1)%rhs(:) = DZERO
@@ -330,9 +332,9 @@ module nonlinear_solution
   end subroutine reset_matvec
 
   subroutine calc_surfw()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_surfw -- Calculate surface water level
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use set_cell, only: ncals
 !    use make_cell, only: surf_elev
@@ -347,7 +349,7 @@ module nonlinear_solution
 !    real(DP), allocatable :: sst_ms(:), sco_ms(:), sse_ms(:), swe_ms(:)
 !    real(DP), allocatable :: sre_ms(:), ssu_ms(:), sri_ms(:), sla_ms(:)
 !    real(DP) :: surf_ms
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
 !    allocate(sst_ms(ncalc), sco_ms(ncalc), sse_ms(ncalc), swe_ms(ncalc))
 !    allocate(sre_ms(ncals), ssu_ms(ncals), sri_ms(ncals), sla_ms(ncals))
 !    !$omp parallel
@@ -363,7 +365,8 @@ module nonlinear_solution
 !    !$omp end do
 !    !$omp end parallel
 !    ! -- Calculate massbalance (mass)
-!      call calc_mass(1, head_new, head_pre, sst_ms, sco_ms, sse_ms, swe_ms, sre_ms, ssu_ms, sri_ms, sla_ms)
+!      call calc_mass(1, head_new, head_pre, sst_ms, sco_ms, sse_ms, swe_ms, sre_ms, ssu_ms,&
+!                     sri_ms, sla_ms)
 
     !$omp parallel do private(i)
 !    !$omp parallel do private(i, surf_ms)
@@ -381,7 +384,8 @@ module nonlinear_solution
       surf_head(i) = head_new(i)
       ! all surface head = calculated from massbalance
 !      if (seal_cflag(i) /= 1) then
-!        surf_ms = sre_ms(i) + swe_ms(i) + sst_ms(i) + sco_ms(i) + ssu_ms(i) + sri_ms(i) + sla_ms(i)
+!        surf_ms = sre_ms(i) + swe_ms(i) + sst_ms(i) + sco_ms(i) + ssu_ms(i) + sri_ms(i) +&
+!                 sla_ms(i)
 !        if (surf_area(i) /= DZERO) then
 !          surf_head(i) = head_new(i) - surf_ms/surf_area(i)
 !        else
@@ -398,16 +402,16 @@ module nonlinear_solution
   end subroutine calc_surfw
 
   subroutine set_backtr
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_backtr -- Set for backtracking
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
 
     ! -- local
     real(DP) :: l2_xnew
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ! -- Calculate l2 norm square (resl2norm2)
       call calc_l2norm2(1, head_new, l2_xnew)
 #ifdef MPI_MSG
@@ -426,9 +430,9 @@ module nonlinear_solution
   end subroutine set_backtr
 
   subroutine set_eater
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_eater -- Set eater
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -436,7 +440,7 @@ module nonlinear_solution
     ! -- local
     real(DP) :: eta_max = 0.9_DP, eta_min = 1.0E-4_DP, eta_safe, minus1
     real(DP) :: eta_alpha = (DONE+sqrt(5.0_DP))/DTWO, lin_l2norm
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     eta_safe = eta**eta_alpha
     minus1 = DONE - lam
     lin_l2norm = sqrt(minus1*minus1*l2_pre + DTWO*lam*minus1*gradient + lam*lam*l2_jnorm)
@@ -453,9 +457,9 @@ module nonlinear_solution
   end subroutine set_eater
 
   subroutine run_backtr
-  !***************************************************************************************
+  !*********************************************************************************************
   ! run_backtr -- Run backtracking
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: MACHI_EPS
     use calc_function, only: calc_vecjacf
@@ -475,7 +479,7 @@ module nonlinear_solution
 #ifdef MPI_MSG
     real(DP) :: max_val
 #endif
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     l2_new2 = l2_new ; lam = DONE ; lam2 = DONE ; maxpnorm = DONE ; lam_length = DONE
     allocate(jacvec(ncalc))
     !$omp parallel do private(i)
@@ -756,11 +760,11 @@ module nonlinear_solution
 !  end subroutine run_relax_delta
 
   subroutine get_cnum(calc_num, char_cell)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! get_cnum -- Get cell number
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
-    use utility_module, only: conv_i2s
+    use utility_module, only: get_ilen, conv_i2s
     use set_cell, only: get_calc_grid
     ! -- inout
     integer(I4), intent(in) :: calc_num
@@ -768,27 +772,28 @@ module nonlinear_solution
     ! -- local
     integer(I4) :: i_num, j_num, k_num
     character(:), allocatable :: cx_num, cy_num, cz_num
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ! -- Get calculation number from grid number (calc_grid)
       call get_calc_grid(calc_num, i_num, j_num, k_num)
 
-    cx_num = conv_i2s(i_num) ; cy_num = conv_i2s(j_num) ; cz_num = conv_i2s(k_num)
+    allocate(character(get_ilen(i_num)) :: cx_num, cy_num, cz_num)
+    call conv_i2s(i_num, cx_num) ; call conv_i2s(j_num, cy_num) ; call conv_i2s(k_num, cz_num)
 
     char_cell = "("//cx_num//","//cy_num//","//cz_num//")"
 
   end subroutine get_cnum
 
   subroutine calc_funcl2norm(in_lam)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_funcl2norm -- Calculate function and l2norm2
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
     real(DP), intent(in) :: in_lam
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, nreg_num
       head_new(i) = head_pre(i) + in_lam*head_change(i)
@@ -811,9 +816,9 @@ module nonlinear_solution
   end subroutine calc_funcl2norm
 
   subroutine write_rest(rest_head)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_rest -- Write restart file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 #ifdef MPI_MSG
     use mpi_write, only: write_mpi_rest
@@ -822,7 +827,7 @@ module nonlinear_solution
     real(DP), intent(in) :: rest_head(:)
     ! -- local
     integer(I4) :: i, rest_fnum
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     rest_fnum = st_out_fnum%rest
 #ifdef MPI_MSG
     i = 0

@@ -32,9 +32,9 @@ module open_file
   contains
 
   subroutine open_in_retnf(retn_type, retn_path, view_calc)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_in_retnf -- Open input retention file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_retf_type, st_retn_path, st_retn_fnum, st_retn
     ! -- inout
@@ -51,7 +51,7 @@ module open_file
     character(:), allocatable :: path_retn, mess_retn
     namelist/inretn_type/vana_type, vann_type, resi_type
     namelist/inretn_path/in_vapath, in_vnpath, in_repath
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     in_vapath = "" ; in_vnpath = "" ; in_repath = ""
     if (my_rank == 0) then
       ! -- Open new read text file (new_rtxt)
@@ -83,6 +83,7 @@ module open_file
       temp_view = view_calc
     end if
 
+    allocate(character(0) :: mess_vana, mess_vann, mess_resi)
     mess_vana = "input van genuchten parameter alpha"
     mess_vann = "input van genuchten parameter n"
     mess_resi = "input residual water content"
@@ -107,6 +108,8 @@ module open_file
       st_retn_path%vana = trim(adjustl(in_vapath))
       st_retn_path%vann = trim(adjustl(in_vnpath))
       st_retn_path%resi = trim(adjustl(in_repath))
+
+      allocate(character(0) :: path_retn, mess_retn)
 
       do i = 1, 3
         retn_num = 0
@@ -163,9 +166,9 @@ module open_file
   end subroutine open_in_retnf
 
   subroutine open_in_parmf(parm_type, parm_path, view_calc)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_in_parmf -- Open input parameter file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_parf_type, st_parm_path, st_parm_fnum, st_parm
     ! -- inout
@@ -182,7 +185,7 @@ module open_file
     character(:), allocatable :: path_parm, mess_parm
     namelist/inparm_type/pakx_type, paky_type, pakz_type, pass_type, pats_type
     namelist/inparm_path/in_kxpath, in_kypath, in_kzpath, in_sspath, in_tspath
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     in_kxpath = "" ; in_kypath = "" ; in_kzpath = "" ; in_sspath = "" ; in_tspath = ""
     if (my_rank == 0) then
       ! -- Open new read text file (new_rtxt)
@@ -214,6 +217,7 @@ module open_file
       temp_view = view_calc
     end if
 
+    allocate(character(0) :: mess_kx, mess_ky, mess_kz, mess_ss, mess_ts)
     mess_kx = "input saturated hydraulic conductivity in x direction"
     mess_ky = "input saturated hydraulic conductivity in y direction"
     mess_kz = "input saturated hydraulic conductivity in z direction"
@@ -246,6 +250,8 @@ module open_file
       st_parm_path%pakz = trim(adjustl(in_kzpath))
       st_parm_path%pass = trim(adjustl(in_sspath))
       st_parm_path%pats = trim(adjustl(in_tspath))
+
+      allocate(character(0) :: path_parm, mess_parm)
 
       do i = 1, 5
         parm_num = 0
@@ -312,9 +318,9 @@ module open_file
   end subroutine open_in_parmf
 
   subroutine open_in_geogf(geog_path, geog_view)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_in_geogf -- Open geography file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_geof_type, st_geog_path, st_geog_fnum
     ! -- inout
@@ -330,7 +336,7 @@ module open_file
     character(:), allocatable :: path_geog, mess_geog
     namelist/ingeog_type/geoz_type, geor_type, geoa_type
     namelist/ingeog_path/in_gzpath, in_grpath, in_gapath
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     in_gzpath = "" ; in_grpath = "" ;  in_gapath = ""
     if (my_rank == 0) then
       ! -- Open new read text file (new_rtxt)
@@ -352,6 +358,7 @@ module open_file
       temp_view = geog_view
     end if
 
+    allocate(character(0) :: mess_geoz, mess_geor, mess_geoa)
     mess_geoz = "input minium z elevation"
     mess_geor = "input relief"
     mess_geoa = "input geography parameter"
@@ -370,6 +377,8 @@ module open_file
     st_geog_path%geoz = trim(adjustl(in_gzpath))
     st_geog_path%geor = trim(adjustl(in_grpath))
     st_geog_path%geoa = trim(adjustl(in_gapath))
+
+    allocate(character(0) :: path_geog, mess_geog)
 
     do i = 1, 3
       geog_num = 0
@@ -426,9 +435,9 @@ module open_file
   end subroutine open_in_geogf
 
   subroutine open_in_initf(init_type, init_path, init_unit, view_rest)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_in_initf -- Open input initial file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_init
 #ifdef MPI_MSG
@@ -443,11 +452,12 @@ module open_file
     integer(I4), allocatable :: txt_init_type(:)
     character(:), allocatable :: err_mes
     logical, allocatable :: init_mask(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(txt_init_type(2), init_mask(2))
     txt_init_type(:) = [in_type(3), in_type(5)]
     init_mask(:) = (init_type == txt_init_type(:))
 
+    allocate(character(0) :: err_mes)
     err_mes = "input initial"
     if (any(init_mask)) then
       if (my_rank == 0) then
@@ -482,9 +492,9 @@ module open_file
   end subroutine open_in_initf
 
   subroutine open_in_sealf(seal_type, seal_path, seal_unit, seal_view)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_in_sealf -- Open input sea level file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_seal
     ! -- inout
@@ -500,7 +510,7 @@ module open_file
     character(CHALEN) :: intsep
     character(:), allocatable :: vname, err_mes
     logical, allocatable :: txt_seal_mask(:), bin_seal_mask(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(txt_seal_type(2), txt_seal_mask(2))
     allocate(bin_seal_type(2), bin_seal_mask(2))
     txt_seal_type(:) = [in_type(3), in_type(5)]
@@ -512,6 +522,7 @@ module open_file
       temp_view = seal_view
     end if
 
+    allocate(character(0) :: vname)
     vname = "sea level"
     st_intse%fnum = 0 ; st_intse%type = 0 ; st_intse%step = SZERO
 
@@ -531,6 +542,7 @@ module open_file
         call open_new_rbin(1, 1, seal_path, "input "//vname, st_seal%fnum)
 #endif
     else if (seal_type == in_type(7)) then
+      allocate(character(0) :: err_mes)
       err_mes = vname//" time interval"
       if (my_rank == 0) then
         ! -- Open new read text file (new_rtxt)
@@ -592,7 +604,8 @@ module open_file
     if (st_seal%multi /= SINFI) then
       if (any(txt_seal_mask) .or. seal_type == in_type(1) .or. seal_type == in_type(2)) then
         if (my_rank == 0) then
-          call skip_file(seal_type, st_seal%fnum, vname, st_seal%multi, st_seal%totn, st_seal%etime)
+          call skip_file(seal_type, st_seal%fnum, vname, st_seal%multi, st_seal%totn,&
+                         st_seal%etime)
         end if
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
@@ -602,25 +615,30 @@ module open_file
 #endif
       else if (any(bin_seal_mask)) then
 #ifdef MPI_MSG
-        call skip_mpi_file(seal_type, st_seal%fnum, temp_view, vname, st_seal%multi, st_seal%etime)
+        call skip_mpi_file(seal_type, st_seal%fnum, temp_view, vname, st_seal%multi,&
+                           st_seal%etime)
 #else
-        call skip_file(seal_type, st_seal%fnum, vname, st_seal%multi, st_seal%totn, st_seal%etime)
+        call skip_file(seal_type, st_seal%fnum, vname, st_seal%multi, st_seal%totn,&
+                       st_seal%etime)
 #endif
       else if (seal_type == in_type(7)) then
 #ifdef MPI_MSG
         if (any(txt_seal_mask)) then
           if (my_rank == 0) then
-            call skip_file_int(intse_type, intse_fnum, st_seal%fnum, vname, st_seal%multi, intse_step, intse_end, st_seal%etime)
+            call skip_file_int(intse_type, intse_fnum, st_seal%fnum, vname, st_seal%multi,&
+                               intse_step, intse_end, st_seal%etime)
           end if
           if (pro_totn /= 1) then
             ! -- Bcast scalar value (val)
               call bcast_val(st_seal%fnum, vname//" file number")
           end if
         else if (any(bin_seal_mask)) then
-          call skip_mpi_file_int(intse_fnum, vname, st_seal%multi, intse_step, intse_end, st_seal%fnum, st_seal%etime)
+          call skip_mpi_file_int(intse_fnum, vname, st_seal%multi, intse_step, intse_end,&
+                                 st_seal%fnum, st_seal%etime)
         end if
 #else
-        call skip_file_int(intse_type, intse_fnum, st_seal%fnum, vname, st_seal%multi, intse_step, intse_end, st_seal%etime)
+        call skip_file_int(intse_type, intse_fnum, st_seal%fnum, vname, st_seal%multi,&
+                           intse_step, intse_end, st_seal%etime)
 #endif
       end if
 #ifdef MPI_MSG
@@ -659,9 +677,9 @@ module open_file
   end subroutine open_in_sealf
 
   subroutine open_in_rechf(rech_type, rech_path, rech_unit, rech_view)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_in_rechf -- Open input recharge file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_rech
     ! -- inout
@@ -675,11 +693,12 @@ module open_file
     real(SP) :: intre_step, intre_end
     character(CHALEN) :: intrep
     character(:), allocatable :: vname, err_mes
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (present(rech_view)) then
       temp_view = rech_view
     end if
 
+    allocate(character(0) :: vname)
     vname = "recharge"
     st_intre%fnum = 0 ; st_intre%type = 0 ; st_intre%step = SZERO
 
@@ -699,6 +718,7 @@ module open_file
         call open_new_rbin(1, 1, rech_path, "input "//vname, st_rech%fnum)
 #endif
     else if (rech_type == in_type(7)) then
+      allocate(character(0) :: err_mes)
       intre_type = 0 ; err_mes = vname//" time interval"
       if (my_rank == 0) then
         ! -- Open new read text file (new_rtxt)
@@ -760,7 +780,8 @@ module open_file
     if (st_rech%multi /= SINFI) then
       if (rech_type == in_type(1) .or. rech_type == in_type(3)) then
         if (my_rank == 0) then
-          call skip_file(rech_type, st_rech%fnum, vname, st_rech%multi, st_rech%totn, st_rech%etime)
+          call skip_file(rech_type, st_rech%fnum, vname, st_rech%multi, st_rech%totn,&
+                         st_rech%etime)
         end if
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
@@ -770,26 +791,31 @@ module open_file
 #endif
       else if (rech_type == in_type(4)) then
 #ifdef MPI_MSG
-        call skip_mpi_file(rech_type, st_rech%fnum, temp_view, vname, st_rech%multi, st_rech%etime)
+        call skip_mpi_file(rech_type, st_rech%fnum, temp_view, vname, st_rech%multi,&
+                           st_rech%etime)
 #else
-        call skip_file(rech_type, st_rech%fnum, vname, st_rech%multi, st_rech%totn, st_rech%etime)
+        call skip_file(rech_type, st_rech%fnum, vname, st_rech%multi, st_rech%totn,&
+                       st_rech%etime)
 #endif
 
       else if (rech_type == in_type(7)) then
 #ifdef MPI_MSG
         if (intre_type == in_type(3)) then
           if (my_rank == 0) then
-            call skip_file_int(intre_type, intre_fnum, st_rech%fnum, vname, st_rech%multi, intre_step, intre_end, st_rech%etime)
+            call skip_file_int(intre_type, intre_fnum, st_rech%fnum, vname, st_rech%multi,&
+                               intre_step, intre_end, st_rech%etime)
           end if
           if (pro_totn /= 1) then
             ! -- Bcast scalar value (val)
               call bcast_val(st_rech%fnum, vname//" file number")
           end if
         else if (intre_type == in_type(4)) then
-          call skip_mpi_file_int(intre_fnum, vname, st_rech%multi, intre_step, intre_end, st_rech%fnum, st_rech%etime)
+          call skip_mpi_file_int(intre_fnum, vname, st_rech%multi, intre_step, intre_end,&
+                                 st_rech%fnum, st_rech%etime)
         end if
 #else
-        call skip_file_int(intre_type, intre_fnum, st_rech%fnum, vname, st_rech%multi, intre_step, intre_end, st_rech%etime)
+        call skip_file_int(intre_type, intre_fnum, st_rech%fnum, vname, st_rech%multi,&
+                           intre_step, intre_end, st_rech%etime)
 #endif
       end if
 #ifdef MPI_MSG
@@ -824,9 +850,9 @@ module open_file
   end subroutine open_in_rechf
 
   subroutine open_in_wellf(well_type, well_path, well_unit, well_view)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_in_wellf -- Open input well file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: SONE, DAYSEC
     use initial_module, only: st_well
@@ -843,7 +869,7 @@ module open_file
     character(CHALEN) :: intwep
     character(:), allocatable :: vname, err_mes
     logical, allocatable :: txt_well_mask(:), bin_well_mask(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(txt_well_type(2), txt_well_mask(2))
     allocate(bin_well_type(2), bin_well_mask(2))
     txt_well_type(:) = [in_type(3), in_type(5)]
@@ -855,6 +881,7 @@ module open_file
       temp_view = well_view
     end if
 
+    allocate(character(0) :: vname)
     vname = "well"
     st_intwe%fnum = 0 ; st_intwe%type = 0 ; st_intwe%step = SZERO
 
@@ -874,6 +901,7 @@ module open_file
         call open_new_rbin(1, 1, well_path, "input "//vname, st_well%fnum)
 #endif
     else if (well_type == in_type(7)) then
+      allocate(character(0) :: err_mes)
       err_mes = vname//" time interval"
       if (my_rank == 0) then
         ! -- Open new read text file (new_rtxt)
@@ -937,7 +965,8 @@ module open_file
     if (st_well%multi /= SINFI) then
       if (any(txt_well_mask) .or. well_type == in_type(2)) then
         if (my_rank == 0) then
-          call skip_file(well_type, st_well%fnum, vname, st_well%multi, st_well%totn, st_well%etime)
+          call skip_file(well_type, st_well%fnum, vname, st_well%multi, st_well%totn,&
+                         st_well%etime)
         end if
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
@@ -947,25 +976,30 @@ module open_file
 #endif
       else if (any(bin_well_mask)) then
 #ifdef MPI_MSG
-        call skip_mpi_file(well_type, st_well%fnum, temp_view, vname, st_well%multi, st_well%etime)
+        call skip_mpi_file(well_type, st_well%fnum, temp_view, vname, st_well%multi,&
+                           st_well%etime)
 #else
-        call skip_file(well_type, st_well%fnum, vname, st_well%multi, st_well%totn, st_well%etime)
+        call skip_file(well_type, st_well%fnum, vname, st_well%multi, st_well%totn,&
+                       st_well%etime)
 #endif
       else if (well_type == in_type(7)) then
 #ifdef MPI_MSG
         if (any(txt_well_mask)) then
           if (my_rank == 0) then
-            call skip_file_int(intwe_type, intwe_fnum, st_well%fnum, vname, st_well%multi, intwe_step, intwe_end, st_well%etime)
+            call skip_file_int(intwe_type, intwe_fnum, st_well%fnum, vname, st_well%multi,&
+                               intwe_step, intwe_end, st_well%etime)
           end if
           if (pro_totn /= 1) then
             ! -- Bcast scalar value (val)
               call bcast_val(st_well%fnum, vname//" file number")
           end if
         else if (any(bin_well_mask)) then
-          call skip_mpi_file_int(intwe_fnum, vname, st_well%multi, intwe_step, intwe_end, st_well%fnum, st_well%etime)
+          call skip_mpi_file_int(intwe_fnum, vname, st_well%multi, intwe_step, intwe_end,&
+                                 st_well%fnum, st_well%etime)
         end if
 #else
-        call skip_file_int(intwe_type, intwe_fnum, st_well%fnum, vname, st_well%multi, intwe_step, intwe_end, st_well%etime)
+        call skip_file_int(intwe_type, intwe_fnum, st_well%fnum, vname, st_well%multi,&
+                           intwe_step, intwe_end, st_well%etime)
 #endif
       end if
 #ifdef MPI_MSG
@@ -1002,9 +1036,9 @@ module open_file
   end subroutine open_in_wellf
 
   subroutine open_in_wlayf(weks_type, weke_type, wells_path, welle_path, wlay_view)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_in_wlayf -- Open input well layer file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 #ifdef MPI_MSG
 !    use mpi_utility, only: bcast_file_path
@@ -1017,11 +1051,12 @@ module open_file
     ! -- local
     integer(I4) :: temp_view
     character(:), allocatable :: vname
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (present(wlay_view)) then
       temp_view = wlay_view
     end if
 
+    allocate(character(0) :: vname)
     vname = "well 2d"
 
 #ifdef MPI_MSG
@@ -1078,9 +1113,9 @@ module open_file
   end subroutine open_in_wlayf
 
   subroutine open_in_precf(prec_type, prec_path, prec_unit, prec_view)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_in_precf -- Open input precipitation file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_prec
     ! -- inout
@@ -1094,11 +1129,12 @@ module open_file
     real(SP) :: intpr_step, intpr_end
     character(CHALEN) :: intprp
     character(:), allocatable :: vname, err_mes
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (present(prec_view)) then
       temp_view = prec_view
     end if
 
+    allocate(character(0) :: vname)
     vname = "precipitation"
     st_intpr%fnum = 0 ; st_intpr%type = 0 ; st_intpr%step = SZERO
 
@@ -1118,6 +1154,7 @@ module open_file
         call open_new_rbin(1, 1, prec_path, "input "//vname, st_prec%fnum)
 #endif
     else if (prec_type == in_type(7)) then
+      allocate(character(0) :: err_mes)
       intpr_type = 0 ; err_mes = ""
       err_mes = vname//" time interval"
       if (my_rank == 0) then
@@ -1180,7 +1217,8 @@ module open_file
     if (st_prec%multi /= SINFI) then
       if (prec_type == in_type(1) .or. prec_type == in_type(3)) then
         if (my_rank == 0) then
-          call skip_file(prec_type, st_prec%fnum, vname, st_prec%multi, st_prec%totn, st_prec%etime)
+          call skip_file(prec_type, st_prec%fnum, vname, st_prec%multi, st_prec%totn,&
+                         st_prec%etime)
         end if
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
@@ -1190,25 +1228,30 @@ module open_file
 #endif
       else if (prec_type == in_type(4)) then
 #ifdef MPI_MSG
-        call skip_mpi_file(prec_type, st_prec%fnum, temp_view, vname, st_prec%multi, st_prec%etime)
+        call skip_mpi_file(prec_type, st_prec%fnum, temp_view, vname, st_prec%multi,&
+                           st_prec%etime)
 #else
-        call skip_file(prec_type, st_prec%fnum, vname, st_prec%multi, st_prec%totn, st_prec%etime)
+        call skip_file(prec_type, st_prec%fnum, vname, st_prec%multi, st_prec%totn,&
+                       st_prec%etime)
 #endif
       else if (prec_type == in_type(7)) then
 #ifdef MPI_MSG
         if (intpr_type == in_type(3)) then
           if (my_rank == 0) then
-            call skip_file_int(intpr_type, intpr_fnum, st_prec%fnum, vname, st_prec%multi, intpr_step, intpr_end, st_prec%etime)
+            call skip_file_int(intpr_type, intpr_fnum, st_prec%fnum, vname, st_prec%multi,&
+                               intpr_step, intpr_end, st_prec%etime)
           end if
           if (pro_totn /= 1) then
             ! -- Bcast scalar value (val)
               call bcast_val(st_prec%fnum, vname//" file number")
           end if
         else if (intpr_type == in_type(4)) then
-          call skip_mpi_file_int(intpr_fnum, vname, st_prec%multi, intpr_step, intpr_end, st_prec%fnum, st_prec%etime)
+          call skip_mpi_file_int(intpr_fnum, vname, st_prec%multi, intpr_step, intpr_end,&
+                                 st_prec%fnum, st_prec%etime)
         end if
 #else
-        call skip_file_int(intpr_type, intpr_fnum, st_prec%fnum, vname, st_prec%multi, intpr_step, intpr_end, st_prec%etime)
+        call skip_file_int(intpr_type, intpr_fnum, st_prec%fnum, vname, st_prec%multi,&
+                           intpr_step, intpr_end, st_prec%etime)
 #endif
       end if
 #ifdef MPI_MSG
@@ -1243,9 +1286,9 @@ module open_file
   end subroutine open_in_precf
 
   subroutine open_in_evapf(evap_type, evap_path, evap_unit, evap_view)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_in_evapf -- Open input evapotranspiration file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_evap
     ! -- inout
@@ -1259,11 +1302,12 @@ module open_file
     real(SP) :: intev_step, intev_end
     character(CHALEN) :: intevp
     character(:), allocatable :: vname, err_mes
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (present(evap_view)) then
       temp_view = evap_view
     end if
 
+    allocate(character(0) :: vname)
     vname = "evapotranspiration"
     st_intev%fnum = 0 ; st_intev%type = 0 ; st_intev%step = SZERO
 
@@ -1283,6 +1327,7 @@ module open_file
         call open_new_rbin(1, 1, evap_path, "input "//vname, st_evap%fnum)
 #endif
     else if (evap_type == in_type(7)) then
+      allocate(character(0) :: err_mes)
       intev_type = 0 ; err_mes = ""
       err_mes = vname//" time interval"
       if (my_rank == 0) then
@@ -1345,7 +1390,8 @@ module open_file
     if (st_evap%multi /= SINFI) then
       if (evap_type == in_type(1) .or. evap_type == in_type(3)) then
         if (my_rank == 0) then
-          call skip_file(evap_type, st_evap%fnum, vname, st_evap%multi, st_evap%totn, st_evap%etime)
+          call skip_file(evap_type, st_evap%fnum, vname, st_evap%multi, st_evap%totn,&
+                         st_evap%etime)
         end if
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
@@ -1355,25 +1401,30 @@ module open_file
 #endif
       else if (evap_type == in_type(4)) then
 #ifdef MPI_MSG
-        call skip_mpi_file(evap_type, st_evap%fnum, temp_view, vname, st_evap%multi, st_evap%etime)
+        call skip_mpi_file(evap_type, st_evap%fnum, temp_view, vname, st_evap%multi,&
+                           st_evap%etime)
 #else
-        call skip_file(evap_type, st_evap%fnum, vname, st_evap%multi, st_evap%totn, st_evap%etime)
+        call skip_file(evap_type, st_evap%fnum, vname, st_evap%multi, st_evap%totn,&
+                       st_evap%etime)
 #endif
       else if (evap_type == in_type(7)) then
 #ifdef MPI_MSG
         if (intev_type == in_type(3)) then
           if (my_rank == 0) then
-            call skip_file_int(intev_type, intev_fnum, st_evap%fnum, vname, st_evap%multi, intev_step, intev_end, st_evap%etime)
+            call skip_file_int(intev_type, intev_fnum, st_evap%fnum, vname, st_evap%multi,&
+                               intev_step, intev_end, st_evap%etime)
           end if
           if (pro_totn /= 1) then
             ! -- Bcast scalar value (val)
               call bcast_val(st_evap%fnum, vname//" file number")
           end if
         else if (intev_type == in_type(4)) then
-          call skip_mpi_file_int(intev_fnum, vname, st_evap%multi, intev_step, intev_end, st_evap%fnum, st_evap%etime)
+          call skip_mpi_file_int(intev_fnum, vname, st_evap%multi, intev_step, intev_end,&
+                                 st_evap%fnum, st_evap%etime)
         end if
 #else
-        call skip_file_int(intev_type, intev_fnum, st_evap%fnum, vname, st_evap%multi, intev_step, intev_end, st_evap%etime)
+        call skip_file_int(intev_type, intev_fnum, st_evap%fnum, vname, st_evap%multi,&
+                           intev_step, intev_end, st_evap%etime)
 #endif
       end if
 #ifdef MPI_MSG
@@ -1408,9 +1459,9 @@ module open_file
   end subroutine open_in_evapf
 
   subroutine open_in_rivef(rive_path, nohv, hv, riwlv, riwdv, riblv, ridev, riwiv, rilev)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_in_rivef -- Read input river file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_rivf_type, st_riwl, st_riwd, st_ribl, st_ride, st_riwi,&
                               st_rile
@@ -1436,7 +1487,7 @@ module open_file
     namelist/inrive_type/riwl_type, riwd_type, ribl_type, ride_type, riwi_type, rile_type
     namelist/inrive_path/riwl_path, riwd_path, ribl_path, ride_path, riwi_path, rile_path
     namelist/inrive_unit/riwl_unit, riwd_unit, ribl_unit, ride_unit, riwi_unit, rile_unit
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     riwl_type = 0 ; riwd_type = 0 ; ribl_type = 0 ; ride_type = 0 ; riwi_type = 0
     rile_type = 0
     riwl_path = "" ; riwd_path = "" ; ribl_path = "" ; ride_path = "" ; riwi_path = ""
@@ -1463,6 +1514,7 @@ module open_file
       call close_file(rive_fnum)
     end if
 
+    allocate(character(0) :: mess_wl, mess_wd, mess_bl, mess_de, mess_wi, mess_le)
     mess_wl = "input river water level"
     mess_wd = "input river water depth"
     mess_bl = "input river bottom level"
@@ -1487,6 +1539,7 @@ module open_file
     riven(1) = 0 ; riven(2) = 0 ; riven(3) = 0
     riven(4) = 0 ; riven(5) = 0 ; riven(6) = 0
 
+    allocate(character(0) :: err_mes, path_rive, mess_rive, unit_rive)
     allocate(riv_txt_type(3), rive_mask(3))
     riv_txt_type(:) = [in_type(1:3)]
 
@@ -1589,7 +1642,8 @@ module open_file
 
       if (len_trim(adjustl(unit_rive)) == 0) then
         if (my_rank == 0) then
-          err_mes = "Not specified time unit in "//mess_rive//". Same value is used in simulation"
+          err_mes = &
+          "Not specified time unit in "//mess_rive//". Same value is used in simulation"
           call write_logf(err_mes)
         end if
         rive_multi = SINFI ; rive_etime = SINFI
@@ -1621,17 +1675,20 @@ module open_file
 #ifdef MPI_MSG
           if (intri_type == in_type(3)) then
             if (my_rank == 0) then
-              call skip_file_int(intri_type, riven(i), intri_num, mess_rive, rive_multi, intri_step, intri_end, rive_etime)
+              call skip_file_int(intri_type, riven(i), intri_num, mess_rive, rive_multi,&
+                                 intri_step, intri_end, rive_etime)
             end if
             if (pro_totn /= 1) then
               ! -- Bcast scalar value (val)
                 call bcast_val(intri_num, mess_rive//" file number")
             end if
           else if (intri_type == in_type(4)) then
-            call skip_mpi_file_int(riven(i), mess_rive, rive_multi, intri_step, intri_end, intri_num, rive_etime)
+            call skip_mpi_file_int(riven(i), mess_rive, rive_multi, intri_step, intri_end,&
+                                   intri_num, rive_etime)
           end if
 #else
-          call skip_file_int(intri_type, riven(i), intri_num, mess_rive, rive_multi, intri_step, intri_end, rive_etime)
+          call skip_file_int(intri_type, riven(i), intri_num, mess_rive, rive_multi,&
+                             intri_step, intri_end, rive_etime)
 #endif
         end if
 #ifdef MPI_MSG
@@ -1751,14 +1808,15 @@ module open_file
 
     deallocate(riv_txt_type)
     deallocate(rive_mask)
+    deallocate(err_mes, path_rive, mess_rive, unit_rive)
 
 
   end subroutine open_in_rivef
 
   subroutine open_in_lakef(lake_path, nohv, hv, lawlv, lawdv, lablv, laarv)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_in_lakef -- Open input lake file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_lakf_type, st_lawl, st_lawd, st_labl, st_laar
     ! -- inout
@@ -1781,7 +1839,7 @@ module open_file
     namelist/inlake_type/lawl_type, lawd_type, labl_type, laar_type
     namelist/inlake_path/lawl_path, lawd_path, labl_path, laar_path
     namelist/inlake_unit/lawl_unit, lawd_unit, labl_unit, laar_unit
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     lawl_type = 0 ; lawd_type = 0 ; labl_type = 0 ; laar_type = 0
     lawl_path = "" ; lawd_path = "" ; labl_path = "" ; laar_path = ""
     lawl_unit = "" ; lawd_unit = "" ; labl_unit = "" ; laar_unit = ""
@@ -1805,6 +1863,7 @@ module open_file
       call close_file(lake_fnum)
     end if
 
+    allocate(character(0) :: mess_wl, mess_wd, mess_bl, mess_ar)
     mess_wl = "input lake water level"
     mess_wd = "input lake water depth"
     mess_bl = "input lake bottom level"
@@ -1820,10 +1879,10 @@ module open_file
     end if
 #endif
 
-    laket(1) = lawl_type ; laket(2) = lawd_type ; laket(3) = labl_type
-    laket(4) = laar_type
+    laket(1) = lawl_type ; laket(2) = lawd_type ; laket(3) = labl_type ; laket(4) = laar_type
     laken(1) = 0 ; laken(2) = 0 ; laken(3) = 0 ; laken(4) = 0
 
+    allocate(character(0) :: err_mes, path_lake, mess_lake, unit_lake)
     allocate(lak_txt_type(3), lake_mask(3))
     lak_txt_type(:) = [in_type(1:3)]
 
@@ -1920,7 +1979,8 @@ module open_file
 
       if (len_trim(adjustl(unit_lake)) == 0) then
         if (my_rank == 0) then
-          err_mes = "Not specified time unit in "//mess_lake//". Same value is used in simulation"
+          err_mes = &
+          "Not specified time unit in "//mess_lake//". Same value is used in simulation"
           call write_logf(err_mes)
         end if
         lake_multi = SINFI ; lake_etime = SINFI
@@ -1952,17 +2012,20 @@ module open_file
 #ifdef MPI_MSG
           if (intla_type == in_type(3)) then
             if (my_rank == 0) then
-              call skip_file_int(intla_type, laken(i), intla_num, mess_lake, lake_multi, intla_step, intla_end, lake_etime)
+              call skip_file_int(intla_type, laken(i), intla_num, mess_lake, lake_multi,&
+                                 intla_step, intla_end, lake_etime)
             end if
             if (pro_totn /= 1) then
               ! -- Bcast scalar value (val)
                 call bcast_val(intla_num, mess_lake//" file number")
             end if
           else if (intla_type == in_type(4)) then
-            call skip_mpi_file_int(laken(i), mess_lake, lake_multi, intla_step, intla_end, intla_num, lake_etime)
+            call skip_mpi_file_int(laken(i), mess_lake, lake_multi, intla_step, intla_end,&
+                                   intla_num, lake_etime)
           end if
 #else
-          call skip_file_int(intla_type, laken(i), intla_num, mess_lake, lake_multi, intla_step, intla_end, lake_etime)
+          call skip_file_int(intla_type, laken(i), intla_num, mess_lake, lake_multi,&
+                             intla_step, intla_end, lake_etime)
 #endif
         end if
 #ifdef MPI_MSG
@@ -2055,13 +2118,14 @@ module open_file
 
     deallocate(lak_txt_type)
     deallocate(lake_mask)
+    deallocate(err_mes, path_lake, mess_lake, unit_lake)
 
   end subroutine open_in_lakef
 
   subroutine open_in_massf(in_mass_type, in_mass_path, view_mass)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_in_massf -- Open input massbalance file for output
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -2072,7 +2136,7 @@ module open_file
     integer(I4) :: temp_view
     integer(I4), allocatable :: txt_mass_type(:)
     logical, allocatable :: txt_mass_mask(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(txt_mass_type(3), txt_mass_mask(3))
     txt_mass_type(:) = [in_type(1), in_type(3), in_type(5)]
 
@@ -2103,9 +2167,9 @@ module open_file
   end subroutine open_in_massf
 
   subroutine open_out_convf(out_conv_path, out_conv_fnum)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_out_convf -- Open output convergence file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -2113,16 +2177,16 @@ module open_file
     integer(I4), intent(inout) :: out_conv_fnum
     ! -- local
 
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ! -- Open new read text file (new_rtxt)
       call open_new_wtxt(out_conv_path, "output convergence", out_conv_fnum)
 
   end subroutine open_out_convf
 
   subroutine open_out_binf(out_file, out_tint, out_path, out_unit, out_chra, out_trel)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_out_binf -- Open output binary file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use utility_module, only: open_new_wbin
 #ifdef MPI_MSG
@@ -2136,7 +2200,7 @@ module open_file
 #ifdef MPI_MSG
     integer(I4) :: out_fh
 #endif
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
 #ifdef MPI_MSG
     if (pro_totn /= 1) then
     ! -- Bcast file (file)
@@ -2162,9 +2226,9 @@ module open_file
   end subroutine open_out_binf
 
   subroutine open_out_massf(out_mass_time, out_mass_path, out_mass_unit, out_mass_fnum)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_out_massf -- Open output massbalance file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_out_step
     ! -- inout
@@ -2173,7 +2237,8 @@ module open_file
     integer(I4), intent(out) :: out_mass_fnum
     ! -- local
     character(:), allocatable :: out_chra
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
+    allocate(character(0) :: out_chra)
     out_chra = "output massbalance"
     if (my_rank == 0) then
       ! -- Open new write text file (new_wtxt)
@@ -2197,6 +2262,8 @@ module open_file
     end if
 
     st_out_step%mass = st_out_step%mass*out_mass_time
+
+    deallocate(out_chra)
 
   end subroutine open_out_massf
 

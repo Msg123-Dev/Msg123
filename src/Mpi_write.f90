@@ -22,9 +22,9 @@ module mpi_write
   contains
 
   subroutine write_mpi_2dbin(out_fh, out_totn, calc_num, out_unit, out_val, ntime)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_mpi_2dbin -- Write MPI 2d binary
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use set_cell, only: no_ncals, seal_snum
     use mpi_set, only: write_2d_ind
@@ -38,7 +38,7 @@ module mpi_write
     integer(I4) :: all_ncals
     integer(I4), allocatable :: istat(:)
     real(SP), allocatable :: vari_sp(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     all_ncals = ncals + no_ncals + seal_snum + 1
     allocate(istat(MPI_STATUS_SIZE))
     allocate(vari_sp(all_ncals))
@@ -76,9 +76,9 @@ module mpi_write
   end subroutine write_mpi_2dbin
 
   subroutine write_mpi_3dbin(out_fh, out_totn, calc_num, out_unit, out_val, ntime)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_mpi_3dbin -- Write MPI 3d binary
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use set_cell, only: no_ncalc, seal_cnum
     use mpi_set, only: write_3d_ind
@@ -92,7 +92,7 @@ module mpi_write
     integer(I4) :: all_ncalc
     integer(I4), allocatable :: istat(:)
     real(SP), allocatable :: vari_sp(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     all_ncalc = ncalc + no_ncalc + seal_cnum + 1
     allocate(istat(MPI_STATUS_SIZE))
     allocate(vari_sp(all_ncalc))
@@ -130,9 +130,9 @@ module mpi_write
   end subroutine write_mpi_3dbin
 
   subroutine write_mpi_rest(out_fh, out_time, out_unit, out_val)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_mpi_rest -- Write mpi restart value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -144,7 +144,7 @@ module mpi_write
     integer(I4), allocatable :: istat(:)
     real(DP), allocatable :: out_rest(:)
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(istat(MPI_STATUS_SIZE), out_rest(ncalc+1))
     !$omp parallel
     !$omp do private(i)
@@ -173,9 +173,9 @@ module mpi_write
   end subroutine write_mpi_rest
 
   subroutine redu_mpi_mass(num_mass, inout_st)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! redu_mpi_mass -- Calculate output massbalance for MPI
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use assign_calc, only: msout_tnum
     use allocate_output, only: st_msout
@@ -186,7 +186,7 @@ module mpi_write
     integer(I4) :: i, ierr
     real(DP), allocatable :: mpi_sto(:), mpi_con(:), mpi_sea(:), mpi_wel(:)
     real(DP), allocatable :: mpi_rec(:), mpi_sur(:), mpi_riv(:), mpi_lak(:), mpi_tot(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(mpi_sto(num_mass), mpi_con(num_mass), mpi_sea(num_mass), mpi_wel(num_mass))
     allocate(mpi_rec(num_mass), mpi_sur(num_mass), mpi_riv(num_mass), mpi_lak(num_mass))
     allocate(mpi_tot(num_mass))
@@ -281,9 +281,9 @@ module mpi_write
   end subroutine redu_mpi_mass
 
   subroutine set_senrec_wtab()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_senrec_wtab -- Set send and receive for water table
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use set_cell, only: neib_num, send_cind, send_citem
     use allocate_solution, only: nreg_num, crs_index, dir_conn
@@ -296,7 +296,7 @@ module mpi_write
     integer(I4), allocatable :: temp_wtab_snum(:), temp_wtab_rnum(:)
     integer(I4), allocatable :: temp_send_cind(:), temp_recv_cind(:)
     integer(I4), allocatable :: temp_send_citem(:), temp_recv_citem(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     temp_item_num = crs_index(1)%offind(nreg_num) - crs_index(1)%offind(ncalc)
     allocate(temp_wtab_snum(neib_mpi_totn), temp_wtab_rnum(neib_mpi_totn))
     allocate(temp_send_cind(0:neib_mpi_totn), temp_recv_cind(0:neib_mpi_totn))
@@ -367,9 +367,9 @@ module mpi_write
   end subroutine set_senrec_wtab
 
   subroutine calc_mpi_wtable(hnew, snew)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_mpi_wtable -- Calculate water table for MPI
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use initial_module, only: pro_totn
     use set_cell, only: get_cals_grid
@@ -384,17 +384,17 @@ module mpi_write
     integer(I4) :: send_len, recv_len
     integer(I4) :: rank_flag, allp_flag
     integer(I4), allocatable :: send_flag(:), recv_flag(:)
-    integer(I4), allocatable :: flag_send(:), flag_recv(:)
-    integer(I4), allocatable :: head_send(:), head_recv(:), srat_send(:), srat_recv(:)
+    integer(I4), allocatable :: flag_send(:), req_flag_recv(:)
+    integer(I4), allocatable :: head_send(:), req_head_recv(:), srat_send(:), req_srat_recv(:)
     integer(I4), allocatable :: stat_s(:,:), stat_r(:,:)
     real(DP), allocatable :: send_head(:), send_srat(:), recv_head(:), recv_srat(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     wtab_sendn = send_wtab_cind(neib_wtab_stotn)
     wtab_recvn = recv_wtab_cind(neib_wtab_rtotn)
     allocate(send_flag(wtab_sendn), recv_flag(wtab_recvn))
-    allocate(flag_send(neib_mpi_totn), flag_recv(neib_mpi_totn))
-    allocate(head_send(neib_mpi_totn), head_recv(neib_mpi_totn))
-    allocate(srat_send(neib_mpi_totn), srat_recv(neib_mpi_totn))
+    allocate(flag_send(neib_mpi_totn), req_flag_recv(neib_mpi_totn))
+    allocate(head_send(neib_mpi_totn), req_head_recv(neib_mpi_totn))
+    allocate(srat_send(neib_mpi_totn), req_srat_recv(neib_mpi_totn))
     allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
     allocate(send_head(wtab_sendn), send_srat(wtab_sendn))
     allocate(recv_head(wtab_recvn), recv_srat(wtab_recvn))
@@ -411,9 +411,9 @@ module mpi_write
     !$omp end do
     !$omp do private(i)
     do i = 1, neib_mpi_totn
-      flag_send(i) = 0 ; flag_recv(i) = 0
-      head_send(i) = 0 ; head_recv(i) = 0
-      srat_send(i) = 0 ; srat_recv(i) = 0
+      flag_send(i) = 0 ; req_flag_recv(i) = 0
+      head_send(i) = 0 ; req_head_recv(i) = 0
+      srat_send(i) = 0 ; req_srat_recv(i) = 0
     end do
     !$omp end do
     !$omp do private(j)
@@ -474,17 +474,17 @@ module mpi_write
         recv_len = irecv_end - irecv_sta + 1
         if (irecv_end /= 0) then
           call MPI_IRECV(recv_flag(irecv_sta), recv_len, MPI_INTEGER, neib_wtab_rnum(i), 0,&
-                         my_comm, flag_recv(i), ierr)
+                         my_comm, req_flag_recv(i), ierr)
           call MPI_IRECV(recv_head(irecv_sta), recv_len, MPI_REAL8, neib_wtab_rnum(i), 1,&
-                         my_comm, head_recv(i), ierr)
+                         my_comm, req_head_recv(i), ierr)
           call MPI_IRECV(recv_srat(irecv_sta), recv_len, MPI_REAL8, neib_wtab_rnum(i), 2,&
-                         my_comm, srat_recv(i), ierr)
+                         my_comm, req_srat_recv(i), ierr)
         end if
       end do
 
-      call MPI_WAITALL(neib_wtab_rtotn, flag_recv, stat_r, ierr)
-      call MPI_WAITALL(neib_wtab_rtotn, head_recv, stat_r, ierr)
-      call MPI_WAITALL(neib_wtab_rtotn, srat_recv, stat_r, ierr)
+      call MPI_WAITALL(neib_wtab_rtotn, req_flag_recv, stat_r, ierr)
+      call MPI_WAITALL(neib_wtab_rtotn, req_head_recv, stat_r, ierr)
+      call MPI_WAITALL(neib_wtab_rtotn, req_srat_recv, stat_r, ierr)
       if (ierr /= MPI_SUCCESS) then
         if (my_rank == 0) then
           call write_err_stop("Receive water table information.")
@@ -547,16 +547,16 @@ module mpi_write
     end do
     !$omp end parallel do
 
-    deallocate(send_flag, recv_flag, flag_send, flag_recv, head_send, head_recv)
-    deallocate(srat_send, srat_recv, stat_s, stat_r)
+    deallocate(send_flag, recv_flag, flag_send, req_flag_recv, head_send, req_head_recv)
+    deallocate(srat_send, req_srat_recv, stat_s, stat_r)
     deallocate(send_head, send_srat, recv_head, recv_srat)
 
   end subroutine calc_mpi_wtable
 
   subroutine set_send_flag(flag_send)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_send_flag -- Set send flag
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -565,8 +565,9 @@ module mpi_write
     integer(I4) :: i, j, k, c_num, isend, nxyz, loc_n, loc_r
     integer(I4) :: is_sta, is_end
     integer(I4) :: i_num, j_num, k_num
-    !-------------------------------------------------------------------------------------
-    !$omp parallel do private(i, j, k, c_num, isend, nxyz, loc_n, loc_r, is_sta, is_end, i_num, j_num, k_num)
+    !-------------------------------------------------------------------------------------------
+    !$omp parallel do private(i, j, k, c_num, isend, nxyz, loc_n, loc_r, is_sta, is_end,&
+    !$omp&                    i_num, j_num, k_num)
     do i = 1, neib_wtab_stotn
       is_sta = send_wtab_cind(i-1) ; is_end = send_wtab_cind(i)
       do isend = 1, is_end-is_sta
@@ -592,9 +593,9 @@ module mpi_write
   end subroutine set_send_flag
 
   subroutine set_send_vari(r_flag, s_flag, c_head, c_srat, r_head, r_srat, s_head, s_srat)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_send_vari -- Set send variable
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -607,8 +608,9 @@ module mpi_write
     integer(I4) :: i, j, k, c_num, isend, nxyz, loc_n, loc_r
     integer(I4) :: is_sta, is_end
     integer(I4) :: i_num, j_num, k_num
-    !-------------------------------------------------------------------------------------
-    !$omp parallel do private(i, j, k, c_num, isend, nxyz, loc_n, loc_r, is_sta, is_end, i_num, j_num, k_num)
+    !-------------------------------------------------------------------------------------------
+    !$omp parallel do private(i, j, k, c_num, isend, nxyz, loc_n, loc_r, is_sta, is_end,&
+    !$omp&                    i_num, j_num, k_num)
     do i = 1, neib_wtab_stotn
       is_sta = send_wtab_cind(i-1) ; is_end = send_wtab_cind(i)
       do isend = 1, is_end-is_sta

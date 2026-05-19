@@ -28,6 +28,7 @@ module constval_module
   real(DP), parameter :: VARMAX = 1.00E+03_DP, XMAX = 1.00E+04_DP, XMAX_INV = 1.00E-04_DP
 
   character(7), parameter :: OUTFORM = "(E13.6)"
-  character(53), parameter :: MASSCHARA = "FLOW,STORAGE,RECHARGE,WELL,SURFACE,RIVER,LAKE,SEA,ALL"
+  character(53), parameter :: MASSCHARA = &
+                              "FLOW,STORAGE,RECHARGE,WELL,SURFACE,RIVER,LAKE,SEA,ALL"
 
 end module constval_module

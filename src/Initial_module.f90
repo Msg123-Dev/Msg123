@@ -220,9 +220,9 @@ module initial_module
   contains
 
   subroutine init_msg(in_stime)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! init_msg -- Initialize msg
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 #ifdef MPI_MSG
     use mpi_initfin, only: init_mpi
@@ -231,7 +231,7 @@ module initial_module
     integer(I4), intent(in) :: in_stime(:)
     ! -- local
 
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (my_rank == 0) then
       ! -- Initialize log file (log)
         call init_log(in_stime)
@@ -256,9 +256,9 @@ module initial_module
   end subroutine init_msg
 
   subroutine init_log(in_stime)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! init_log -- Initialize log file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use utility_module, only: open_new_wtxt
     ! -- inout
@@ -268,7 +268,8 @@ module initial_module
     character(:), allocatable :: log_file
     10 format(/"Run start date and time(yyyy/mm/dd hh:mm:ss) : ",i4,"/",i2.2,"/",i2.2,1x,&
               i2,":",i2.2,":",i2.2,/)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
+    allocate(character(0) :: log_file)
     log_file = 'msg123_log.txt'
     ! -- Open new read text file (new_rtxt)
       call open_new_wtxt(log_file, "msg123 log", log_fnum)
@@ -280,9 +281,9 @@ module initial_module
   end subroutine init_log
 
   subroutine init_var()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! init_var -- Initialize variables
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use constval_module, only: SZERO, DZERO, DONE, SINFI, MACHI_EPS, INF_SPEC, INF_CLAS,&
                                INF_POIN, INF_2DTX, INF_2DBI, INF_3DTX, INF_3DBI,&
@@ -291,7 +292,7 @@ module initial_module
 
     ! -- local
 
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ! input file type
     st_in_type%grid = -1 ; st_in_type%retn = -1 ; st_in_type%parm = -1
     st_in_type%geog = -1 ; st_in_type%init = -1 ; st_in_type%seal = -1
@@ -354,7 +355,8 @@ module initial_module
 
     !file type
     allocate(in_type(0:7), out_type(3))
-    in_type(:) = [INF_SPEC, INF_CLAS, INF_POIN, INF_2DTX, INF_2DBI, INF_3DTX, INF_3DBI, INF_EXTR]
+    in_type(:) = [INF_SPEC, INF_CLAS, INF_POIN, INF_2DTX, INF_2DBI, INF_3DTX, INF_3DBI,&
+                  INF_EXTR]
     out_type(:) = [OUTF_TABL, OUTF_2DBI, OUTF_3DBI]
 
     st_sim%sim_name  = repeat(' ', CHALEN)
@@ -420,9 +422,9 @@ module initial_module
   end subroutine init_var
 
   !$ subroutine init_omp()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! init_omp -- Initialize OpenMP
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     !$ use omp_lib
     ! -- inout
@@ -430,7 +432,7 @@ module initial_module
     ! -- local
     !$ integer(KIND=OMP_SCHED_KIND) :: kind
     !$ integer(I4) :: chunk_size
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ! set internal control variables
 
     !$ call OMP_GET_SCHEDULE(kind, chunk_size)

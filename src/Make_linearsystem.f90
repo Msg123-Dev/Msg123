@@ -22,9 +22,9 @@ module make_linearsystem
   contains
 
   subroutine make_matvec()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! make_matvec -- Make matrix and vector
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: precon_type
     use allocate_solution, only: array_var
@@ -35,7 +35,7 @@ module make_linearsystem
     ! -- local
     integer(I4) :: i
     real(DP), allocatable :: temp_rhs(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(temp_rhs(nreg_num))
     !$omp parallel do private(i)
     do i = 1, nreg_num
@@ -69,9 +69,9 @@ module make_linearsystem
   end subroutine make_matvec
 
   subroutine make_matrix(diamat, lumat)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! make_matrix -- Make matrix
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_sim
     use calc_parameter, only: calc_srat_rperm
@@ -82,7 +82,7 @@ module make_linearsystem
     real(DP), allocatable :: ss_alp(:)
     real(DP), allocatable :: stod(:), cond(:), sead(:), dmats(:)
     real(DP), allocatable :: rivd(:), lakd(:), surd(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(per_srat(ncalc), per_relp(nreg_num), ss_alp(ncalc))
     allocate(stod(ncalc), cond(nreg_num), sead(ncalc), dmats(ncalc))
     allocate(rivd(ncals), lakd(ncals), surd(ncals))
@@ -159,9 +159,9 @@ module make_linearsystem
   end subroutine make_matrix
 
   subroutine form_stochn(alp, dmat_sto)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! form_stochn -- Form storage change
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use make_cell, only: cell_vol
     use assign_calc, only: read_poro
@@ -172,7 +172,7 @@ module make_linearsystem
     ! -- local
     integer(I4) :: i
     real(DP), allocatable :: deri_srat(:), deri_stor(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(deri_srat(ncalc), deri_stor(ncalc))
     !$omp parallel
     !$omp do private(i)
@@ -207,9 +207,9 @@ module make_linearsystem
   end subroutine form_stochn
 
   subroutine form_connflow(dmat_con, lumat_con)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! form_connflow -- Form connect flow from adjacent cells
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use calc_parameter, only: calc_hyd_upwind
     use allocate_solution, only: abyd_conn, hydf_conn
@@ -222,7 +222,7 @@ module make_linearsystem
     real(DP) :: delhead, relp1, relp2, per_head1, per_head2, relat, deri_hyd1, deri_hyd2
     real(DP), allocatable :: deri_dcon(:), rel_hyd(:)
     real(DP), allocatable :: deri_lucon(:), deri_con1(:), deri_con2(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     tot_ind = crs_index(1)%offind(nreg_num)
     allocate(deri_dcon(tot_ind), rel_hyd(tot_ind))
     allocate(deri_lucon(tot_ind), deri_con1(tot_ind), deri_con2(tot_ind))
@@ -252,7 +252,8 @@ module make_linearsystem
     !$omp end do
 
     if (form_switch == 1) then
-      !$omp do private(i, j, k, sta_ind, end_ind, ind, relat, delhead, relp1, relp2, per_head1, per_head2, deri_hyd1, deri_hyd2)
+      !$omp do private(i, j, k, sta_ind, end_ind, ind, relat, delhead, relp1, relp2,&
+      !$omp&           per_head1, per_head2, deri_hyd1, deri_hyd2)
       do i = 1, nreg_num
         sta_ind = crs_index(1)%offind(i-1) ; end_ind = crs_index(1)%offind(i)
         do k = 1, end_ind-sta_ind
@@ -300,9 +301,9 @@ module make_linearsystem
   end subroutine form_connflow
 
   subroutine set_rivebound(dmat_riv)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_rivebound -- Set river boundary to dmat
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use calc_boundary, only: rive2cals, rive_head, rive_bott
     use set_boundary, only: rive_num, abyd_rive
@@ -312,7 +313,7 @@ module make_linearsystem
     integer(I4) :: i, s
     real(DP), allocatable :: over_riv(:), deri_r(:), deri_ks(:), delh_r(:)
     real(DP), allocatable :: per_riv(:), rel_riv(:), tran_riv(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(over_riv(rive_num), deri_r(rive_num), deri_ks(rive_num), delh_r(rive_num))
     allocate(per_riv(rive_num), rel_riv(rive_num), tran_riv(rive_num))
     !$omp parallel
@@ -363,9 +364,9 @@ module make_linearsystem
   end subroutine set_rivebound
 
   subroutine set_lakebound(dmat_lak)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_lakebound -- Set lake boundary to dmat
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use calc_boundary, only: lake2cals, lake_head, lake_bott
     use set_boundary, only: lake_num, abyd_lake
@@ -375,7 +376,7 @@ module make_linearsystem
     integer(I4) :: i, s
     real(DP), allocatable :: over_lak(:), deri_l(:), deri_ks(:), delh_l(:)
     real(DP), allocatable :: per_lak(:), rel_lak(:), tran_lak(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(over_lak(lake_num), deri_l(lake_num), deri_ks(lake_num), delh_l(lake_num))
     allocate(per_lak(lake_num), rel_lak(lake_num), tran_lak(lake_num))
     !$omp parallel
@@ -426,9 +427,9 @@ module make_linearsystem
   end subroutine set_lakebound
 
   subroutine set_surfbound(dmat_sur)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_surfbound -- Set surface boundary to dmat
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 !    use make_cell, only: surf_elev
     use assign_calc, only: surf_bott
@@ -440,7 +441,7 @@ module make_linearsystem
     ! -- local
     integer(I4) :: i
     real(DP), allocatable :: over_sur(:), deri_s(:), deri_ks(:), delh_s(:), tran_sur(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(over_sur(ncals), deri_s(ncals), deri_ks(ncals), delh_s(ncals), tran_sur(ncals))
     !$omp parallel
     !$omp do private(i)
@@ -516,9 +517,9 @@ module make_linearsystem
   end subroutine set_surfbound
 
   subroutine set_seabound(dmat_sea)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_seabound -- Set sea boundary to dmat
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use set_condition, only: nseal
     use assign_boundary, only: read_seal
@@ -529,7 +530,7 @@ module make_linearsystem
     integer(I4) :: i, c, s
     real(DP), allocatable :: deri_sea(:), deri_ks(:), delh_sea(:)
     real(DP), allocatable :: per_sea(:), rel_sea(:), tran_sea(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(deri_sea(nseal), deri_ks(nseal), delh_sea(nseal))
     allocate(per_sea(nseal), rel_sea(nseal), tran_sea(nseal))
     !$omp parallel

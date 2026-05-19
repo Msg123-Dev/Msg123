@@ -2,9 +2,9 @@ module set_boundary
   ! -- modules
   use kind_module, only: I4, SP, DP
   use constval_module, only: SNOVAL, DNOVAL
-  use utility_module, only: write_logf, write_err_stop, conv_i2s
-  use initial_module, only: my_rank, st_in_type, st_in_path, st_in_unit,&
-                            st_rivf_type, st_lakf_type, in_type
+  use utility_module, only: write_logf, write_err_stop, get_ilen, conv_i2s
+  use initial_module, only: my_rank, st_in_type, st_in_path, st_in_unit, st_rivf_type,&
+                            st_lakf_type, in_type
   use set_cell, only: ncals
   use assign_boundary, only: assign_surfbv, assign_rilav
   use calc_boundary, only: conv_rech2calc, calc_blld, calc_lsurf, calc_wlbd
@@ -78,9 +78,9 @@ module set_boundary
   contains
 
   subroutine set_bound()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_bound -- Set boundary
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: DZERO
     use open_file, only: open_in_rivef, open_in_lakef
@@ -88,8 +88,7 @@ module set_boundary
     use set_condition, only: set_connect, set_srabyd, set_chabyd, set_wellconn
     use assign_calc, only: read_ksx, read_ksy, read_ksz, read_init
     use calc_boundary, only: calc_reprev, calc_rivea, count_rivecalc, count_lakecalc,&
-                             rive2cals, lake2cals, rive_bott, rive_area, lake_bott,&
-                             lake_area
+                             rive2cals, lake2cals, rive_bott, rive_area, lake_bott, lake_area
 #ifdef MPI_MSG
    use mpi_set, only: bcast_bound_ftype, bcast_solval
 #endif
@@ -101,7 +100,7 @@ module set_boundary
     integer(I4) :: rfv_wl, rfv_wd, rfv_bl, rfv_de, rfv_wi, rfv_le
     integer(I4) :: lfv_wl, lfv_wd, lfv_bl, lfv_ar
     character(:), allocatable :: num_str, err_mes
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
 #ifdef MPI_MSG
     if (pro_totn /= 1) then
       ! -- Bcast boundary file type (bound_ftype)
@@ -139,9 +138,12 @@ module set_boundary
         call conv_rech2calc(rech_num)
       if (my_rank == 0) then
         call write_logf("Recharge is calculated from precipitation and evapotranspiration.")
-        num_str = conv_i2s(rech_num)
+        allocate(character(get_ilen(rech_num)) :: num_str)
+        allocate(character(0) :: err_mes)
+        call conv_i2s(rech_num, num_str)
         err_mes = "Set "//num_str//" recharge rate."
         call write_logf(err_mes)
+        deallocate(num_str, err_mes)
       end if
     else if (my_rank == 0) then
       if (sum_rechn == 0 .and. sum_precn == 0 .and. sum_evapn /= 0) then
@@ -154,8 +156,8 @@ module set_boundary
     if (st_in_type%rive == in_type(0)) then
 #ifdef MPI_MSG
       ! -- Read input river file (inrivef)
-        call open_in_rivef(st_in_path%rive, cals_r4view, cals_r4hview, rfv_wl, rfv_wd,&
-                           rfv_bl, rfv_de, rfv_wi, rfv_le)
+        call open_in_rivef(st_in_path%rive, cals_r4view, cals_r4hview, rfv_wl, rfv_wd, rfv_bl,&
+                           rfv_de, rfv_wi, rfv_le)
       rfview%wl = rfv_wl ; rfview%wd = rfv_wd ; rfview%bl = rfv_bl ; rfview%de = rfv_de
       rfview%wi = rfv_wi ; rfview%le = rfv_le
 #else
@@ -238,8 +240,8 @@ module set_boundary
       end do
       !$omp end parallel do
       ! -- Calculate river area (rivea)
-        call calc_rivea(cflag_riv%wi, cflag_riv%le, criv%wi, criv%le, cflag_riv%ar,&
-                        criv%ar, rivnum%ar)
+        call calc_rivea(cflag_riv%wi, cflag_riv%le, criv%wi, criv%le, cflag_riv%ar, criv%ar,&
+                        rivnum%ar)
     end if
 
 #ifdef MPI_MSG
@@ -260,8 +262,8 @@ module set_boundary
     if (st_in_type%lake == in_type(0)) then
 #ifdef MPI_MSG
       ! -- Open input lake file (in_lakef)
-        call open_in_lakef(st_in_path%lake, cals_r4view, cals_r4hview, lfv_wl, lfv_wd,&
-                          lfv_bl, lfv_ar)
+        call open_in_lakef(st_in_path%lake, cals_r4view, cals_r4hview, lfv_wl, lfv_wd, lfv_bl,&
+                           lfv_ar)
       lfview%wl = lfv_wl ; lfview%wd = lfv_wd ; lfview%bl = lfv_bl ; lfview%ar = lfv_ar
 #else
       ! -- Open input lake file (in_lakef)
@@ -375,9 +377,9 @@ module set_boundary
   end subroutine set_bound
 
   subroutine set_seal_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_seal_info -- Set sea level information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_seal
     use open_file, only: open_in_sealf
@@ -391,7 +393,7 @@ module set_boundary
     ! -- local
     integer(I4), allocatable :: all_seal_type(:)
     logical, allocatable :: all_seal_mask(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(all_seal_type(7), all_seal_mask(7))
     all_seal_type(:) = [in_type(1:7)]
     all_seal_mask(:) = (st_in_type%seal == all_seal_type(:))
@@ -445,9 +447,9 @@ module set_boundary
   end subroutine set_seal_info
 
   subroutine set_rech_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_rech_info -- Set recharge information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_rech
     use open_file, only: open_in_rechf, st_intre
@@ -458,7 +460,7 @@ module set_boundary
     integer(I4) :: i
     integer(I4), allocatable :: all_rech_type(:)
     logical, allocatable :: all_rech_mask(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(all_rech_type(4), all_rech_mask(4))
     all_rech_type(:) = [in_type(1), in_type(3:4), in_type(7)]
     all_rech_mask(:) = (st_in_type%rech == all_rech_type(:))
@@ -509,9 +511,9 @@ module set_boundary
   end subroutine set_rech_info
 
   subroutine set_well_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_well_info -- Set well information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use open_file, only: open_in_wellf, open_in_wlayf
     use assign_boundary, only: assign_wellv
@@ -524,7 +526,7 @@ module set_boundary
     ! -- local
     integer(I4), allocatable :: all_well_type(:)
     logical, allocatable :: all_well_mask(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(all_well_type(6), all_well_mask(6))
     all_well_type(:) = [in_type(2:7)]
     all_well_mask(:) = (st_in_type%well == all_well_type(:))
@@ -566,8 +568,7 @@ module set_boundary
                              st_in_path%weke, cals_i4view)
 #else
         ! -- Open input well layer file (in_wlayf)
-          call open_in_wlayf(st_in_type%weks, st_in_type%weke, st_in_path%weks,&
-                             st_in_path%weke)
+          call open_in_wlayf(st_in_type%weks, st_in_type%weke, st_in_path%weks, st_in_path%weke)
 #endif
       end if
     end if
@@ -581,9 +582,9 @@ module set_boundary
   end subroutine set_well_info
 
   subroutine set_prec_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_prec_info -- Set precipitation information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_prec
     use open_file, only: open_in_precf, st_intpr
@@ -594,7 +595,7 @@ module set_boundary
     integer(I4) :: i
     integer(I4), allocatable :: all_prec_type(:)
     logical, allocatable :: all_prec_mask(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(all_prec_type(4), all_prec_mask(4))
     all_prec_type(:) = [in_type(1), in_type(3:4), in_type(7)]
     all_prec_mask(:) = (st_in_type%prec == all_prec_type(:))
@@ -644,9 +645,9 @@ module set_boundary
   end subroutine set_prec_info
 
   subroutine set_evap_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_evap_info -- Set evapotranspiration information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_evap
     use open_file, only: open_in_evapf, st_intev
@@ -657,7 +658,7 @@ module set_boundary
     integer(I4) :: i
     integer(I4), allocatable :: all_evap_type(:)
     logical, allocatable :: all_evap_mask(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(all_evap_type(4), all_evap_mask(4))
     all_evap_type(:) = [in_type(1), in_type(3:4), in_type(7)]
     all_evap_mask(:) = (st_in_type%evap == all_evap_type(:))
@@ -707,16 +708,16 @@ module set_boundary
   end subroutine set_evap_info
 
   subroutine set_riwl_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_riwl_info -- Set river water level information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_riwl
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(cflag_riv%wl(ncals))
     allocate(criv%wl(ncals))
     !$omp parallel do private(i)
@@ -731,16 +732,16 @@ module set_boundary
   end subroutine set_riwl_info
 
   subroutine set_ribl_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_ribl_info -- Set river bottom level information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_ribl
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(cflag_riv%bl(ncals))
     allocate(criv%bl(ncals))
     !$omp parallel do private(i)
@@ -755,16 +756,16 @@ module set_boundary
   end subroutine set_ribl_info
 
   subroutine set_riwd_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_riwd_info -- Set river water depth information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_riwd
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_riwd%totn > 0) then
       allocate(cflag_riv%wd(ncals))
       allocate(criv%wd(ncals))
@@ -781,16 +782,16 @@ module set_boundary
   end subroutine set_riwd_info
 
   subroutine set_ride_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_ride_info -- Set river depth information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_ride
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_ride%totn > 0) then
       allocate(cflag_riv%de(ncals))
       allocate(criv%de(ncals))
@@ -807,16 +808,16 @@ module set_boundary
   end subroutine set_ride_info
 
   subroutine set_riwi_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_riwi_info -- Set river width information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_riwi
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_riwi%totn > 0) then
       allocate(cflag_riv%wi(ncals))
       allocate(criv%wi(ncals))
@@ -833,16 +834,16 @@ module set_boundary
   end subroutine set_riwi_info
 
   subroutine set_rile_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_rile_info -- Set river length information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_rile
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_rile%totn > 0) then
       allocate(cflag_riv%le(ncals))
       allocate(criv%le(ncals))
@@ -859,16 +860,16 @@ module set_boundary
   end subroutine set_rile_info
 
   subroutine set_lawl_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_lawl_info -- Set lake water level information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_lawl
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(cflag_lak%wl(ncals))
     allocate(clak%wl(ncals))
     !$omp parallel do private(i)
@@ -883,16 +884,16 @@ module set_boundary
   end subroutine set_lawl_info
 
   subroutine set_labl_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_labl_info -- Set lake bottom level information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_labl
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(cflag_lak%bl(ncals))
     allocate(clak%bl(ncals))
     !$omp parallel do private(i)
@@ -907,16 +908,16 @@ module set_boundary
   end subroutine set_labl_info
 
   subroutine set_lawd_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_lawd_info -- Set lake water depth information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_lawd
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_lawd%totn > 0) then
       allocate(cflag_lak%wd(ncals))
       allocate(clak%wd(ncals))
@@ -933,16 +934,16 @@ module set_boundary
   end subroutine set_lawd_info
 
   subroutine set_laar_info()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_laar_info -- Set lake area information
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_laar
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_laar%totn > 0) then
       allocate(cflag_lak%ar(ncals))
       allocate(clak%ar(ncals))
@@ -959,30 +960,32 @@ module set_boundary
   end subroutine set_laar_info
 
   subroutine set_rive_bott()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_rive_bott -- Set river bottom
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use calc_boundary, only: calc_blsl
     ! -- inout
 
     ! -- local
     character(:), allocatable :: err_mes
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (sum_riden /= 0) then
       ! -- Calculate bottom level from surface level (blsl)
         call calc_blsl(cflag_riv%de, criv%de, cflag_riv%bl, criv%bl, rivnum%bl)
       deallocate(cflag_riv%de, criv%de)
       if (my_rank == 0) then
+        allocate(character(0) :: err_mes)
         err_mes = "River bottom level is calculated from surface elevation and river depth."
         call write_logf(err_mes)
       end if
     else if (sum_riwln /= 0 .and. sum_riwdn /= 0) then
       ! -- Calculate bottom level from water level and water depth (blld)
-        call calc_blld(cflag_riv%wl, criv%wl, cflag_riv%wd, criv%wd, cflag_riv%bl,&
-                       criv%bl, rivnum%bl)
+        call calc_blld(cflag_riv%wl, criv%wl, cflag_riv%wd, criv%wd, cflag_riv%bl, criv%bl,&
+                       rivnum%bl)
       deallocate(cflag_riv%wd, criv%wd)
       if (my_rank == 0) then
+        allocate(character(0) :: err_mes)
         err_mes = "River bottom level is calculated from water level and water depth."
         call write_logf(err_mes)
       end if
@@ -990,10 +993,12 @@ module set_boundary
       ! -- Calculate level from surface (lsurf)
         call calc_lsurf(cflag_riv%wl, cflag_riv%bl, criv%bl, rivnum%bl)
       if (my_rank == 0) then
+        allocate(character(0) :: err_mes)
         err_mes = "River bottom level is setted to surface elevation."
         call write_logf(err_mes)
       end if
     else if (sum_riwln == 0 .and. sum_riwdn /= 0 .and. my_rank == 0) then
+      allocate(character(0) :: err_mes)
       err_mes = "Only specified river water depth."
       call write_err_stop(err_mes)
     end if
@@ -1005,20 +1010,20 @@ module set_boundary
   end subroutine set_rive_bott
 
   subroutine set_rive_wlevel()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_rive_wlevel -- Set river water level
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
 
     ! -- local
     character(:), allocatable :: num_str, err_mes
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (sum_riwln == 0 .and. sum_ribln /= 0 .and. sum_riwdn /= 0) then
       ! -- Calculate water level from bottom level and water depth (wlbd)
-        call calc_wlbd(cflag_riv%bl, criv%bl, cflag_riv%wd, criv%wd, cflag_riv%wl,&
-                       criv%wl, rivnum%wl)
+        call calc_wlbd(cflag_riv%bl, criv%bl, cflag_riv%wd, criv%wd, cflag_riv%wl, criv%wl,&
+                       rivnum%wl)
       deallocate(cflag_riv%wd, criv%wd)
 #ifdef MPI_MSG
       ! -- Sum value for MPI (val)
@@ -1028,17 +1033,21 @@ module set_boundary
 #endif
       if (my_rank == 0) then
         call write_logf("River water level is calculated from bottom level.")
-        num_str = conv_i2s(sum_riwln)
+        allocate(character(get_ilen(sum_riwln)) :: num_str)
+        allocate(character(0) :: err_mes)
+        call conv_i2s(sum_riwln, num_str)
         err_mes = "Set "//num_str//" river water level."
         call write_logf(err_mes)
       end if
     else if (sum_riwln == 0 .and. sum_ribln /= 0 .and. sum_riden /= 0) then
       if (my_rank == 0) then
+        allocate(character(0) :: err_mes)
         err_mes = "Not calculated river water level from river bottom level and river depth."
         call write_err_stop(err_mes)
       end if
     else if (sum_riwln == 0 .and. sum_ribln /= 0 .and. sum_riden == 0) then
       if (my_rank == 0) then
+        allocate(character(0) :: err_mes)
         err_mes = "Not calculated river water level from only river bottom level."
         call write_err_stop(err_mes)
       end if
@@ -1055,40 +1064,45 @@ module set_boundary
   end subroutine set_rive_wlevel
 
   subroutine set_lake_wblevel()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_lake_wblevel -- Set lake water or bottom level
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
 
     ! -- local
     character(:), allocatable :: num_str, err_mes
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (sum_lawln == 0 .and. sum_labln /= 0 .and. sum_lawdn /= 0) then
       ! -- Calculate water level from bottom level and water depth (wlbd)
-        call calc_wlbd(cflag_lak%bl, clak%bl, cflag_lak%wd, clak%wd, cflag_lak%wl,&
-                       clak%wl, laknum%wl)
+        call calc_wlbd(cflag_lak%bl, clak%bl, cflag_lak%wd, clak%wd, cflag_lak%wl, clak%wl,&
+                       laknum%wl)
       deallocate(cflag_lak%wd, clak%wd)
       if (my_rank == 0) then
         call write_logf("Lake water level is calculated from bottom level.")
-        num_str = conv_i2s(sum_lawln)
+        allocate(character(get_ilen(sum_lawln)) :: num_str)
+        allocate(character(0) :: err_mes)
+        call conv_i2s(sum_lawln, num_str)
         err_mes = "Set "//num_str//" lake water level."
         call write_logf(err_mes)
       end if
     else if (sum_lawln /= 0 .and. sum_labln == 0 .and. sum_lawdn /= 0) then
       ! -- Calculate bottom level from water level and water depth (blld)
-        call calc_blld(cflag_lak%wl, clak%wl, cflag_lak%wd, clak%wd, cflag_lak%bl,&
-                       clak%bl, laknum%bl)
+        call calc_blld(cflag_lak%wl, clak%wl, cflag_lak%wd, clak%wd, cflag_lak%bl, clak%bl,&
+                       laknum%bl)
       deallocate(cflag_lak%wd, clak%wd)
       if (my_rank == 0) then
         call write_logf("Lake bottom level is calculated from water level and water depth.")
-        num_str = conv_i2s(sum_labln)
+        allocate(character(get_ilen(sum_labln)) :: num_str)
+        allocate(character(0) :: err_mes)
+        call conv_i2s(sum_labln, num_str)
         err_mes = "Set "//num_str//" lake bottom level."
         call write_logf(err_mes)
       end if
     else if (sum_lawln == 0 .and. sum_labln == 0 .and. sum_lawdn /= 0) then
       if (my_rank == 0) then
+        allocate(character(0) :: err_mes)
         err_mes = "Only specified lake water depth."
         call write_err_stop(err_mes)
       end if
@@ -1097,12 +1111,15 @@ module set_boundary
         call calc_lsurf(cflag_lak%bl, cflag_lak%wl, clak%wl, laknum%wl)
       if (my_rank == 0) then
         call write_logf("Lake water level is setted to surface elevation.")
-        num_str = conv_i2s(sum_lawln)
+        allocate(character(get_ilen(sum_lawln)) :: num_str)
+        allocate(character(0) :: err_mes)
+        call conv_i2s(sum_lawln, num_str)
         err_mes = "Set "//num_str//" lake water level."
         call write_logf(err_mes)
       end if
     else if (sum_lawln /= 0 .and. sum_labln == 0 .and. sum_lawdn == 0) then
       if (my_rank == 0) then
+        allocate(character(0) :: err_mes)
         err_mes = "Not calculated river bottom level."
         call write_err_stop(err_mes)
       end if

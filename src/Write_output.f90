@@ -28,9 +28,9 @@ module write_output
   contains
 
   subroutine write_outf(time_val)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_outf -- write output file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_out_step, st_out_type, out_type
     use prep_calculation, only: current_t
@@ -46,7 +46,7 @@ module write_output
     ! -- local
     integer(I4) :: rest_fnum
     integer(I4) :: header_flag = 0, allocate_flag = 0
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ! -- Check output timing (outtiming)
       call check_outtiming()
 
@@ -283,12 +283,12 @@ module write_output
   end subroutine write_outf
 
   subroutine write_mass_header()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_mass_header -- Write massbalance file header
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: MASSCHARA, OUTFORM
-    use utility_module, only: conv_i2s
+    use utility_module, only: get_ilen, conv_i2s
     use initial_module, only: st_sim
     use allocate_output, only: ms_head
     ! -- inout
@@ -297,7 +297,7 @@ module write_output
     integer(I4) :: i, mass_fnum
     character(:), allocatable :: str_mstnum
     integer(I4) :: msout_tnum_format
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     mass_fnum = st_out_fnum%mass
     write(mass_fnum,'(3a)') trim(adjustl(st_sim%cal_unit)), ",", trim(adjustl(ms_head))
 
@@ -313,15 +313,16 @@ module write_output
 
     msout_tnum_format = msout_tnum*9
 
-    str_mstnum = conv_i2s(msout_tnum_format)
+    allocate(character(get_ilen(msout_tnum_format)) :: str_mstnum)
+    call conv_i2s(msout_tnum_format, str_mstnum)
     msformat = "("//OUTFORM//","//trim(adjustl(str_mstnum))//"(',',"//OUTFORM//"))"
 
   end subroutine write_mass_header
 
   subroutine write_out_headf(time_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_out_headf -- Write output head file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -329,7 +330,7 @@ module write_output
     ! -- local
     integer(I4) :: i, head_fnum
     integer(I4), allocatable :: calc2calc(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(calc2calc(ncalc))
     !$omp parallel do private(i)
     do i = 1, ncalc
@@ -360,9 +361,9 @@ module write_output
   end subroutine write_out_headf
 
   subroutine write_out_sratf(time_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_out_sratf -- Write output saturation file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: SONE
     ! -- inout
@@ -370,7 +371,7 @@ module write_output
     ! -- local
     integer(I4) :: i, srat_fnum
     integer(I4), allocatable :: calc2calc(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(calc2calc(ncalc))
     !$omp parallel do private(i)
     do i = 1, ncalc
@@ -401,9 +402,9 @@ module write_output
   end subroutine write_out_sratf
 
   subroutine write_out_restf(fnum_rest, time_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_out_restf -- Write restart file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -411,7 +412,7 @@ module write_output
     real(SP), intent(in) :: time_out
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     rewind(fnum_rest)
     write(fnum_rest) real(time_out, kind=DP)
     write(fnum_rest) (head_new(i)*len_scal, i = 1, ncalc)
@@ -420,9 +421,9 @@ module write_output
   end subroutine write_out_restf
 
   subroutine write_out_wtabf(time_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_out_wtabf -- Write watertable file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use allocate_output, only: wtable
     use calc_output, only: calc_wtable
@@ -434,7 +435,7 @@ module write_output
     ! -- local
     integer(I4) :: i, wtab_fnum
     integer(I4), allocatable :: cals2cals(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
 #ifdef MPI_MSG
     if (pro_totn /= 1) then
     ! -- Calculate water table for MPI (mpi_wtable)
@@ -478,9 +479,9 @@ module write_output
   end subroutine write_out_wtabf
 
   subroutine write_out_massf(time_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_out_massf -- Write massbalance file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use allocate_output, only: st_msloc, st_msglo
     use calc_output, only: calc_out_mass
@@ -492,7 +493,7 @@ module write_output
     ! -- local
     integer(I4) :: i, mass_fnum
     real(SP) :: cubic
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     cubic = len_scal**3
     !$omp parallel
     !$omp do private(i)
@@ -531,9 +532,9 @@ module write_output
   end subroutine write_out_massf
 
   subroutine write_out_velcf(time_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_out_velcf -- Write velocity file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use allocate_output, only: pointv
     use calc_output, only: calc_outvelc
@@ -543,7 +544,7 @@ module write_output
     integer(I4) :: i, velx_fnum, vely_fnum, velz_fnum
     integer(I4), allocatable :: calc2calc(:)
     real(DP), allocatable :: velcx(:), velcy(:), velcz(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ! -- Calculate output velocity (outvelc)
       call calc_outvelc()
 
@@ -596,9 +597,9 @@ module write_output
   end subroutine write_out_velcf
 
   subroutine write_out_rivrf(time_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_out_rivrf -- Write river runoff file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use calc_boundary, only: rive2cals
     use set_boundary, only: rive_num
@@ -608,7 +609,7 @@ module write_output
     ! -- local
     integer(I4) :: i, s, rivr_fnum
     real(DP), allocatable :: rive_flux(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(rive_flux(rive_num))
     !$omp parallel do private(i, s)
     do i = 1, rive_num
@@ -647,9 +648,9 @@ module write_output
   end subroutine write_out_rivrf
 
   subroutine write_out_lakrf(time_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_out_lakrf -- Write lake runoff file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use calc_boundary, only: lake2cals
     use set_boundary, only: lake_num
@@ -659,7 +660,7 @@ module write_output
     ! -- local
     integer(I4) :: i, s, lakr_fnum
     real(DP), allocatable :: lake_flux(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(lake_flux(lake_num))
     !$omp parallel do private(i, s)
     do i = 1, lake_num
@@ -698,9 +699,9 @@ module write_output
   end subroutine write_out_lakrf
 
   subroutine write_out_sufrf(time_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_out_sufrf -- Write surface runoff file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use allocate_output, only: roff_surf, surf_sumtime
     ! -- inout
@@ -709,7 +710,7 @@ module write_output
     integer(I4) :: i, sufr_fnum
     integer(I4), allocatable :: cals2cals(:)
     real(DP), allocatable :: surf_flux(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(cals2cals(ncals))
     allocate(surf_flux(ncals))
     !$omp parallel do private(i)
@@ -750,9 +751,9 @@ module write_output
   end subroutine write_out_sufrf
 
   subroutine write_out_dunrf(time_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_out_dunrf -- Write dunne runoff file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use calc_boundary, only: rech2cals
     use set_boundary, only: rech_num
@@ -762,7 +763,7 @@ module write_output
     ! -- local
     integer(I4) :: i, dunr_file
     real(DP), allocatable :: dunn_flux(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(dunn_flux(rech_num))
     !$omp parallel do private(i)
     do i = 1, rech_num
@@ -800,9 +801,9 @@ module write_output
   end subroutine write_out_dunrf
 
   subroutine write_out_sealf(time_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_out_sealf -- Write sea results file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use allocate_output, only: res_snum, res_seal
     ! -- inout
@@ -810,7 +811,7 @@ module write_output
     ! -- local
     integer(I4) :: i, seal_fnum
     real(SP) :: cubic
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     seal_fnum = st_out_fnum%seal ; cubic = len_scal**3
 #ifdef MPI_MSG
     ! -- Write MPI 3D binary file (mpi_3dbin)
@@ -838,9 +839,9 @@ module write_output
   end subroutine write_out_sealf
 
   subroutine write_out_rechf(time_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_out_rechf -- Write recharge results file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use allocate_output, only: res_rnum, res_rech
     ! -- inout
@@ -849,7 +850,7 @@ module write_output
     integer(I4) :: i
     integer(I4) :: rech_fnum
     real(SP) :: cubic
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     rech_fnum = st_out_fnum%rech ; cubic = len_scal**3
 #ifdef MPI_MSG
     ! -- Write MPI 2D binary file (mpi_2dbin)
@@ -877,9 +878,9 @@ module write_output
   end subroutine write_out_rechf
 
   subroutine write_out_wellf(time_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! write_out_wellf -- Write well pumping results file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use allocate_output, only: res_wnum, res_well
     ! -- inout
@@ -887,7 +888,7 @@ module write_output
     ! -- local
     integer(I4) :: i, well_fnum
     real(SP) :: cubic
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     well_fnum = st_out_fnum%well ; cubic = len_scal**3
 #ifdef MPI_MSG
     ! -- Write MPI 3D binary file (mpi_3dbin)

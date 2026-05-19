@@ -24,9 +24,9 @@ module linear_solution
   contains
 
   subroutine solve_linalg(init_norm, inx, last_norm)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! solve_lnralg -- Solve linear algebra
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use allocate_solution, only: nreg_num
     use prep_calculation, only: form_switch
@@ -36,7 +36,7 @@ module linear_solution
     real(DP), intent(out) :: last_norm
     ! -- local
     integer(I4) :: n
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(resi(nreg_num))
     !$omp parallel do private(n)
     do n = 1, nreg_num
@@ -60,9 +60,9 @@ module linear_solution
   end subroutine solve_linalg
 
   subroutine solve_pcg(level, inx)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! solve_pcg -- Solve Preconditioned Conjugate Gradient method
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -76,7 +76,7 @@ module linear_solution
 #ifdef MPI_MSG
     real(DP) :: sum_sk, sum_rnorm
 #endif
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     d_size = crs_index(level)%unknow
     lu_size = crs_index(level)%lunum
     reg_size = size(inx)
@@ -253,9 +253,9 @@ module linear_solution
   end subroutine solve_pcg
 
   subroutine solve_bicgs(level, inx)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! solve_bicgs -- Solve Preconditioned Bi-Conjugate Gradient Stabilized method
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -269,7 +269,7 @@ module linear_solution
 #ifdef MPI_MSG
     real(DP) :: sum_sk, sum_rnorm
 #endif
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     d_size = crs_index(level)%unknow
     lu_size = crs_index(level)%lunum
     reg_size = size(inx)
@@ -543,9 +543,9 @@ module linear_solution
   end subroutine solve_bicgs
 
   subroutine loop_amg(llevel, r, d, e)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! loop_amg -- Loop cycle for amg
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 !    use initial_module, only: maxvcy_iter, max_sweep
     use initial_module, only: maxvcy_iter
@@ -562,7 +562,7 @@ module linear_solution
     integer(I4) :: rst, ren, pst, pen
     real(DP), allocatable :: temp_d(:), temp_lu(:), temp_r(:), temp_x(:), temp_b(:)
     real(DP), allocatable :: trhs(:), tx(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     mgd_size = crs_index(llevel)%unknow ; mgreg_size = size(array_var(llevel)%x)
     !$omp parallel
     !$omp do private(i)
@@ -825,9 +825,9 @@ module linear_solution
   end subroutine loop_amg
 
   subroutine precon_dilu(plevel, npre, pre_ind, pre_inlu, pre_d)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! precon_dilu -- Preconditon incomplete lu diagonal
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -839,7 +839,7 @@ module linear_solution
     integer(I4) :: off_sta, off_end, off_sta2, off_end2
     integer(I4) :: offr, offr2
     real(DP) :: d_invk
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, npre
       pre_d(i) = pre_ind(i)
@@ -889,9 +889,9 @@ module linear_solution
 !  end subroutine precon_dscal
 
   subroutine solve_ilu(plevel, npre, inrhs, indmat, inlumat, outx)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! solve_ilu -- Solve ilu factorization
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -902,7 +902,7 @@ module linear_solution
     integer(I4) :: i, k
     integer(I4) :: off_sta, off_end, offr
     real(DP), allocatable :: temp_outx(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(temp_outx(npre))
     !$omp parallel do private(i)
     do i = 1, npre
@@ -1010,9 +1010,9 @@ module linear_solution
 !  end subroutine smooth_gs
 
   subroutine calc_matvec(mvlevel, nmv, invec, indmat, inlumat, outvec)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_matvec -- Calculate matrix-vector multiplication
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -1023,7 +1023,7 @@ module linear_solution
     integer(I4) :: i, j, k
     integer(I4) :: off_sta, off_end
     real(DP), allocatable :: temp_vec(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(temp_vec(nmv))
     !$omp parallel
     !$omp do private(i)

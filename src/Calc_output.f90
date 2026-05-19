@@ -18,9 +18,9 @@ module calc_output
   contains
 
   subroutine calc_wtable(hyd_head, deg_satu)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_wtable -- Calculate water table
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_grid
     use set_cell, only: loc2glo_ijk, get_cals_grid
@@ -30,7 +30,7 @@ module calc_output
     ! -- local
     integer(I4) :: i, k, nijk, c_num
     integer(I4) :: i_num, j_num
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i, k, i_num, j_num, c_num, nijk)
     do i = 1, ncals
       call get_cals_grid(i, i_num, j_num)
@@ -52,9 +52,9 @@ module calc_output
   end subroutine calc_wtable
 
   subroutine calc_cell_mas()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_cell_mas -- Calculate cell massbalance
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use calc_function, only: calc_mass
     use allocate_solution, only: head_old
@@ -64,7 +64,7 @@ module calc_output
     integer(I4) :: i
     real(DP), allocatable :: ms_st(:), ms_co(:), ms_se(:), ms_we(:)
     real(DP), allocatable :: ms_re(:), ms_su(:), ms_ri(:), ms_la(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(ms_st(ncalc), ms_co(ncalc), ms_se(ncalc), ms_we(ncalc))
     allocate(ms_re(ncals), ms_su(ncals), ms_ri(ncals), ms_la(ncals))
     !$omp parallel
@@ -107,9 +107,9 @@ module calc_output
   end subroutine calc_cell_mas
 
   subroutine calc_out_mass()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_out_mass -- Calculate output massbalance
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_in_type, in_type
     use assign_calc, only: mass_num, msout_tnum, mass2calc, int_mass
@@ -120,7 +120,7 @@ module calc_output
     integer(I4) :: i, j, k
     real(DP), allocatable :: ms_sto(:), ms_con(:), ms_sea(:), ms_wel(:)
     real(DP), allocatable :: ms_rec(:), ms_sur(:), ms_riv(:), ms_lak(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(ms_sto(msout_tnum), ms_con(msout_tnum), ms_sea(msout_tnum), ms_wel(msout_tnum))
     allocate(ms_rec(msout_tnum), ms_sur(msout_tnum), ms_riv(msout_tnum), ms_lak(msout_tnum))
     !$omp parallel
@@ -196,9 +196,9 @@ module calc_output
   end subroutine calc_out_mass
 
   subroutine calc_outvelc()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_outvelc -- Calculate output velocity
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: DHALF
     use make_cell, only: surf_elev, cell_cent
@@ -216,7 +216,7 @@ module calc_output
     integer(I4) :: sta_ind, end_ind, ind
     integer(I4) :: dir, d
     real(DP) :: delhead, relat, invdis, relp1, relp2
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel
     !$omp do private(i, j, k, sta_ind, end_ind, ind, dir, delhead, relat, relp1, relp2)
     do i = 1, ncalc
@@ -271,9 +271,9 @@ module calc_output
   end subroutine calc_outvelc
 
   subroutine calc_rivr_off()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_rivr_off -- Calculate river runoff
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use calc_boundary, only: rive2cals
     use set_boundary, only: rive_num
@@ -284,7 +284,7 @@ module calc_output
     ! -- local
     integer(I4) :: i, s
     real(DP), allocatable :: rives(:), temp_rive(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(rives(ncals), temp_rive(rive_num))
     !$omp parallel
     !$omp do private(i)
@@ -316,9 +316,9 @@ module calc_output
   end subroutine calc_rivr_off
 
   subroutine calc_lakr_off()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_lakr_off -- Calculate lake runoff
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use calc_boundary, only: lake2cals
     use set_boundary, only: lake_num
@@ -329,7 +329,7 @@ module calc_output
     ! -- local
     integer(I4) :: i, s
     real(DP), allocatable :: lakes(:), temp_lake(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(lakes(ncals), temp_lake(lake_num))
     !$omp parallel
     !$omp do private(i)
@@ -361,9 +361,9 @@ module calc_output
   end subroutine calc_lakr_off
 
   subroutine calc_sufr_off()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_sufr_off -- Calculate surface runoff
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use calc_function, only: func_surfterm
     use allocate_solution, only: surf_old
@@ -373,7 +373,7 @@ module calc_output
     ! -- local
     integer(I4) :: i
     real(DP), allocatable :: surfs(:), temp_surf(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(surfs(ncals), temp_surf(ncals))
     !$omp parallel do private(i)
     do i = 1, ncals
@@ -398,9 +398,9 @@ module calc_output
   end subroutine calc_sufr_off
 
   subroutine calc_dunr_off()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_dunr_off -- Calculate dunne runoff
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use set_condition, only: rech_area
     use assign_boundary, only: read_rech
@@ -412,7 +412,7 @@ module calc_output
     ! -- local
     integer(I4) :: i, s
     real(DP), allocatable :: dunns(:), temp_dunn(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(dunns(rech_num), temp_dunn(rech_num))
     !$omp parallel
     !$omp do private(i)
@@ -443,9 +443,9 @@ module calc_output
   end subroutine calc_dunr_off
 
   subroutine calc_seal_res()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_seal_res -- Calculate sea level results
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use calc_function, only: func_sealterm
     use allocate_output, only: res_seal, res_snum
@@ -454,7 +454,7 @@ module calc_output
     ! -- local
     integer(I4) :: i
     real(DP), allocatable :: sealr(:), temp_seal(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(sealr(ncalc), temp_seal(ncalc))
     !$omp parallel do private(i)
     do i = 1, ncalc
@@ -478,9 +478,9 @@ module calc_output
   end subroutine calc_seal_res
 
   subroutine calc_rech_res()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_rech_res -- Calculate recharge results
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use calc_function, only: func_rechterm
     use allocate_output, only: res_rech, res_rnum
@@ -489,7 +489,7 @@ module calc_output
     ! -- local
     integer(I4) :: i
     real(DP), allocatable :: rechr(:), temp_rech(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(rechr(ncals), temp_rech(ncals))
     !$omp parallel do private(i)
     do i = 1, ncals
@@ -513,9 +513,9 @@ module calc_output
   end subroutine calc_rech_res
 
   subroutine calc_well_res()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! calc_well_res -- Calculate well results
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use calc_function, only: func_wellterm
     use allocate_output, only: res_well, res_wnum
@@ -524,7 +524,7 @@ module calc_output
     ! -- local
     integer(I4) :: i
     real(DP), allocatable :: wellr(:), temp_well(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(wellr(ncalc), temp_well(ncalc))
     !$omp parallel do private(i)
     do i = 1, ncalc

@@ -2,7 +2,7 @@ module check_condition
   ! -- modules
   use kind_module, only: I4, SP
   use constval_module, only: SONE, SNOVAL
-  use utility_module, only: write_err_stop, conv_i2s
+  use utility_module, only: write_err_stop, get_ilen, conv_i2s
   use initial_module, only: my_rank, st_grid, st_in_type, st_seal, in_type, out_type,&
                             st_out_type, st_out_step, st_out_path, st_out_time,&
                             st_out_unit
@@ -31,9 +31,9 @@ module check_condition
   contains
 
   subroutine check_calc_region(gclas_flag, greg_flag)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_calc_region -- Check calculation region
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: SZERO
     use initial_module, only: st_in_path, st_in_unit
@@ -45,7 +45,7 @@ module check_condition
     integer(I4), allocatable :: temp_greg(:)
     real(SP), allocatable :: check_seal(:), temp_seal(:)
     logical, allocatable :: mask(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_in_type%seal > 0) then
       ! -- open input sea level file for check (sealf)
         call open_sealf(st_in_type%seal, st_in_path%seal, st_in_unit%seal)
@@ -84,9 +84,9 @@ module check_condition
   end subroutine check_calc_region
 
   subroutine check_calc_retn(calcn, calc_reta, calc_retn, calc_resi)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_calc_retn -- Check calculation retention value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -95,7 +95,7 @@ module check_condition
     ! -- local
     integer(I4) :: check_flag, sum_checkf
     character(:), allocatable :: str_num, err_mes
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     check_flag = 0 ; sum_checkf = 0
 
     ! -- Check read value (read_val)
@@ -109,7 +109,9 @@ module check_condition
     sum_checkf = check_flag
 #endif
     if (sum_checkf > 0 .and. my_rank == 0) then
-      str_num = conv_i2s(sum_checkf)
+      allocate(character(get_ilen(sum_checkf)) :: str_num)
+      allocate(character(len=0) :: err_mes)
+      call conv_i2s(sum_checkf, str_num)
       err_mes = "There are "//str_num//" cells which have no retention value."
       call write_err_stop(err_mes)
       deallocate(err_mes)
@@ -118,9 +120,9 @@ module check_condition
   end subroutine check_calc_retn
 
   subroutine check_calc_parm(calcn, calc_ksx, calc_ksy, calc_ksz, calc_ss, calc_por)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_calc_parm -- Check calculation parameter value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -129,7 +131,7 @@ module check_condition
     ! -- local
     integer(I4) :: check_flag, sum_checkf
     character(:), allocatable :: str_num, err_mes
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     check_flag = 0 ; sum_checkf = 0
     ! -- Check read value (read_val)
       call check_read_val(calcn, calc_ksx, len_scal, check_flag)
@@ -144,18 +146,20 @@ module check_condition
     sum_checkf = check_flag
 #endif
     if (sum_checkf > 0 .and. my_rank == 0) then
-      str_num = conv_i2s(sum_checkf)
+      allocate(character(get_ilen(sum_checkf)) :: str_num)
+      allocate(character(len=0) :: err_mes)
+      call conv_i2s(sum_checkf, str_num)
       err_mes = "There are "//str_num//" cells which have no parameter value."
       call write_err_stop(err_mes)
-      deallocate(err_mes)
+      deallocate(str_num, err_mes)
     end if
 
   end subroutine check_calc_parm
 
   subroutine check_calc_init(calcn, calc_init)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_calc_init -- Check calculation initial value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use kind_module, only: DP
     ! -- inout
@@ -164,7 +168,7 @@ module check_condition
     ! -- local
     integer(I4) :: check_flag, sum_checkf
     character(:), allocatable :: str_num, err_mes
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     check_flag = 0 ; sum_checkf = 0
     ! -- Check read value (read_val)
       call check_read_val(calcn, real(calc_init, kind=SP), len_scal, check_flag)
@@ -175,18 +179,20 @@ module check_condition
     sum_checkf = check_flag
 #endif
     if (sum_checkf > 0 .and. my_rank == 0) then
-      str_num = conv_i2s(sum_checkf)
+      allocate(character(get_ilen(sum_checkf)) :: str_num)
+      allocate(character(len=0) :: err_mes)
+      call conv_i2s(sum_checkf, str_num)
       err_mes = "There are "//str_num//" cells which have no initial value."
       call write_err_stop(err_mes)
-      deallocate(err_mes)
+      deallocate(str_num, err_mes)
     end if
 
   end subroutine check_calc_init
 
   subroutine open_sealf(seal_ftype, seal_path, seal_unit)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_sealf -- Open input sea level file for check
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use kind_module, only: SP
     use utility_module, only: open_new_rtxt, open_new_rbin, write_err_read, write_success
@@ -199,9 +205,10 @@ module check_condition
     integer(I4), allocatable :: type_txt(:), type_bin(:)
     real(SP) :: intse_step, intse_end
     character(:), allocatable :: err_mes, intsep
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     allocate(type_txt(4), type_bin(2))
+    allocate(character(len=0) :: err_mes, intsep)
     type_txt(:) = [in_type(1:3), in_type(5)] ; type_bin(:) = [in_type(4), in_type(6)]
     err_mes = "input sea level for check" ; intsep = ""
     if (any(seal_ftype == type_txt(:))) then
@@ -257,9 +264,9 @@ module check_condition
   end subroutine open_sealf
 
   subroutine read_sealf(seal_ftype, seal_num, seal_clas, seal_val)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_sealf -- Read sea level value for check
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use constval_module, only: VARLEN
     use utility_module, only: close_file
@@ -274,7 +281,7 @@ module check_condition
     integer(I4), allocatable :: type_2d(:), type_3d(:)
     real(SP), allocatable :: seal_read(:)
     character(VARLEN), allocatable :: seal_name(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(type_2d(2), type_3d(2))
     type_2d(:) = [in_type(3:4)] ; type_3d(:) = [in_type(5:6)]
     seal_fnum = st_seal%fnum
@@ -324,16 +331,16 @@ module check_condition
   end subroutine read_sealf
 
   subroutine check_outf_cond()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_outf_cond -- Check output file condition
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
 
     ! -- local
 
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ! -- Check convergence file (convf)
       call check_convf()
 
@@ -379,9 +386,9 @@ module check_condition
   end subroutine check_outf_cond
 
   subroutine check_read_val(readn, readv, cunit, cflag)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_read_val -- Check read value
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -391,7 +398,7 @@ module check_condition
     integer(I4), intent(inout) :: cflag
     ! -- local
     integer(I4) :: i
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i) reduction(+:cflag)
     do i = 1, readn
       if (readv(i)*cunit == SNOVAL) then
@@ -403,9 +410,9 @@ module check_condition
   end subroutine check_read_val
 
   subroutine set_clas2seal(clasn, clas_name, clas_set, clas_val, tg_val)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_clas2seal -- Set sea level from classification
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_clas
     ! -- inout
@@ -417,7 +424,7 @@ module check_condition
     ! -- local
     integer(I4) :: i, j, k
     integer(I4), allocatable :: temp_clas(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(temp_clas(clasn))
     !$omp parallel do private(i)
     do i = 1, clasn
@@ -449,9 +456,9 @@ module check_condition
   end subroutine set_clas2seal
 
   subroutine set_point2seal(pointn, p_i, p_j, p_k, poin_val, tg_val)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_point2seal -- Set sea level from point
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -462,7 +469,7 @@ module check_condition
     ! -- local
     integer(I4) :: i, c_num, ii, jj, kk
     integer(I4) :: pi, pj, pk, ist, ien, jst, jen, kst, ken
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i, ii, jj, kk, pi, pj, pk, ist, ien, jst, jen, kst, ken, c_num)
     do i = 1, pointn
       pi = p_i(i) ; pj = p_j(i) ; pk = p_k(i)
@@ -498,9 +505,9 @@ module check_condition
   end subroutine set_point2seal
 
   subroutine set_2dfile2seal(fnum, file_type, no_val, tg_val)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_2dfile2seal -- Set sea level value from 2d file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use read_module, only: read_2dtxt, read_2dbin, flat_2dto3d
     ! -- inout
@@ -510,7 +517,7 @@ module check_condition
     ! -- local
     integer(I4) :: j
     real(SP), allocatable :: array_read(:,:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(array_read(st_grid%nx,st_grid%ny))
     !$omp parallel do private(j)
     do j = 1, st_grid%ny
@@ -530,9 +537,9 @@ module check_condition
   end subroutine set_2dfile2seal
 
   subroutine set_3dfile2seal(fnum, file_type, no_val, tg_val)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_3dfile2seal -- Set sea level value from 3d file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use read_module, only: read_3dtxt, read_3dbin, flat_3dto3d
     ! -- inout
@@ -542,7 +549,7 @@ module check_condition
     ! -- local
     integer(I4) :: k
     real(SP), allocatable :: array_read(:,:,:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(array_read(st_grid%nx,st_grid%ny,st_grid%nz))
     !$omp parallel do private(k)
     do k = 1, st_grid%nz
@@ -562,16 +569,16 @@ module check_condition
   end subroutine set_3dfile2seal
 
   subroutine check_convf()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_convf -- Check convergence file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use open_file, only: open_out_convf
     ! -- inout
 
     ! -- local
 
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (my_rank == 0) then
       ! -- Open output convergence file (out_convf)
         call open_out_convf(st_out_path%conv, st_out_fnum%conv)
@@ -580,9 +587,9 @@ module check_condition
   end subroutine check_convf
 
   subroutine check_headf()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_headf -- Check head file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -590,7 +597,8 @@ module check_condition
     ! -- local
     integer(I4) :: head_file
     character(:), allocatable :: out_mess
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
+    allocate(character(len=0) :: out_mess)
     head_file = 0 ; out_mess = "output head"
     ! -- Open output binary file (out_binf)
       call open_out_binf(head_file, st_out_time%head, st_out_path%head, st_out_unit%head,&
@@ -608,9 +616,9 @@ module check_condition
   end subroutine check_headf
 
   subroutine check_restf()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_restf -- Check restart file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 #ifdef MPI_MSG
     use mpi_read, only: set_real8_fview
@@ -621,7 +629,8 @@ module check_condition
     ! -- local
     integer(I4) :: rest_file
     character(:), allocatable :: out_mess
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
+    allocate(character(len=0) :: out_mess)
     rest_file = 0 ; out_mess = "output restart"
     ! -- Open output binary file (out_binf)
       call open_out_binf(rest_file, st_out_time%rest, st_out_path%rest, st_out_unit%rest,&
@@ -639,9 +648,9 @@ module check_condition
   end subroutine check_restf
 
   subroutine check_sratf()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_sratf -- Check saturation file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -649,8 +658,9 @@ module check_condition
     ! -- local
     integer(I4) :: srat_file
     character(:), allocatable :: out_mess
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_out_type%srat == out_type(3)) then
+      allocate(character(len=0) :: out_mess)
       srat_file = 0 ; out_mess = "output saturation"
       ! -- Open output binary file (out_binf)
         call open_out_binf(srat_file, st_out_time%srat, st_out_path%srat,&
@@ -669,9 +679,9 @@ module check_condition
   end subroutine check_sratf
 
   subroutine check_wtabf()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_wtabf -- Check water table file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -679,12 +689,13 @@ module check_condition
     ! -- local
     integer(I4) :: wtab_file
     character(:), allocatable :: out_mess
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_out_type%wtab == out_type(2) .and. st_in_type%wtab == in_type(7)) then
+      allocate(character(len=0) :: out_mess)
       wtab_file = 0 ; out_mess = "output water table"
       ! -- Open output binary file (out_binf)
-        call open_out_binf(wtab_file, st_out_time%wtab, st_out_path%wtab,&
-                           st_out_unit%wtab, out_mess, st_out_step%wtab)
+        call open_out_binf(wtab_file, st_out_time%wtab, st_out_path%wtab, st_out_unit%wtab,&
+                           out_mess, st_out_step%wtab)
 #ifdef MPI_MSG
       ! -- Set real4 file view (real4_fview)
         call set_real4_fview(wtab_file, write_2dview, out_mess)
@@ -696,9 +707,9 @@ module check_condition
   end subroutine check_wtabf
 
   subroutine check_massf()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_massf -- Check massbalance file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
     use utility_module, only: write_logf
     use open_file, only: open_out_massf
@@ -707,7 +718,7 @@ module check_condition
     ! -- local
     integer(I4) :: mass_file
     integer(I4), allocatable :: all_mass(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(all_mass(6))
     all_mass(:) = [in_type(1), in_type(3:7)]
 
@@ -725,9 +736,9 @@ module check_condition
   end subroutine check_massf
 
   subroutine check_velcf()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_velcf -- Check velocity file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -735,8 +746,9 @@ module check_condition
     ! -- local
     integer(I4) :: velc_file
     character(:), allocatable :: out_mess, new_velc
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_out_type%velc == out_type(3)) then
+      allocate(character(len=0) :: out_mess, new_velc)
       out_mess = "output velocity x direction" ; new_velc = st_out_path%velx
       ! -- Open output binary file (out_binf)
         call open_out_binf(velc_file, st_out_time%velc, new_velc, st_out_unit%velc,&
@@ -774,9 +786,9 @@ module check_condition
   end subroutine check_velcf
 
   subroutine check_rivrf()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_rivrf -- Check river runoff file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -784,12 +796,13 @@ module check_condition
     ! -- local
     integer(I4) :: rivr_file
     character(:), allocatable :: out_mess
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_out_type%rivr == out_type(2)) then
+      allocate(character(len=0) :: out_mess)
       rivr_file = 0 ; out_mess = "output river runoff"
       ! -- Open output binary file (out_binf)
-        call open_out_binf(rivr_file, st_out_time%rivr, st_out_path%rivr,&
-                           st_out_unit%rivr, out_mess, st_out_step%rivr)
+        call open_out_binf(rivr_file, st_out_time%rivr, st_out_path%rivr, st_out_unit%rivr,&
+                           out_mess, st_out_step%rivr)
 #ifdef MPI_MSG
       ! -- Set real4 file view (real4_fview)
         call set_real4_fview(rivr_file, write_2dview, out_mess)
@@ -802,9 +815,9 @@ module check_condition
   end subroutine check_rivrf
 
   subroutine check_lakrf()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_lakrf -- Check lake runoff file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -812,12 +825,13 @@ module check_condition
     ! -- local
     integer(I4) :: lakr_file
     character(:), allocatable :: out_mess
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_out_type%lakr == out_type(2)) then
+      allocate(character(len=0) :: out_mess)
       lakr_file = 0 ; out_mess = "output lake runoff"
       ! -- Open output binary file (out_binf)
-        call open_out_binf(lakr_file, st_out_time%lakr, st_out_path%lakr,&
-                           st_out_unit%lakr, out_mess, st_out_step%lakr)
+        call open_out_binf(lakr_file, st_out_time%lakr, st_out_path%lakr, st_out_unit%lakr,&
+                           out_mess, st_out_step%lakr)
 #ifdef MPI_MSG
       ! -- Set real4 file view (real4_fview)
         call set_real4_fview(lakr_file, write_2dview, out_mess)
@@ -830,9 +844,9 @@ module check_condition
   end subroutine check_lakrf
 
   subroutine check_sufrf()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_sufrf -- Check surface runoff file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -840,12 +854,13 @@ module check_condition
     ! -- local
     integer(I4) :: sufr_file
     character(:), allocatable :: out_mess
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_out_type%sufr == out_type(2)) then
+      allocate(character(len=0) :: out_mess)
       sufr_file = 0 ; out_mess = "output surface runoff"
       ! -- Open output binary file (out_binf)
-        call open_out_binf(sufr_file, st_out_time%sufr, st_out_path%sufr,&
-                           st_out_unit%sufr, out_mess, st_out_step%sufr)
+        call open_out_binf(sufr_file, st_out_time%sufr, st_out_path%sufr, st_out_unit%sufr,&
+                           out_mess, st_out_step%sufr)
 #ifdef MPI_MSG
       ! -- Set real4 file view (real4_fview)
         call set_real4_fview(sufr_file, write_2dview, out_mess)
@@ -858,9 +873,9 @@ module check_condition
   end subroutine check_sufrf
 
   subroutine check_dunrf()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_dunrf -- Check dunne runoff file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -868,12 +883,13 @@ module check_condition
     ! -- local
     integer(I4) :: dunr_file
     character(:), allocatable :: out_mess
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_out_type%dunr == out_type(3)) then
+      allocate(character(len=0) :: out_mess)
       dunr_file = 0 ; out_mess = "output dunne runoff"
       ! -- Open output binary file (out_binf)
-        call open_out_binf(dunr_file, st_out_time%dunr, st_out_path%dunr,&
-                           st_out_unit%dunr, out_mess, st_out_step%dunr)
+        call open_out_binf(dunr_file, st_out_time%dunr, st_out_path%dunr, st_out_unit%dunr,&
+                           out_mess, st_out_step%dunr)
 #ifdef MPI_MSG
       ! -- Set real4 file view (real4_fview)
         call set_real4_fview(dunr_file, write_2dview, out_mess)
@@ -886,9 +902,9 @@ module check_condition
   end subroutine check_dunrf
 
   subroutine check_out_sealf()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_out_sealf -- Check sea results file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -896,12 +912,13 @@ module check_condition
     ! -- local
     integer(I4) :: seal_file
     character(:), allocatable :: out_mess
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_out_type%seal == out_type(3)) then
+      allocate(character(len=0) :: out_mess)
       seal_file = 0 ; out_mess = "output sea"
       ! -- Open output binary file (out_binf)
-        call open_out_binf(seal_file, st_out_time%seal, st_out_path%seal,&
-                           st_out_unit%seal, out_mess, st_out_step%seal)
+        call open_out_binf(seal_file, st_out_time%seal, st_out_path%seal, st_out_unit%seal,&
+                           out_mess, st_out_step%seal)
 #ifdef MPI_MSG
       ! -- Set real4 file view (real4_fview)
         call set_real4_fview(seal_file, write_3dview, out_mess)
@@ -914,9 +931,9 @@ module check_condition
   end subroutine check_out_sealf
 
   subroutine check_out_rechf()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_out_rechf -- Check output recharge results file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -924,12 +941,13 @@ module check_condition
     ! -- local
     integer(I4) :: rech_file
     character(:), allocatable :: out_mess
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_out_type%rech == out_type(2)) then
+      allocate(character(len=0) :: out_mess)
       rech_file = 0 ; out_mess = "output recharge"
       ! -- Open output binary file (out_binf)
-        call open_out_binf(rech_file, st_out_time%rech, st_out_path%rech,&
-                           st_out_unit%rech, out_mess, st_out_step%rech)
+        call open_out_binf(rech_file, st_out_time%rech, st_out_path%rech, st_out_unit%rech,&
+                           out_mess, st_out_step%rech)
 #ifdef MPI_MSG
       ! -- Set real4 file view (real4_fview)
         call set_real4_fview(rech_file, write_2dview, out_mess)
@@ -942,9 +960,9 @@ module check_condition
   end subroutine check_out_rechf
 
   subroutine check_out_wellf()
-  !***************************************************************************************
+  !*********************************************************************************************
   ! check_out_wellf -- Check output well pumping results file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- modules
 
     ! -- inout
@@ -952,12 +970,13 @@ module check_condition
     ! -- local
     integer(I4) :: well_file
     character(:), allocatable :: out_mess
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     if (st_out_type%well == out_type(3)) then
+      allocate(character(len=0) :: out_mess)
       well_file = 0 ; out_mess = "output well"
       ! -- Open output binary file (out_binf)
-        call open_out_binf(well_file, st_out_time%well, st_out_path%well,&
-                           st_out_unit%well, out_mess, st_out_step%well)
+        call open_out_binf(well_file, st_out_time%well, st_out_path%well, st_out_unit%well,&
+                           out_mess, st_out_step%well)
 #ifdef MPI_MSG
       ! -- Set real4 file view (real4_fview)
         call set_real4_fview(well_file, write_3dview, out_mess)

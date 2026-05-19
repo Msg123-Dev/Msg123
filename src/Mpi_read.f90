@@ -31,9 +31,9 @@ module mpi_read
   contains
 
   subroutine open_mpi_read_file(stop_flag, write_flag, mpi_path, err_mes, mpi_fh, mpi_ier)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_mpi_read_file -- Open mpi read file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use utility_module, only: write_success
     ! -- inout
@@ -43,7 +43,7 @@ module mpi_read
     integer(I4), intent(out), optional :: mpi_ier
     ! -- local
     integer(I4) :: ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_FILE_OPEN(my_comm, mpi_path, MPI_MODE_RDONLY, MPI_INFO_NULL, mpi_fh, ierr)
 
@@ -64,9 +64,9 @@ module mpi_read
   end subroutine open_mpi_read_file
 
   subroutine open_mpi_write_file(mpi_path, err_mes, mpi_fh)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_mpi_write_file -- Open mpi write file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -75,7 +75,7 @@ module mpi_read
     ! -- local
     integer(I4) :: ierr
     integer(KIND=MPI_OFFSET_KIND) :: offset
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_FILE_OPEN(my_comm, mpi_path, MPI_MODE_CREATE + MPI_MODE_WRONLY,&
                        MPI_INFO_NULL, mpi_fh, ierr)
@@ -92,9 +92,9 @@ module mpi_read
   end subroutine open_mpi_write_file
 
   subroutine set_int4_fview(fileh, file_view, err_mes)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_int4_fview -- Set int4 file view
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -103,7 +103,7 @@ module mpi_read
     ! -- local
     integer(I4) :: ierr
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0 ; head_dis = 0
     call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_INTEGER, file_view, "native",&
                            MPI_INFO_NULL, ierr)
@@ -117,9 +117,9 @@ module mpi_read
   end subroutine set_int4_fview
 
   subroutine set_real4_fview(fileh, file_view, err_mes)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_real4_fview -- Set real4 file view
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -128,7 +128,7 @@ module mpi_read
     ! -- local
     integer(I4) :: ierr
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0 ; head_dis = 0
     call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_REAL4, file_view, "native",&
                            MPI_INFO_NULL, ierr)
@@ -142,9 +142,9 @@ module mpi_read
   end subroutine set_real4_fview
 
   subroutine set_real8_fview(fileh, file_view, err_mes)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_real8_fview -- Set real8 file view
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -153,7 +153,7 @@ module mpi_read
     ! -- local
     integer(I4) :: ierr
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0 ; head_dis = 0
     call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_REAL8, file_view, "native",&
                            MPI_INFO_NULL, ierr)
@@ -167,9 +167,9 @@ module mpi_read
   end subroutine set_real8_fview
 
   subroutine read_mpi_restf(fileh, calc_num, rest_time, calc_init)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_mpi_restf -- Read mpi restart file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use constval_module, only: DZERO
     ! -- inout
@@ -180,7 +180,7 @@ module mpi_read
     integer(I4) :: i, ierr
     integer(I4), allocatable :: istat(:)
     real(DP), allocatable :: read_rest(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     allocate(istat(MPI_STATUS_SIZE), read_rest(calc_num+1))
     !$omp parallel
@@ -216,9 +216,9 @@ module mpi_read
   end subroutine read_mpi_restf
 
   subroutine read_mpi_i4head(fileh, ierr, head_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_mpi_i4head -- Read mpi integer header
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -229,7 +229,7 @@ module mpi_read
     integer(I4) :: i
     integer(I4), allocatable :: istat(:)
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(istat(MPI_STATUS_SIZE))
     !$omp parallel do private(i)
     do i = 1, MPI_STATUS_SIZE
@@ -246,9 +246,9 @@ module mpi_read
   end subroutine read_mpi_i4head
 
   subroutine read_mpi_r4head(fileh, ierr, head_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_mpi_r4head -- Read mpi real4 header
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -259,7 +259,7 @@ module mpi_read
     integer(I4) :: i
     integer(I4), allocatable :: istat(:)
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(istat(MPI_STATUS_SIZE))
     !$omp parallel do private(i)
     do i = 1, MPI_STATUS_SIZE
@@ -276,9 +276,9 @@ module mpi_read
   end subroutine read_mpi_r4head
 
   subroutine read_mpi_r8head(fileh, ierr, head_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_mpi_r8head -- Read mpi real8 header
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -289,7 +289,7 @@ module mpi_read
     integer(I4) :: i
     integer(I4), allocatable :: istat(:)
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     allocate(istat(MPI_STATUS_SIZE))
     !$omp parallel do private(i)
     do i = 1, MPI_STATUS_SIZE
@@ -306,9 +306,9 @@ module mpi_read
   end subroutine read_mpi_r8head
 
   subroutine read_mpi_i4(ftype, int_ftype, fileh, read_num, read_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_mpi_i4 -- Read integer mpi file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use constval_module, only: INOVAL
     ! -- inout
@@ -318,7 +318,7 @@ module mpi_read
     integer(I4) :: i, ierr, mpi_rnum
     integer(I4), allocatable :: istat(:)
     integer(I4), allocatable :: read_val(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     allocate(istat(MPI_STATUS_SIZE))
 
@@ -369,9 +369,9 @@ module mpi_read
   end subroutine read_mpi_i4
 
   subroutine read_mpi_r4(ftype, int_ftype, fileh, read_num, read_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_mpi_r4 -- Read real4 mpi file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use constval_module, only: SNOVAL
     ! -- inout
@@ -381,7 +381,7 @@ module mpi_read
     integer(I4) :: i, ierr, mpi_rnum
     integer(I4), allocatable :: istat(:)
     real(SP), allocatable :: read_val(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     allocate(istat(MPI_STATUS_SIZE))
 
@@ -432,9 +432,9 @@ module mpi_read
   end subroutine read_mpi_r4
 
   subroutine read_mpi_r8(ftype, int_ftype, fileh, read_num, read_out)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! read_mpi_r8 -- Read real8 mpi file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use constval_module, only: DNOVAL
     ! -- inout
@@ -444,7 +444,7 @@ module mpi_read
     integer(I4) :: i, ierr, mpi_rnum
     integer(I4), allocatable :: istat(:)
     real(DP), allocatable :: read_val(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     allocate(istat(MPI_STATUS_SIZE))
 
@@ -495,11 +495,11 @@ module mpi_read
   end subroutine read_mpi_r8
 
   subroutine skip_mpi_file(ftype, fnum, fview, err_mes, fmulti, fetime)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! skip_mpi_file -- Skip mpi file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
-    use utility_module, only: conv_i2s
+    use utility_module, only: get_ilen, conv_i2s
     ! -- inout
     integer(I4), intent(in) :: ftype, fnum, fview
     character(*), intent(in) :: err_mes
@@ -511,7 +511,7 @@ module mpi_read
     integer(KIND=MPI_OFFSET_KIND) :: head_dis, read_head
     real(SP) :: read_etime
     character(:), allocatable :: str_fnum
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0 ; head_dis = 0
     allocate(istat(MPI_STATUS_SIZE))
     !$omp parallel do private(i)
@@ -520,12 +520,12 @@ module mpi_read
     end do
     !$omp end parallel do
 
-    str_fnum = conv_i2s(fnum)
+    allocate(character(get_ilen(fnum)) :: str_fnum)
+    call conv_i2s(fnum, str_fnum)
 
     if (ftype == in_type(4)) then
       call set_2dgrid_view(err_mes)
-      call MPI_FILE_SET_VIEW(fnum, head_dis, MPI_REAL4, gview2d, "native",&
-                             MPI_INFO_NULL, ierr)
+      call MPI_FILE_SET_VIEW(fnum, head_dis, MPI_REAL4, gview2d, "native", MPI_INFO_NULL, ierr)
       if (ierr /= MPI_SUCCESS) then
         if (my_rank == 0) then
           call write_err_stop("Set view "//err_mes//" in MPI program.")
@@ -534,8 +534,7 @@ module mpi_read
       read_count = st_grid%nx*st_grid%ny+1
     else if (ftype == in_type(6)) then
       call set_3dgrid_view(err_mes)
-      call MPI_FILE_SET_VIEW(fnum, head_dis, MPI_REAL4, gview3d, "native",&
-                             MPI_INFO_NULL, ierr)
+      call MPI_FILE_SET_VIEW(fnum, head_dis, MPI_REAL4, gview3d, "native", MPI_INFO_NULL, ierr)
       if (ierr /= MPI_SUCCESS) then
         if (my_rank == 0) then
           call write_err_stop("Set view "//err_mes//" in MPI program.")
@@ -557,8 +556,7 @@ module mpi_read
       fetime = read_etime*fmulti
       if (st_sim%res_type == 0) then
         time_flag = 1
-        call MPI_FILE_SET_VIEW(fnum, read_head, MPI_REAL4, fview, "native",&
-                               MPI_INFO_NULL, ierr)
+        call MPI_FILE_SET_VIEW(fnum, read_head, MPI_REAL4, fview, "native", MPI_INFO_NULL,ierr)
         if (ierr /= MPI_SUCCESS) then
           if (my_rank == 0) then
             call write_err_stop("Set view "//err_mes//" in MPI program.")
@@ -566,8 +564,7 @@ module mpi_read
         end if
       else if (fetime > st_init%rest_time .and. st_sim%res_type == 1) then
         time_flag = 1 ; read_head = head_dis*read_count*I4
-        call MPI_FILE_SET_VIEW(fnum, read_head, MPI_REAL4, fview, "native",&
-                               MPI_INFO_NULL, ierr)
+        call MPI_FILE_SET_VIEW(fnum, read_head, MPI_REAL4, fview, "native", MPI_INFO_NULL, ierr)
         if (ierr /= MPI_SUCCESS) then
           if (my_rank == 0) then
             call write_err_stop("Set view "//err_mes//" in MPI program.")
@@ -588,9 +585,9 @@ module mpi_read
   end subroutine skip_mpi_file
 
   subroutine skip_mpi_file_int(bnum, err_mes, fmulti, fstep, finend, fnum, fetime)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! skip_mpi_file_int -- Skip mpi time interval list file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use constval_module, only: CHALEN
     ! -- inout
@@ -602,7 +599,7 @@ module mpi_read
     ! -- local
     integer(I4) :: ierr, time_flag, count_num, file_len
     character(CHALEN) :: intpath
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0 ; time_flag = 0 ; count_num = 0
 
     do while (time_flag == 0)
@@ -634,9 +631,9 @@ module mpi_read
   end subroutine skip_mpi_file_int
 
   subroutine set_2dgrid_view(emess)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_2dgrid_view -- Set 2d grid file view
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -646,7 +643,7 @@ module mpi_read
     integer(I4), allocatable :: xyblock(:), xytype(:)
     integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
     integer(KIND=MPI_ADDRESS_KIND), allocatable :: xydis(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     allocate(xyblock(1), xydis(1), xytype(1))
     xyblock(1) = 1 ; xydis(1) = 0_MPI_ADDRESS_KIND ; xytype(1) = MPI_REAL4
@@ -686,9 +683,9 @@ module mpi_read
   end subroutine set_2dgrid_view
 
   subroutine set_3dgrid_view(emess)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! set_3dgrid_view -- Set 3d grid file view
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -698,7 +695,7 @@ module mpi_read
     integer(I4), allocatable :: xyzblock(:), xyztype(:)
     integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
     integer(KIND=MPI_ADDRESS_KIND), allocatable :: xyzdis(:)
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     ierr = 0
     allocate(xyzblock(1), xyzdis(1), xyztype(1))
     xyzblock(1) = 1 ; xyzdis(1) = 0_MPI_ADDRESS_KIND ; xyztype(1) = MPI_REAL4
@@ -738,9 +735,9 @@ module mpi_read
   end subroutine set_3dgrid_view
 
   subroutine open_int_mpi(int_path, int_name, int_unit)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! open_int_mpi -- Open time interval mpi file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
 
     ! -- inout
@@ -749,11 +746,12 @@ module mpi_read
     ! -- local
     integer(I4) :: ierr, mpi_fh
     character(:), allocatable :: err_mes
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     call MPI_FILE_OPEN(my_comm, int_path, MPI_MODE_RDONLY, MPI_INFO_NULL, mpi_fh, ierr)
 
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
+        allocate(character(0) :: err_mes)
         err_mes = "Open input"//int_name//" time interval file."
         call write_err_stop(err_mes)
         deallocate(err_mes)
@@ -765,16 +763,16 @@ module mpi_read
   end subroutine open_int_mpi
 
   subroutine close_mpi_file(fileh)
-  !***************************************************************************************
+  !*********************************************************************************************
   ! close_mpi_file -- Close mpi file
-  !***************************************************************************************
+  !*********************************************************************************************
     ! -- module
     use utility_module, only: write_err_close
     ! -- inout
     integer(I4), intent(inout) :: fileh
     ! -- local
     integer(I4) :: ierr
-    !-------------------------------------------------------------------------------------
+    !-------------------------------------------------------------------------------------------
     call MPI_FILE_CLOSE(fileh, ierr)
 
     if (ierr /= MPI_SUCCESS) then

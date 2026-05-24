@@ -295,9 +295,10 @@ module time_module
 
     ! -- local
     integer(I4) :: ierr
-    character(:), allocatable :: bound_name, err_mes, str_time
+    character(:), allocatable :: bound_name, err_mes
+    character(32) :: str_time
     !-------------------------------------------------------------------------------------------
-    allocate(character(0) :: str_time, err_mes, bound_name)
+    allocate(character(0) :: err_mes, bound_name)
     ierr = 0 ; str_time = "" ; err_mes = "" ; bound_name = ""
     if (st_step_flag%seal == 1) then
       bound_name = "sea level"

@@ -10,7 +10,6 @@ module set_boundary
   use calc_boundary, only: conv_rech2calc, calc_blld, calc_lsurf, calc_wlbd
 #ifdef MPI_MSG
   use initial_module, only: pro_totn
-!  use mpi_utility, only: mpisum_val, bcast_path_unit
   use mpi_utility, only: mpisum_val, bcast_file
   use mpi_set, only: cals_r4view, cals_r4hview
 #endif

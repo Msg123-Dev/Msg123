@@ -384,9 +384,9 @@ module mpi_write
     integer(I4) :: send_len, recv_len
     integer(I4) :: rank_flag, allp_flag
     integer(I4), allocatable :: send_flag(:), recv_flag(:)
-    integer(I4), allocatable :: flag_send(:), req_flag_recv(:)
-    integer(I4), allocatable :: head_send(:), req_head_recv(:), srat_send(:), req_srat_recv(:)
-    integer(I4), allocatable :: stat_s(:,:), stat_r(:,:)
+    integer, allocatable :: flag_send(:), req_flag_recv(:)
+    integer, allocatable :: head_send(:), req_head_recv(:), srat_send(:), req_srat_recv(:)
+    integer, allocatable :: stat_s(:,:), stat_r(:,:)
     real(DP), allocatable :: send_head(:), send_srat(:), recv_head(:), recv_srat(:)
     !-------------------------------------------------------------------------------------------
     wtab_sendn = send_wtab_cind(neib_wtab_stotn)
@@ -411,9 +411,9 @@ module mpi_write
     !$omp end do
     !$omp do private(i)
     do i = 1, neib_mpi_totn
-      flag_send(i) = 0 ; req_flag_recv(i) = 0
-      head_send(i) = 0 ; req_head_recv(i) = 0
-      srat_send(i) = 0 ; req_srat_recv(i) = 0
+      flag_send(i) = MPI_REQUEST_NULL ; req_flag_recv(i) = MPI_REQUEST_NULL
+      head_send(i) = MPI_REQUEST_NULL ; req_head_recv(i) = MPI_REQUEST_NULL
+      srat_send(i) = MPI_REQUEST_NULL ; req_srat_recv(i) = MPI_REQUEST_NULL
     end do
     !$omp end do
     !$omp do private(j)

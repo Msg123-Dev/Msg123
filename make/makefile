@@ -11,6 +11,8 @@ ${SOURCEDIR}
 
 .SUFFIXES: .f90 .o
 
+SHELL := /bin/bash
+
 # Define the Fortran compile flags (gfortran, ifort or ifx)
 FC = gfortran
 
@@ -27,37 +29,28 @@ ifeq ($(FC),gfortran)
 	else
 		FFLAGS = -cpp -Wall -O3 -Wno-unused-function
 	endif
-	ifeq ($(PARA),Hybrid)
-		FC = mpif90
-		FFLAGS += -fopenmp
-		CPPFLAGS = -DMPI_MSG
-	endif
-	ifeq ($(PARA),MPI)
+	ifneq ($(filter MPI Hybrid,$(PARA)),)
 		FC = mpif90
 		CPPFLAGS = -DMPI_MSG
 	endif
-	ifeq ($(PARA),OpenMP)
+	ifneq ($(filter OpenMP Hybrid,$(PARA)),)
 		FFLAGS += -fopenmp
 	endif
 endif
 
-#for ifortran
-ifeq ($(FC),ifort)
+#for intel fortran
+ifneq ($(filter $(FC), ifort ifx),)
 	ifeq ($(MODE),debug)
-		FFLAGS = -fpp -warn all -g -traceback -check bounds -fpe0 -check all -std -ftrapuv -gen_interfaces
+		FFLAGS = -fpp -warn all -g -traceback -check bounds -fpe0 -check all -std -ftrapuv -gen_interfaces -diag-disable=10448
 	else
-		FFLAGS = -fpp -warn all -O3
+		FFLAGS = -fpp -warn all -O3 -diag-disable=10448
 	endif
-	ifeq ($(PARA),Hybrid)
-		FC = mpif90
-		FFLAGS += -qopenmp
-		CPPFLAGS = -DMPI_MSG
-	endif
-	ifeq ($(PARA),MPI)
+	ifneq ($(filter MPI Hybrid,$(PARA)),)
 		FC = mpif90
 		CPPFLAGS = -DMPI_MSG
+		FFLAGS += -diag-disable=8889
 	endif
-	ifeq ($(PARA),OpenMP)
+	ifneq ($(filter OpenMP Hybrid,$(PARA)),)
 		FFLAGS += -qopenmp
 	endif
 endif
@@ -151,11 +144,13 @@ makebin :
 
 # Define the objects that make up the program
 $(PROGRAM) : $(OBJECTS)
-	-$(FC) $(FFLAGS) -o $@ $(OBJECTS)
+	@echo "-$(FC) $(FFLAGS) -o $@ $(OBJECTS)"
+	@-$(FC) $(FFLAGS) -o $@ $(OBJECTS) 2> >(grep -v "remark #10448" >&2)
 
 $(OBJDIR)/%.o : %.f90
 	@mkdir -p $(@D)
-	$(FC) $(FFLAGS) $(CPPFLAGS) -c $< -o $@
+	@echo "$(FC) $(FFLAGS) $(CPPFLAGS) -c $< -o $@"
+	@$(FC) $(FFLAGS) $(CPPFLAGS) -c $< -o $@ 2> >(grep -v "remark #10448" >&2)
 
 # Clean the object and module files and the executable
 .PHONY : clean

@@ -308,7 +308,7 @@ module make_linearsystem
     use calc_boundary, only: rive2cals, rive_head, rive_bott
     use set_boundary, only: rive_num, abyd_rive
     ! -- inout
-    real(DP), intent(out) :: dmat_riv(:)
+    real(DP), intent(inout) :: dmat_riv(:)
     ! -- local
     integer(I4) :: i, s
     real(DP), allocatable :: over_riv(:), deri_r(:), deri_ks(:), delh_r(:)
@@ -371,7 +371,7 @@ module make_linearsystem
     use calc_boundary, only: lake2cals, lake_head, lake_bott
     use set_boundary, only: lake_num, abyd_lake
     ! -- inout
-    real(DP), intent(out) :: dmat_lak(:)
+    real(DP), intent(inout) :: dmat_lak(:)
     ! -- local
     integer(I4) :: i, s
     real(DP), allocatable :: over_lak(:), deri_l(:), deri_ks(:), delh_l(:)

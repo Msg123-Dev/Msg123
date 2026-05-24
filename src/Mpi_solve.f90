@@ -33,15 +33,15 @@ module mpi_solve
     integer(I4) :: i, j, k, jj, kk, ierr
     integer(I4) :: nsenrev, isend_sta, isend_end, irecv_sta, irecv_end
     integer(I4) :: buflen_send, buflen_recv
-    integer(I4), allocatable :: requ_send(:), requ_recv(:)
-    integer(I4), allocatable :: stat_s(:,:), stat_r(:,:)
+    integer, allocatable :: requ_send(:), requ_recv(:)
+    integer, allocatable :: stat_s(:,:), stat_r(:,:)
     integer(I4), allocatable :: sbufint(:), rbufint(:)
     !-------------------------------------------------------------------------------------------
     allocate(requ_send(neib_mpi_totn), requ_recv(neib_mpi_totn))
     allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
     !$omp parallel do private(i)
     do i = 1, neib_mpi_totn
-      requ_send(i) = 0 ; requ_recv(i) = 0
+      requ_send(i) = MPI_REQUEST_NULL ; requ_recv(i) = MPI_REQUEST_NULL
       stat_s(:,i) = 0 ; stat_r(:,i) = 0
     end do
     !$omp end parallel do
@@ -65,7 +65,7 @@ module mpi_solve
     end do
     !$omp end do
 
-    !$omp do private(i, isend_sta, isend_end, buflen_send, ierr)
+    !$omp single
     do i = 1, neib_mpi_totn
       isend_sta = send_cind(i-1)+1
       isend_end = send_cind(i)
@@ -75,9 +75,6 @@ module mpi_solve
                        my_comm, requ_send(i), ierr)
       end if
     end do
-    !$omp end do
-
-    !$omp do private(i, irecv_sta, irecv_end, buflen_recv, ierr)
     do i = 1, neib_mpi_totn
       irecv_sta = recv_cind(i-1)+1
       irecv_end = recv_cind(i)
@@ -87,8 +84,6 @@ module mpi_solve
                        my_comm, requ_recv(i), ierr)
       end if
     end do
-    !$omp end do
-    !$omp single
     call MPI_WAITALL(neib_mpi_totn, requ_recv, stat_r, ierr)
     call MPI_WAITALL(neib_mpi_totn, requ_send, stat_s, ierr)
     !$omp end single
@@ -119,15 +114,15 @@ module mpi_solve
     integer(I4) :: i, j, k, jj, kk, ierr
     integer(I4) :: nsenrev, isend_sta, isend_end, irecv_sta, irecv_end
     integer(I4) :: buflen_send, buflen_recv
-    integer(I4), allocatable :: requ_send(:), requ_recv(:)
-    integer(I4), allocatable :: stat_s(:,:), stat_r(:,:)
+    integer, allocatable :: requ_send(:), requ_recv(:)
+    integer, allocatable :: stat_s(:,:), stat_r(:,:)
     real(DP), allocatable :: sbufreal(:), rbufreal(:)
     !-------------------------------------------------------------------------------------------
     allocate(requ_send(neib_mpi_totn), requ_recv(neib_mpi_totn))
     allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
     !$omp parallel do private(i)
     do i = 1, neib_mpi_totn
-      requ_send(i) = 0 ; requ_recv(i) = 0
+      requ_send(i) = MPI_REQUEST_NULL ; requ_recv(i) = MPI_REQUEST_NULL
       stat_s(:,i) = 0 ; stat_r(:,i) = 0
     end do
     !$omp end parallel do
@@ -151,7 +146,7 @@ module mpi_solve
     end do
     !$omp end do
 
-    !$omp do private(i, isend_sta, isend_end, buflen_send, ierr)
+    !$omp single
     do i = 1, neib_mpi_totn
       isend_sta = send_cind(i-1)+1
       isend_end = send_cind(i)
@@ -161,9 +156,6 @@ module mpi_solve
                        my_comm, requ_send(i), ierr)
       end if
     end do
-    !$omp end do
-
-    !$omp do private(i, irecv_sta, irecv_end, buflen_recv, ierr)
     do i = 1, neib_mpi_totn
       irecv_sta = recv_cind(i-1)+1
       irecv_end = recv_cind(i)
@@ -173,8 +165,6 @@ module mpi_solve
                        my_comm, requ_recv(i), ierr)
       end if
     end do
-    !$omp end do
-    !$omp single
     call MPI_WAITALL(neib_mpi_totn, requ_recv, stat_r, ierr)
     call MPI_WAITALL(neib_mpi_totn, requ_send, stat_s, ierr)
     !$omp end single

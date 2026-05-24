@@ -617,7 +617,7 @@ module read_input
     ! -- Check grid location (gridloc)
       call check_grid_loc(nx, ny, nz)
 
-    allocate(character(0) :: err_mes)
+    allocate(character(64) :: err_mes)
     err_mes = ""
 
     if (grid_check == 0) then
@@ -625,15 +625,15 @@ module read_input
     else
       if (grid_xnum /= 0) then
         write(err_mes,'(a,i0,a)') "X direction is reversed at ", grid_xnum, " point."
-        call write_logf(err_mes)
+        call write_logf(trim(err_mes))
       end if
       if (grid_ynum /= 0) then
         write(err_mes,'(a,i0,a)') "Y direction is reversed at ", grid_ynum, " point."
-        call write_logf(err_mes)
+        call write_logf(trim(err_mes))
       end if
       if (grid_znum /= 0) then
         write(err_mes,'(a,i0,a)') "Z direction is reversed at ", grid_znum, " point."
-        call write_logf(err_mes)
+        call write_logf(trim(err_mes))
       end if
       call write_err_stop("Check the direction in grid file.")
     end if

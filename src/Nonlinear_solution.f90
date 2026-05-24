@@ -438,12 +438,13 @@ module nonlinear_solution
     ! -- inout
 
     ! -- local
-    real(DP) :: eta_max = 0.9_DP, eta_min = 1.0E-4_DP, eta_safe, minus1
+    real(DP) :: eta_max = 0.9_DP, eta_min = 1.0E-4_DP, eta_safe, minus1, l2_line
     real(DP) :: eta_alpha = (DONE+sqrt(5.0_DP))/DTWO, lin_l2norm
     !-------------------------------------------------------------------------------------------
     eta_safe = eta**eta_alpha
     minus1 = DONE - lam
-    lin_l2norm = sqrt(minus1*minus1*l2_pre + DTWO*lam*minus1*gradient + lam*lam*l2_jnorm)
+    l2_line = minus1*minus1*l2_pre + DTWO*lam*minus1*gradient + lam*lam*l2_jnorm
+    lin_l2norm = sqrt(max(DZERO, l2_line))
     eta = abs(sqrt(l2_new) - lin_l2norm)/sqrt(l2_pre)
 
     if (eta_safe < 0.1_DP) then

@@ -318,14 +318,14 @@ module mpi_set
       call MPI_BCAST(char_leng, 1, MPI_INTEGER, 0, my_comm, ierr)
       if (ierr /= MPI_SUCCESS) then
         if (my_rank == 0) then
-          call write_err_stop("Broadcast the classification name "//clas_name(i)//" length.")
+          call write_err_stop("Broadcast the classification name "//trim(clas_name(i))//" length.")
         end if
       end if
 
       call MPI_BCAST(clas_name(i), char_leng, MPI_CHARACTER, 0, my_comm, ierr)
       if (ierr /= MPI_SUCCESS) then
         if (my_rank == 0) then
-          call write_err_stop("Broadcast the classification name "//clas_name(i)//".")
+          call write_err_stop("Broadcast the classification name "//trim(clas_name(i))//".")
         end if
       end if
     end do
@@ -1831,8 +1831,8 @@ module mpi_set
     integer(I4) :: i, j, k, jj, kk, ierr
     integer(I4) :: sbuflen, rbuflen, send_count, recv_count
     integer(I4) :: is_sta, is_end, ir_sta, ir_end
-    integer(I4), allocatable :: requ_send(:), requ_recv(:)
-    integer(I4), allocatable :: stat_send(:,:), stat_recv(:,:)
+    integer, allocatable :: requ_send(:), requ_recv(:)
+    integer, allocatable :: stat_send(:,:), stat_recv(:,:)
     integer(I4), allocatable :: sbufint(:), rbufint(:)
     !-------------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
@@ -1840,7 +1840,7 @@ module mpi_set
     !$omp parallel
     !$omp do private(i)
     do i = 1, nbtot
-      requ_send(i) = 0 ; requ_recv(i) = 0
+      requ_send(i) = MPI_REQUEST_NULL ; requ_recv(i) = MPI_REQUEST_NULL
       stat_send(:,i) = 0 ; stat_recv(:,i) = 0
     end do
     !$omp end do
@@ -1882,7 +1882,7 @@ module mpi_set
 
     ierr = 0
     !$omp parallel
-    !$omp do private(i, is_sta, is_end, sbuflen)
+    !$omp single
     do i = 1, nbtot
       is_sta = sind(i-1)+1 ; is_end = sind(i)
       sbuflen = is_end - is_sta + 1
@@ -1891,9 +1891,6 @@ module mpi_set
                        requ_send(i), ierr)
       end if
     end do
-    !$omp end do
-
-    !$omp do private(i, ir_sta, ir_end, rbuflen)
     do i = 1, nbtot
       ir_sta = rind(i-1)+1 ; ir_end = rind(i)
       rbuflen = ir_end - ir_sta + 1
@@ -1902,21 +1899,19 @@ module mpi_set
                        requ_recv(i), ierr)
       end if
     end do
-    !$omp end do
-
     call MPI_WAITALL(nbtot, requ_recv, stat_recv, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Receive neighbor integer values.")
       end if
     end if
-
     call MPI_WAITALL(nbtot, requ_send, stat_send, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Send neighbor integer values.")
       end if
     end if
+    !$omp end single
 
     !$omp do private(i, k, kk)
     do i = 1, nbtot
@@ -1947,8 +1942,8 @@ module mpi_set
     integer(I4) :: i, j, k, jj, kk, ierr
     integer(I4) :: sbuflen, rbuflen, send_count, recv_count
     integer(I4) :: is_sta, is_end, ir_sta, ir_end
-    integer(I4), allocatable :: requ_send(:), requ_recv(:)
-    integer(I4), allocatable :: stat_send(:,:), stat_recv(:,:)
+    integer, allocatable :: requ_send(:), requ_recv(:)
+    integer, allocatable :: stat_send(:,:), stat_recv(:,:)
     real(SP), allocatable :: sbufreal(:), rbufreal(:)
     !-------------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
@@ -1957,7 +1952,7 @@ module mpi_set
     !$omp parallel
     !$omp do private(i)
     do i = 1, nbtot
-      requ_send(i) = 0 ; requ_recv(i) = 0
+      requ_send(i) = MPI_REQUEST_NULL ; requ_recv(i) = MPI_REQUEST_NULL
       stat_send(:,i) = 0 ; stat_recv(:,i) = 0
     end do
     !$omp end do
@@ -1998,7 +1993,7 @@ module mpi_set
 
     ierr = 0
     !$omp parallel
-    !$omp do private(i, is_sta, is_end, sbuflen)
+    !$omp single
     do i = 1, nbtot
       is_sta = sind(i-1)+1 ; is_end = sind(i)
       sbuflen = is_end - is_sta + 1
@@ -2007,9 +2002,6 @@ module mpi_set
                        requ_send(i), ierr)
       end if
     end do
-    !$omp end do
-
-    !$omp do private(i, ir_sta, ir_end, rbuflen)
     do i = 1, nbtot
       ir_sta = rind(i-1)+1 ; ir_end = rind(i)
       rbuflen = ir_end - ir_sta + 1
@@ -2018,21 +2010,19 @@ module mpi_set
                        requ_recv(i), ierr)
       end if
     end do
-    !$omp end do
-
     call MPI_WAITALL(nbtot, requ_recv, stat_recv, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Receive neighbor real4 values.")
       end if
     end if
-
     call MPI_WAITALL(nbtot, requ_send, stat_send, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Send neighbor real4 values.")
       end if
     end if
+    !$omp end single
 
     !$omp do private(i, k, kk)
     do i = 1, nbtot
@@ -2063,8 +2053,8 @@ module mpi_set
     integer(I4) :: i, j, k, jj, kk, ierr
     integer(I4) :: sbuflen, rbuflen, send_count, recv_count
     integer(I4) :: is_sta, is_end, ir_sta, ir_end
-    integer(I4), allocatable :: requ_send(:), requ_recv(:)
-    integer(I4), allocatable :: stat_send(:,:), stat_recv(:,:)
+    integer, allocatable :: requ_send(:), requ_recv(:)
+    integer, allocatable :: stat_send(:,:), stat_recv(:,:)
     real(DP), allocatable :: sbufreal(:), rbufreal(:)
     !-------------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
@@ -2073,7 +2063,7 @@ module mpi_set
     !$omp parallel
     !$omp do private(i)
     do i = 1, nbtot
-      requ_send(i) = 0 ; requ_recv(i) = 0
+      requ_send(i) = MPI_REQUEST_NULL ; requ_recv(i) = MPI_REQUEST_NULL
       stat_send(:,i) = 0 ; stat_recv(:,i) = 0
     end do
     !$omp end do
@@ -2114,7 +2104,7 @@ module mpi_set
 
     ierr = 0
     !$omp parallel
-    !$omp do private(i, is_sta, is_end, sbuflen)
+    !$omp single
     do i = 1, nbtot
       is_sta = sind(i-1)+1 ; is_end = sind(i)
       sbuflen = is_end - is_sta + 1
@@ -2123,9 +2113,6 @@ module mpi_set
                        requ_send(i), ierr)
       end if
     end do
-    !$omp end do
-
-    !$omp do private(i, ir_sta, ir_end, rbuflen)
     do i = 1, nbtot
       ir_sta = rind(i-1)+1 ; ir_end = rind(i)
       rbuflen = ir_end - ir_sta + 1
@@ -2134,21 +2121,19 @@ module mpi_set
                        requ_recv(i), ierr)
       end if
     end do
-    !$omp end do
-
     call MPI_WAITALL(nbtot, requ_recv, stat_recv, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Receive neighbor real8 values.")
       end if
     end if
-
     call MPI_WAITALL(nbtot, requ_send, stat_send, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Send neighbor real8 values.")
       end if
     end if
+    !$omp end single
 
     !$omp do private(i, k, kk)
     do i = 1, nbtot
@@ -2179,8 +2164,8 @@ module mpi_set
     integer(I4) :: i, j, k, jj, kk, ierr
     integer(I4) :: sbuflen, rbuflen, send_count, recv_count
     integer(I4) :: is_sta, is_end, ir_sta, ir_end
-    integer(I4), allocatable :: requ_send(:), requ_recv(:)
-    integer(I4), allocatable :: stat_send(:,:), stat_recv(:,:)
+    integer, allocatable :: requ_send(:), requ_recv(:)
+    integer, allocatable :: stat_send(:,:), stat_recv(:,:)
     integer(I4), allocatable :: sbufreal(:), rbufreal(:)
     !-------------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
@@ -2189,7 +2174,7 @@ module mpi_set
     !$omp parallel
     !$omp do private(i)
     do i = 1, nbtot
-      requ_send(i) = 0 ; requ_recv(i) = 0
+      requ_send(i) = MPI_REQUEST_NULL ; requ_recv(i) = MPI_REQUEST_NULL
       stat_send(:,i) = 0 ; stat_recv(:,i) = 0
     end do
     !$omp end do
@@ -2233,7 +2218,7 @@ module mpi_set
 
     ierr = 0
     !$omp parallel
-    !$omp do private(i, is_sta, is_end, sbuflen)
+    !$omp single
     do i = 1, nbtot
       is_sta = sind(i-1)*FACE+1 ; is_end = sind(i)*FACE
       sbuflen = is_end - is_sta + 1
@@ -2242,9 +2227,6 @@ module mpi_set
                        requ_send(i), ierr)
       end if
     end do
-    !$omp end do
-
-    !$omp do private(i, ir_sta, ir_end, rbuflen)
     do i = 1, nbtot
       ir_sta = rind(i-1)*FACE+1 ; ir_end = rind(i)*FACE
       rbuflen = ir_end - ir_sta + 1
@@ -2253,21 +2235,19 @@ module mpi_set
                        requ_recv(i), ierr)
       end if
     end do
-    !$omp end do
-
     call MPI_WAITALL(nbtot, requ_recv, stat_recv, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Receive face integer values.")
       end if
     end if
-
     call MPI_WAITALL(nbtot, requ_send, stat_send, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Send face integer values.")
       end if
     end if
+    !$omp end single
 
     !$omp do private(i, j, jj, k, kk)
     do i = 1, nbtot
@@ -2301,8 +2281,8 @@ module mpi_set
     integer(I4) :: i, j, k, jj, kk, ierr
     integer(I4) :: sbuflen, rbuflen, send_count, recv_count
     integer(I4) :: is_sta, is_end, ir_sta, ir_end
-    integer(I4), allocatable :: requ_send(:), requ_recv(:)
-    integer(I4), allocatable :: stat_send(:,:), stat_recv(:,:)
+    integer, allocatable :: requ_send(:), requ_recv(:)
+    integer, allocatable :: stat_send(:,:), stat_recv(:,:)
     real(SP), allocatable :: sbufreal(:), rbufreal(:)
     !-------------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
@@ -2312,7 +2292,7 @@ module mpi_set
     !$omp do private(i)
     do i = 1, nbtot
       stat_send(:,i) = 0 ; stat_recv(:,i) = 0
-      requ_send(i) = 0 ; requ_recv(i) = 0
+      requ_send(i) = MPI_REQUEST_NULL ; requ_recv(i) = MPI_REQUEST_NULL
     end do
     !$omp end do
 
@@ -2355,7 +2335,7 @@ module mpi_set
 
     ierr = 0
     !$omp parallel
-    !$omp do private(i, is_sta, is_end, sbuflen)
+    !$omp single
     do i = 1, nbtot
       is_sta = sind(i-1)*FACE+1 ; is_end = sind(i)*FACE
       sbuflen = is_end - is_sta + 1
@@ -2364,9 +2344,6 @@ module mpi_set
                        requ_send(i), ierr)
       end if
     end do
-    !$omp end do
-
-    !$omp do private(i, ir_sta, ir_end, rbuflen)
     do i = 1, nbtot
       ir_sta = rind(i-1)*FACE+1 ; ir_end = rind(i)*FACE
       rbuflen = ir_end - ir_sta + 1
@@ -2375,21 +2352,19 @@ module mpi_set
                        requ_recv(i), ierr)
       end if
     end do
-    !$omp end do
-
     call MPI_WAITALL(nbtot, requ_recv, stat_recv, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Receive face real4 values.")
       end if
     end if
-
     call MPI_WAITALL(nbtot, requ_send, stat_send, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Send face real4 values.")
       end if
     end if
+    !$omp end single
 
     !$omp do private(i, j, jj, k, kk)
     do i = 1, nbtot
@@ -2423,8 +2398,8 @@ module mpi_set
     integer(I4) :: i, j, k, jj, kk, ierr
     integer(I4) :: sbuflen, rbuflen, send_count, recv_count
     integer(I4) :: is_sta, is_end, ir_sta, ir_end
-    integer(I4), allocatable :: requ_send(:), requ_recv(:)
-    integer(I4), allocatable :: stat_send(:,:), stat_recv(:,:)
+    integer, allocatable :: requ_send(:), requ_recv(:)
+    integer, allocatable :: stat_send(:,:), stat_recv(:,:)
     real(DP), allocatable :: sbufreal(:), rbufreal(:)
     !-------------------------------------------------------------------------------------------
     allocate(requ_send(nbtot), requ_recv(nbtot))
@@ -2433,7 +2408,7 @@ module mpi_set
     !$omp parallel
     !$omp do private(i)
     do i = 1, nbtot
-      requ_send(i) = 0 ; requ_recv(i) = 0
+      requ_send(i) = MPI_REQUEST_NULL ; requ_recv(i) = MPI_REQUEST_NULL
       stat_send(:,i) = 0 ; stat_recv(:,i) = 0
     end do
     !$omp end do
@@ -2477,7 +2452,7 @@ module mpi_set
 
     ierr = 0
     !$omp parallel
-    !$omp do private(i, is_sta, is_end, sbuflen)
+    !$omp single
     do i = 1, nbtot
       is_sta = sind(i-1)*FACE+1 ; is_end = sind(i)*FACE
       sbuflen = is_end - is_sta + 1
@@ -2486,9 +2461,6 @@ module mpi_set
                        requ_send(i), ierr)
       end if
     end do
-    !$omp end do
-
-    !$omp do private(i, ir_sta, ir_end, rbuflen)
     do i = 1, nbtot
       ir_sta = rind(i-1)*FACE+1 ; ir_end = rind(i)*FACE
       rbuflen = ir_end - ir_sta + 1
@@ -2497,21 +2469,19 @@ module mpi_set
                        requ_recv(i), ierr)
       end if
     end do
-    !$omp end do
-
     call MPI_WAITALL(nbtot, requ_recv, stat_recv, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Receive face real8 values.")
       end if
     end if
-
     call MPI_WAITALL(nbtot, requ_send, stat_send, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (my_rank == 0) then
         call write_err_stop("Send face real8 values.")
       end if
     end if
+    !$omp end single
 
     !$omp do private(i, j, jj, k, kk)
     do i = 1, nbtot

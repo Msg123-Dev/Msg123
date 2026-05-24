@@ -111,7 +111,6 @@ module calc_output
   ! calc_out_mass -- Calculate output massbalance
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_in_type, in_type
     use assign_calc, only: mass_num, msout_tnum, mass2calc, int_mass
     use allocate_output, only: st_msglo
     ! -- inout
@@ -136,31 +135,19 @@ module calc_output
     !$omp end do
     !$omp end parallel
 
-    if (st_in_type%mass /= in_type(7)) then
-      do i = 1, mass_num
-        j = mass2calc(i) ; k = int_mass(i)
-        if (j <= ncals) then
-          ms_rec(k) = ms_rec(k) + st_msloc%rec(j)
-          ms_sur(k) = ms_sur(k) + st_msloc%sur(j)
-          ms_riv(k) = ms_riv(k) + st_msloc%riv(j)
-          ms_lak(k) = ms_lak(k) + st_msloc%lak(j)
-        end if
-        ms_sto(k) = ms_sto(k) + st_msloc%sto(j)
-        ms_con(k) = ms_con(k) + st_msloc%con(j)
-        ms_sea(k) = ms_sea(k) + st_msloc%sea(j)
-        ms_wel(k) = ms_wel(k) + st_msloc%wel(j)
-      end do
-
-    else if (st_in_type%mass == in_type(7)) then
-      !$omp parallel do private(i)
-      do i = 1, msout_tnum
-        ms_sto(i) = ms_sto(i) + st_msloc%sto(i) ; ms_con(i) = ms_con(i) + st_msloc%con(i)
-        ms_sea(i) = ms_sea(i) + st_msloc%sea(i) ; ms_wel(i) = ms_wel(i) + st_msloc%wel(i)
-        ms_rec(i) = ms_rec(i) + st_msloc%rec(i) ; ms_sur(i) = ms_sur(i) + st_msloc%sur(i)
-        ms_riv(i) = ms_riv(i) + st_msloc%riv(i) ; ms_lak(i) = ms_lak(i) + st_msloc%lak(i)
-      end do
-      !$omp end parallel do
-    end if
+    do i = 1, mass_num
+      j = mass2calc(i) ; k = int_mass(i)
+      if (j <= ncals) then
+        ms_rec(k) = ms_rec(k) + st_msloc%rec(j)
+        ms_sur(k) = ms_sur(k) + st_msloc%sur(j)
+        ms_riv(k) = ms_riv(k) + st_msloc%riv(j)
+        ms_lak(k) = ms_lak(k) + st_msloc%lak(j)
+      end if
+      ms_sto(k) = ms_sto(k) + st_msloc%sto(j)
+      ms_con(k) = ms_con(k) + st_msloc%con(j)
+      ms_sea(k) = ms_sea(k) + st_msloc%sea(j)
+      ms_wel(k) = ms_wel(k) + st_msloc%wel(j)
+    end do
 
     !$omp parallel
     !$omp do private(i)

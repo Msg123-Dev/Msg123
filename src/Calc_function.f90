@@ -119,8 +119,8 @@ module calc_function
     integer(I4), intent(in) :: sfla
     real(DP), intent(in) :: inmxo(:)
     real(DP), intent(inout) :: inmxn(:)
-    real(DP), intent(out) :: stom(:), conm(:), seam(:), welm(:)
-    real(DP), intent(out) :: recm(:), surm(:), rivm(:), lakm(:)
+    real(DP), intent(inout) :: stom(:), conm(:), seam(:), welm(:)
+    real(DP), intent(inout) :: recm(:), surm(:), rivm(:), lakm(:)
     ! -- local
     integer(I4) :: i
     real(DP), allocatable :: alp_ss_new(:), alp_ss_old(:)
@@ -285,7 +285,7 @@ module calc_function
     use calc_boundary, only: rech2cals, calc_rech
     use set_boundary, only: rech_num
     ! -- inout
-    real(DP), intent(out) :: recfunc(:)
+    real(DP), intent(inout) :: recfunc(:)
     ! -- local
     integer(I4) :: i, s
     !-------------------------------------------------------------------------------------------
@@ -307,7 +307,7 @@ module calc_function
     use assign_boundary, only: calc_well
     use set_boundary, only: well_num
     ! -- inout
-    real(DP), intent(out) :: welfunc(:)
+    real(DP), intent(inout) :: welfunc(:)
     ! -- local
     integer(I4) :: i, j, k
     integer(I4) :: sta_wind, end_wind, wind
@@ -337,7 +337,7 @@ module calc_function
     use allocate_solution, only: surf_rati
     ! -- inout
     real(DP), intent(in) :: infsurf(:), inshead(:)
-    real(DP), intent(out) :: surfunc(:)
+    real(DP), intent(inout) :: surfunc(:)
     ! -- local
     integer(I4) :: i
     real(DP), allocatable :: delh_s(:), elev_rati(:)
@@ -425,7 +425,7 @@ module calc_function
     use set_boundary, only: rive_num, abyd_rive
     ! -- inout
     real(DP), intent(in) :: infrive(:)
-    real(DP), intent(out) :: rivfunc(:)
+    real(DP), intent(inout) :: rivfunc(:)
     ! -- local
     integer(I4) :: i, s
     real(DP), allocatable :: delh_r(:)
@@ -468,7 +468,7 @@ module calc_function
     use set_boundary, only: lake_num, abyd_lake
     ! -- inout
     real(DP), intent(in) :: inflake(:)
-    real(DP), intent(out) :: lakfunc(:)
+    real(DP), intent(inout) :: lakfunc(:)
     ! -- local
     integer(I4) :: i, s
     real(DP), allocatable :: delh_l(:)
@@ -512,7 +512,7 @@ module calc_function
     use allocate_solution, only: seal2calc, seal2seal, hydf_seal, abyd_seal
     ! -- inout
     real(DP), intent(in) :: infseal(:)
-    real(DP), intent(out) :: seafunc(:)
+    real(DP), intent(inout) :: seafunc(:)
     ! -- local
     integer(I4) :: i, c, s
     real(DP) :: delhead

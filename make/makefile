@@ -1,165 +1,135 @@
 # Define the directories for the object and module files,
 # the executable, and the executable name and path.
 OBJDIR = ./obj_temp
-BINDIR = .
 PROGRAM = ../msg123
-
 SOURCEDIR = ../src
 
-VPATH = \
-${SOURCEDIR}
+VPATH = ${SOURCEDIR}
 
 .SUFFIXES: .f90 .o
 
 SHELL := /bin/bash
 
-# Define the Fortran compile flags (gfortran, ifort or ifx)
+# Compiler: gfortran / ifort / ifx
 FC = gfortran
 
-# Define the mode (release or debug)
+# Mode: release or debug
 MODE = release
 
-# Define the parallel (MPI, OpenMP, Hybrid)
-PARA = OpenMP
+# Parallelism: Serial / OpenMP / MPI / Hybrid
+PARA = Serial
 
-#for gfortran
-ifeq ($(FC),gfortran)
+# ---- MPI flag ----
+_FC_ORIG := $(FC)
+ifneq ($(filter MPI Hybrid,$(PARA)),)
+    USE_MPI := 1
+    FC = mpif90
+    CPPFLAGS = -DMPI_MSG
+endif
+
+# ---- gfortran ----
+ifeq ($(_FC_ORIG),gfortran)
 	ifeq ($(MODE),debug)
 		FFLAGS = -cpp -Wall -g -fbacktrace -fbounds-check  -Wuninitialized -pedantic -ffpe-trap=invalid,zero,overflow
 	else
 		FFLAGS = -cpp -Wall -O3 -Wno-unused-function
-	endif
-	ifneq ($(filter MPI Hybrid,$(PARA)),)
-		FC = mpif90
-		CPPFLAGS = -DMPI_MSG
 	endif
 	ifneq ($(filter OpenMP Hybrid,$(PARA)),)
 		FFLAGS += -fopenmp
 	endif
 endif
 
-#for intel fortran
-ifneq ($(filter $(FC), ifort ifx),)
+# ---- ifort / ifx ----
+ifneq ($(filter $(_FC_ORIG),ifort ifx),)
 	ifeq ($(MODE),debug)
-		FFLAGS = -fpp -warn all -g -traceback -check bounds -fpe0 -check all -std -ftrapuv -gen_interfaces -diag-disable=10448
+		FFLAGS = -fpp -warn all -g -traceback -check bounds -fpe0 -check all -std -ftrapuv -gen_interfaces
 	else
-		FFLAGS = -fpp -warn all -O3 -diag-disable=10448
+		FFLAGS = -fpp -warn all -O3
 	endif
-	ifneq ($(filter MPI Hybrid,$(PARA)),)
-		FC = mpif90
-		CPPFLAGS = -DMPI_MSG
-		FFLAGS += -diag-disable=8889
-	endif
+	FFLAGS += -diag-disable=10448 -fpscomp logicals
 	ifneq ($(filter OpenMP Hybrid,$(PARA)),)
 		FFLAGS += -qopenmp
 	endif
+	ifneq ($(filter MPI OpenMP Hybrid,$(PARA)),)
+		FFLAGS += -diag-disable=8889
+	endif
 endif
 
-# Define the C compile flags
+# ---- C flags ----
 CC = gcc
 CFLAGS = -O3 -D_UF
 
-ifeq ($(CPPFLAGS),-DMPI_MSG)
-OBJECTS = \
-$(OBJDIR)/Kind_module.o \
-$(OBJDIR)/Constval_module.o \
-$(OBJDIR)/Mpi_initfin.o \
-$(OBJDIR)/Utility_module.o \
-$(OBJDIR)/Mpi_utility.o \
-$(OBJDIR)/Initial_module.o \
-$(OBJDIR)/Mpi_read.o \
-$(OBJDIR)/Read_module.o \
-$(OBJDIR)/Open_file.o \
-$(OBJDIR)/Read_input.o \
-$(OBJDIR)/Mpi_set.o \
-$(OBJDIR)/Check_condition.o \
-$(OBJDIR)/Set_cell.o \
-$(OBJDIR)/Make_cell.o \
-$(OBJDIR)/Set_condition.o \
-$(OBJDIR)/Assign_calculation.o \
-$(OBJDIR)/Prep_calculation.o \
-$(OBJDIR)/Assign_boundary.o \
-$(OBJDIR)/Calc_boundary.o \
-$(OBJDIR)/Set_boundary.o \
-$(OBJDIR)/Calc_parameter.o \
-$(OBJDIR)/Allocate_solution.o \
-$(OBJDIR)/Mpi_solve.o \
-$(OBJDIR)/Calc_function.o \
-$(OBJDIR)/Make_amg_matrix.o \
-$(OBJDIR)/Make_linearsystem.o \
-$(OBJDIR)/Check_simulation.o \
-$(OBJDIR)/Calc_simulation.o \
-$(OBJDIR)/Linear_solution.o \
-$(OBJDIR)/Allocate_output.o \
-$(OBJDIR)/Mpi_write.o \
-$(OBJDIR)/Calc_output.o \
-$(OBJDIR)/Write_module.o \
-$(OBJDIR)/Time_module.o \
-$(OBJDIR)/Nonlinear_solution.o \
-$(OBJDIR)/Write_output.o \
-$(OBJDIR)/Msg.o
-else
-OBJECTS = \
-$(OBJDIR)/Kind_module.o \
-$(OBJDIR)/Constval_module.o \
-$(OBJDIR)/Utility_module.o \
-$(OBJDIR)/Initial_module.o \
-$(OBJDIR)/Read_module.o \
-$(OBJDIR)/Open_file.o \
-$(OBJDIR)/Read_input.o \
-$(OBJDIR)/Check_condition.o \
-$(OBJDIR)/Set_cell.o \
-$(OBJDIR)/Make_cell.o \
-$(OBJDIR)/Set_condition.o \
-$(OBJDIR)/Assign_calculation.o \
-$(OBJDIR)/Prep_calculation.o \
-$(OBJDIR)/Assign_boundary.o \
-$(OBJDIR)/Calc_boundary.o \
-$(OBJDIR)/Set_boundary.o \
-$(OBJDIR)/Calc_parameter.o \
-$(OBJDIR)/Allocate_solution.o \
-$(OBJDIR)/Calc_function.o \
-$(OBJDIR)/Make_amg_matrix.o \
-$(OBJDIR)/Make_linearsystem.o \
-$(OBJDIR)/Check_simulation.o \
-$(OBJDIR)/Calc_simulation.o \
-$(OBJDIR)/Linear_solution.o \
-$(OBJDIR)/Allocate_output.o \
-$(OBJDIR)/Calc_output.o \
-$(OBJDIR)/Write_module.o \
-$(OBJDIR)/Time_module.o \
-$(OBJDIR)/Nonlinear_solution.o \
-$(OBJDIR)/Write_output.o \
-$(OBJDIR)/Msg.o
+# ---- Object list ----
+# MPI-specific objects resolve to empty string when USE_MPI is not set,
+# preserving compilation order without duplicating the full list.
+ifeq ($(USE_MPI),1)
+    MPI_INITFIN = $(OBJDIR)/Mpi_initfin.o
+    MPI_UTILITY = $(OBJDIR)/Mpi_utility.o
+    MPI_READ = $(OBJDIR)/Mpi_read.o
+    MPI_SET = $(OBJDIR)/Mpi_set.o
+    MPI_SOLVE = $(OBJDIR)/Mpi_solve.o
+    MPI_WRITE = $(OBJDIR)/Mpi_write.o
 endif
 
-# Define task functions
+OBJECTS = \
+$(OBJDIR)/Kind_module.o \
+$(OBJDIR)/Constval_module.o \
+$(MPI_INITFIN) \
+$(OBJDIR)/Utility_module.o \
+$(MPI_UTILITY) \
+$(OBJDIR)/Initial_module.o \
+$(MPI_READ) \
+$(OBJDIR)/Read_module.o \
+$(OBJDIR)/Open_file.o \
+$(OBJDIR)/Read_input.o \
+$(MPI_SET) \
+$(OBJDIR)/Check_condition.o \
+$(OBJDIR)/Set_cell.o \
+$(OBJDIR)/Make_cell.o \
+$(OBJDIR)/Set_condition.o \
+$(OBJDIR)/Assign_calculation.o \
+$(OBJDIR)/Prep_calculation.o \
+$(OBJDIR)/Assign_boundary.o \
+$(OBJDIR)/Calc_boundary.o \
+$(OBJDIR)/Set_boundary.o \
+$(OBJDIR)/Calc_parameter.o \
+$(OBJDIR)/Allocate_solution.o \
+$(MPI_SOLVE) \
+$(OBJDIR)/Calc_function.o \
+$(OBJDIR)/Make_amg_matrix.o \
+$(OBJDIR)/Make_linearsystem.o \
+$(OBJDIR)/Check_simulation.o \
+$(OBJDIR)/Calc_simulation.o \
+$(OBJDIR)/Linear_solution.o \
+$(OBJDIR)/Allocate_output.o \
+$(MPI_WRITE) \
+$(OBJDIR)/Calc_output.o \
+$(OBJDIR)/Write_module.o \
+$(OBJDIR)/Time_module.o \
+$(OBJDIR)/Nonlinear_solution.o \
+$(OBJDIR)/Write_output.o \
+$(OBJDIR)/Msg.o
 
-# Create the bin directory and compile and link the program
-all: makebin | $(PROGRAM)
+# ---- Build rules ----
+.PHONY: all clean cleanobj
 
-# Make the bin directory for the executable
-makebin :
-	mkdir -p $(BINDIR)
+all: $(PROGRAM)
 
-# Define the objects that make up the program
 $(PROGRAM) : $(OBJECTS)
-	@echo "-$(FC) $(FFLAGS) -o $@ $(OBJECTS)"
-	@-$(FC) $(FFLAGS) -o $@ $(OBJECTS) 2> >(grep -v "remark #10448" >&2)
+	@echo "$(FC) $(FFLAGS) -o $@ $(OBJECTS)"
+	@$(FC) $(FFLAGS) -o $@ $(OBJECTS)
 
 $(OBJDIR)/%.o : %.f90
 	@mkdir -p $(@D)
 	@echo "$(FC) $(FFLAGS) $(CPPFLAGS) -c $< -o $@"
-	@$(FC) $(FFLAGS) $(CPPFLAGS) -c $< -o $@ 2> >(grep -v "remark #10448" >&2)
+	@$(FC) $(FFLAGS) $(CPPFLAGS) -c $< -o $@
 
 # Clean the object and module files and the executable
-.PHONY : clean
 clean :
 	-rm -rf $(OBJDIR)
 	-rm -rf $(PROGRAM)
 	-rm -rf *.mod
 
 # Clean the object and module files
-.PHONY : cleanobj
 cleanobj :
 	-rm -rf $(OBJDIR)

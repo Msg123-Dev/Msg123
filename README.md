@@ -6,7 +6,10 @@ This quickstart shows how to build and run the model with a minimal example.
 
 ### Requirements
 - Linux or macOS
-- Fortran compiler (gfortran >= 9.1.0 or interl fortran >=19.0.3.199)
+- Fortran compiler (one of the following)
+  - gfortran 11.4.0
+  - ifort 2021.11.1 (Intel Fortran Compiler Classic)
+  - ifx 2025.3.1 (Intel Fortran Compiler)
 
 ### Clone
 ```bash

@@ -10,29 +10,32 @@ VPATH = ${SOURCEDIR}
 
 SHELL := /bin/bash
 
-# Compiler: gfortran / ifort / ifx
-FC = gfortran
+# Compiler: gfortran / ifort / ifx / nvfortran
+COMPILER := gfortran
 
 # Mode: release or debug
-MODE = release
+MODE := release
 
 # Parallelism: Serial / OpenMP / MPI / Hybrid
-PARA = Serial
+PARA := Serial
 
 # ---- MPI flag ----
-_FC_ORIG := $(FC)
 ifneq ($(filter MPI Hybrid,$(PARA)),)
+    override FC := mpif90
     USE_MPI := 1
-    FC = mpif90
-    CPPFLAGS = -DMPI_MSG
+    CPPFLAGS := -DMPI_MSG
+else
+    override FC := $(COMPILER)
+    USE_MPI := 0
+    CPPFLAGS :=
 endif
 
 # ---- gfortran ----
-ifeq ($(_FC_ORIG),gfortran)
+ifeq ($(COMPILER),gfortran)
 	ifeq ($(MODE),debug)
-		FFLAGS = -cpp -Wall -g -fbacktrace -fbounds-check  -Wuninitialized -pedantic -ffpe-trap=invalid,zero,overflow
+		FFLAGS := -cpp -Wall -g -fbacktrace -fbounds-check  -Wuninitialized -pedantic -ffpe-trap=invalid,zero,overflow
 	else
-		FFLAGS = -cpp -Wall -O3 -Wno-unused-function
+		FFLAGS := -cpp -Wall -O3 -Wno-unused-function
 	endif
 	ifneq ($(filter OpenMP Hybrid,$(PARA)),)
 		FFLAGS += -fopenmp
@@ -40,11 +43,11 @@ ifeq ($(_FC_ORIG),gfortran)
 endif
 
 # ---- ifort / ifx ----
-ifneq ($(filter $(_FC_ORIG),ifort ifx),)
+ifneq ($(filter $(COMPILER),ifort ifx),)
 	ifeq ($(MODE),debug)
-		FFLAGS = -fpp -warn all -g -traceback -check bounds -fpe0 -check all -std -ftrapuv -gen_interfaces
+		FFLAGS := -fpp -warn all -g -O0 -traceback -check bounds -fpe0 -check all -std -ftrapuv -gen-interfaces
 	else
-		FFLAGS = -fpp -warn all -O3
+		FFLAGS := -fpp -warn all -O3
 	endif
 	FFLAGS += -diag-disable=10448 -fpscomp logicals
 	ifneq ($(filter OpenMP Hybrid,$(PARA)),)
@@ -53,6 +56,26 @@ ifneq ($(filter $(_FC_ORIG),ifort ifx),)
 	ifneq ($(filter MPI OpenMP Hybrid,$(PARA)),)
 		FFLAGS += -diag-disable=8889
 	endif
+	REMARK_FILTER = 2>&1 | grep -v 'remark .10448'; exit $${PIPESTATUS[0]}
+endif
+
+# ---- nvfortran (NVIDIA HPC SDK) ----
+ifeq ($(COMPILER),nvfortran)
+	ifeq ($(MODE),debug)
+		FFLAGS := -cpp -Wall -g -traceback -Mbounds -Mchkptr -Ktrap=fp -Mstandard
+	else
+		FFLAGS := -cpp -Wall -O3
+	endif
+	ifneq ($(filter OpenMP Hybrid,$(PARA)),)
+		FFLAGS += -mp
+	endif
+endif
+
+# ---- Module output directory ----
+ifeq ($(COMPILER),gfortran)
+	FFLAGS += -J $(OBJDIR)
+else
+	FFLAGS += -module $(OBJDIR)
 endif
 
 # ---- C flags ----
@@ -117,18 +140,17 @@ all: $(PROGRAM)
 
 $(PROGRAM) : $(OBJECTS)
 	@echo "$(FC) $(FFLAGS) -o $@ $(OBJECTS)"
-	@$(FC) $(FFLAGS) -o $@ $(OBJECTS)
+	@$(FC) $(FFLAGS) -o $@ $(OBJECTS) $(REMARK_FILTER)
 
 $(OBJDIR)/%.o : %.f90
 	@mkdir -p $(@D)
 	@echo "$(FC) $(FFLAGS) $(CPPFLAGS) -c $< -o $@"
-	@$(FC) $(FFLAGS) $(CPPFLAGS) -c $< -o $@
+	@$(FC) $(FFLAGS) $(CPPFLAGS) -c $< -o $@ $(REMARK_FILTER)
 
 # Clean the object and module files and the executable
 clean :
 	-rm -rf $(OBJDIR)
 	-rm -rf $(PROGRAM)
-	-rm -rf *.mod
 
 # Clean the object and module files
 cleanobj :

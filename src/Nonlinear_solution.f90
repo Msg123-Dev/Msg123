@@ -20,14 +20,6 @@ module nonlinear_solution
   private
   public :: calc_numsol
 
-  ! -- local
-  integer(I4) :: back_iter, back_flag, beta_iter
-  real(DP) :: maxvar
-  real(DP) :: l2_new, l2_pre, l2_jnorm, lam, eta, gradient, maxstep
-  real(DP), allocatable :: new_f(:)
-#ifdef MPI_MSG
-  real(DP) :: sum_l2
-#endif
   contains
 
   subroutine calc_numsol()
@@ -35,6 +27,7 @@ module nonlinear_solution
   ! calc_numsol -- Calculate numerical solution
   !*********************************************************************************************
     ! -- modules
+    use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
     use constval_module, only: XMAX, XMAX_INV, VARLEN
     use utility_module, only: log_fnum
     use initial_module, only: st_sim, maxout_iter, errtol, st_out_step, my_rank
@@ -49,12 +42,16 @@ module nonlinear_solution
 
     ! -- local
     integer(I4) :: i
-    integer(I4) :: maxnun, conv_fnum
+    integer(I4) :: max_num, conv_fnum
+    integer(I4) :: back_iter, back_flag, beta_iter
     character(VARLEN) :: cxyzn
-    real(DP) :: maxunk, check_val
+    real(DP) :: max_var, max_unk, check_val
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var
+    real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
+    real(DP), allocatable :: new_func(:)
 #ifdef MPI_MSG
-  real(DP) :: var_max, unk_max, var_abs_max
+    real(DP) :: sum_l2
+    real(DP) :: var_max, unk_max, var_abs_max
 #endif
     ! -- format
     10 format(//1x,"CURRENT TIME : ",es12.5,1x,"(",a,")",20x,"TIME STEP : ",&
@@ -70,8 +67,9 @@ module nonlinear_solution
     15 format(1X,"Didn't converge in steady state calculation")
     !-------------------------------------------------------------------------------------------
     conv_fnum = st_out_fnum%conv
+    eater = DHALF
     ! -- Set for backtracking (backtr)
-      call set_backtr()
+      call set_backtr(max_step)
 
     outer_loop : do out_iter = 1, maxout_iter
 
@@ -80,14 +78,14 @@ module nonlinear_solution
           write(conv_fnum,10) now_time, trim(st_sim%cal_unit), delt
         end if
         form_switch = 1
-        allocate(new_f(ncalc))
+        allocate(new_func(ncalc))
         !$omp parallel do private(i)
         do i = 1, ncalc
-          new_f(i) = DZERO
+          new_func(i) = DZERO
         end do
         !$omp end parallel do
       else
-        l2_pre = l2_new
+        l2norm_pre = l2norm_new
       end if
 
       back_flag = 0 ; back_iter = 0 ; beta_iter = 0
@@ -105,15 +103,15 @@ module nonlinear_solution
 
       if (out_iter == 1) then
         ! -- Calculate l2 norm square (resl2norm2)
-          call calc_l2norm2(1, array_var(1)%rhs, l2_new)
+          call calc_l2norm2(1, array_var(1)%rhs, l2norm_new)
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
           ! -- Sum value for MPI (val)
-            call mpisum_val(l2_new, "initial function l2-norm", sum_l2)
-          l2_new = sum_l2
+            call mpisum_val(l2norm_new, "initial function l2-norm", sum_l2)
+          l2norm_new = sum_l2
         end if
 #endif
-        l2_pre = l2_new ; eta = DHALF
+        l2norm_pre = l2norm_new
       end if
 
       !$omp parallel do private(i)
@@ -125,12 +123,12 @@ module nonlinear_solution
 
       conv_flag = 0
       if (st_sim%sim_type /= -1) then
-        errtol = eta
+        errtol = eater
       else
         errtol = XMAX_INV**3
       end if
       ! -- Solve linear algebra (linalg)
-        call solve_linalg(l2_pre, head_change, l2_jnorm)
+        call solve_linalg(l2norm_pre, head_change, l2norm_jac)
 
       !$omp parallel do private(i)
       do i = 1, nreg_num
@@ -139,31 +137,31 @@ module nonlinear_solution
       !$omp end parallel do
 
       ! -- Check absolute error max norm
-        call check_abserrmax(head_new, head_pre, maxvar, maxunk, maxnun)
+        call check_abserrmax(head_new, head_pre, max_var, max_unk, max_num)
 
 #ifdef MPI_MSG
       if (pro_totn /= 1) then
         ! -- Check mpi max error (mpimaxerr)
-          call check_mpimaxerr(maxvar, maxunk, var_abs_max, unk_max, var_max)
-        check_val = var_abs_max*len_scal ; maxunk = unk_max*len_scal
+          call check_mpimaxerr(max_var, max_unk, var_abs_max, unk_max, var_max)
+        check_val = var_abs_max*len_scal ; max_unk = unk_max*len_scal
       else
-        check_val = abs(maxvar)*len_scal ; maxunk = abs(maxunk)*len_scal
-        var_max = maxvar
+        check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk)*len_scal
+        var_max = max_var
       end if
 #else
-      check_val = abs(maxvar)*len_scal ; maxunk = abs(maxunk)*len_scal
+      check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk)*len_scal
 #endif
-      if (conv_flag /= 0 .and. maxunk == maxunk) then
+      if (conv_flag /= 0 .and. .not. ieee_is_nan(max_unk)) then
         conv_flag = 0
-        if (check_val <= criteria .and. maxunk < XMAX) then
+        if (check_val <= criteria .and. max_unk < XMAX) then
           conv_flag = 1
         end if
-      else if (maxunk /= maxunk .and. st_sim%sim_type /= -1) then
+      else if (ieee_is_nan(max_unk) .and. st_sim%sim_type /= -1) then
         if (my_rank == 0) then
           write(log_fnum,'(a)') "Nan detected."
         end if
         exit outer_loop
-      else if (maxunk /= maxunk .and. st_sim%sim_type == -1) then
+      else if (ieee_is_nan(max_unk) .and. st_sim%sim_type == -1) then
         st_sim%sim_type = 0
         current_t = DZERO
         if (my_rank == 0) then
@@ -175,87 +173,86 @@ module nonlinear_solution
 
       if (conv_flag /= 1 .and. form_switch == 1) then
         ! -- Run backtracking (backtr)
-          call run_backtr()
+          call run_backtr(back_iter, back_flag, beta_iter, l2norm_new, l2norm_pre, l2norm_jac,&
+                          lambda, gradient, max_step, new_func)
         ! -- Check absolute error max norm
-          call check_abserrmax(head_new, head_pre, maxvar, maxunk, maxnun)
+          call check_abserrmax(head_new, head_pre, max_var, max_unk, max_num)
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
           ! -- Check mpi max error (mpimaxerr)
-            call check_mpimaxerr(maxvar, maxunk, var_abs_max, unk_max, var_max)
-          check_val = var_abs_max*len_scal ; maxunk = unk_max*len_scal
+            call check_mpimaxerr(max_var, max_unk, var_abs_max, unk_max, var_max)
+          check_val = var_abs_max*len_scal ; max_unk = unk_max*len_scal
         else
-          check_val = abs(maxvar)*len_scal ; maxunk = abs(maxunk)*len_scal
-          var_max = maxvar
+          check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk)*len_scal
+          var_max = max_var
         end if
 #else
-        check_val = abs(maxvar)*len_scal ; maxunk = abs(maxunk)*len_scal
+        check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk)*len_scal
 #endif
-        if ((check_val >= VARMAX .or. maxunk >= XMAX) .and. st_sim%sim_type /= -1) then
+        if ((check_val >= VARMAX .or. max_unk >= XMAX) .and. st_sim%sim_type /= -1) then
           back_flag = 1
-        else if (check_val <= criteria .and. maxunk < XMAX) then
+        else if (check_val <= criteria .and. max_unk < XMAX) then
           conv_flag = 1
         else if (st_sim%sim_type == -1) then
           back_flag = 0
         end if
         if (conv_flag /= 1 .and. back_flag /= 1) then
-          ! -- Set eater (eater)
-            call set_eater()
+          ! -- Set Eisenstat-Walker forcing term (eise_walk)
+            call set_eise_walk(eater, lambda, l2norm_new, l2norm_pre, l2norm_jac, gradient)
         end if
       end if
 
 !      if (conv_flag /= 1 .and. form_switch == 1 .and. back_flag /= 1) then
 !        ! -- Run under relax using cooley underrelaxation (relaxcooly)
-!          call run_relax_cooly(head_new, head_pre)
+!          call run_relax_cooly(max_var, head_new, head_pre)
 !        ! -- Run under relax using delta-bar-delta underrelaxation (relaxdelta)
 !          call run_relax_delta(head_new, head_pre)
 
 !        ! -- Check absolute error max norm
-!          call check_abserrmax(head_new, head_pre, maxvar, maxunk, maxnun)
+!          call check_abserrmax(head_new, head_pre, max_var, max_unk, max_num)
 !#ifdef MPI_MSG
 !        if (pro_totn /= 1) then
 !          ! -- Check mpi max error (mpimaxerr)
-!            call check_mpimaxerr(maxvar, maxunk, var_abs_max, unk_max, var_max)
-!          check_val = var_abs_max*len_scal ; maxunk = unk_max*len_scal
+!            call check_mpimaxerr(max_var, max_unk, var_abs_max, unk_max, var_max)
+!          check_val = var_abs_max*len_scal ; max_unk = unk_max*len_scal
 !        else
-!          check_val = abs(maxvar)*len_scal ; maxunk = abs(maxunk)*len_scal
+!          check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk)*len_scal
 !        end if
 !#else
-!        check_val = abs(maxvar)*len_scal ; maxunk = abs(maxunk)*len_scal
+!        check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk)*len_scal
 !#endif
-!        if (check_val <= criteria .and. maxunk < XMAX) then
+!        if (check_val <= criteria .and. max_unk < XMAX) then
 !          conv_flag = 1
 !        end if
 !      end if
 
       ! -- Calculate function value (func)
-        call calc_func(head_new, new_f)
+        call calc_func(head_new, new_func)
       ! -- Calculate l2 norm square (resl2norm2)
-        call calc_l2norm2(1, new_f, l2_new)
+        call calc_l2norm2(1, new_func, l2norm_new)
 #ifdef MPI_MSG
       if (pro_totn /= 1) then
         ! -- Sum value for MPI (val)
-          call mpisum_val(l2_new, "new function l2-norm", sum_l2)
-        l2_new = sum_l2
+          call mpisum_val(l2norm_new, "new function l2-norm", sum_l2)
+        l2norm_new = sum_l2
       end if
-      if (maxvar == var_max) then
-        ! -- Get cell number (cnum)
-          call get_cnum(maxnun, cxyzn)
+      if (max_var == var_max) then
+        cxyzn = get_cnum(max_num)
       else
         cxyzn = ""
       end if
-      conv_dmat = array_var(1)%dmat(maxnun)*len_scal**2
-      conv_rhs = array_var(1)%rhs(maxnun)*len_scal**3
-      conv_head = head_new(maxnun)*len_scal
+      conv_dmat = array_var(1)%dmat(max_num)*len_scal**2
+      conv_rhs = array_var(1)%rhs(max_num)*len_scal**3
+      conv_head = head_new(max_num)*len_scal
       ! -- Bcast converge information (convinfo)
-        call bcast_convinfo(cxyzn, conv_dmat, conv_rhs, conv_head, maxvar)
+        call bcast_convinfo(cxyzn, conv_dmat, conv_rhs, conv_head, max_var)
 #else
-      ! -- Get cell number (cnum)
-        call get_cnum(maxnun, cxyzn)
-      conv_dmat = array_var(1)%dmat(maxnun)*len_scal**2
-      conv_rhs = array_var(1)%rhs(maxnun)*len_scal**3
-      conv_head = head_new(maxnun)*len_scal
+      cxyzn = get_cnum(max_num)
+      conv_dmat = array_var(1)%dmat(max_num)*len_scal**2
+      conv_rhs = array_var(1)%rhs(max_num)*len_scal**3
+      conv_head = head_new(max_num)*len_scal
 #endif
-      conv_var = maxvar*len_scal
+      conv_var = max_var*len_scal
       if (my_rank == 0) then
         write(conv_fnum,11) out_iter, in_iter, back_iter, conv_var, trim(adjustl(cxyzn)),&
                             conv_dmat, conv_rhs, conv_head
@@ -290,7 +287,7 @@ module nonlinear_solution
           write(conv_fnum,14)
         end if
         exit outer_loop
-      else if ((abs(conv_var) >= VARMAX .or. maxunk >= XMAX) .and. st_sim%sim_type /= -1) then
+      else if ((abs(conv_var) >= VARMAX .or. max_unk >= XMAX) .and. st_sim%sim_type /= -1) then
         if (my_rank == 0) then
           write(conv_fnum,12)
         end if
@@ -299,7 +296,7 @@ module nonlinear_solution
 
     end do outer_loop
 
-    deallocate(new_f)
+    deallocate(new_func)
 
   end subroutine calc_numsol
 
@@ -401,16 +398,19 @@ module nonlinear_solution
 
   end subroutine calc_surfw
 
-  subroutine set_backtr
+  subroutine set_backtr(maxstep)
   !*********************************************************************************************
   ! set_backtr -- Set for backtracking
   !*********************************************************************************************
     ! -- modules
 
     ! -- inout
-
+    real(DP), intent(out) :: maxstep
     ! -- local
     real(DP) :: l2_xnew
+#ifdef MPI_MSG
+    real(DP) :: sum_l2
+#endif
     !-------------------------------------------------------------------------------------------
     ! -- Calculate l2 norm square (resl2norm2)
       call calc_l2norm2(1, head_new, l2_xnew)
@@ -429,21 +429,24 @@ module nonlinear_solution
 
   end subroutine set_backtr
 
-  subroutine set_eater
+  subroutine set_eise_walk(lam, l2_new, l2_pre, l2_jac, grad, eta)
   !*********************************************************************************************
-  ! set_eater -- Set eater
+  ! set_eise_walk -- Set Eisenstat-Walker forcing term
   !*********************************************************************************************
     ! -- modules
 
     ! -- inout
-
+    real(DP), intent(in) :: lam, l2_new, l2_pre, l2_jac, grad
+    real(DP), intent(out) :: eta
     ! -- local
-    real(DP) :: eta_max = 0.9_DP, eta_min = 1.0E-4_DP, eta_safe, minus1, l2_line
-    real(DP) :: eta_alpha = (DONE+sqrt(5.0_DP))/DTWO, lin_l2norm
+    real(DP), parameter :: EW_ETA_MAX   = 0.9_DP
+    real(DP), parameter :: EW_ETA_MIN   = 1.0E-4_DP
+    real(DP), parameter :: EW_ETA_ALPHA = (1.0_DP+sqrt(5.0_DP))*DHALF
+    real(DP) :: eta_safe, minus1, l2_line, lin_l2norm
     !-------------------------------------------------------------------------------------------
-    eta_safe = eta**eta_alpha
+    eta_safe = eta**EW_ETA_ALPHA
     minus1 = DONE - lam
-    l2_line = minus1*minus1*l2_pre + DTWO*lam*minus1*gradient + lam*lam*l2_jnorm
+    l2_line = minus1*minus1*l2_pre + DTWO*lam*minus1*grad + lam*lam*l2_jac
     lin_l2norm = sqrt(max(DZERO, l2_line))
     eta = abs(sqrt(l2_new) - lin_l2norm)/sqrt(l2_pre)
 
@@ -452,12 +455,12 @@ module nonlinear_solution
     end if
 
     eta = max(eta, eta_safe)
-    eta = max(eta, eta_min)
-    eta = min(eta, eta_max)
+    eta = max(eta, EW_ETA_MIN)
+    eta = min(eta, EW_ETA_MAX)
 
-  end subroutine set_eater
+  end subroutine set_eise_walk
 
-  subroutine run_backtr
+  subroutine run_backtr(backi, backf, betai, l2_new, l2_pre, l2_jac, lam, grad, maxstep, new_f)
   !*********************************************************************************************
   ! run_backtr -- Run backtracking
   !*********************************************************************************************
@@ -468,17 +471,22 @@ module nonlinear_solution
     use mpi_utility, only: mpimax_val
 #endif
     ! -- inout
-
+    integer(I4), intent(inout) :: backi, backf, betai
+    real(DP), intent(inout) :: l2_new, l2_jac, lam
+    real(DP), intent(in) :: l2_pre, maxstep
+    real(DP), intent(out) :: grad
+    real(DP), intent(inout) :: new_f(:)
     ! -- local
     integer(I4) :: i
     real(DP) :: l2_new2, l2_pnorm, slope, av, bv, rhs1, rhs2, root, step_len, step_tol
     real(DP) :: lam2, temp_lam, lam_inv, lam2_inv, del_lam, lam_max, lam_min
     real(DP) :: lam_length, lam_base, lam_diff, lam_incr, sql2_pnorm, maxpnorm
     real(DP) :: alpha_cond, beta_cond
-    real(DP) :: back_alpha = 1.00E-4_DP, back_beta = 0.9_DP
+    real(DP), parameter :: back_alpha = 1.00E-4_DP
+    real(DP), parameter :: back_beta  = 0.9_DP
     real(DP), allocatable :: jacvec(:)
 #ifdef MPI_MSG
-    real(DP) :: max_val
+    real(DP) :: sum_l2, max_val
 #endif
     !-------------------------------------------------------------------------------------------
     l2_new2 = l2_new ; lam = DONE ; lam2 = DONE ; maxpnorm = DONE ; lam_length = DONE
@@ -536,7 +544,7 @@ module nonlinear_solution
     !$omp end do
     !$omp end parallel
 
-    l2_jnorm = l2_jnorm*maxpnorm*maxpnorm
+    l2_jac = l2_jac*maxpnorm*maxpnorm
 
     deallocate(jacvec)
 
@@ -555,14 +563,14 @@ module nonlinear_solution
 #endif
     step_tol = MACHI_EPS**(2.0_DP/3.0_DP)
     lam_min = step_tol/lam_length ; alpha_cond = DHALF*l2_pre + back_alpha*lam*slope
-    gradient = slope
+    grad = slope
     back_aloop: do
       if (DHALF*l2_new <= alpha_cond) then
         exit back_aloop
       end if
-      back_iter = back_iter + 1
+      backi = backi + 1
       ! -- Calculate function and l2norm2 (func2norm)
-        call calc_funcl2norm(lam)
+        call calc_funcl2norm(lam, l2_new, new_f)
 
       if (lam == DONE) then
         temp_lam = -slope/(DTWO*(DHALF*l2_new-DHALF*l2_pre-slope))
@@ -593,7 +601,7 @@ module nonlinear_solution
       l2_new2 = DHALF*l2_new
       lam = max(temp_lam, 0.1_DP*lam)
       if (lam < lam_min) then
-        back_flag = 1
+        backf = 1
         return
       end if
       alpha_cond = DHALF*l2_pre + back_alpha*lam*slope
@@ -611,7 +619,7 @@ module nonlinear_solution
           end if
           lam2 = lam ; l2_new2 = DHALF*l2_new ; lam = min(DTWO*lam, lam_max)
           ! -- Calculate function and l2norm2 (func2norm)
-            call calc_funcl2norm(lam)
+            call calc_funcl2norm(lam, l2_new, new_f)
           alpha_cond = DHALF*l2_pre + back_alpha*lam*slope
           beta_cond = DHALF*l2_pre + back_beta*lam*slope
         end do b1_loop
@@ -626,7 +634,7 @@ module nonlinear_solution
           end if
           lam_incr = DHALF*lam_diff ; lam = lam_base + lam_incr
           ! -- Calculate function and l2norm2 (func2norm)
-            call calc_funcl2norm(lam)
+            call calc_funcl2norm(lam, l2_new, new_f)
           alpha_cond = DHALF*l2_pre + back_alpha*lam*slope
           beta_cond = DHALF*l2_pre + back_beta*lam*slope
 
@@ -642,11 +650,11 @@ module nonlinear_solution
 
         if (DHALF*l2_new < beta_cond) then
           ! -- Calculate function and l2norm2 (func2norm)
-            call calc_funcl2norm(lam_base)
-          beta_iter = beta_iter + 1
+            call calc_funcl2norm(lam_base, l2_new, new_f)
+          betai = betai + 1
         end if
-        if (beta_iter == 10) then
-          back_flag = 1
+        if (betai == 10) then
+          backf = 1
           return
         end if
       end if
@@ -654,13 +662,14 @@ module nonlinear_solution
 
   end subroutine run_backtr
 
-!  subroutine run_relax_cooly(x_new, x_pre)
+!  subroutine run_relax_cooly(maxvar, x_new, x_pre)
 !  !***************************************************************************************
 !  ! run_relax_cooly -- Run under relax using cooley underrelaxation
 !  !***************************************************************************************
 !    ! -- modules
 !
 !    ! -- inout
+!    real(DP), intent(in) :: maxvar
 !    real(DP), intent(inout) :: x_new(:), x_pre(:)
 !    ! -- local
 !    integer(I4) :: i
@@ -760,7 +769,7 @@ module nonlinear_solution
 !
 !  end subroutine run_relax_delta
 
-  subroutine get_cnum(calc_num, char_cell)
+  function get_cnum(calc_num) result(char_cell)
   !*********************************************************************************************
   ! get_cnum -- Get cell number
   !*********************************************************************************************
@@ -769,22 +778,25 @@ module nonlinear_solution
     use set_cell, only: get_calc_grid
     ! -- inout
     integer(I4), intent(in) :: calc_num
-    character(*), intent(out) :: char_cell
     ! -- local
     integer(I4) :: i_num, j_num, k_num
     character(:), allocatable :: cx_num, cy_num, cz_num
+    character(:), allocatable :: char_cell
     !-------------------------------------------------------------------------------------------
     ! -- Get calculation number from grid number (calc_grid)
       call get_calc_grid(calc_num, i_num, j_num, k_num)
 
-    allocate(character(get_ilen(i_num)) :: cx_num, cy_num, cz_num)
+    allocate(character(get_ilen(i_num)) :: cx_num)
+    allocate(character(get_ilen(j_num)) :: cy_num)
+    allocate(character(get_ilen(k_num)) :: cz_num)
+
     call conv_i2s(i_num, cx_num) ; call conv_i2s(j_num, cy_num) ; call conv_i2s(k_num, cz_num)
 
     char_cell = "("//cx_num//","//cy_num//","//cz_num//")"
 
-  end subroutine get_cnum
+  end function get_cnum
 
-  subroutine calc_funcl2norm(in_lam)
+  subroutine calc_funcl2norm(in_lam, l2_new, new_f)
   !*********************************************************************************************
   ! calc_funcl2norm -- Calculate function and l2norm2
   !*********************************************************************************************
@@ -792,8 +804,13 @@ module nonlinear_solution
 
     ! -- inout
     real(DP), intent(in) :: in_lam
+    real(DP), intent(out) :: l2_new
+    real(DP), intent(inout) :: new_f(:)
     ! -- local
     integer(I4) :: i
+#ifdef MPI_MSG
+    real(DP) :: sum_l2
+#endif
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, nreg_num

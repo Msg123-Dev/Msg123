@@ -93,6 +93,7 @@ module calc_simulation
     real(DP), allocatable :: res2sum(:), temp_l2(:)
     !-------------------------------------------------------------------------------------------
     nres2 = crs_index(rlevel)%unknow
+    resl2 = DZERO
     allocate(res2sum(nres2), temp_l2(nres2))
     !$omp parallel
     !$omp do private(i)

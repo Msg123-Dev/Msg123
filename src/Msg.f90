@@ -5,12 +5,15 @@ program msg123
   ! -- modules
   use kind_module, only: I4, DP
   use utility_module, only: log_fnum
-  use initial_module, only: my_rank, init_msg
+  use initial_module, only: my_rank, init_msg, precon_type
   use read_input, only: read_main_file
   use set_cell, only: set_cell_info
   use prep_calculation, only: prepare_calc, conv_flag
   use set_boundary, only: set_bound
   use allocate_solution, only: allocate_solvar
+  use calc_function, only: allocate_calfun
+  use make_linearsystem, only: allocate_matvec
+  use linear_solution, only: allocate_amgalg
   use time_module, only: update_tstep, now_time
   use nonlinear_solution, only: calc_numsol
   use write_output, only: write_outf
@@ -74,6 +77,14 @@ program msg123
 
   ! -- Allocate solution variable for time step (solvar)
     call allocate_solvar()
+  ! -- Allocate for calculate function value (calfun)
+    call allocate_calfun()
+  ! -- Allocate for matrix and vector (matvec)
+    call allocate_matvec()
+  if (precon_type == 1) then
+    ! -- Allocate for amg algebra (amgalg)
+      call allocate_amgalg()
+  end if
 
   if (my_rank == 0) then
     ! -- Time loop start time

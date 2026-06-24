@@ -96,6 +96,7 @@ module make_amg_matrix
     !$omp end do
     !$omp end parallel
 
+    nonaggr_index(0) = 0
     nonaggr = 0
 
     do i = 1, nfine

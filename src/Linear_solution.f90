@@ -3,7 +3,7 @@ module linear_solution
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE, DINFI
   use initial_module, only: precon_type, maxinn_iter, nlevel, pro_totn
-  use allocate_solution, only: array_var, crs_index, dir_conn
+  use allocate_solution, only: nreg_num, array_var, crs_index, dir_conn
   use prep_calculation, only: conv_flag
   use check_simulation, only: check_insol
   use calc_simulation, only: calc_l2norm2, calc_resi
@@ -14,14 +14,48 @@ module linear_solution
 
   implicit none
   private
-  public :: solve_linalg
+  public :: allocate_amgalg, solve_linalg
   integer(I4), public :: in_iter
 
   ! -- local
   real(DP) :: bnorm, rnorm
   real(DP), allocatable :: resi(:)
+  real(DP), allocatable :: amg_td(:), amg_tx(:), amg_tb(:), amg_tr(:)
+  real(DP), allocatable :: amg_trhs(:), amg_tfx(:)
+  real(DP), allocatable :: amg_tlu(:)
 
   contains
+
+  subroutine allocate_amgalg()
+  !*********************************************************************************************
+  ! allocate_amgalg -- Allocate for amg algebra
+  !*********************************************************************************************
+    ! -- module
+    use set_condition, only: tconn_num
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i
+    !-------------------------------------------------------------------------------------------
+    allocate(amg_td(nreg_num), amg_tx(nreg_num), amg_tb(nreg_num), amg_tr(nreg_num))
+    allocate(amg_trhs(nreg_num), amg_tfx(nreg_num), amg_tlu(tconn_num))
+
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, nreg_num
+      amg_td(i) = DZERO ; amg_tx(i) = DZERO ; amg_tb(i) = DZERO ; amg_tr(i) = DZERO
+      amg_trhs(i) = DZERO ; amg_tfx(i) = DZERO
+    end do
+    !$omp end do
+
+    !$omp do private(i)
+    do i = 1, tconn_num
+      amg_tlu(i) = DZERO
+    end do
+    !$omp end do
+    !$omp end parallel
+
+  end subroutine allocate_amgalg
 
   subroutine solve_linalg(init_norm, inx, last_norm)
   !*********************************************************************************************
@@ -72,7 +106,6 @@ module linear_solution
     integer(I4) :: n, d_size, lu_size, reg_size
     real(DP) :: sk, sk0, sk2, alpha, beta
     real(DP), allocatable :: d(:), z(:), p(:), q(:)
-    real(DP), allocatable :: level_d(:), level_lu(:), level_b(:)
 #ifdef MPI_MSG
     real(DP) :: sum_sk, sum_rnorm
 #endif
@@ -83,14 +116,11 @@ module linear_solution
 
     sk = DZERO ; sk0 = DINFI ; sk2 = DZERO ; alpha = DZERO ; beta = DZERO
     allocate(d(reg_size), z(reg_size), p(reg_size), q(d_size))
-    allocate(level_d(reg_size), level_lu(lu_size), level_b(reg_size))
     !$omp parallel
     !$omp do private(n)
     do n = 1, reg_size
-      d(n) = DZERO ; z(n) = DZERO ; p(n) = DZERO
+      z(n) = DZERO ; p(n) = DZERO
       d(n) = array_var(level)%dmat(n)
-      level_d(n) = array_var(level)%dmat(n)
-      level_b(n) = array_var(level)%rhs(n)
     end do
     !$omp end do
     !$omp do private(n)
@@ -98,32 +128,28 @@ module linear_solution
       q(n) = DZERO
     end do
     !$omp end do
-    !$omp do private(n)
-    do n = 1, lu_size
-      level_lu(n) = array_var(level)%lumat(n)
-    end do
-    !$omp end do
     !$omp end parallel
 
     ! -- Calculate residual (resi)
-      call calc_resi(level, d_size, level_d, level_lu, inx, level_b, resi)
+      call calc_resi(level, d_size, array_var(level)%dmat, array_var(level)%lumat, inx,&
+                     array_var(level)%rhs, resi)
 
 !    if (precon_type == 0) then
 #ifdef MPI_MSG
       if (pro_totn /= 1 .and. level == 1) then
         ! -- Preconditon mpi incomplete lu diagonal (mpi_dilu)
-          call precon_mpi_dilu(level_d, level_lu, d)
+          call precon_mpi_dilu(array_var(level)%dmat, array_var(level)%lumat, d)
       else
 !        ! -- Preconditon diagonal scaling (dscal)
-!          call precon_dscal(d_size, level_d, d)
+!          call precon_dscal(d_size, array_var(level)%dmat, d)
         ! -- Preconditon incomplete lu diagonal (dilu)
-          call precon_dilu(level, d_size, level_d, level_lu, d)
+          call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, d)
       end if
 #else
 !      ! -- Preconditon diagonal scaling (dscal)
-!        call precon_dscal(d_size, level_d, d)
+!        call precon_dscal(d_size, array_var(level)%dmat, d)
       ! -- Preconditon incomplete lu diagonal (dilu)
-        call precon_dilu(level, d_size, level_d, level_lu, d)
+        call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, d)
 #endif
 !    end if
 
@@ -140,18 +166,18 @@ module linear_solution
 #ifdef MPI_MSG
         if (pro_totn /= 1 .and. level == 1) then
           ! -- Solve mpi ilu factorization (ilu)
-            call solve_mpi_ilu(resi, d, level_lu, z)
+            call solve_mpi_ilu(resi, d, array_var(level)%lumat, z)
         else
 !          ! -- Solve preconditioned diagonal system (dsys)
 !            call solve_dsys(d_size, resi, d, z)
           ! -- Solve ilu factorization (ilu)
-            call solve_ilu(level, d_size, resi, d, level_lu, z)
+            call solve_ilu(level, d_size, resi, d, array_var(level)%lumat, z)
         end if
 #else
 !        ! -- Solve preconditioned diagonal system (dsys)
 !          call solve_dsys(d_size, resi, d, z)
         ! -- Solve ilu factorization (ilu)
-          call solve_ilu(level, d_size, resi, d, level_lu, z)
+          call solve_ilu(level, d_size, resi, d, array_var(level)%lumat, z)
 #endif
       else if (precon_type == 1) then
         ! -- Loop cycle for amg (amg)
@@ -195,7 +221,7 @@ module linear_solution
       end if
 #endif
       ! -- Calculate matrix-vector multiplication (matvec)
-        call calc_matvec(level, d_size, p, level_d, level_lu, q)
+        call calc_matvec(level, d_size, p, array_var(level)%dmat, array_var(level)%lumat, q)
 
       sk2 = DZERO
       !$omp parallel do private(n) reduction(+:sk2)
@@ -248,7 +274,7 @@ module linear_solution
 
     end do pcg_inter
 
-    deallocate(d, z, p, q, level_d, level_lu, level_b)
+    deallocate(d, z, p, q)
 
   end subroutine solve_pcg
 
@@ -265,7 +291,6 @@ module linear_solution
     integer(I4) :: n, d_size, lu_size, reg_size
     real(DP) :: sk, sk0, sk2, alpha, beta, bicgs_omega, ts, tt
     real(DP), allocatable :: d(:), z(:), p(:), v(:), rs(:), t(:)
-    real(DP), allocatable :: level_d(:), level_lu(:), level_b(:)
 #ifdef MPI_MSG
     real(DP) :: sum_sk, sum_rnorm
 #endif
@@ -277,14 +302,11 @@ module linear_solution
     sk = DZERO ; sk0 = DINFI ; sk2 = DZERO ; alpha = DZERO ; beta = DZERO
     bicgs_omega = DONE ; ts = DZERO ; tt = DZERO
     allocate(d(reg_size), z(reg_size), p(reg_size), v(d_size), rs(d_size), t(d_size))
-    allocate(level_d(reg_size), level_lu(lu_size), level_b(reg_size))
     !$omp parallel
     !$omp do private(n)
     do n = 1, reg_size
       z(n) = DZERO ; p(n) = DZERO
       d(n) = array_var(level)%dmat(n)
-      level_d(n) = array_var(level)%dmat(n)
-      level_b(n) = array_var(level)%rhs(n)
     end do
     !$omp end do
     !$omp do private(n)
@@ -292,32 +314,28 @@ module linear_solution
       v(n) = DZERO ; rs(n) = DZERO ; t(n) = DZERO
     end do
     !$omp end do
-    !$omp do private(n)
-    do n = 1, lu_size
-      level_lu(n) = array_var(level)%lumat(n)
-    end do
-    !$omp end do
     !$omp end parallel
 
     ! -- Calculate residual (resi)
-      call calc_resi(level, d_size, level_d, level_lu, inx, level_b, resi)
+      call calc_resi(level, d_size, array_var(level)%dmat, array_var(level)%lumat, inx,&
+                     array_var(level)%rhs, resi)
 
 !    if (precon_type == 0) then
 #ifdef MPI_MSG
       if (pro_totn /= 1 .and. level == 1) then
         ! -- Preconditon mpi incomplete lu diagonal (mpi_dilu)
-          call precon_mpi_dilu(level_d, level_lu, d)
+          call precon_mpi_dilu(array_var(level)%dmat, array_var(level)%lumat, d)
       else
 !        ! -- Preconditon diagonal scaling (dscal)
-!          call precon_dscal(d_size, level_d, d)
+!          call precon_dscal(d_size, array_var(level)%dmat, d)
         ! -- Preconditon incomplete lu diagonal (dilu)
-          call precon_dilu(level, d_size, level_d, level_lu, d)
+          call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, d)
       end if
 #else
 !      ! -- Preconditon diagonal scaling (dscal)
-!        call precon_dscal(d_size, level_d, d)
+!        call precon_dscal(d_size, array_var(level)%dmat, d)
       ! -- Preconditon incomplete lu diagonal (dilu)
-        call precon_dilu(level, d_size, level_d, level_lu, d)
+        call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, d)
 #endif
 !    end if
 
@@ -374,16 +392,16 @@ module linear_solution
 #ifdef MPI_MSG
         if (pro_totn /= 1 .and. level == 1) then
           ! -- Solve mpi ilu factorization (ilu)
-            call solve_mpi_ilu(p, d, level_lu, z)
+            call solve_mpi_ilu(p, d, array_var(level)%lumat, z)
         else
           ! -- Solve ilu factorization (ilu)
-            call solve_ilu(level, d_size, p, d, level_lu, z)
+            call solve_ilu(level, d_size, p, d, array_var(level)%lumat, z)
         end if
 #else
 !        ! -- Solve preconditioned diagonal system (dsys)
 !          call solve_dsys(d_size, p, d, z)
         ! -- Solve ilu factorization (ilu)
-          call solve_ilu(level, d_size, p, d, level_lu, z)
+          call solve_ilu(level, d_size, p, d, array_var(level)%lumat, z)
 #endif
       else if (precon_type == 1) then
         ! -- Loop cycle for amg (amg)
@@ -398,7 +416,7 @@ module linear_solution
 #endif
 
       ! -- Calculate matrix-vector multiplication (matvec)
-        call calc_matvec(level, d_size, z, level_d, level_lu, v)
+        call calc_matvec(level, d_size, z, array_var(level)%dmat, array_var(level)%lumat, v)
 
       sk2 = DZERO
       !$omp parallel do private(n) reduction(+:sk2)
@@ -449,16 +467,16 @@ module linear_solution
 #ifdef MPI_MSG
           if (pro_totn /= 1 .and. level == 1) then
             ! -- Solve mpi ilu factorization (ilu)
-              call solve_mpi_ilu(resi, d, level_lu, z)
+              call solve_mpi_ilu(resi, d, array_var(level)%lumat, z)
           else
             ! -- Solve ilu factorization (ilu)
-              call solve_ilu(level, d_size, resi, d, level_lu, z)
+              call solve_ilu(level, d_size, resi, d, array_var(level)%lumat, z)
           end if
 #else
 !        ! -- Solve preconditioned diagonal system (dsys)
 !          call solve_dsys(d_size, resi, d, z)
         ! -- Solve ilu factorization (ilu)
-          call solve_ilu(level, d_size, resi, d, level_lu, z)
+          call solve_ilu(level, d_size, resi, d, array_var(level)%lumat, z)
 #endif
         else if (precon_type == 1) then
         ! -- Loop cycle for amg (amg)
@@ -473,7 +491,7 @@ module linear_solution
 #endif
 
         ! -- Calculate matrix-vector multiplication (matvec)
-          call calc_matvec(level, d_size, z, level_d, level_lu, t)
+          call calc_matvec(level, d_size, z, array_var(level)%dmat, array_var(level)%lumat, t)
 
         ts = DZERO ; tt = DZERO
         !$omp parallel
@@ -538,7 +556,7 @@ module linear_solution
 
     end do bicg_inter
 
-    deallocate(d, z, p, v, rs, t, level_d, level_lu, level_b)
+    deallocate(d, z, p, v, rs, t)
 
   end subroutine solve_bicgs
 
@@ -560,19 +578,19 @@ module linear_solution
     integer(I4) :: v_iter, vlevel, ncoa, nfin
 !    integer(I4) :: sweep
     integer(I4) :: rst, ren, pst, pen
-    real(DP), allocatable :: temp_d(:), temp_lu(:), temp_r(:), temp_x(:), temp_b(:)
-    real(DP), allocatable :: trhs(:), tx(:)
+    real(DP), allocatable :: save_rhs(:)
     !-------------------------------------------------------------------------------------------
     mgd_size = crs_index(llevel)%unknow ; mgreg_size = size(array_var(llevel)%x)
+    allocate(save_rhs(mgreg_size))
     !$omp parallel
     !$omp do private(i)
     do i = 1, mgd_size
       array_var(llevel)%x(i) = DZERO
-      array_var(llevel)%dmat(i) = d(i)
     end do
     !$omp end do
     !$omp do private(i)
     do i = 1, mgreg_size
+      save_rhs(i) = array_var(llevel)%rhs(i)
       array_var(llevel)%rhs(i) = r(i)
     end do
     !$omp end do
@@ -584,73 +602,78 @@ module linear_solution
         d_size = crs_index(vlevel)%unknow
         lu_size = crs_index(vlevel)%lunum
         reg_size = size(array_var(vlevel)%x)
-
-        allocate(temp_d(reg_size), temp_lu(lu_size), temp_x(reg_size), temp_b(reg_size))
-        allocate(temp_r(reg_size))
         !$omp parallel
         !$omp do private(i)
         do i = 1, reg_size
-          temp_d(i) = array_var(vlevel)%dmat(i)
-          temp_x(i) = array_var(vlevel)%x(i)
-          temp_b(i) = array_var(vlevel)%rhs(i)
-          temp_r(i) = DZERO
+          amg_td(i) = array_var(vlevel)%dmat(i)
+          amg_tx(i) = array_var(vlevel)%x(i)
+          amg_tb(i) = array_var(vlevel)%rhs(i)
+          amg_tr(i) = DZERO
         end do
         !$omp end do
         !$omp do private(i)
         do i = 1, lu_size
-          temp_lu(i) = array_var(vlevel)%lumat(i)
+          amg_tlu(i) = array_var(vlevel)%lumat(i)
         end do
         !$omp end do
+        if (vlevel == llevel) then
+          !$omp do private(i)
+          do i = 1, d_size
+            amg_td(i) = d(i)
+          end do
+          !$omp end do
+        end if
         !$omp end parallel
 
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
           ! -- Send and Receive real vector value (rvectv)
-            call senrec_rvectv(temp_x)
-            call senrec_rvectv(temp_b)
+            call senrec_rvectv(amg_tx(1:reg_size))
+            call senrec_rvectv(amg_tb(1:reg_size))
         end if
-        if (pro_totn /= 1 .and. vlevel == 1) then
+        if (pro_totn /= 1 .and. vlevel == llevel) then
           ! -- Solve mpi ilu factorization (ilu)
-            call solve_mpi_ilu(temp_b, temp_d, temp_lu, temp_x)
+            call solve_mpi_ilu(amg_tb(1:reg_size), amg_td(1:reg_size), amg_tlu(1:reg_size),&
+                               amg_tx(1:reg_size))
         else
           ! -- Solve ilu factorization (ilu)
-            call solve_ilu(vlevel, d_size, temp_b, temp_d, temp_lu, temp_x)
+            call solve_ilu(vlevel, d_size, amg_tb(1:reg_size), amg_td(1:reg_size),&
+                           amg_tlu(1:lu_size), amg_tx(1:reg_size))
         end if
 #else
 !        ! -- Solve preconditioned diagonal system (dsys)
-!          call solve_dsys(d_size, temp_b, temp_d, temp_x)
+!          call solve_dsys(d_size, amg_tb, amg_td, amg_tx)
         ! -- Solve ilu factorization (ilu)
-          call solve_ilu(vlevel, d_size, temp_b, temp_d, temp_lu, temp_x)
+          call solve_ilu(vlevel, d_size, amg_tb(1:reg_size), amg_td(1:reg_size),&
+                         amg_tlu(1:lu_size), amg_tx(1:reg_size))
 !        do sweep = 1, max_sweep
-!          call smooth_gs(vlevel, d_size, temp_d, temp_lu, temp_b, temp_x)
+!          call smooth_gs(vlevel, d_size, amg_td, amg_tlu, amg_tb, amg_tx)
 !        end do
 #endif
 
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
           ! -- Send and Receive real vector value (rvectv)
-            call senrec_rvectv(temp_x)
+            call senrec_rvectv(amg_tx(1:reg_size))
         end if
 #endif
 
         ! -- Calculate residual
-          call calc_resi(vlevel, d_size, temp_d, temp_lu, temp_x, temp_b, temp_r)
-
-        deallocate(temp_d, temp_lu, temp_x, temp_b)
+          call calc_resi(vlevel, d_size, amg_td(1:reg_size), amg_tlu(1:lu_size),&
+                         amg_tx(1:reg_size), amg_tb(1:reg_size), amg_tr(1:reg_size))
 
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
           ! -- Send and Receive real vector value (rvectv)
-            call senrec_rvectv(temp_r)
+            call senrec_rvectv(amg_tr(1:reg_size))
         end if
 #endif
 
         ncoa = crs_index(vlevel+1)%unknow
-        allocate(trhs(ncoa))
         !$omp parallel
         !$omp do private(i)
         do i = 1, ncoa
-          trhs(i) = DZERO
+          amg_trhs(i) = DZERO
         end do
         !$omp end do
         !$omp do private(i, j, k, rst, ren)
@@ -659,9 +682,9 @@ module linear_solution
           ren = res_var(vlevel+1)%rindex(i)
           do k = rst, ren
             j = res_var(vlevel+1)%roffrow(k)
-            trhs(i) = trhs(i) + res_var(vlevel+1)%rval(k)*temp_r(j)
+            amg_trhs(i) = amg_trhs(i) + res_var(vlevel+1)%rval(k)*amg_tr(j)
           end do
-          array_var(vlevel+1)%rhs(i) = trhs(i)
+          array_var(vlevel+1)%rhs(i) = amg_trhs(i)
         end do
         !$omp end do
 
@@ -671,75 +694,78 @@ module linear_solution
         end do
         !$omp end do
         !$omp end parallel
-
-        deallocate(temp_r, trhs)
-
       end do
 
       d_size = crs_index(nlevel)%unknow
       lu_size = crs_index(nlevel)%lunum
       reg_size = size(array_var(nlevel)%x)
 
-      allocate(temp_d(d_size), temp_lu(lu_size), temp_x(reg_size), temp_b(reg_size))
       !$omp parallel
       !$omp do private(i)
       do i = 1, d_size
-        temp_d(i) = array_var(nlevel)%dmat(i)
+        amg_td(i) = array_var(nlevel)%dmat(i)
       end do
       !$omp end do
       !$omp do private(i)
       do i = 1, lu_size
-        temp_lu(i) = array_var(nlevel)%lumat(i)
+        amg_tlu(i) = array_var(nlevel)%lumat(i)
       end do
       !$omp end do
       !$omp do private(i)
       do i = 1, reg_size
-        temp_x(i) = array_var(nlevel)%x(i)
-        temp_b(i) = array_var(nlevel)%rhs(i)
+        amg_tx(i) = array_var(nlevel)%x(i)
+        amg_tb(i) = array_var(nlevel)%rhs(i)
       end do
       !$omp end do
+      if (vlevel == llevel) then
+        !$omp do private(i)
+        do i = 1, d_size
+          amg_td(i) = d(i)
+        end do
+        !$omp end do
+      end if
       !$omp end parallel
 
 #ifdef MPI_MSG
       if (pro_totn /= 1) then
         ! -- Send and Receive real vector value (rvectv)
-          call senrec_rvectv(temp_x)
-          call senrec_rvectv(temp_b)
+          call senrec_rvectv(amg_tx(1:reg_size))
+          call senrec_rvectv(amg_tb(1:reg_size))
       end if
-      if (pro_totn /= 1 .and. nlevel == 1) then
+      if (pro_totn /= 1 .and. nlevel == llevel) then
         ! -- Solve mpi ilu factorization (ilu)
-          call solve_mpi_ilu(temp_b, temp_d, temp_lu, temp_x)
+          call solve_mpi_ilu(amg_tb(1:reg_size), amg_td(1:d_size), amg_tlu(1:lu_size),&
+                             amg_tx(1:reg_size))
       else
         ! -- Solve ilu factorization (ilu)
-          call solve_ilu(nlevel, d_size, temp_b, temp_d, temp_lu, temp_x)
+          call solve_ilu(nlevel, d_size, amg_tb(1:reg_size), amg_td(1:d_size),&
+                         amg_tlu(1:lu_size), amg_tx(1:reg_size))
       end if
 #else
 !      ! -- Solve preconditioned diagonal system (dsys)
-!        call solve_dsys(d_size, temp_b, temp_d, temp_x)
-      ! -- Solve ilu factorization (ilu)
-        call solve_ilu(nlevel, d_size, temp_b, temp_d, temp_lu, temp_x)
+!        call solve_dsys(d_size, amg_tb, amg_td, amg_tx)
+        ! -- Solve ilu factorization (ilu)
+        call solve_ilu(nlevel, d_size, amg_tb(1:reg_size), amg_td(1:d_size),&
+                       amg_tlu(1:lu_size), amg_tx(1:reg_size))
 !      do sweep = 1, max_sweep
-!        call smooth_gs(nlevel, d_size, temp_d, temp_lu, temp_b, temp_x)
+!        call smooth_gs(nlevel, d_size, amg_td, amg_tlu, amg_tb, amg_tx)
 !      end do
 #endif
 
 #ifdef MPI_MSG
       if (pro_totn /= 1) then
         ! -- Send and Receive real vector value (rvectv)
-          call senrec_rvectv(temp_x)
+          call senrec_rvectv(amg_tx(1:reg_size))
       end if
 #endif
-      array_var(nlevel)%x(:) = temp_x(:)
-
-      deallocate(temp_d, temp_lu, temp_x, temp_b)
+      array_var(nlevel)%x(:) = amg_tx(1:reg_size)
 
       do vlevel = nlevel-1, llevel, -1
         nfin = crs_index(vlevel+1)%unknow
-        allocate(tx(nfin))
         !$omp parallel
         !$omp do private(i)
         do i = 1, nfin
-          tx(i) = DZERO
+          amg_tfx(i) = DZERO
         end do
         !$omp end do
         !$omp do private(i, j, k, pst, pen)
@@ -748,60 +774,67 @@ module linear_solution
           pen = pro_var(vlevel+1)%pindex(i)
           do k = pst, pen
             j = pro_var(vlevel+1)%poffrow(k)
-            tx(i) = tx(i) + pro_var(vlevel+1)%pval(k)*array_var(vlevel+1)%x(j)
+            amg_tfx(i) = amg_tfx(i) + pro_var(vlevel+1)%pval(k)*array_var(vlevel+1)%x(j)
           end do
-          array_var(vlevel)%x(i) = array_var(vlevel)%x(i) + tx(i)
+          array_var(vlevel)%x(i) = array_var(vlevel)%x(i) + amg_tfx(i)
         end do
         !$omp end do
         !$omp end parallel
-
-        deallocate(tx)
 
         d_size = crs_index(vlevel)%unknow
         lu_size = crs_index(vlevel)%lunum
         reg_size = size(array_var(vlevel)%x)
 
-        allocate(temp_d(reg_size), temp_lu(lu_size), temp_x(reg_size), temp_b(reg_size))
         !$omp parallel
         !$omp do private(i)
         do i = 1, reg_size
-          temp_d(i) = array_var(vlevel)%dmat(i)
-          temp_x(i) = array_var(vlevel)%x(i)
-          temp_b(i) = array_var(vlevel)%rhs(i)
+          amg_td(i) = array_var(vlevel)%dmat(i)
+          amg_tx(i) = array_var(vlevel)%x(i)
+          amg_tb(i) = array_var(vlevel)%rhs(i)
         end do
         !$omp end do
         !$omp do private(i)
         do i = 1, lu_size
-          temp_lu(i) = array_var(vlevel)%lumat(i)
+          amg_tlu(i) = array_var(vlevel)%lumat(i)
         end do
         !$omp end do
+        if (vlevel == llevel) then
+          !$omp do private(i)
+          do i = 1, d_size
+            amg_td(i) = d(i)
+          end do
+          !$omp end do
+        end if
         !$omp end parallel
 
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
           ! -- Send and Receive real vector value (rvectv)
-            call senrec_rvectv(temp_x)
-            call senrec_rvectv(temp_b)
+            call senrec_rvectv(amg_tx(1:reg_size))
+            call senrec_rvectv(amg_tb(1:reg_size))
         end if
-        if (pro_totn /= 1 .and. vlevel == 1) then
+        if (pro_totn /= 1 .and. vlevel == llevel) then
           ! -- Solve mpi ilu factorization (ilu)
-            call solve_mpi_ilu(temp_b, temp_d, temp_lu, temp_x)
+            call solve_mpi_ilu(amg_tb(1:reg_size), amg_td(1:reg_size), amg_tlu(1:lu_size),&
+                               amg_tx(1:reg_size))
         else
           ! -- Solve ilu factorization (ilu)
-            call solve_ilu(vlevel, d_size, temp_b, temp_d, temp_lu, temp_x)
+            call solve_ilu(vlevel, d_size, amg_tb(1:reg_size), amg_td(1:reg_size),&
+                           amg_tlu(1:lu_size), amg_tx(1:reg_size))
         end if
 #else
 !        ! -- Solve preconditioned diagonal system (dsys)
-!          call solve_dsys(d_size, temp_b, temp_d, temp_x)
+!          call solve_dsys(d_size, amg_tb, amg_td, amg_tx)
         ! -- Solve ilu factorization (ilu)
-          call solve_ilu(vlevel, d_size, temp_b, temp_d, temp_lu, temp_x)
+          call solve_ilu(vlevel, d_size, amg_tb(1:reg_size), amg_td(1:reg_size),&
+                         amg_tlu(1:lu_size), amg_tx(1:reg_size))
 !        do sweep = 1, max_sweep
-!          call smooth_gs(vlevel, d_size, temp_d, temp_lu, temp_b, temp_x)
+!          call smooth_gs(vlevel, d_size, amg_td, amg_tlu, amg_tb, amg_tx)
 !        end do
 #endif
 
-        array_var(vlevel)%x(:) = temp_x(:)
-        array_var(vlevel)%rhs(:) = temp_b(:)
+        array_var(vlevel)%x(:) = amg_tx(1:reg_size)
+        array_var(vlevel)%rhs(:) = amg_tb(1:reg_size)
 
 #ifdef MPI_MSG
         if (pro_totn /= 1) then
@@ -810,17 +843,24 @@ module linear_solution
             call senrec_rvectv(array_var(vlevel)%rhs)
         end if
 #endif
-        deallocate(temp_d, temp_lu, temp_x, temp_b)
 
       end do
-
     end do
 
-    !$omp parallel do private(i)
+    !$omp parallel
+    !$omp do private(i)
     do i = 1, mgd_size
       e(i) = array_var(llevel)%x(i)
     end do
-    !$omp end parallel do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, mgreg_size
+      array_var(llevel)%rhs(i) = save_rhs(i)
+    end do
+    !$omp end do
+    !$omp end parallel
+
+    deallocate(save_rhs)
 
   end subroutine loop_amg
 

@@ -198,7 +198,7 @@ module nonlinear_solution
         end if
         if (conv_flag /= 1 .and. back_flag /= 1) then
           ! -- Set Eisenstat-Walker forcing term (eise_walk)
-            call set_eise_walk(eater, lambda, l2norm_new, l2norm_pre, l2norm_jac, gradient)
+            call set_eise_walk(lambda, l2norm_new, l2norm_pre, l2norm_jac, gradient, eater)
         end if
       end if
 
@@ -437,7 +437,7 @@ module nonlinear_solution
 
     ! -- inout
     real(DP), intent(in) :: lam, l2_new, l2_pre, l2_jac, grad
-    real(DP), intent(out) :: eta
+    real(DP), intent(inout) :: eta
     ! -- local
     real(DP), parameter :: EW_ETA_MAX   = 0.9_DP
     real(DP), parameter :: EW_ETA_MIN   = 1.0E-4_DP

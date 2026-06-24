@@ -4,7 +4,8 @@ module calc_function
   use constval_module, only: DZERO, DONE
   use initial_module, only: st_sim
   use set_cell, only: ncalc, ncals
-  use set_condition, only: hydf_surf
+  use set_condition, only: nseal, hydf_surf
+  use set_boundary, only: rive_num, lake_num
   use calc_parameter, only: calc_srat_rperm
   use allocate_solution, only: srat_new, rel_perm, crs_index
 #ifdef MPI_MSG
@@ -14,12 +15,42 @@ module calc_function
 
   implicit none
   private
-  public :: calc_func, calc_mass, calc_vecjacf, func_rechterm, func_wellterm
-  public :: func_surfterm, func_riveterm, func_laketerm, func_sealterm
+  public :: allocate_calfun, calc_func, calc_mass, calc_vecjacf
+  public :: func_rechterm, func_wellterm, func_surfterm, func_riveterm
+  public :: func_laketerm, func_sealterm, alp_ss
 
   ! -- local
+  real(DP), allocatable, private :: stof(:), conf(:), welf(:), seaf(:)
+  real(DP), allocatable, private :: funcvs(:)
+  real(DP), allocatable          :: alp_ss(:)
+  real(DP), allocatable, private :: recf(:), surf(:), rivf(:), lakf(:)
+  real(DP), allocatable, private :: ch_stor1(:), ch_stor2(:), ch_stor(:)
+  real(DP), allocatable, private :: conn_flow(:)
+  real(DP), allocatable, private :: delh_s(:), elev_rati(:)
+  real(DP), allocatable, private :: delh_r(:), delh_l(:), seal_flow(:)
 
   contains
+
+  subroutine allocate_calfun()
+  !*********************************************************************************************
+  ! allocate_calfun -- Allocate for calculate function value
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+
+    ! -- local
+
+    !-------------------------------------------------------------------------------------------
+    allocate(stof(ncalc), conf(ncalc), welf(ncalc), seaf(ncalc))
+    allocate(funcvs(ncalc), alp_ss(ncalc))
+    allocate(recf(ncals), surf(ncals), rivf(ncals), lakf(ncals))
+    allocate(ch_stor1(ncalc), ch_stor2(ncalc), ch_stor(ncalc))
+    allocate(conn_flow(ncalc))
+    allocate(delh_s(ncals), elev_rati(ncals))
+    allocate(delh_r(rive_num), delh_l(lake_num), seal_flow(nseal))
+
+  end subroutine allocate_calfun
 
   subroutine calc_func(infx, funcv)
   !*********************************************************************************************
@@ -32,13 +63,7 @@ module calc_function
     real(DP), intent(out) :: funcv(:)
     ! -- local
     integer(I4) :: i, s
-    real(DP), allocatable :: stof(:), conf(:), welf(:), seaf(:)
-    real(DP), allocatable :: recf(:), surf(:), rivf(:), lakf(:)
-    real(DP), allocatable :: alp_ss(:), funcvs(:)
     !-------------------------------------------------------------------------------------------
-    allocate(stof(ncalc), conf(ncalc), welf(ncalc), seaf(ncalc))
-    allocate(funcvs(ncalc), alp_ss(ncalc))
-    allocate(recf(ncals), surf(ncals), rivf(ncals), lakf(ncals))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc
@@ -101,10 +126,6 @@ module calc_function
       funcv(i) = funcvs(i) + stof(i) + conf(i) + welf(i) + seaf(i)
     end do
     !$omp end parallel do
-
-    deallocate(recf, surf, rivf, lakf)
-    deallocate(funcvs, stof, conf, welf, seaf)
-    deallocate(alp_ss)
 
   end subroutine calc_func
 
@@ -207,9 +228,7 @@ module calc_function
     real(DP), intent(out) :: stofunc(:)
     ! -- local
     integer(I4) :: i
-    real(DP), allocatable :: ch_stor1(:), ch_stor2(:), ch_stor(:)
     !-------------------------------------------------------------------------------------------
-    allocate(ch_stor1(ncalc), ch_stor2(ncalc), ch_stor(ncalc))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc
@@ -227,8 +246,6 @@ module calc_function
     !$omp end do
     !$omp end parallel
 
-    deallocate(ch_stor1, ch_stor2, ch_stor)
-
   end subroutine func_stochn
 
   subroutine func_connflow(infconn, confunc)
@@ -245,9 +262,7 @@ module calc_function
     integer(I4) :: i, j, k
     integer(I4) :: sta_ind, end_ind, ind
     real(DP) :: relat, delhead, relp1, relp2
-    real(DP), allocatable :: conn_flow(:)
     !-------------------------------------------------------------------------------------------
-    allocate(conn_flow(ncalc))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc
@@ -272,8 +287,6 @@ module calc_function
     end do
     !$omp end do
     !$omp end parallel
-
-    deallocate(conn_flow)
 
   end subroutine func_connflow
 
@@ -340,9 +353,7 @@ module calc_function
     real(DP), intent(inout) :: surfunc(:)
     ! -- local
     integer(I4) :: i
-    real(DP), allocatable :: delh_s(:), elev_rati(:)
     !-------------------------------------------------------------------------------------------
-    allocate(delh_s(ncals), elev_rati(ncals))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncals
@@ -412,8 +423,6 @@ module calc_function
     !$omp end do
     !$omp end parallel
 
-    deallocate(delh_s, elev_rati)
-
   end subroutine func_surfterm
 
   subroutine func_riveterm(infrive, rivfunc)
@@ -422,15 +431,13 @@ module calc_function
   !*********************************************************************************************
     ! -- modules
     use calc_boundary, only: rive2cals, rive_head, rive_bott
-    use set_boundary, only: rive_num, abyd_rive
+    use set_boundary, only: abyd_rive
     ! -- inout
     real(DP), intent(in) :: infrive(:)
     real(DP), intent(inout) :: rivfunc(:)
     ! -- local
     integer(I4) :: i, s
-    real(DP), allocatable :: delh_r(:)
     !-------------------------------------------------------------------------------------------
-    allocate(delh_r(rive_num))
     !$omp parallel
     !$omp do private(i)
     do i = 1, rive_num
@@ -455,8 +462,6 @@ module calc_function
     !$omp end do
     !$omp end parallel
 
-    deallocate(delh_r)
-
   end subroutine func_riveterm
 
   subroutine func_laketerm(inflake, lakfunc)
@@ -465,15 +470,13 @@ module calc_function
   !*********************************************************************************************
     ! -- modules
     use calc_boundary, only: lake2cals, lake_head, lake_bott
-    use set_boundary, only: lake_num, abyd_lake
+    use set_boundary, only: abyd_lake
     ! -- inout
     real(DP), intent(in) :: inflake(:)
     real(DP), intent(inout) :: lakfunc(:)
     ! -- local
     integer(I4) :: i, s
-    real(DP), allocatable :: delh_l(:)
     !-------------------------------------------------------------------------------------------
-    allocate(delh_l(lake_num))
     !$omp parallel
     !$omp do private(i)
     do i = 1, lake_num
@@ -498,8 +501,6 @@ module calc_function
     !$omp end do
     !$omp end parallel
 
-    deallocate(delh_l)
-
   end subroutine func_laketerm
 
   subroutine func_sealterm(infseal, seafunc)
@@ -507,7 +508,6 @@ module calc_function
   ! func_sealterm -- Function sea level term
   !*********************************************************************************************
     ! -- modules
-    use set_condition, only: nseal
     use assign_boundary, only: read_seal
     use allocate_solution, only: seal2calc, seal2seal, hydf_seal, abyd_seal
     ! -- inout
@@ -516,9 +516,7 @@ module calc_function
     ! -- local
     integer(I4) :: i, c, s
     real(DP) :: delhead
-    real(DP), allocatable :: seal_flow(:)
     !-------------------------------------------------------------------------------------------
-    allocate(seal_flow(nseal))
     !$omp parallel
     !$omp do private(i)
     do i = 1, nseal
@@ -533,14 +531,15 @@ module calc_function
       seal_flow(i) = hydf_seal(i)*rel_perm(c)*abyd_seal(i)*delhead
     end do
     !$omp end do
-    !$omp end parallel
 
+    !$omp do private(i, c)
     do i = 1, nseal
       c = seal2calc(i)
+      !$omp atomic
       seafunc(c) = seafunc(c) + seal_flow(i)
     end do
-
-    deallocate(seal_flow)
+    !$omp end do
+    !$omp end parallel
 
   end subroutine func_sealterm
 

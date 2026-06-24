@@ -14,12 +14,55 @@ module make_linearsystem
 
   implicit none
   private
-  public :: make_matvec
+  public :: allocate_matvec, make_matvec
 
   ! -- local
   real(DP), allocatable :: per_srat(:), per_relp(:)
+  real(DP), allocatable :: temp_rhs(:)
+  real(DP), allocatable :: stod(:), cond(:), sead(:), dmats(:)
+  real(DP), allocatable :: rivd(:), lakd(:), surd(:)
+  real(DP), allocatable :: deri_srat(:), deri_stor(:)
+  real(DP), allocatable :: deri_dcon(:), rel_hyd(:), deri_lucon(:), deri_con1(:), deri_con2(:)
+  real(DP), allocatable :: over_riv(:), deri_r(:), deri_ks_riv(:), delh_r(:)
+  real(DP), allocatable :: per_riv(:), rel_riv(:), tran_riv(:)
+  real(DP), allocatable :: over_lak(:), deri_l(:), deri_ks_lak(:), delh_l(:)
+  real(DP), allocatable :: per_lak(:), rel_lak(:), tran_lak(:)
+  real(DP), allocatable :: over_sur(:), deri_s(:), deri_ks_sur(:), delh_s(:), tran_sur(:)
+  real(DP), allocatable :: deri_sea(:), deri_ks_sea(:), delh_sea(:)
+  real(DP), allocatable :: per_sea(:), rel_sea(:), tran_sea(:)
 
   contains
+
+  subroutine allocate_matvec()
+  !*********************************************************************************************
+  ! allocate_matvec -- Allocate for matrix and vector
+  !*********************************************************************************************
+    ! -- modules
+    use set_condition, only: nseal
+    use set_boundary, only: rive_num, lake_num
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: tot_ind
+    !-------------------------------------------------------------------------------------------
+    tot_ind = crs_index(1)%offind(nreg_num)
+
+    allocate(per_srat(ncalc), per_relp(nreg_num))
+    allocate(temp_rhs(nreg_num))
+    allocate(stod(ncalc), cond(nreg_num), sead(ncalc), dmats(ncalc))
+    allocate(rivd(ncals), lakd(ncals), surd(ncals))
+    allocate(deri_srat(ncalc), deri_stor(ncalc))
+    allocate(deri_dcon(tot_ind), rel_hyd(tot_ind), deri_lucon(tot_ind))
+    allocate(deri_con1(tot_ind), deri_con2(tot_ind))
+    allocate(over_riv(rive_num), deri_r(rive_num), deri_ks_riv(rive_num), delh_r(rive_num))
+    allocate(per_riv(rive_num), rel_riv(rive_num), tran_riv(rive_num))
+    allocate(over_lak(lake_num), deri_l(lake_num), deri_ks_lak(lake_num), delh_l(lake_num))
+    allocate(per_lak(lake_num), rel_lak(lake_num), tran_lak(lake_num))
+    allocate(over_sur(ncals), deri_s(ncals), deri_ks_sur(ncals), delh_s(ncals), tran_sur(ncals))
+    allocate(deri_sea(nseal), deri_ks_sea(nseal), delh_sea(nseal))
+    allocate(per_sea(nseal), rel_sea(nseal), tran_sea(nseal))
+
+  end subroutine allocate_matvec
 
   subroutine make_matvec()
   !*********************************************************************************************
@@ -34,9 +77,7 @@ module make_linearsystem
 
     ! -- local
     integer(I4) :: i
-    real(DP), allocatable :: temp_rhs(:)
     !-------------------------------------------------------------------------------------------
-    allocate(temp_rhs(nreg_num))
     !$omp parallel do private(i)
     do i = 1, nreg_num
       temp_rhs(i) = DZERO
@@ -64,8 +105,6 @@ module make_linearsystem
         call make_amgmat()
     end if
 
-    deallocate(temp_rhs)
-
   end subroutine make_matvec
 
   subroutine make_matrix(diamat, lumat)
@@ -75,20 +114,15 @@ module make_linearsystem
     ! -- modules
     use initial_module, only: st_sim
     use calc_parameter, only: calc_srat_rperm
+    use calc_function, only: alp_ss
     ! -- inout
     real(DP), intent(out) :: diamat(:), lumat(:)
     ! -- local
     integer(I4) :: i, s
-    real(DP), allocatable :: ss_alp(:)
-    real(DP), allocatable :: stod(:), cond(:), sead(:), dmats(:)
-    real(DP), allocatable :: rivd(:), lakd(:), surd(:)
     !-------------------------------------------------------------------------------------------
-    allocate(per_srat(ncalc), per_relp(nreg_num), ss_alp(ncalc))
-    allocate(stod(ncalc), cond(nreg_num), sead(ncalc), dmats(ncalc))
-    allocate(rivd(ncals), lakd(ncals), surd(ncals))
     !$omp parallel do private(i)
     do i = 1, ncalc
-      per_srat(i) = DZERO ; ss_alp(i) = DZERO
+      per_srat(i) = DZERO
       stod(i) = DZERO ; sead(i) = DZERO ; dmats(i) = DZERO
     end do
     !$omp end parallel do
@@ -105,20 +139,16 @@ module make_linearsystem
     !$omp end parallel do
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, newper, head_new, per_srat, per_relp, ss_alp)
-    ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, DZERO, head_new, srat_new, rel_perm, ss_alp)
+      call calc_srat_rperm(ncalc, newper, head_new, per_srat, per_relp)
 
     if (st_sim%sim_type >= 0) then
       ! -- Form storage change (stochn)
-        call form_stochn(ss_alp, stod)
+        call form_stochn(alp_ss, stod)
     end if
 
 #ifdef MPI_MSG
     if (pro_totn /= 1) then
     ! -- Send and Receive real vector value (rvectv)
-      call senrec_rvectv(head_new)
-      call senrec_rvectv(rel_perm)
       call senrec_rvectv(per_relp)
     end if
 #endif
@@ -152,10 +182,6 @@ module make_linearsystem
     !$omp end do
     !$omp end parallel
 
-    deallocate(per_srat, per_relp, ss_alp)
-    deallocate(stod, cond, sead, dmats)
-    deallocate(rivd, lakd, surd)
-
   end subroutine make_matrix
 
   subroutine form_stochn(alp, dmat_sto)
@@ -171,9 +197,7 @@ module make_linearsystem
     real(DP), intent(out) :: dmat_sto(:)
     ! -- local
     integer(I4) :: i
-    real(DP), allocatable :: deri_srat(:), deri_stor(:)
     !-------------------------------------------------------------------------------------------
-    allocate(deri_srat(ncalc), deri_stor(ncalc))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc
@@ -202,8 +226,6 @@ module make_linearsystem
     !$omp end do
     !$omp end parallel
 
-    deallocate(deri_srat, deri_stor)
-
   end subroutine form_stochn
 
   subroutine form_connflow(dmat_con, lumat_con)
@@ -220,12 +242,8 @@ module make_linearsystem
     integer(I4) :: i, j, k
     integer(I4) :: tot_ind, sta_ind, end_ind, ind
     real(DP) :: delhead, relp1, relp2, per_head1, per_head2, relat, deri_hyd1, deri_hyd2
-    real(DP), allocatable :: deri_dcon(:), rel_hyd(:)
-    real(DP), allocatable :: deri_lucon(:), deri_con1(:), deri_con2(:)
     !-------------------------------------------------------------------------------------------
     tot_ind = crs_index(1)%offind(nreg_num)
-    allocate(deri_dcon(tot_ind), rel_hyd(tot_ind))
-    allocate(deri_lucon(tot_ind), deri_con1(tot_ind), deri_con2(tot_ind))
     !$omp parallel
     !$omp do private(i)
     do i = 1, tot_ind
@@ -295,9 +313,6 @@ module make_linearsystem
     !$omp end do
     !$omp end parallel
 
-    deallocate(deri_dcon, rel_hyd)
-    deallocate(deri_lucon, deri_con1, deri_con2)
-
   end subroutine form_connflow
 
   subroutine set_rivebound(dmat_riv)
@@ -311,15 +326,11 @@ module make_linearsystem
     real(DP), intent(inout) :: dmat_riv(:)
     ! -- local
     integer(I4) :: i, s
-    real(DP), allocatable :: over_riv(:), deri_r(:), deri_ks(:), delh_r(:)
-    real(DP), allocatable :: per_riv(:), rel_riv(:), tran_riv(:)
     !-------------------------------------------------------------------------------------------
-    allocate(over_riv(rive_num), deri_r(rive_num), deri_ks(rive_num), delh_r(rive_num))
-    allocate(per_riv(rive_num), rel_riv(rive_num), tran_riv(rive_num))
     !$omp parallel
     !$omp do private(i)
     do i = 1, rive_num
-      over_riv(i) = DZERO ; deri_r(i) = DZERO ; deri_ks(i) = DZERO ; delh_r(i) = DZERO
+      over_riv(i) = DZERO ; deri_r(i) = DZERO ; deri_ks_riv(i) = DZERO ; delh_r(i) = DZERO
       per_riv(i) = DZERO ; rel_riv(i) = DZERO ; tran_riv(i) = DZERO
     end do
     !$omp end do
@@ -346,7 +357,7 @@ module make_linearsystem
     if (form_switch == 1) then
       !$omp do private(i)
       do i = 1, rive_num
-        deri_ks(i) = (per_riv(i)-rel_riv(i))*newper_inv*delh_r(i)*tran_riv(i)*over_riv(i)
+        deri_ks_riv(i) = (per_riv(i)-rel_riv(i))*newper_inv*delh_r(i)*tran_riv(i)*over_riv(i)
       end do
       !$omp end do
     end if
@@ -354,12 +365,10 @@ module make_linearsystem
     !$omp do private(i, s)
     do i = 1, rive_num
       s = rive2cals(i)
-      dmat_riv(s) = deri_r(i) + deri_ks(i)
+      dmat_riv(s) = deri_r(i) + deri_ks_riv(i)
     end do
     !$omp end do
     !$omp end parallel
-
-    deallocate(over_riv, deri_r, deri_ks, delh_r, per_riv, rel_riv, tran_riv)
 
   end subroutine set_rivebound
 
@@ -374,15 +383,11 @@ module make_linearsystem
     real(DP), intent(inout) :: dmat_lak(:)
     ! -- local
     integer(I4) :: i, s
-    real(DP), allocatable :: over_lak(:), deri_l(:), deri_ks(:), delh_l(:)
-    real(DP), allocatable :: per_lak(:), rel_lak(:), tran_lak(:)
     !-------------------------------------------------------------------------------------------
-    allocate(over_lak(lake_num), deri_l(lake_num), deri_ks(lake_num), delh_l(lake_num))
-    allocate(per_lak(lake_num), rel_lak(lake_num), tran_lak(lake_num))
     !$omp parallel
     !$omp do private(i)
     do i = 1, lake_num
-      over_lak(i) = DZERO ; deri_l(i) = DZERO ; deri_ks(i) = DZERO ; delh_l(i) = DZERO
+      over_lak(i) = DZERO ; deri_l(i) = DZERO ; deri_ks_lak(i) = DZERO ; delh_l(i) = DZERO
       per_lak(i) = DZERO ; rel_lak(i) =  DZERO ; tran_lak(i) = DZERO
     end do
     !$omp end do
@@ -409,7 +414,7 @@ module make_linearsystem
     if (form_switch == 1) then
       !$omp do private(i)
       do i = 1, lake_num
-        deri_ks(i) = (per_lak(i)-rel_lak(i))*newper_inv*delh_l(i)*tran_lak(i)*over_lak(i)
+        deri_ks_lak(i) = (per_lak(i)-rel_lak(i))*newper_inv*delh_l(i)*tran_lak(i)*over_lak(i)
       end do
       !$omp end do
     end if
@@ -417,12 +422,10 @@ module make_linearsystem
     !$omp do private(i, s)
     do i = 1, lake_num
       s = lake2cals(i)
-      dmat_lak(s) = deri_l(i) + deri_ks(i)
+      dmat_lak(s) = deri_l(i) + deri_ks_lak(i)
     end do
     !$omp end do
     !$omp end parallel
-
-    deallocate(over_lak, deri_l, deri_ks, delh_l, per_lak, rel_lak, tran_lak)
 
   end subroutine set_lakebound
 
@@ -440,13 +443,11 @@ module make_linearsystem
     real(DP), intent(out) :: dmat_sur(:)
     ! -- local
     integer(I4) :: i
-    real(DP), allocatable :: over_sur(:), deri_s(:), deri_ks(:), delh_s(:), tran_sur(:)
     !-------------------------------------------------------------------------------------------
-    allocate(over_sur(ncals), deri_s(ncals), deri_ks(ncals), delh_s(ncals), tran_sur(ncals))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncals
-      over_sur(i) = DZERO ; deri_s(i) = DZERO ; deri_ks(i) = DZERO
+      over_sur(i) = DZERO ; deri_s(i) = DZERO ; deri_ks_sur(i) = DZERO
       delh_s(i) = DZERO ; tran_sur(i) = DZERO
     end do
     !$omp end do
@@ -500,19 +501,17 @@ module make_linearsystem
     if (form_switch == 1) then
       !$omp do private(i)
       do i = 1, ncals
-        deri_ks(i) = (per_relp(i)-rel_perm(i))*newper_inv*delh_s(i)*tran_sur(i)*over_sur(i)
+        deri_ks_sur(i) = (per_relp(i)-rel_perm(i))*newper_inv*delh_s(i)*tran_sur(i)*over_sur(i)
       end do
       !$omp end do
     end if
 
     !$omp do private(i)
     do i = 1, ncals
-      dmat_sur(i) = deri_s(i) + deri_ks(i)
+      dmat_sur(i) = deri_s(i) + deri_ks_sur(i)
     end do
     !$omp end do
     !$omp end parallel
-
-    deallocate(over_sur, deri_s, deri_ks, delh_s, tran_sur)
 
   end subroutine set_surfbound
 
@@ -528,15 +527,11 @@ module make_linearsystem
     real(DP), intent(inout) :: dmat_sea(:)
     ! -- local
     integer(I4) :: i, c, s
-    real(DP), allocatable :: deri_sea(:), deri_ks(:), delh_sea(:)
-    real(DP), allocatable :: per_sea(:), rel_sea(:), tran_sea(:)
     !-------------------------------------------------------------------------------------------
-    allocate(deri_sea(nseal), deri_ks(nseal), delh_sea(nseal))
-    allocate(per_sea(nseal), rel_sea(nseal), tran_sea(nseal))
     !$omp parallel
     !$omp do private(i)
     do i = 1, nseal
-      deri_sea(i) = DZERO ; deri_ks(i) = DZERO ; delh_sea(i) = DZERO
+      deri_sea(i) = DZERO ; deri_ks_sea(i) = DZERO ; delh_sea(i) = DZERO
       per_sea(i) = DZERO ; rel_sea(i) = DZERO ; tran_sea(i) = DZERO
     end do
     !$omp end do
@@ -552,18 +547,19 @@ module make_linearsystem
     if (form_switch == 1) then
       !$omp do private(i)
       do i = 1, nseal
-        deri_ks(i) = (per_sea(i)-rel_sea(i))*newper_inv*delh_sea(i)*abyd_seal(i)
+        deri_ks_sea(i) = (per_sea(i)-rel_sea(i))*newper_inv*delh_sea(i)*abyd_seal(i)
       end do
       !$omp end do
     end if
-    !$omp end parallel
 
+    !$omp do private(i, c)
     do i = 1, nseal
       c = seal2calc(i)
-      dmat_sea(c) = dmat_sea(c) + deri_sea(i) + deri_ks(i)
+      !$omp atomic
+      dmat_sea(c) = dmat_sea(c) + deri_sea(i) + deri_ks_sea(i)
     end do
-
-    deallocate(deri_sea, deri_ks, delh_sea, per_sea, rel_sea, tran_sea)
+    !$omp end do
+    !$omp end parallel
 
   end subroutine set_seabound
 

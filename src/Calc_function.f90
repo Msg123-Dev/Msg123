@@ -453,7 +453,6 @@ module calc_function
       else if (rive_head(i) > rive_bott(i)) then
         delh_r(i) = rive_head(i) - rive_bott(i)
       else
-!        delh_r(i) = rive_head(i) - infrive(s)
         delh_r(i) = DZERO
       end if
 
@@ -492,7 +491,6 @@ module calc_function
       else if (lake_head(i) > lake_bott(i)) then
         delh_l(i) = lake_head(i) - lake_bott(i)
       else
-!        delh_l(i) = lake_head(i) - inflake(s)
         delh_l(i) = DZERO
       end if
 
@@ -586,23 +584,6 @@ module calc_function
     ! -- Calculate function value (func)
       call calc_func(injx, tempf1)
 
-!    ! simple version
-!    l2_v = DZERO ; l2_x = DZERO
-!    !$omp do private(i) reduction(+:l2_v, l2_x)
-!    do i = 1, vj_num
-!      l2_v = l2_v + injvec(i)*injvec(i)
-!      l2_x = l2_x + abs(injx(i))*MACHI_EPS + MACHI_EPS
-!    end do
-!    !$omp end do
-!    eps = l2_x/(l2_v*vj_num)
-
-!    ! NITSOL version
-!    ! -- Calculate Calculate l2 norm square
-!      call calc_l2norm2(vjlevel, tempf1, l2_x)
-!    ! -- Calculate Calculate l2 norm square
-!      call calc_l2norm2(vjlevel, injvec, l2_v)
-!    eps = sqrt((DONE+sqrt(l2_x))*MACHI_EPS)/sqrt(l2_v)
-
     ! Brown and Saad version
     l2_v = DZERO ; l2_x = DZERO ; l1_v = DZERO
     !$omp parallel
@@ -638,9 +619,8 @@ module calc_function
     else
       sign = DONE
     end if
-!    eps = sign*MACHI_EPS*max(abs(l2_x),sqrt(l2_v))/l2_v
-    eps = sign*sqrt(MACHI_EPS)*max(abs(l2_x),l1_v)/l2_v
 
+    eps = sign*sqrt(MACHI_EPS)*max(abs(l2_x),l1_v)/l2_v
     eps_inv = DONE/eps
 
     !$omp parallel do private(i)

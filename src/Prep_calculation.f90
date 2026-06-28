@@ -12,10 +12,11 @@ module prep_calculation
   implicit none
   private
   public :: prepare_calc
-  integer(I4), public :: now_date(6), out_iter, conv_flag, form_switch
+  integer(I4), public :: now_date(6), out_iter, form_switch
   real(SP), public :: current_t, inter_time
   real(DP), public :: delt, delt_inv
   real(DP), allocatable, public :: surf_top(:)
+  logical, public :: conv_flag
 
   ! -- local
 
@@ -77,7 +78,8 @@ module prep_calculation
 
     current_t = SZERO ; delt = DZERO ; delt_inv = DZERO
     newper = MACHI_EPS*len_scal_inv ; newper_inv = DONE/newper
-    now_date(:) = st_sim%sta_date(:) ; out_iter = 0 ; conv_flag = 0 ; form_switch = 0
+    now_date(:) = st_sim%sta_date(:) ; out_iter = 0 ; form_switch = 0
+    conv_flag = .false.
 
   end subroutine prepare_calc
 

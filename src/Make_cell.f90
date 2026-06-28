@@ -222,28 +222,6 @@ module make_cell
 
   end subroutine make_face_area
 
-!  function fa_diag(x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4) result(quadarea)
-!  !***************************************************************************************
-!  ! fa_diag -- Calculate face area using cross product with diagonal vector
-!  !***************************************************************************************
-!    ! -- modules
-!
-!    ! -- inout
-!    real(DP), intent(in) :: x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4
-!    ! -- local
-!    real(DP) :: quadarea
-!    real(DP) :: vec3d1(3), vec3d2(3)
-!    !-------------------------------------------------------------------------------------
-!    vec3d1(1) = x3 - x1 ; vec3d1(2) = y3 - y1 ; vec3d1(3) = z3 - z1
-!    vec3d2(1) = x4 - x2 ; vec3d2(2) = y4 - y2 ; vec3d2(3) = z4 - z2
-!    quadarea = (vec3d1(2)*vec3d2(3) - vec3d1(3)*vec3d2(2))**2&
-!             + (vec3d1(3)*vec3d2(1) - vec3d1(1)*vec3d2(3))**2&
-!             + (vec3d1(1)*vec3d2(2) - vec3d1(2)*vec3d2(1))**2
-!
-!    quadarea = sqrt(quadarea)*DHALF
-!
-!  end function fa_diag
-
   function fa_2tri(x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4) result(triarea)
   !*********************************************************************************************
   ! fa_2tri -- Calculate face area using cross product with two triangle

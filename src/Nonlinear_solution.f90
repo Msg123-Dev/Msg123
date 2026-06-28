@@ -43,12 +43,13 @@ module nonlinear_solution
     ! -- local
     integer(I4) :: i
     integer(I4) :: max_num, conv_fnum
-    integer(I4) :: back_iter, back_flag, beta_iter
+    integer(I4) :: back_iter, beta_iter
     character(VARLEN) :: cxyzn
     real(DP) :: max_var, max_unk, check_val
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var
     real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
     real(DP), allocatable :: new_func(:)
+    logical :: back_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
     real(DP) :: var_max, unk_max, var_abs_max
@@ -88,7 +89,8 @@ module nonlinear_solution
         l2norm_pre = l2norm_new
       end if
 
-      back_flag = 0 ; back_iter = 0 ; beta_iter = 0
+      back_iter = 0 ; beta_iter = 0
+      back_flag = .false.
 
       ! -- Reset coefficients matrix and constant vector (matvec)
         call reset_matvec()
@@ -121,7 +123,7 @@ module nonlinear_solution
       end do
       !$omp end parallel do
 
-      conv_flag = 0
+      conv_flag = .false.
       if (st_sim%sim_type /= -1) then
         errtol = eater
       else
@@ -151,10 +153,10 @@ module nonlinear_solution
 #else
       check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk)*len_scal
 #endif
-      if (conv_flag /= 0 .and. .not. ieee_is_nan(max_unk)) then
-        conv_flag = 0
+      if (conv_flag .and. .not. ieee_is_nan(max_unk)) then
+          conv_flag = .false.
         if (check_val <= criteria .and. max_unk < XMAX) then
-          conv_flag = 1
+          conv_flag = .true.
         end if
       else if (ieee_is_nan(max_unk) .and. st_sim%sim_type /= -1) then
         if (my_rank == 0) then
@@ -171,7 +173,7 @@ module nonlinear_solution
         exit outer_loop
       end if
 
-      if (conv_flag /= 1 .and. form_switch == 1) then
+      if (.not. conv_flag .and. form_switch == 1) then
         ! -- Run backtracking (backtr)
           call run_backtr(back_iter, back_flag, beta_iter, l2norm_new, l2norm_pre, l2norm_jac,&
                           lambda, gradient, max_step, new_func)
@@ -190,41 +192,17 @@ module nonlinear_solution
         check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk)*len_scal
 #endif
         if ((check_val >= VARMAX .or. max_unk >= XMAX) .and. st_sim%sim_type /= -1) then
-          back_flag = 1
+          back_flag = .true.
         else if (check_val <= criteria .and. max_unk < XMAX) then
-          conv_flag = 1
+          conv_flag = .true.
         else if (st_sim%sim_type == -1) then
-          back_flag = 0
+          back_flag = .false.
         end if
-        if (conv_flag /= 1 .and. back_flag /= 1) then
+        if (.not. conv_flag .and. .not. back_flag) then
           ! -- Set Eisenstat-Walker forcing term (eise_walk)
             call set_eise_walk(lambda, l2norm_new, l2norm_pre, l2norm_jac, gradient, eater)
         end if
       end if
-
-!      if (conv_flag /= 1 .and. form_switch == 1 .and. back_flag /= 1) then
-!        ! -- Run under relax using cooley underrelaxation (relaxcooly)
-!          call run_relax_cooly(max_var, head_new, head_pre)
-!        ! -- Run under relax using delta-bar-delta underrelaxation (relaxdelta)
-!          call run_relax_delta(head_new, head_pre)
-
-!        ! -- Check absolute error max norm
-!          call check_abserrmax(head_new, head_pre, max_var, max_unk, max_num)
-!#ifdef MPI_MSG
-!        if (pro_totn /= 1) then
-!          ! -- Check mpi max error (mpimaxerr)
-!            call check_mpimaxerr(max_var, max_unk, var_abs_max, unk_max, var_max)
-!          check_val = var_abs_max*len_scal ; max_unk = unk_max*len_scal
-!        else
-!          check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk)*len_scal
-!        end if
-!#else
-!        check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk)*len_scal
-!#endif
-!        if (check_val <= criteria .and. max_unk < XMAX) then
-!          conv_flag = 1
-!        end if
-!      end if
 
       ! -- Calculate function value (func)
         call calc_func(head_new, new_func)
@@ -258,7 +236,7 @@ module nonlinear_solution
                             conv_dmat, conv_rhs, conv_head
       end if
       ! check outer_loop
-      if (conv_flag == 1) then
+      if (conv_flag) then
         ! -- Calculate surface water level (surfw)
           call calc_surfw()
         if (st_out_step%rest == DZERO) then
@@ -269,7 +247,7 @@ module nonlinear_solution
             call write_rest(head_new)
         end if
         exit outer_loop
-      else if (back_flag == 1 .and. st_sim%sim_type /= -1) then
+      else if (back_flag .and. st_sim%sim_type /= -1) then
         if (my_rank == 0) then
           write(conv_fnum,13)
         end if
@@ -335,38 +313,14 @@ module nonlinear_solution
     ! -- modules
     use set_cell, only: ncals
 !    use make_cell, only: surf_elev
-!    use set_condition, only: surf_area
 !    use prep_calculation, only: surf_bott
     use allocate_solution, only: surf_head
-!    use calc_function, only: calc_mass
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-!    real(DP), allocatable :: sst_ms(:), sco_ms(:), sse_ms(:), swe_ms(:)
-!    real(DP), allocatable :: sre_ms(:), ssu_ms(:), sri_ms(:), sla_ms(:)
-!    real(DP) :: surf_ms
     !-------------------------------------------------------------------------------------------
-!    allocate(sst_ms(ncalc), sco_ms(ncalc), sse_ms(ncalc), swe_ms(ncalc))
-!    allocate(sre_ms(ncals), ssu_ms(ncals), sri_ms(ncals), sla_ms(ncals))
-!    !$omp parallel
-!    !$omp do private(i)
-!    do i = 1, ncals
-!      sre_ms(:) = DZERO ; ssu_ms(:) = DZERO ; sri_ms(:) = DZERO ; sla_ms(:) = DZERO
-!    end do
-!    !$omp end do
-!    !$omp do private(i)
-!    do i = 1, ncalc
-!      sst_ms(:) = DZERO ; sco_ms(:) = DZERO ; sse_ms(:) = DZERO ; swe_ms(:) = DZERO
-!    end do
-!    !$omp end do
-!    !$omp end parallel
-!    ! -- Calculate massbalance (mass)
-!      call calc_mass(1, head_new, head_pre, sst_ms, sco_ms, sse_ms, swe_ms, sre_ms, ssu_ms,&
-!                     sri_ms, sla_ms)
-
     !$omp parallel do private(i)
-!    !$omp parallel do private(i, surf_ms)
     do i = 1, ncals
 !      if (head_new(i) <= surf_elev(i)) then
 !        surf_head(i) = head_new(i)
@@ -379,22 +333,8 @@ module nonlinear_solution
 !      surf_head(i) = surf_bott(i)
       ! all surface head = head_new
       surf_head(i) = head_new(i)
-      ! all surface head = calculated from massbalance
-!      if (seal_cflag(i) /= 1) then
-!        surf_ms = sre_ms(i) + swe_ms(i) + sst_ms(i) + sco_ms(i) + ssu_ms(i) + sri_ms(i) +&
-!                 sla_ms(i)
-!        if (surf_area(i) /= DZERO) then
-!          surf_head(i) = head_new(i) - surf_ms/surf_area(i)
-!        else
-!          surf_head(i) = head_new(i)
-!        end if
-!      else
-!        surf_head(i) = head_new(i)
-!      end if
     end do
     !$omp end parallel do
-
-!    deallocate(sst_ms, sco_ms, sre_ms, swe_ms, sre_ms, ssu_ms, sri_ms, sla_ms)
 
   end subroutine calc_surfw
 
@@ -439,12 +379,12 @@ module nonlinear_solution
     real(DP), intent(in) :: lam, l2_new, l2_pre, l2_jac, grad
     real(DP), intent(inout) :: eta
     ! -- local
-    real(DP), parameter :: EW_ETA_MAX   = 0.9_DP
-    real(DP), parameter :: EW_ETA_MIN   = 1.0E-4_DP
-    real(DP), parameter :: EW_ETA_ALPHA = (1.0_DP+sqrt(5.0_DP))*DHALF
+    real(DP), parameter :: ETA_MAX = 0.9_DP
+    real(DP), parameter :: ETA_MIN = 1.0E-4_DP
+    real(DP), parameter :: ETA_ALPHA = (1.0_DP+sqrt(5.0_DP))*DHALF
     real(DP) :: eta_safe, minus1, l2_line, lin_l2norm
     !-------------------------------------------------------------------------------------------
-    eta_safe = eta**EW_ETA_ALPHA
+    eta_safe = eta**ETA_ALPHA
     minus1 = DONE - lam
     l2_line = minus1*minus1*l2_pre + DTWO*lam*minus1*grad + lam*lam*l2_jac
     lin_l2norm = sqrt(max(DZERO, l2_line))
@@ -455,8 +395,8 @@ module nonlinear_solution
     end if
 
     eta = max(eta, eta_safe)
-    eta = max(eta, EW_ETA_MIN)
-    eta = min(eta, EW_ETA_MAX)
+    eta = max(eta, ETA_MIN)
+    eta = min(eta, ETA_MAX)
 
   end subroutine set_eise_walk
 
@@ -471,7 +411,8 @@ module nonlinear_solution
     use mpi_utility, only: mpimax_val
 #endif
     ! -- inout
-    integer(I4), intent(inout) :: backi, backf, betai
+    integer(I4), intent(inout) :: backi, betai
+    logical, intent(inout) :: backf
     real(DP), intent(inout) :: l2_new, l2_jac, lam
     real(DP), intent(in) :: l2_pre, maxstep
     real(DP), intent(out) :: grad
@@ -482,8 +423,8 @@ module nonlinear_solution
     real(DP) :: lam2, temp_lam, lam_inv, lam2_inv, del_lam, lam_max, lam_min
     real(DP) :: lam_length, lam_base, lam_diff, lam_incr, sql2_pnorm, maxpnorm
     real(DP) :: alpha_cond, beta_cond
-    real(DP), parameter :: back_alpha = 1.00E-4_DP
-    real(DP), parameter :: back_beta  = 0.9_DP
+    real(DP), parameter :: BACK_ALPHA = 1.00E-4_DP
+    real(DP), parameter :: BACK_BETA = 0.9_DP
     real(DP), allocatable :: jacvec(:)
 #ifdef MPI_MSG
     real(DP) :: sum_l2, max_val
@@ -562,7 +503,7 @@ module nonlinear_solution
     end if
 #endif
     step_tol = MACHI_EPS**(2.0_DP/3.0_DP)
-    lam_min = step_tol/lam_length ; alpha_cond = DHALF*l2_pre + back_alpha*lam*slope
+    lam_min = step_tol/lam_length ; alpha_cond = DHALF*l2_pre + BACK_ALPHA*lam*slope
     grad = slope
     back_aloop: do
       if (DHALF*l2_new <= alpha_cond) then
@@ -601,14 +542,14 @@ module nonlinear_solution
       l2_new2 = DHALF*l2_new
       lam = max(temp_lam, 0.1_DP*lam)
       if (lam < lam_min) then
-        backf = 1
+        backf = .true.
         return
       end if
-      alpha_cond = DHALF*l2_pre + back_alpha*lam*slope
+      alpha_cond = DHALF*l2_pre + BACK_ALPHA*lam*slope
     end do back_aloop
 
-    alpha_cond = DHALF*l2_pre + back_alpha*lam*slope
-    beta_cond = DHALF*l2_pre + back_beta*lam*slope
+    alpha_cond = DHALF*l2_pre + BACK_ALPHA*lam*slope
+    beta_cond = DHALF*l2_pre + BACK_BETA*lam*slope
     if (DHALF*l2_new < beta_cond) then
       if (lam == DONE .and. sql2_pnorm < step_len) then
         lam_max = step_len/sql2_pnorm
@@ -620,8 +561,8 @@ module nonlinear_solution
           lam2 = lam ; l2_new2 = DHALF*l2_new ; lam = min(DTWO*lam, lam_max)
           ! -- Calculate function and l2norm2 (func2norm)
             call calc_funcl2norm(lam, l2_new, new_f)
-          alpha_cond = DHALF*l2_pre + back_alpha*lam*slope
-          beta_cond = DHALF*l2_pre + back_beta*lam*slope
+          alpha_cond = DHALF*l2_pre + BACK_ALPHA*lam*slope
+          beta_cond = DHALF*l2_pre + BACK_BETA*lam*slope
         end do b1_loop
       end if
 
@@ -635,8 +576,8 @@ module nonlinear_solution
           lam_incr = DHALF*lam_diff ; lam = lam_base + lam_incr
           ! -- Calculate function and l2norm2 (func2norm)
             call calc_funcl2norm(lam, l2_new, new_f)
-          alpha_cond = DHALF*l2_pre + back_alpha*lam*slope
-          beta_cond = DHALF*l2_pre + back_beta*lam*slope
+          alpha_cond = DHALF*l2_pre + BACK_ALPHA*lam*slope
+          beta_cond = DHALF*l2_pre + BACK_BETA*lam*slope
 
           if (DHALF*l2_new > alpha_cond) then
             lam_diff = lam_incr
@@ -654,120 +595,13 @@ module nonlinear_solution
           betai = betai + 1
         end if
         if (betai == 10) then
-          backf = 1
+          backf = .true.
           return
         end if
       end if
     end if
 
   end subroutine run_backtr
-
-!  subroutine run_relax_cooly(maxvar, x_new, x_pre)
-!  !***************************************************************************************
-!  ! run_relax_cooly -- Run under relax using cooley underrelaxation
-!  !***************************************************************************************
-!    ! -- modules
-!
-!    ! -- inout
-!    real(DP), intent(in) :: maxvar
-!    real(DP), intent(inout) :: x_new(:), x_pre(:)
-!    ! -- local
-!    integer(I4) :: i
-!    real(DP), save :: old_relax, old_maxvar
-!    real(DP) :: relax, esk, esk_abs, del_x
-!    !-------------------------------------------------------------------------------------
-!    if (out_iter == 1) then
-!      relax = DONE
-!      old_relax = DONE
-!      old_maxvar = maxvar
-!    else
-!      esk = maxvar/(old_maxvar*old_relax)
-!      esk_abs = abs(esk)
-!      if (esk < -DONE) then
-!        relax = DHALF/esk_abs
-!      else
-!        relax = (DONE*3 + esk)/(DONE*3 + esk_abs)
-!      end if
-!    end if
-!
-!    old_relax = relax
-!    old_maxvar = maxvar
-!
-!    if (relax < DONE) then
-!      !$omp parallel do private(i, del_x)
-!      do i = 1, ncalc
-!        del_x = x_new(i) - x_pre(i)
-!        x_new(i) = x_pre(i) + relax*del_x
-!      end do
-!      !$omp end parallel do
-!    end if
-!
-!  end subroutine run_relax_cooly
-
-!  subroutine run_relax_delta(x_new, x_pre)
-!  !***************************************************************************************
-!  ! run_relax_delta -- Run under relax using delta-bar-delta under-relaxation
-!  !***************************************************************************************
-!    ! -- modules
-!
-!    ! -- inout
-!    real(DP), intent(inout) :: x_new(:), x_pre(:)
-!    ! -- local
-!    integer(I4) :: i
-!    real(DP), allocatable, save :: old_w(:), weight_x(:), old_del_x(:)
-!    real(DP) :: w, mom, theta = 0.97_DP, kappa = 1.0E-5_DP
-!    real(DP) :: gamma = DZERO, momentum = 0.1_DP, del_x
-!    !-------------------------------------------------------------------------------------
-!    if (.not. allocated(old_w)) then
-!      allocate(old_w(ncalc), weight_x(ncalc), old_del_x(ncalc))
-!      !$omp parallel do private(i)
-!      do i = 1, ncalc
-!        old_w(i) = DZERO ; weight_x(i) = DZERO ; old_del_x(i) = DZERO
-!      end do
-!      !$omp end parallel do
-!    end if
-!
-!    !$omp parallel do private(i, w, mom, del_x)
-!    do i = 1, ncalc
-!      del_x = x_new(i) - x_pre(i)
-!      if (out_iter == 1) then
-!        old_w(i) = DONE
-!        old_del_x(i) = DZERO
-!        weight_x(i) = DZERO
-!      end if
-!
-!      w = old_w(i)
-!
-!      if (old_del_x(i)*del_x < DZERO) then
-!        w = theta*old_w(i)
-!      else
-!        w = old_w(i) + kappa
-!      end if
-!
-!      if (w > DONE) then
-!        w = DONE
-!      end if
-!
-!      old_w(i) = w
-!
-!      if (out_iter == 1) then
-!        weight_x(i) = del_x
-!      else
-!        weight_x(i) = (DONE - gamma)*del_x + gamma*weight_x(i)
-!      end if
-!
-!      old_del_x(i) = del_x
-!
-!      mom = DZERO
-!      if (out_iter > 4) then
-!        mom = momentum
-!      end if
-!      del_x = del_x*w + mom*weight_x(i)
-!      x_new(i) = x_pre(i) + del_x
-!    end do
-!    !$omp end parallel do
-!
-!  end subroutine run_relax_delta
 
   function get_cnum(calc_num) result(char_cell)
   !*********************************************************************************************

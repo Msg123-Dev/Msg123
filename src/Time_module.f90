@@ -51,7 +51,7 @@ module time_module
     ! -- Calculate next time step (nextst)
       call calc_nextst()
 
-    if (conv_flag == 1 .and. st_sim%sim_type == 1) then
+    if (conv_flag .and. st_sim%sim_type == 1) then
       ! -- Set next end time (nextet)
         call set_nextet()
       ! -- Set delta time (delt)
@@ -80,7 +80,7 @@ module time_module
     now_time = current_t/st_sim%cal_fact
     delt_inv = DONE/delt
 
-    if (conv_flag == 1 .or. timestep_num == 0) then
+    if (conv_flag .or. timestep_num == 0) then
       if (well_num /= 0) then
         ! -- Set virtual well head (vwell_head)
           call set_vwell_head()
@@ -98,16 +98,6 @@ module time_module
         end if
       end if
     end if
-
-!    if (rech_num /= 0) then
-!      ! -- Change the volume rate using time step and cell volume (volrate)
-!        call change_volrate()
-!    end if
-
-!    if (timestep_num /= 0 .and. st_sim%sim_type /= -1) then
-!      ! -- Set estimate head (est_head)
-!        call set_est_head(head_old2, head_old, head_new)
-!    end if
 
   end subroutine update_tstep
 
@@ -211,7 +201,7 @@ module time_module
       deallocate(calc2calc)
 
     else if (st_sim%sim_type >= 0) then
-      if (conv_flag == 1) then
+      if (conv_flag) then
         if (timestep_num == 0) then
           delt_old1 = delt
         end if
@@ -1275,58 +1265,6 @@ module time_module
 
   end subroutine change_recharge
 
-!  subroutine change_volrate()
-!  !***************************************************************************************
-!  ! change_volrate -- Change the volume rate using time step and cell volume
-!  !***************************************************************************************
-!    ! -- modules
-!    use make_cell, only: surf_elev
-!    ! -- inout
-!
-!    ! -- local
-!    integer(I4) :: i, s
-!    !-------------------------------------------------------------------------------------
-!    !$omp parallel do private(i, s)
-!    do i = 1, rech_num
-!      s = rech2cals(i)
-!      if (surf_head(s) >= surf_elev(s)) then !exist surface water
-!        surf_head(s) = surf_head(s) + read_rech(i)*delt
-!        if (surf_head(s) < surf_elev(s)) then !below groundlevel
-!          calc_rech(i) = (surf_head(s)-surf_elev(s))/delt*rech_area(s)
-!          surf_head(s) = surf_elev(s)
-!        else
-!          calc_rech(i) = DZERO
-!        end if
-!      else
-!        calc_rech(i) = read_rech(i)*rech_area(s)
-!      end if
-!    end do
-!    !$omp end parallel do
-!
-!  end subroutine change_volrate
-
-!  subroutine set_est_head(old2_head, old1_head, new_head)
-!  !***************************************************************************************
-!  ! set_est_head -- Set estimate head
-!  !***************************************************************************************
-!    ! -- modules
-!
-!    ! -- inout
-!    real(DP), intent(in) :: old1_head(:), old2_head(:)
-!    real(DP), intent(out) :: new_head(:)
-!    ! -- local
-!    integer(I4) :: i
-!    real(DP) :: delt2_inv
-!    !-------------------------------------------------------------------------------------
-!    delt2_inv = DONE/delt_old2
-!    !$omp parallel do private(i)
-!    do i = 1, ncalc
-!      new_head(i) = old1_head(i) + delt_old1*((old1_head(i)-old2_head(i))*delt2_inv)
-!    end do
-!    !$omp end parallel do
-!
-!  end subroutine set_est_head
-
   subroutine calc_vheadout()
   !*********************************************************************************************
   ! calc_vheadout -- Calculate virtual well head without well pumping
@@ -1608,119 +1546,119 @@ module time_module
     integer(I4), intent(in) :: out_num
     ! -- local
     integer(I4) :: incr_num, decr_num
-    real(DP) :: incr_fac = 1.2E+00_DP, decr_fac = 0.8E+00_DP
+    real(DP), parameter :: INCR_FAC = 1.2E+00_DP
+    real(DP), parameter :: DECR_FAC = 0.8E+00_DP
     !-------------------------------------------------------------------------------------------
     incr_num = int(maxout_iter*0.4) ; decr_num = int(maxout_iter*0.8)
     if (out_num <= incr_num) then
-      delt = delt_old1*incr_fac
+      delt = delt_old1*INCR_FAC
     else if (out_num <= decr_num) then
       delt = delt_old1
     else
-      delt = delt_old1*decr_fac
+      delt = delt_old1*DECR_FAC
     end if
 
   end subroutine apply_heuri
 
-!  subroutine apply_adapt(old1_head, old2_head, new_head)
-!  !***************************************************************************************
-!  ! apply_adapt -- Apply adaptive time stepping
-!  !***************************************************************************************
-!    ! -- modules
-!    use constval_module, only: MACHI_EPS
-!    use initial_module, only: criteria
-!    use read_input, only: len_scal_inv
-!    ! -- inout
-!    real(DP), intent(in) :: old1_head(:), old2_head(:), new_head(:)
-!    ! -- local
-!    integer(I4) :: loop_max
-!    real(DP) :: tru_err, max_err
-!    real(DP) :: temp_step, rmin = 0.1_DP
-!    real(DP) :: rmax, max_tau
-!    !-------------------------------------------------------------------------------------
-!    rmax = st_sim%inc_fact ; max_tau = criteria*10_DP*len_scal_inv
-!    ! -- Calculate truncation error (trunerr)
-!      call calc_trunerr(max_tau, new_head, old1_head, old2_head, tru_err, max_err)
-!
-!    loop_max = 1 ; temp_step = delt_old1
-!    trun_loop: do while (tru_err >= DZERO)
-!      if (loop_max == 10) then
-!        exit trun_loop
-!      end if
-!      delt_old1 = delt_old1*max(sqrt(max_tau/max(max_err, MACHI_EPS)), rmin)
-!      ! -- Calculate truncation error (trunerr)
-!        call calc_trunerr(max_tau, new_head, old1_head, old2_head, tru_err, max_err)
-!      loop_max = loop_max + 1
-!    end do trun_loop
-!
-!    if (loop_max == 10) then
-!      delt = temp_step*rmin
-!    else
-!      delt = delt_old1*min(sqrt(max_tau/max(max_err, MACHI_EPS)), rmax)
-!    end if
-!
-!  end subroutine apply_adapt
+  subroutine apply_adapt(old1_head, old2_head, new_head)
+  !*********************************************************************************************
+  ! apply_adapt -- Apply adaptive time stepping
+  !*********************************************************************************************
+    ! -- modules
+    use constval_module, only: MACHI_EPS
+    use initial_module, only: criteria
+    use read_input, only: len_scal_inv
+    ! -- inout
+    real(DP), intent(in) :: old1_head(:), old2_head(:), new_head(:)
+    ! -- local
+    integer(I4) :: loop_max
+    real(DP) :: tru_err, max_err, temp_step, rmax, max_tau
+    real(DP), parameter :: RMIN = 0.1_DP
+    !-------------------------------------------------------------------------------------------
+    rmax = st_sim%inc_fact ; max_tau = criteria*10_DP*len_scal_inv
+    ! -- Calculate truncation error (trunerr)
+      call calc_trunerr(max_tau, new_head, old1_head, old2_head, tru_err, max_err)
 
-!  subroutine calc_trunerr(abs_err, newh, old1h, old2h, maxterr, maxerr)
-!  !***************************************************************************************
-!  ! calc_trunerr -- Calculate truncation error
-!  !***************************************************************************************
-!    ! -- modules
-!#ifdef MPI_MSG
-!    use mpi_utility, only: mpimax_val
-!#endif
-!    ! -- inout
-!    real(DP), intent(in) :: abs_err
-!    real(DP), intent(in) :: newh(:), old1h(:), old2h(:)
-!    real(DP), intent(out) :: maxterr, maxerr
-!    ! -- local
-!    integer(I4) :: i
-!    real(DP) :: delt1_inv, delt2_inv, trun_crit, err_max
-!    real(DP), allocatable :: deri_time1(:), deri_time2(:), truc_error(:)
-!    !-------------------------------------------------------------------------------------
-!    allocate(deri_time1(ncalc), deri_time2(ncalc), truc_error(ncalc))
-!    !$omp parallel do private(i)
-!    do i = 1, ncalc
-!      deri_time1(i) = DZERO ; deri_time2(i) = DZERO ; truc_error(i) = DZERO
-!    end do
-!    !$omp end parallel do
-!
-!    if (delt_old2 /= DZERO) then
-!      delt2_inv = DONE/delt_old2
-!      !$omp parallel do private(i)
-!      do i = 1, ncalc
-!        deri_time2(i) = (old1h(i) - old2h(i))*delt2_inv
-!      end do
-!      !$omp end parallel do
-!    end if
-!
-!    delt1_inv = DONE/delt_old1
-!    !$omp parallel do private(i)
-!    do i = 1, ncalc
-!      deri_time1(i) = (newh(i) - old1h(i))*delt1_inv
-!      truc_error(i) = DHALF*delt_old1*abs(deri_time1(i)-deri_time2(i))
-!    end do
-!    !$omp end parallel do
-!
-!    trun_crit = truc_error(1) - abs_err ; err_max =  truc_error(1)
-!    !$omp parallel do private(i) reduction(max:trun_crit, err_max)
-!    do i = 1, ncalc
-!      if ((truc_error(i)-abs_err) > trun_crit) then
-!        trun_crit = truc_error(i) - abs_err ; err_max =  truc_error(i)
-!      end if
-!    end do
-!    !$omp end parallel do
-!
-!#ifdef MPI_MSG
-!    ! -- MAX value for MPI (val)
-!      call mpimax_val(trun_crit, "truncation criteria", maxterr)
-!      call mpimax_val(err_max, "truncation error", maxerr)
-!#else
-!    maxterr = trun_crit ; maxerr = err_max
-!#endif
-!
-!    deallocate(deri_time1, deri_time2, truc_error)
-!
-!  end subroutine calc_trunerr
+    loop_max = 1 ; temp_step = delt_old1
+    trun_loop: do while (tru_err >= DZERO)
+      if (loop_max == 10) then
+        exit trun_loop
+      end if
+      delt_old1 = delt_old1*max(sqrt(max_tau/max(max_err, MACHI_EPS)), RMIN)
+      ! -- Calculate truncation error (trunerr)
+        call calc_trunerr(max_tau, new_head, old1_head, old2_head, tru_err, max_err)
+      loop_max = loop_max + 1
+    end do trun_loop
+
+    if (loop_max == 10) then
+      delt = temp_step*RMIN
+    else
+      delt = delt_old1*min(sqrt(max_tau/max(max_err, MACHI_EPS)), rmax)
+    end if
+
+  end subroutine apply_adapt
+
+  subroutine calc_trunerr(abs_err, newh, old1h, old2h, maxterr, maxerr)
+  !*********************************************************************************************
+  ! calc_trunerr -- Calculate truncation error
+  !*********************************************************************************************
+    ! -- modules
+#ifdef MPI_MSG
+    use mpi_utility, only: mpimax_val
+#endif
+    ! -- inout
+    real(DP), intent(in) :: abs_err
+    real(DP), intent(in) :: newh(:), old1h(:), old2h(:)
+    real(DP), intent(out) :: maxterr, maxerr
+    ! -- local
+    integer(I4) :: i
+    real(DP) :: delt1_inv, delt2_inv, trun_crit, err_max
+    real(DP), allocatable :: deri_time1(:), deri_time2(:), truc_error(:)
+    !-------------------------------------------------------------------------------------------
+    allocate(deri_time1(ncalc), deri_time2(ncalc), truc_error(ncalc))
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      deri_time1(i) = DZERO ; deri_time2(i) = DZERO ; truc_error(i) = DZERO
+    end do
+    !$omp end parallel do
+
+    if (delt_old2 /= DZERO) then
+      delt2_inv = DONE/delt_old2
+      !$omp parallel do private(i)
+      do i = 1, ncalc
+        deri_time2(i) = (old1h(i) - old2h(i))*delt2_inv
+      end do
+      !$omp end parallel do
+    end if
+
+    delt1_inv = DONE/delt_old1
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      deri_time1(i) = (newh(i) - old1h(i))*delt1_inv
+      truc_error(i) = DHALF*delt_old1*abs(deri_time1(i)-deri_time2(i))
+    end do
+    !$omp end parallel do
+
+    trun_crit = truc_error(1) - abs_err ; err_max =  truc_error(1)
+    !$omp parallel do private(i) reduction(max:trun_crit, err_max)
+    do i = 1, ncalc
+      if ((truc_error(i)-abs_err) > trun_crit) then
+        trun_crit = truc_error(i) - abs_err ; err_max =  truc_error(i)
+      end if
+    end do
+    !$omp end parallel do
+
+#ifdef MPI_MSG
+    ! -- MAX value for MPI (val)
+      call mpimax_val(trun_crit, "truncation criteria", maxterr)
+      call mpimax_val(err_max, "truncation error", maxerr)
+#else
+    maxterr = trun_crit ; maxerr = err_max
+#endif
+
+    deallocate(deri_time1, deri_time2, truc_error)
+
+  end subroutine calc_trunerr
 
   subroutine set_date(inttime, ndate, restime)
   !*********************************************************************************************

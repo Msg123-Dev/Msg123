@@ -27,9 +27,9 @@ module check_simulation
     rerr = sqrt(rsum/bsum)
 
     if (rerr <= errtol) then
-      conv_flag = 1
+      conv_flag = .true.
     else
-      conv_flag = 0
+      conv_flag = .false.
     end if
 
   end subroutine check_insol
@@ -111,7 +111,7 @@ module check_simulation
       write_flag = 1
     else if (current_t >= st_sim%end_time) then
       write_flag = 1
-    else if (conv_flag == 1 .and. st_sim%sim_type /= 1) then
+    else if (conv_flag .and. st_sim%sim_type /= 1) then
       write_flag = 1
     else
       write_flag = 0
@@ -132,7 +132,7 @@ module check_simulation
     !-------------------------------------------------------------------------------------------
     if (current_t >= st_sim%end_time) then
       lasttime_flag = 1
-    else if (conv_flag == 1 .and. st_sim%sim_type == -1) then
+    else if (conv_flag .and. st_sim%sim_type == -1) then
       lasttime_flag = 1
     else
       lasttime_flag = 0

@@ -99,7 +99,7 @@ program msg123
     ! -- Calculate numerical solution (numsol)
       call calc_numsol()
 
-    if (conv_flag == 1) then
+    if (conv_flag) then
       ! -- Check last time step conditions (lastts)
         call check_lastts()
       ! -- Write output file (outf)

@@ -345,7 +345,6 @@ module make_linearsystem
         delh_r(i) = rive_head(i) - rive_bott(i)
         over_riv(i) = DZERO
       else
-!        delh_r(i) = rive_head(i) - head_new(s)
         delh_r(i) = DZERO
         over_riv(i) = DONE
       end if
@@ -402,7 +401,6 @@ module make_linearsystem
         delh_l(i) = lake_head(i) - lake_bott(i)
         over_lak(i) = DZERO
       else
-!        delh_l(i) = lake_head(i) - head_new(s)
         delh_l(i) = DZERO
         over_lak(i) = DONE
       end if

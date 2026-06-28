@@ -106,6 +106,9 @@ module make_amg_matrix
       en_off = crs_index(amglev-1)%offind(i)
       do k = st_off, en_off
         j = crs_index(amglev-1)%offrow(k)
+        if (j > nfine) then
+          cycle
+        end if
         ddmat = array_var(amglev-1)%dmat(i)*array_var(amglev-1)%dmat(j)
         lulumat = array_var(amglev-1)%lumat(k)
         if (lulumat**DTWO > abs(ddmat*amg_theta**DTWO) .and. ddmat*lulumat > DZERO) then
@@ -167,6 +170,9 @@ module make_amg_matrix
       aggr_num(i) = ncoase
       do k = nonaggr_index(i-1)+1, nonaggr_index(i)
         j = crs_index(amglev-1)%offrow(nonaggr_lu(k))
+        if (j > nfine) then
+          cycle
+        end if
         aggr_num(j) = ncoase
         if (aggr_luflag(j) > 0) then
           ! -- Remove queue (que)
@@ -190,14 +196,14 @@ module make_amg_matrix
       if (aggr_luflag(i) == 0) then
         do k = nonaggr_index(i-1)+1, nonaggr_index(i)
           j = crs_index(amglev-1)%offrow(nonaggr_lu(k))
+          if (j > nfine) then
+            cycle
+          end if
           if (aggr_num(j) > 0) then
             aggr_num(i) = aggr_num(j)
             exit aggre_check
           end if
         end do
-!        if (aggr_num(i) == 0) then
-!          write(*,*) "independent node in aggregate()", aggr_luflag(i), i
-!        end if
       end if
     end do aggre_check
 
@@ -236,8 +242,6 @@ module make_amg_matrix
         aggr_belongnum(k) = i
       end if
     end do
-
-!    write(*,*) ncoase, " aggregates are selected from ", aggr_inresult(ncoase)
 
     deallocate(aggr_num, aggr_index, aggr_luflag)
 
@@ -289,6 +293,9 @@ module make_amg_matrix
     do i = 1, nfine
       do kk = nonaggr_index(i-1)+1, nonaggr_index(i)
         j = crs_index(amglev-1)%offrow(nonaggr_lu(kk))
+        if (j > nfine) then
+          cycle
+        end if
         if (glob2aggrn(j) == 0) then
           cycle
         end if
@@ -333,6 +340,9 @@ module make_amg_matrix
       end if
       do kk = nonaggr_index(i-1)+1, nonaggr_index(i)
         j = crs_index(amglev-1)%offrow(nonaggr_lu(kk))
+        if (j > nfine) then
+          cycle
+        end if
         if (glob2aggrn(j) == 0) then
           cycle
         end if
@@ -530,7 +540,10 @@ module make_amg_matrix
             en_off = crs_index(amglev-1)%offind(fin_num)
             rest_3: do k = st_off, en_off
               fine_lu = crs_index(amglev-1)%offrow(k)
-              if (fine_lu <= nfine .and. temp_size(fine_lu) >= 7) then
+              if (fine_lu > nfine) then
+                cycle
+              end if
+              if (temp_size(fine_lu) >= 7) then
                 cancel_flag = 1
                 exit rest_3
               end if
@@ -691,8 +704,14 @@ module make_amg_matrix
     ! lay2
     do k = nonaggr_index(n-1)+1, nonaggr_index(n)
       j = crs_index(amglev-1)%offrow(nonaggr_lu(k))
+      if (j > nfine) then
+        cycle
+      end if
       do i = nonaggr_index(j-1)+1, nonaggr_index(j)
         lay2 = crs_index(amglev-1)%offrow(nonaggr_lu(i))
+        if (lay2 > nfine) then
+          cycle
+        end if
         if (glob_num(lay2) /= n) then
           glob_num(lay2) = n
           lay2_count = lay2_count + 1
@@ -711,6 +730,9 @@ module make_amg_matrix
       j = lay2_num(k)
       do i = nonaggr_index(j-1)+1, nonaggr_index(j)
         lay3 = crs_index(amglev-1)%offrow(nonaggr_lu(i))
+        if (lay3 > nfine) then
+          cycle
+        end if
         if (glob_num(lay3) /= n) then
           glob_num(lay3) = n
           if (aggr_luflag(lay3) > 0) then
@@ -746,17 +768,16 @@ module make_amg_matrix
       if (temq > que_size) then
         exit rmque_loop
       end if
-      if (temq+1 <= que_size .and. que_flag(temq+1) > que_flag(temq)) then
-        temq = temq + 1
+      if (temq+1 <= que_size) then
+        if (que_flag(temq+1) > que_flag(temq)) then
+          temq = temq + 1
+        end if
       end if
       if (que_flag(temq) == 0) then
         exit rmque_loop
       end if
 
       temg = que2glob(temq)
-      if (temg == 0) then
-!        write(*,*) qnum, que_flag(qnum), que2glob(qnum), temg, que_flag(temq), que2glob(temq)
-      end if
 
       que_flag(qnum) = que_flag(temq)
       que2glob(qnum) = temg

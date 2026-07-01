@@ -27,7 +27,7 @@ module time_module
   integer(I4) :: timestep_num, boundstep
   real(SP) :: next_time
   real(DP) :: delt_old1, delt_old2
-  real(DP), allocatable :: whead_new(:), head_old2(:)
+  real(DP), allocatable :: whead_new(:)
 
   contains
 
@@ -108,8 +108,8 @@ module time_module
     ! -- modules
     use constval_module, only: DNOVAL
     use utility_module, only: conv_unit
-    use initial_module, only: maxinn_iter, st_init
-    use read_input, only: temp_maxinn_iter, len_scal
+    use initial_module, only: st_init, tstep_type
+    use read_input, only: len_scal
     use prep_calculation, only: now_date, out_iter, inter_time
     use set_boundary, only: read_head
     use calc_parameter, only: calc_srat_rperm
@@ -134,16 +134,8 @@ module time_module
       delt_old1 = DZERO ; resi_time = SZERO
       if (st_sim%sim_type == -1) then
         delt = DNOVAL
-        maxinn_iter = 100
       else
-        allocate(head_old2(ncalc))
-        !$omp parallel do private(i)
-        do i = 1, ncalc
-          head_old2(i) = read_head(i)
-        end do
-        !$omp end parallel do
         delt = st_sim%ini_step
-        maxinn_iter = temp_maxinn_iter
       end if
 
       allocate(cell_srat(ncalc), calc2calc(ncalc))
@@ -227,27 +219,24 @@ module time_module
           if (trim(adjustl(st_sim%cal_unit)) == "YEA") then
             call conv_unit(my_rank, st_sim%cal_unit, "main file", now_date, st_sim%cal_fact)
           end if
-!          delt = delt*DHALF
           delt = delt
-        else if (st_sim%sim_type == 0) then
-          delt = delt*st_sim%inc_fact
-!          ! -- Apply heuristic time stepping (heuri)
-!            call apply_heuri(out_iter)
-        else if (st_sim%sim_type == 1) then
-          ! -- Apply heuristic time stepping (heuri)
-            call apply_heuri(out_iter)
-!          ! -- Apply adaptive time stepping (adapt)
-!            call apply_adapt(head_old, head_old2, head_new)
+        else
+          select case (tstep_type)
+          case (0)
+            delt = delt*st_sim%inc_fact
+          case (1)
+            ! -- Apply heuristic time stepping (heuri)
+              call apply_heuri(out_iter)
+          end select
         end if
 
         ! -- Set value exchange (valexc)
-          call set_valexc(ncalc, head_old, head_old2)
           call set_valexc(ncalc, head_new, head_old)
           call set_valexc(ncalc, srat_new, srat_old)
           call set_valexc(ncals, surf_head, surf_old)
       else
         current_t = current_t - real(delt, kind=SP)
-        delt = delt*DHALF
+        delt = delt*st_sim%dec_fact
         ! -- Set value exchange (valexc)
           call set_valexc(ncalc, head_old, head_new)
           call set_valexc(ncalc, srat_old, srat_new)
@@ -1546,119 +1535,17 @@ module time_module
     integer(I4), intent(in) :: out_num
     ! -- local
     integer(I4) :: incr_num, decr_num
-    real(DP), parameter :: INCR_FAC = 1.2E+00_DP
-    real(DP), parameter :: DECR_FAC = 0.8E+00_DP
     !-------------------------------------------------------------------------------------------
     incr_num = int(maxout_iter*0.4) ; decr_num = int(maxout_iter*0.8)
     if (out_num <= incr_num) then
-      delt = delt_old1*INCR_FAC
+      delt = delt_old1*st_sim%inc_fact
     else if (out_num <= decr_num) then
       delt = delt_old1
     else
-      delt = delt_old1*DECR_FAC
+      delt = delt_old1*st_sim%dec_fact
     end if
 
   end subroutine apply_heuri
-
-  subroutine apply_adapt(old1_head, old2_head, new_head)
-  !*********************************************************************************************
-  ! apply_adapt -- Apply adaptive time stepping
-  !*********************************************************************************************
-    ! -- modules
-    use constval_module, only: MACHI_EPS
-    use initial_module, only: criteria
-    use read_input, only: len_scal_inv
-    ! -- inout
-    real(DP), intent(in) :: old1_head(:), old2_head(:), new_head(:)
-    ! -- local
-    integer(I4) :: loop_max
-    real(DP) :: tru_err, max_err, temp_step, rmax, max_tau
-    real(DP), parameter :: RMIN = 0.1_DP
-    !-------------------------------------------------------------------------------------------
-    rmax = st_sim%inc_fact ; max_tau = criteria*10_DP*len_scal_inv
-    ! -- Calculate truncation error (trunerr)
-      call calc_trunerr(max_tau, new_head, old1_head, old2_head, tru_err, max_err)
-
-    loop_max = 1 ; temp_step = delt_old1
-    trun_loop: do while (tru_err >= DZERO)
-      if (loop_max == 10) then
-        exit trun_loop
-      end if
-      delt_old1 = delt_old1*max(sqrt(max_tau/max(max_err, MACHI_EPS)), RMIN)
-      ! -- Calculate truncation error (trunerr)
-        call calc_trunerr(max_tau, new_head, old1_head, old2_head, tru_err, max_err)
-      loop_max = loop_max + 1
-    end do trun_loop
-
-    if (loop_max == 10) then
-      delt = temp_step*RMIN
-    else
-      delt = delt_old1*min(sqrt(max_tau/max(max_err, MACHI_EPS)), rmax)
-    end if
-
-  end subroutine apply_adapt
-
-  subroutine calc_trunerr(abs_err, newh, old1h, old2h, maxterr, maxerr)
-  !*********************************************************************************************
-  ! calc_trunerr -- Calculate truncation error
-  !*********************************************************************************************
-    ! -- modules
-#ifdef MPI_MSG
-    use mpi_utility, only: mpimax_val
-#endif
-    ! -- inout
-    real(DP), intent(in) :: abs_err
-    real(DP), intent(in) :: newh(:), old1h(:), old2h(:)
-    real(DP), intent(out) :: maxterr, maxerr
-    ! -- local
-    integer(I4) :: i
-    real(DP) :: delt1_inv, delt2_inv, trun_crit, err_max
-    real(DP), allocatable :: deri_time1(:), deri_time2(:), truc_error(:)
-    !-------------------------------------------------------------------------------------------
-    allocate(deri_time1(ncalc), deri_time2(ncalc), truc_error(ncalc))
-    !$omp parallel do private(i)
-    do i = 1, ncalc
-      deri_time1(i) = DZERO ; deri_time2(i) = DZERO ; truc_error(i) = DZERO
-    end do
-    !$omp end parallel do
-
-    if (delt_old2 /= DZERO) then
-      delt2_inv = DONE/delt_old2
-      !$omp parallel do private(i)
-      do i = 1, ncalc
-        deri_time2(i) = (old1h(i) - old2h(i))*delt2_inv
-      end do
-      !$omp end parallel do
-    end if
-
-    delt1_inv = DONE/delt_old1
-    !$omp parallel do private(i)
-    do i = 1, ncalc
-      deri_time1(i) = (newh(i) - old1h(i))*delt1_inv
-      truc_error(i) = DHALF*delt_old1*abs(deri_time1(i)-deri_time2(i))
-    end do
-    !$omp end parallel do
-
-    trun_crit = truc_error(1) - abs_err ; err_max =  truc_error(1)
-    !$omp parallel do private(i) reduction(max:trun_crit, err_max)
-    do i = 1, ncalc
-      if ((truc_error(i)-abs_err) > trun_crit) then
-        trun_crit = truc_error(i) - abs_err ; err_max =  truc_error(i)
-      end if
-    end do
-    !$omp end parallel do
-
-#ifdef MPI_MSG
-    ! -- MAX value for MPI (val)
-      call mpimax_val(trun_crit, "truncation criteria", maxterr)
-      call mpimax_val(err_max, "truncation error", maxerr)
-#else
-    maxterr = trun_crit ; maxerr = err_max
-#endif
-
-    deallocate(deri_time1, deri_time2, truc_error)
-
-  end subroutine calc_trunerr
 
   subroutine set_date(inttime, ndate, restime)
   !*********************************************************************************************

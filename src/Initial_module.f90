@@ -15,7 +15,7 @@ module initial_module
     integer(I4) :: sim_type, res_type, reg_type, reg_neib
     integer(I4) :: sta_date(6), end_date(6)
     character(:), allocatable :: sim_name, cal_unit, reg_name, inact_name
-    real(SP) :: end_time, ini_step, max_step, inc_fact, cal_fact
+    real(SP) :: end_time, ini_step, max_step, inc_fact, dec_fact, cal_fact
   end type sim_set
   type(sim_set), public :: st_sim
 
@@ -206,7 +206,7 @@ module initial_module
   type(out_step), public :: st_out_step
 
   !input solution file
-  integer(I4), public :: maxout_iter, maxinn_iter, precon_type
+  integer(I4), public :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type
   integer(I4), public :: nlevel, maxvcy_iter, amg_nlevel, max_sweep
   real(DP), public :: criteria, errtol, newper, newper_inv
   real(SP), public :: jac_omega, amg_theta
@@ -344,7 +344,7 @@ module initial_module
     st_out_type%rech = 0 ; st_out_type%well = 0 ; st_out_type%calg = 0
 
     ! input solution file
-    maxout_iter = 20 ; maxinn_iter = 10 ; precon_type = 0
+    tstep_type = 0 ; maxout_iter = 20 ; picard_iter = 0 ; maxinn_iter = 10 ; precon_type = 0
     nlevel = 0 ; maxvcy_iter = 0 ; amg_nlevel = 0 ; max_sweep = 0
     criteria = 1.00E-03_DP ; errtol = DZERO
     newper = MACHI_EPS ; newper_inv = DONE/newper

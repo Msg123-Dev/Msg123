@@ -17,12 +17,12 @@ module constval_module
   real(SP), parameter :: DAYSEC = 86400_SP, YEARSEC = 31536000_SP
 
   real(SP), parameter :: SZERO = 0.00_SP, SONE = 1.00_SP, SHALF = 0.50_SP
-  real(SP), parameter :: STWO = 2.00_SP, SQUA = 0.25_SP, SINFI = 1.00E+20_SP
-  real(SP), parameter :: SSMAL = 1.00E-20_SP, SNOVAL = -9999_SP
+  real(SP), parameter :: STWO = 2.00_SP, SQUA = 0.25_SP, SINFI = 1.00E+10_SP
+  real(SP), parameter :: SSMAL = 1.00E-10_SP, SNOVAL = -9999_SP
 
   real(DP), parameter :: DZERO = 0.00_DP, DONE = 1.00_DP, DHALF = 0.50_DP
-  real(DP), parameter :: DTWO = 2.00_DP, DQUA = 0.25_DP, DINFI = 1.00E+20_DP
-  real(DP), parameter :: DSMAL = 1.00E-20_DP, DNOVAL = -9999_DP
+  real(DP), parameter :: DTWO = 2.00_DP, DQUA = 0.25_DP, DINFI = 1.00E+10_DP
+  real(DP), parameter :: DSMAL = 1.00E-10_DP, DNOVAL = -9999_DP
 
   real(DP), parameter :: MACHI_EPS = epsilon(1.00_SP)
   real(DP), parameter :: VARMAX = 1.00E+03_DP, XMAX = 1.00E+04_DP, XMAX_INV = 1.00E-04_DP

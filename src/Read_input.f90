@@ -9,7 +9,6 @@ module read_input
   implicit none
   private
   public :: read_main_file, read_grid_file
-  integer(I4), public :: temp_maxinn_iter
   real(SP), public :: len_scal, len_scal_inv
   real(DP), allocatable, public :: glob_x(:,:), glob_y(:,:), glob_z(:,:,:)
 
@@ -348,16 +347,17 @@ module read_input
   ! read_sol_list -- Read solution name list
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: maxout_iter, maxinn_iter, criteria, precon_type, nlevel
+    use initial_module, only: tstep_type, maxout_iter, picard_iter, criteria, maxinn_iter,&
+                              precon_type, nlevel
     ! -- inout
 
     ! -- local
     integer(I4) :: ierr
-    real(SP) :: init_step, incr_multi, max_step
-    namelist/set_solution/init_step, incr_multi, max_step, maxout_iter, criteria,&
-                          maxinn_iter, precon_type
+    real(SP) :: init_step, incr_multi, decr_multi, max_tstep
+    namelist/set_solution/init_step, tstep_type, incr_multi, decr_multi, max_tstep,&
+                          maxout_iter, picard_iter, criteria, maxinn_iter, precon_type
     !-------------------------------------------------------------------------------------------
-    ierr = 0 ; init_step = SZERO ; incr_multi = SZERO ; max_step = SZERO
+    ierr = 0 ; init_step = SZERO ; incr_multi = SZERO ; decr_multi = SZERO ; max_tstep = SZERO
     read(unit=main_fnum,nml=set_solution,iostat=ierr)
 
     if (ierr /= 0) then
@@ -366,8 +366,19 @@ module read_input
       call write_err_stop("Input a positive value for maximum number of outer iteration.")
     else if (maxinn_iter <= 0) then
       call write_err_stop("Input a positive value for maximum number of inner iteration.")
+    else if (picard_iter < -1) then
+      call write_err_stop("Input a larger than -1 value for Picard iteration.")
+    else if (tstep_type < 0) then
+      call write_err_stop("Input a non-negative value for time step type.")
+    else if (tstep_type > 2) then
+      call write_err_stop("Input a valid value for time step type.")
+    else if (precon_type < 0) then
+      call write_err_stop("Input a non-negative value for preconditoner type.")
+    else if (precon_type > 1) then
+      call write_err_stop("Input a valid value for preconditoner type.")
+    else if (maxout_iter < picard_iter) then
+      call write_err_stop("Picard iteration is larger than maximum number of outer iteration.")
     end if
-    temp_maxinn_iter = maxinn_iter
 
     nlevel = 1
     if (precon_type /= 0 .and. precon_type /= 1) then
@@ -375,8 +386,9 @@ module read_input
     end if
 
     st_sim%ini_step = init_step*st_sim%cal_fact
-    st_sim%max_step = max_step*st_sim%cal_fact
+    st_sim%max_step = max_tstep*st_sim%cal_fact
     st_sim%inc_fact = incr_multi
+    st_sim%dec_fact = decr_multi
 
     if (precon_type == 1) then
       call read_amg_parm(main_fnum)
@@ -513,11 +525,11 @@ module read_input
 
       do i = 1, 3
         select case (i)
-        case(1)
+        case (1)
           xyz_path = trim(adjustl(in_xpath))
-        case(2)
+        case (2)
           xyz_path = trim(adjustl(in_ypath))
-        case(3)
+        case (3)
           xyz_path = trim(adjustl(in_zpath))
         end select
 
@@ -562,11 +574,11 @@ module read_input
         deallocate(xyz_path)
 
         select case (i)
-        case(1)
+        case (1)
           glob_x = real(read_xy, kind=DP)
-        case(2)
+        case (2)
           glob_y = real(read_xy, kind=DP)
-        case(3)
+        case (3)
           glob_z = real(read_z, kind=DP)
         end select
       end do
@@ -1354,61 +1366,61 @@ module read_input
 
     do i = 1, outv_num
       select case (vari_name(i))
-      case('conv')
+      case ('conv')
         st_out_path%conv = "conv_"//str_sim_name//".txt"
-      case('head')
+      case ('head')
         st_out_path%head = "head_"//str_sim_name//".bin"
         st_out_unit%head = head_unit ; st_out_time%head = head_time
-      case('rest')
+      case ('rest')
         st_out_path%rest = "rest_"//str_sim_name//".bin"
         st_out_unit%rest = rest_unit ; st_out_time%rest = rest_time
-      case('srat')
+      case ('srat')
         st_out_type%srat = out_type(3)
         st_out_path%srat = "srat_"//str_sim_name//".bin"
         st_out_unit%srat = srat_unit ; st_out_time%srat = srat_time
-      case('wtab')
+      case ('wtab')
         st_out_type%wtab = out_type(2)
         st_out_path%wtab = "wtab_"//str_sim_name//".bin"
         st_out_unit%wtab = wtab_unit ; st_out_time%wtab = wtab_time
-      case('mass')
+      case ('mass')
         st_out_type%mass = out_type(1)
         st_out_path%mass = "mass_"//str_sim_name//".csv"
         st_out_unit%mass = mass_unit ; st_out_time%mass = mass_time
-      case('velc')
+      case ('velc')
         st_out_type%velc = out_type(3)
         st_out_path%velx = "velx_"//str_sim_name//".bin"
         st_out_path%vely = "vely_"//str_sim_name//".bin"
         st_out_path%velz = "velz_"//str_sim_name//".bin"
         st_out_unit%velc = velc_unit ; st_out_time%velc = velc_time
-      case('rivr')
+      case ('rivr')
         st_out_type%rivr = out_type(2)
         st_out_path%rivr = "rivr_"//str_sim_name//".bin"
         st_out_unit%rivr = rivr_unit ; st_out_time%rivr = rivr_time
-      case('lakr')
+      case ('lakr')
         st_out_type%lakr = out_type(2)
         st_out_path%lakr = "lakr_"//str_sim_name//".bin"
         st_out_unit%lakr = lakr_unit ; st_out_time%lakr = lakr_time
-      case('sufr')
+      case ('sufr')
         st_out_type%sufr = out_type(2)
         st_out_path%sufr = "sufr_"//str_sim_name//".bin"
         st_out_unit%sufr = sufr_unit ; st_out_time%sufr = sufr_time
-      case('dunr')
+      case ('dunr')
         st_out_type%dunr = out_type(2)
         st_out_path%dunr = "dunr_"//str_sim_name//".bin"
         st_out_unit%dunr = dunr_unit ; st_out_time%dunr = dunr_time
-      case('seal')
+      case ('seal')
         st_out_type%seal = out_type(3)
         st_out_path%seal = "seal_"//str_sim_name//".bin"
         st_out_unit%seal = seal_unit ; st_out_time%seal = seal_time
-      case('well')
+      case ('well')
         st_out_type%well = out_type(3)
         st_out_path%well = "well_"//str_sim_name//".bin"
         st_out_unit%well = well_unit ; st_out_time%well = well_time
-      case('rech')
+      case ('rech')
         st_out_type%rech = out_type(2)
         st_out_path%rech = "rech_"//str_sim_name//".bin"
         st_out_unit%rech = rech_unit ; st_out_time%rech = rech_time
-      case('calg')
+      case ('calg')
         st_out_type%calg = out_type(1)
         st_out_path%calg = "calg_"//str_sim_name//".csv"
       end select

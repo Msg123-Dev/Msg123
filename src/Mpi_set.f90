@@ -3017,7 +3017,6 @@ module mpi_set
     use mpi_utility, only: bcast_val
     use initial_module, only: maxout_iter, maxinn_iter, amg_nlevel, maxvcy_iter,&
                               max_sweep, criteria, jac_omega, amg_theta
-    use read_input, only: temp_maxinn_iter
     ! -- inout
 
     ! -- local
@@ -3025,11 +3024,8 @@ module mpi_set
     !-------------------------------------------------------------------------------------------
     ! -- Bcast scalar value (val)
       call bcast_val(maxout_iter, " maximum outer iteration number")
-
-    if (st_sim%sim_type /= -1) then
-      ! -- Bcast scalar value (val)
-        call bcast_val(maxinn_iter, " maximum inner iteration number")
-    end if
+    ! -- Bcast scalar value (val)
+      call bcast_val(maxinn_iter, " maximum inner iteration number")
 
     ! -- Bcast scalar value (val)
       call bcast_val(amg_nlevel, " multigrid level number")
@@ -3040,6 +3036,8 @@ module mpi_set
       call bcast_val(st_sim%max_step, " maximun time step value")
     ! -- Bcast scalar value (val)
       call bcast_val(st_sim%inc_fact, " increment multiplier value")
+    ! -- Bcast scalar value (val)
+      call bcast_val(st_sim%dec_fact, " decrement multiplier value")
     ! -- Bcast scalar value (val)
       call bcast_val(criteria, " outer criteria (max norm) value")
 
@@ -3053,9 +3051,6 @@ module mpi_set
       ! -- Bcast scalar value (val)
         call bcast_val(amg_theta, " amg theta value")
     end if
-
-    ! -- Bcast scalar value (val)
-      call bcast_val(temp_maxinn_iter, " maximum inner iteration number")
 
   end subroutine bcast_solval
 

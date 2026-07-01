@@ -30,7 +30,7 @@ module nonlinear_solution
     use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
     use constval_module, only: XMAX, XMAX_INV, VARLEN
     use utility_module, only: log_fnum
-    use initial_module, only: st_sim, maxout_iter, errtol, st_out_step, my_rank
+    use initial_module, only: st_sim, maxout_iter, picard_iter, errtol, st_out_step, my_rank
     use prep_calculation, only: current_t, delt, conv_flag, form_switch
     use make_linearsystem, only: make_matvec
     use check_simulation, only: check_abserrmax
@@ -78,7 +78,6 @@ module nonlinear_solution
         if (my_rank == 0) then
           write(conv_fnum,10) now_time, trim(st_sim%cal_unit), delt
         end if
-        form_switch = 1
         allocate(new_func(ncalc))
         !$omp parallel do private(i)
         do i = 1, ncalc
@@ -87,6 +86,14 @@ module nonlinear_solution
         !$omp end parallel do
       else
         l2norm_pre = l2norm_new
+      end if
+
+      if (picard_iter < 0) then
+        form_switch = 0
+      else if (out_iter > picard_iter) then
+        form_switch = 1
+      else
+        form_switch = 0
       end if
 
       back_iter = 0 ; beta_iter = 0

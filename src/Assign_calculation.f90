@@ -71,19 +71,19 @@ module assign_calc
         end if
 
         select case (i)
-        case(1)
+        case (1)
           !$omp parallel do private(j)
           do j = 1, ncalc
             read_reta(j) = ret_val(j)
           end do
           !$omp end parallel do
-        case(2)
+        case (2)
           !$omp parallel do private(j)
           do j = 1, ncalc
             read_retn(j) = ret_val(j)
           end do
           !$omp end parallel do
-        case(3)
+        case (3)
           !$omp parallel do private(j)
           do j = 1, ncalc
             read_resi(j) = ret_val(j)
@@ -213,31 +213,31 @@ module assign_calc
         end if
 
         select case (i)
-        case(1)
+        case (1)
           !$omp parallel do private(j)
           do j = 1, ncalc
             read_ksx(j) = par_val(j)
           end do
           !$omp end parallel do
-        case(2)
+        case (2)
           !$omp parallel do private(j)
           do j = 1, ncalc
             read_ksy(j) = par_val(j)
           end do
           !$omp end parallel do
-        case(3)
+        case (3)
           !$omp parallel do private(j)
           do j = 1, ncalc
             read_ksz(j) = par_val(j)
           end do
           !$omp end parallel do
-        case(4)
+        case (4)
           !$omp parallel do private(j)
           do j = 1, ncalc
             read_ss(j) = par_val(j)
           end do
           !$omp end parallel do
-        case(5)
+        case (5)
           !$omp parallel do private(j)
           do j = 1, ncalc
             read_poro(j) = par_val(j)
@@ -370,19 +370,19 @@ module assign_calc
       call set_2dfile2cals(geo_fnum(i), geo_ftype(i), 0, SNOVAL, geo_val, geo_cflag, geog_num)
 
       select case (i)
-      case(1)
+      case (1)
         !$omp parallel do private(j)
         do j = 1, ncals
           surf_bott(j) = geo_val(j)
         end do
         !$omp end parallel do
-      case(2)
+      case (2)
         !$omp parallel do private(j)
         do j = 1, ncals
           surf_reli(j) = geo_val(j)
         end do
         !$omp end parallel do
-      case(3)
+      case (3)
         !$omp parallel do private(j)
         do j = 1, ncals
           surf_parm(j) = geo_val(j)

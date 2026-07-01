@@ -114,13 +114,13 @@ module open_file
       do i = 1, 3
         retn_num = 0
         select case (i)
-        case(1)
+        case (1)
           path_retn = trim(adjustl(in_vapath)) ; mess_retn = mess_vana
           deallocate(mess_vana)
-        case(2)
+        case (2)
           path_retn = trim(adjustl(in_vnpath)) ; mess_retn = mess_vann
           deallocate(mess_vann)
-        case(3)
+        case (3)
           path_retn = trim(adjustl(in_repath)) ; mess_retn = mess_resi
           deallocate(mess_resi)
         end select
@@ -151,11 +151,11 @@ module open_file
         end if
 
         select case (i)
-        case(1)
+        case (1)
           st_retn_fnum%vana = retn_num
-        case(2)
+        case (2)
           st_retn_fnum%vann = retn_num
-        case(3)
+        case (3)
           st_retn_fnum%resi = retn_num
         end select
 
@@ -256,19 +256,19 @@ module open_file
       do i = 1, 5
         parm_num = 0
         select case (i)
-        case(1)
+        case (1)
           path_parm = trim(adjustl(in_kxpath)) ; mess_parm = mess_kx
           deallocate(mess_kx)
-        case(2)
+        case (2)
           path_parm = trim(adjustl(in_kypath)) ; mess_parm = mess_ky
           deallocate(mess_ky)
-        case(3)
+        case (3)
           path_parm = trim(adjustl(in_kzpath)) ; mess_parm = mess_kz
           deallocate(mess_kz)
-        case(4)
+        case (4)
           path_parm = trim(adjustl(in_sspath)) ; mess_parm = mess_ss
           deallocate(mess_ss)
-        case(5)
+        case (5)
           path_parm = trim(adjustl(in_tspath)) ; mess_parm = mess_ts
           deallocate(mess_ts)
         end select
@@ -299,15 +299,15 @@ module open_file
         end if
 
         select case (i)
-        case(1)
+        case (1)
           st_parm_fnum%pakx = parm_num
-        case(2)
+        case (2)
           st_parm_fnum%paky = parm_num
-        case(3)
+        case (3)
           st_parm_fnum%pakz = parm_num
-        case(4)
+        case (4)
           st_parm_fnum%pass = parm_num
-        case(5)
+        case (5)
           st_parm_fnum%pats = parm_num
         end select
 
@@ -383,13 +383,13 @@ module open_file
     do i = 1, 3
       geog_num = 0
       select case (i)
-      case(1)
+      case (1)
         path_geog = trim(adjustl(in_gzpath)) ; mess_geog = mess_geoz
         deallocate(mess_geoz)
-      case(2)
+      case (2)
         path_geog = trim(adjustl(in_grpath)) ; mess_geog = mess_geor
         deallocate(mess_geor)
-      case(3)
+      case (3)
         path_geog = trim(adjustl(in_gapath)) ; mess_geog = mess_geoa
         deallocate(mess_geoa)
       end select
@@ -420,11 +420,11 @@ module open_file
       end if
 
       select case (i)
-      case(1)
+      case (1)
         st_geog_fnum%geoz = geog_num
-      case(2)
+      case (2)
         st_geog_fnum%geor = geog_num
-      case(3)
+      case (3)
         st_geog_fnum%geoa = geog_num
       end select
 
@@ -1553,22 +1553,22 @@ module open_file
       rive_view = 0 ; intri_type = 0 ; err_mes = "" ; path_rive = "" ; mess_rive = ""
 
       select case (i)
-      case(1)
+      case (1)
         path_rive = trim(adjustl(riwl_path)) ; mess_rive = mess_wl ; unit_rive = riwl_unit
         deallocate(mess_wl)
-      case(2)
+      case (2)
         path_rive = trim(adjustl(riwd_path)) ; mess_rive = mess_wd ; unit_rive = riwd_unit
         deallocate(mess_wd)
-      case(3)
+      case (3)
         path_rive = trim(adjustl(ribl_path)) ; mess_rive = mess_bl ; unit_rive = ribl_unit
         deallocate(mess_bl)
-      case(4)
+      case (4)
         path_rive = trim(adjustl(ride_path)) ; mess_rive = mess_de ; unit_rive = ride_unit
         deallocate(mess_de)
-      case(5)
+      case (5)
         path_rive = trim(adjustl(riwi_path)) ; mess_rive = mess_wi ; unit_rive = riwi_unit
         deallocate(mess_wi)
-      case(6)
+      case (6)
         path_rive = trim(adjustl(rile_path)) ; mess_rive = mess_le ; unit_rive = rile_unit
         deallocate(mess_le)
       case default
@@ -1720,7 +1720,7 @@ module open_file
       rive_stepflag = 0
 
       select case (i)
-      case(1)
+      case (1)
         st_riwl%multi = rive_multi ; st_riwl%totn = rive_totn
         st_riwl%etime = rive_etime ; st_step_flag%riwl = rive_stepflag
         st_riwl%inttype = intri_type
@@ -1733,7 +1733,7 @@ module open_file
         else
           st_riwl%fnum = riven(i)
         end if
-      case(2)
+      case (2)
         st_riwd%multi = rive_multi ; st_riwd%totn = rive_totn
         st_riwd%etime = rive_etime ; st_step_flag%riwd = rive_stepflag
         st_riwd%inttype = intri_type
@@ -1746,7 +1746,7 @@ module open_file
         else
           st_riwd%fnum = riven(i)
         end if
-      case(3)
+      case (3)
         st_ribl%multi = rive_multi ; st_ribl%totn = rive_totn
         st_ribl%etime = rive_etime ; st_step_flag%ribl = rive_stepflag
         st_ribl%inttype = intri_type
@@ -1759,7 +1759,7 @@ module open_file
         else
           st_ribl%fnum = riven(i)
         end if
-      case(4)
+      case (4)
         st_ride%multi = rive_multi ; st_ride%totn = rive_totn
         st_ride%etime = rive_etime ; st_step_flag%ride = rive_stepflag
         st_ride%inttype = intri_type
@@ -1772,7 +1772,7 @@ module open_file
         else
           st_ride%fnum = riven(i)
         end if
-      case(5)
+      case (5)
         st_riwi%multi = rive_multi ; st_riwi%totn = rive_totn
         st_riwi%etime = rive_etime ; st_step_flag%riwi = rive_stepflag
         st_riwi%inttype = intri_type
@@ -1785,7 +1785,7 @@ module open_file
         else
           st_riwi%fnum = riven(i)
         end if
-      case(6)
+      case (6)
         st_rile%multi = rive_multi ; st_rile%totn = rive_totn
         st_rile%etime = rive_etime ; st_step_flag%rile = rive_stepflag
         st_rile%inttype = intri_type
@@ -1896,16 +1896,16 @@ module open_file
       lake_view = 0 ; intla_type = 0 ; err_mes = "" ; path_lake = "" ; mess_lake = ""
 
       select case (i)
-      case(1)
+      case (1)
         path_lake = trim(adjustl(lawl_path)) ; mess_lake = mess_wl ; unit_lake = lawl_unit
         deallocate(mess_wl)
-      case(2)
+      case (2)
         path_lake = trim(adjustl(lawd_path)) ; mess_lake = mess_wd ; unit_lake = lawd_unit
         deallocate(mess_wd)
-      case(3)
+      case (3)
         path_lake = trim(adjustl(labl_path)) ; mess_lake = mess_bl ; unit_lake = labl_unit
         deallocate(mess_bl)
-      case(4)
+      case (4)
         path_lake = trim(adjustl(laar_path)) ; mess_lake = mess_ar ; unit_lake = laar_unit
         deallocate(mess_ar)
       case default
@@ -2057,7 +2057,7 @@ module open_file
       lake_stepflag = 0
 
       select case (i)
-      case(1)
+      case (1)
         st_lawl%multi = lake_multi ; st_lawl%totn = lake_totn
         st_lawl%etime = lake_etime ; st_step_flag%lawl = lake_stepflag
         st_lawl%inttype = intla_type
@@ -2070,7 +2070,7 @@ module open_file
         else
           st_lawl%fnum = laken(i)
         end if
-      case(2)
+      case (2)
         st_lawd%multi = lake_multi ; st_lawd%totn = lake_totn
         st_lawd%etime = lake_etime ; st_step_flag%lawd = lake_stepflag
         st_lawd%inttype = intla_type
@@ -2083,7 +2083,7 @@ module open_file
         else
           st_lawd%fnum = laken(i)
         end if
-      case(3)
+      case (3)
         st_labl%multi = lake_multi ; st_labl%totn = lake_totn
         st_labl%etime = lake_etime ; st_step_flag%labl = lake_stepflag
         st_labl%inttype = intla_type
@@ -2096,7 +2096,7 @@ module open_file
         else
           st_labl%fnum = laken(i)
         end if
-      case(4)
+      case (4)
         st_laar%multi = lake_multi ; st_laar%totn = lake_totn
         st_laar%etime = lake_etime ; st_step_flag%laar = lake_stepflag
         st_laar%inttype = intla_type

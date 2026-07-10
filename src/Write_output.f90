@@ -2,18 +2,17 @@ module write_output
   ! -- modules
   use kind_module, only: I4, SP, DP
   use constval_module, only: SZERO, DZERO
-  use utility_module, only: close_file
-  use initial_module, only: my_rank
+  use utility_module, only: st_mpi, close_file
   use read_input, only: len_scal
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc, ncals
-  use set_condition, only: rech_area
+  use set_condition, only: st_hydr, st_bcnd
   use assign_calc, only: msout_tnum
+  use prep_calculation, only: st_time
   use allocate_solution, only: head_new, srat_new
   use check_simulation, only: lasttime_flag
-  use write_module, only: write_header_bin, write_2dbin, write_3dbin
+  use write_module, only: write_2dbin, write_3dbin, write_header_bin
 #ifdef MPI_MSG
-  use initial_module, only: pro_totn
   use mpi_read, only: close_mpi_file
   use mpi_write, only: write_mpi_2dbin, write_mpi_3dbin
 #endif
@@ -32,14 +31,13 @@ module write_output
   ! write_outf -- write output file
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_out_step, st_out_type, out_type
-    use prep_calculation, only: current_t
+    use initial_module, only: st_out_type, st_out_step, out_type
     use check_simulation, only: check_outtiming, write_flag
     use allocate_output, only: allocate_outvar
     use calc_output, only: calc_cell_mas, calc_rivr_off, calc_lakr_off, calc_sufr_off,&
                            calc_dunr_off, calc_seal_res, calc_rech_res, calc_well_res
 #ifdef MPI_MSG
-    use mpi_write, only: set_senrec_wtab, write_mpi_rest
+    use mpi_write, only: write_mpi_rest, set_senrec_wtab
 #endif
     ! -- inout
     real(SP), intent(in) :: time_val
@@ -58,12 +56,12 @@ module write_output
 
     if (header_flag == 0 .and. write_flag == 1) then
       header_flag = 1
-      if (my_rank == 0 .and. st_out_type%mass == out_type(1)) then
+      if (st_mpi%rank == 0 .and. st_out_type%mass == out_type(1)) then
         ! -- Write massbalance file header (mass_header)
           call write_mass_header()
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1 .and. st_out_type%wtab == out_type(2)) then
+      if (st_mpi%totn /= 1 .and. st_out_type%wtab == out_type(2)) then
         ! -- Set send and receive for water table (senrec_wtab)
           call set_senrec_wtab()
       end if
@@ -115,7 +113,7 @@ module write_output
       if (st_out_step%head == SZERO) then
         ! -- Write output head file (out_headf)
           call write_out_headf(time_val)
-      else if (mod(current_t,st_out_step%head) == 0) then
+      else if (mod(st_time%current_t,st_out_step%head) == 0) then
         ! -- Write output head file (out_headf)
           call write_out_headf(time_val)
       else if (lasttime_flag == 1) then
@@ -139,7 +137,7 @@ module write_output
         if (st_out_step%srat == SZERO) then
           ! -- Write output saturation file (out_sratf)
             call write_out_sratf(time_val)
-        else if (mod(current_t,st_out_step%srat) == 0) then
+        else if (mod(st_time%current_t,st_out_step%srat) == 0) then
           ! -- Write output saturation file (out_sratf)
             call write_out_sratf(time_val)
         else if (lasttime_flag == 1) then
@@ -152,7 +150,7 @@ module write_output
         if (st_out_step%wtab == SZERO) then
           ! -- Write watertable file (out_wtabf)
             call write_out_wtabf(time_val)
-        else if (mod(current_t,st_out_step%wtab) == 0) then
+        else if (mod(st_time%current_t,st_out_step%wtab) == 0) then
           ! -- Write watertable file (out_wtabf)
             call write_out_wtabf(time_val)
         else if (lasttime_flag== 1) then
@@ -165,7 +163,7 @@ module write_output
         if (st_out_step%mass == SZERO) then
           ! -- Write massbalance file (out_massf)
             call write_out_massf(time_val)
-        else if (mod(current_t,st_out_step%mass) == 0) then
+        else if (mod(st_time%current_t,st_out_step%mass) == 0) then
           ! -- Write massbalance file (out_massf)
             call write_out_massf(time_val)
         else if (lasttime_flag== 1) then
@@ -178,7 +176,7 @@ module write_output
         if (st_out_step%velc == SZERO) then
           ! -- Write velocity file (out_velcf)
             call write_out_velcf(time_val)
-        else if (mod(current_t,st_out_step%velc) == 0) then
+        else if (mod(st_time%current_t,st_out_step%velc) == 0) then
           ! -- Write velocity file (out_velcf)
             call write_out_velcf(time_val)
         else if (lasttime_flag== 1) then
@@ -191,7 +189,7 @@ module write_output
         if (st_out_step%rivr == SZERO) then
           ! -- Write river runoff file (out_rivrf)
             call write_out_rivrf(time_val)
-        else if (mod(current_t,st_out_step%rivr) == 0) then
+        else if (mod(st_time%current_t,st_out_step%rivr) == 0) then
           ! -- Write river runoff file (out_rivrf)
             call write_out_rivrf(time_val)
         else if (lasttime_flag== 1) then
@@ -204,7 +202,7 @@ module write_output
         if (st_out_step%lakr == SZERO) then
           ! -- Write lake runoff file (out_lakrf)
             call write_out_lakrf(time_val)
-        else if (mod(current_t,st_out_step%lakr) == 0) then
+        else if (mod(st_time%current_t,st_out_step%lakr) == 0) then
           ! -- Write lake runoff file (out_lakrf)
             call write_out_lakrf(time_val)
         else if (lasttime_flag== 1) then
@@ -217,7 +215,7 @@ module write_output
         if (st_out_step%sufr == SZERO) then
           ! -- Write surface runoff file (out_sufrf)
             call write_out_sufrf(time_val)
-        else if (mod(current_t,st_out_step%sufr) == 0) then
+        else if (mod(st_time%current_t,st_out_step%sufr) == 0) then
           ! -- Write surface runoff file (out_sufrf)
             call write_out_sufrf(time_val)
         else if (lasttime_flag== 1) then
@@ -230,7 +228,7 @@ module write_output
         if (st_out_step%dunr == SZERO) then
           ! -- Write dunne runoff file (out_dunrf)
             call write_out_dunrf(time_val)
-        else if (mod(current_t,st_out_step%dunr) == 0) then
+        else if (mod(st_time%current_t,st_out_step%dunr) == 0) then
           ! -- Write dunne runoff file (out_dunrf)
             call write_out_dunrf(time_val)
         else if (lasttime_flag== 1) then
@@ -243,7 +241,7 @@ module write_output
         if (st_out_step%seal == SZERO) then
           ! -- Write sea results file (out_sealf)
             call write_out_sealf(time_val)
-        else if (mod(current_t,st_out_step%seal) == 0) then
+        else if (mod(st_time%current_t,st_out_step%seal) == 0) then
           ! -- Write sea results file (out_sealf)
             call write_out_sealf(time_val)
         else if (lasttime_flag== 1) then
@@ -256,7 +254,7 @@ module write_output
         if (st_out_step%rech == SZERO) then
           ! -- Write recharge results file (out_rechf)
             call write_out_rechf(time_val)
-        else if (mod(current_t,st_out_step%rech) == 0) then
+        else if (mod(st_time%current_t,st_out_step%rech) == 0) then
           ! -- Write recharge results file (out_rechf)
             call write_out_rechf(time_val)
         else if (lasttime_flag== 1) then
@@ -269,7 +267,7 @@ module write_output
         if (st_out_step%well == SZERO) then
           ! -- Write well pumping results file (out_wellf)
             call write_out_wellf(time_val)
-        else if (mod(current_t,st_out_step%well) == 0) then
+        else if (mod(st_time%current_t,st_out_step%well) == 0) then
           ! -- Write well pumping results file (out_wellf)
             call write_out_wellf(time_val)
         else if (lasttime_flag== 1) then
@@ -287,7 +285,7 @@ module write_output
   ! write_mass_header -- Write massbalance file header
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: MASSCHARA, OUTFORM
+    use constval_module, only: OUTFORM, MASSCHARA
     use utility_module, only: get_ilen, conv_i2s
     use initial_module, only: st_sim
     use allocate_output, only: ms_head
@@ -437,7 +435,7 @@ module write_output
     integer(I4), allocatable :: cals2cals(:)
     !-------------------------------------------------------------------------------------------
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
     ! -- Calculate water table for MPI (mpi_wtable)
       call calc_mpi_wtable(head_new, srat_new)
     else
@@ -523,7 +521,7 @@ module write_output
 #endif
 
     mass_fnum = st_out_fnum%mass
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       write(mass_fnum,msformat) time_out, (st_msglo%con(i), st_msglo%sto(i),&
             st_msglo%rec(i), st_msglo%wel(i), st_msglo%sur(i), st_msglo%riv(i),&
             st_msglo%lak(i), st_msglo%sea(i), st_msglo%tot(i), i = 1, msout_tnum)
@@ -601,8 +599,6 @@ module write_output
   ! write_out_rivrf -- Write river runoff file
   !*********************************************************************************************
     ! -- modules
-    use calc_boundary, only: rive2cals
-    use set_boundary, only: rive_num
     use allocate_output, only: roff_rive, rive_sumtime
     ! -- inout
     real(SP), intent(in) :: time_out
@@ -610,11 +606,11 @@ module write_output
     integer(I4) :: i, s, rivr_fnum
     real(DP), allocatable :: rive_flux(:)
     !-------------------------------------------------------------------------------------------
-    allocate(rive_flux(rive_num))
+    allocate(rive_flux(st_bcnd%rive_num))
     !$omp parallel do private(i, s)
-    do i = 1, rive_num
-      s = rive2cals(i)
-      rive_flux(i) = roff_rive(i)/rech_area(s)/rive_sumtime
+    do i = 1, st_bcnd%rive_num
+      s = st_bcnd%rive2cals(i)
+      rive_flux(i) = roff_rive(i)/st_hydr%rech_area(s)/rive_sumtime
     end do
     !$omp end parallel do
 
@@ -622,7 +618,8 @@ module write_output
 
 #ifdef MPI_MSG
     ! -- Write MPI 2D binary file (mpi_2dbin)
-      call write_mpi_2dbin(rivr_fnum, rive_num, rive2cals, len_scal, rive_flux, time_out)
+      call write_mpi_2dbin(rivr_fnum, st_bcnd%rive_num, st_bcnd%rive2cals,&
+                           len_scal, rive_flux, time_out)
     if (lasttime_flag == 1) then
       call close_mpi_file(rivr_fnum)
     end if
@@ -630,14 +627,14 @@ module write_output
     ! -- Write header binary file (header_bin)
       call write_header_bin(rivr_fnum, time_out)
     ! -- Write 2D binary file (2dbin)
-      call write_2dbin(rivr_fnum, rive_num, rive2cals, len_scal, rive_flux)
+      call write_2dbin(rivr_fnum, st_bcnd%rive_num, st_bcnd%rive2cals, len_scal, rive_flux)
     if (lasttime_flag == 1) then
       call close_file(rivr_fnum)
     end if
 #endif
 
     !$omp parallel do private(i)
-    do i = 1, rive_num
+    do i = 1, st_bcnd%rive_num
       roff_rive(i) = DZERO
     end do
     !$omp end parallel do
@@ -652,8 +649,6 @@ module write_output
   ! write_out_lakrf -- Write lake runoff file
   !*********************************************************************************************
     ! -- modules
-    use calc_boundary, only: lake2cals
-    use set_boundary, only: lake_num
     use allocate_output, only: roff_lake, lake_sumtime
     ! -- inout
     real(SP), intent(in) :: time_out
@@ -661,11 +656,11 @@ module write_output
     integer(I4) :: i, s, lakr_fnum
     real(DP), allocatable :: lake_flux(:)
     !-------------------------------------------------------------------------------------------
-    allocate(lake_flux(lake_num))
+    allocate(lake_flux(st_bcnd%lake_num))
     !$omp parallel do private(i, s)
-    do i = 1, lake_num
-      s = lake2cals(i)
-      lake_flux(i) = roff_lake(i)/rech_area(s)/lake_sumtime
+    do i = 1, st_bcnd%lake_num
+      s = st_bcnd%lake2cals(i)
+      lake_flux(i) = roff_lake(i)/st_hydr%rech_area(s)/lake_sumtime
     end do
     !$omp end parallel do
 
@@ -673,7 +668,8 @@ module write_output
 
 #ifdef MPI_MSG
     ! -- Write MPI 2D binary file (mpi_2dbin)
-      call write_mpi_2dbin(lakr_fnum, lake_num, lake2cals, len_scal, lake_flux, time_out)
+      call write_mpi_2dbin(lakr_fnum, st_bcnd%lake_num, st_bcnd%lake2cals,&
+                           len_scal, lake_flux, time_out)
     if (lasttime_flag == 1) then
       call close_mpi_file(lakr_fnum)
     end if
@@ -681,14 +677,14 @@ module write_output
     ! -- Write header binary file (header_bin)
       call write_header_bin(lakr_fnum, time_out)
     ! -- Write 2D binary file (2dbin)
-      call write_2dbin(lakr_fnum, lake_num, lake2cals, len_scal, lake_flux)
+      call write_2dbin(lakr_fnum, st_bcnd%lake_num, st_bcnd%lake2cals, len_scal, lake_flux)
     if (lasttime_flag == 1) then
       call close_file(lakr_fnum)
     end if
 #endif
 
     !$omp parallel do private(i)
-    do i = 1, lake_num
+    do i = 1, st_bcnd%lake_num
       roff_lake(i) = DZERO
     end do
     !$omp end parallel do
@@ -716,7 +712,7 @@ module write_output
     !$omp parallel do private(i)
     do i = 1, ncals
       cals2cals(i) = i
-      surf_flux(i) = roff_surf(i)/rech_area(i)/surf_sumtime
+      surf_flux(i) = roff_surf(i)/st_hydr%rech_area(i)/surf_sumtime
     end do
     !$omp end parallel do
 
@@ -755,8 +751,6 @@ module write_output
   ! write_out_dunrf -- Write dunne runoff file
   !*********************************************************************************************
     ! -- modules
-    use calc_boundary, only: rech2cals
-    use set_boundary, only: rech_num
     use allocate_output, only: roff_dunn, dunn_sumtime
     ! -- inout
     real(SP), intent(in) :: time_out
@@ -764,9 +758,9 @@ module write_output
     integer(I4) :: i, dunr_file
     real(DP), allocatable :: dunn_flux(:)
     !-------------------------------------------------------------------------------------------
-    allocate(dunn_flux(rech_num))
+    allocate(dunn_flux(st_bcnd%rech_num))
     !$omp parallel do private(i)
-    do i = 1, rech_num
+    do i = 1, st_bcnd%rech_num
       dunn_flux(i) = roff_dunn(i)/dunn_sumtime
     end do
     !$omp end parallel do
@@ -775,7 +769,8 @@ module write_output
 
 #ifdef MPI_MSG
     ! -- Write MPI 2D binary file (mpi_2dbin)
-      call write_mpi_2dbin(dunr_file, rech_num, rech2cals, len_scal, dunn_flux, time_out)
+      call write_mpi_2dbin(dunr_file, st_bcnd%rech_num, st_bcnd%rech2cals,&
+                           len_scal, dunn_flux, time_out)
     if (lasttime_flag == 1) then
       call close_mpi_file(dunr_file)
     end if
@@ -783,14 +778,14 @@ module write_output
     ! -- Write header binary file (header_bin)
       call write_header_bin(dunr_file, time_out)
     ! -- Write 2D binary file (2dbin)
-      call write_2dbin(dunr_file, rech_num, rech2cals, len_scal, dunn_flux)
+      call write_2dbin(dunr_file, st_bcnd%rech_num, st_bcnd%rech2cals, len_scal, dunn_flux)
     if (lasttime_flag == 1) then
       call close_file(dunr_file)
     end if
 #endif
 
     !$omp parallel do private(i)
-    do i = 1, rech_num
+    do i = 1, st_bcnd%rech_num
       roff_dunn(i) = DZERO
     end do
     !$omp end parallel do
@@ -805,7 +800,7 @@ module write_output
   ! write_out_sealf -- Write sea results file
   !*********************************************************************************************
     ! -- modules
-    use allocate_output, only: res_snum, res_seal
+    use allocate_output, only: res_seal, res_snum
     ! -- inout
     real(SP), intent(in) :: time_out
     ! -- local
@@ -843,7 +838,7 @@ module write_output
   ! write_out_rechf -- Write recharge results file
   !*********************************************************************************************
     ! -- modules
-    use allocate_output, only: res_rnum, res_rech
+    use allocate_output, only: res_rech, res_rnum
     ! -- inout
     real(SP), intent(in) :: time_out
     ! -- local
@@ -882,7 +877,7 @@ module write_output
   ! write_out_wellf -- Write well pumping results file
   !*********************************************************************************************
     ! -- modules
-    use allocate_output, only: res_wnum, res_well
+    use allocate_output, only: res_well, res_wnum
     ! -- inout
     real(SP), intent(in) :: time_out
     ! -- local

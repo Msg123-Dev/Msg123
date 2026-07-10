@@ -2,13 +2,14 @@ module ici_module
   ! -- modules
   use kind_module, only: I4, SP, DP
   use constval_module, only: DZERO
-  use initial_module, only: my_rank, st_grid, st_out_type, out_type
+  use utility_module, only: st_mpi
+  use initial_module, only: st_grid, st_out_type, out_type
   use read_input, only: len_scal
-  use set_cell, only: ncals, ncalc, get_calc_grid
-  use set_condition, only: rech_area
-  use prep_calculation, only: now_date
+  use set_cell, only: get_calc_grid, ncalc, ncals
+  use set_condition, only: st_hydr, st_bcnd
+  use prep_calculation, only: st_time
+  use assign_boundary, only: st_forc
   use allocate_output, only: wtable
-  use calc_output, only: calc_wtable
   use palmtime, only: palm_TimeStart, palm_TimeEnd
   use ici_api, only: ici_put_data
   use mpi
@@ -33,11 +34,9 @@ module ici_module
   ! init_ici -- Initialize ici
   !*********************************************************************************************
     ! -- module
-    use mpi_initfin, only: my_comm
-    use initial_module, only: pro_totn
     use mpi_set, only: bcast_ici_set
-    use ici_api, only: ici_init, ici_get_comm_local, ici_get_numpe_local,&
-                       ici_get_irank_local, ici_is_coupled
+    use ici_api, only: ici_init, ici_get_comm_local, ici_get_numpe_local, ici_get_irank_local,&
+                       ici_is_coupled
     use palmtime, only: palm_TimeInit
     ! -- inout
 
@@ -45,7 +44,7 @@ module ici_module
     integer(I4) :: ierr, errcode
     logical :: mpi_init_check
     !-------------------------------------------------------------------------------------------
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       ! -- Read ici main file (ici_main)
         call read_ici_main()
     end if
@@ -58,9 +57,9 @@ module ici_module
 
     call palm_TimeStart('Initialize')
 
-    pro_totn = ici_get_numpe_local()
-    my_rank = ici_get_irank_local()
-    my_comm = ici_get_comm_local()
+    st_mpi%totn = ici_get_numpe_local()
+    st_mpi%rank = ici_get_irank_local()
+    st_mpi%comm = ici_get_comm_local()
 
     coupled_matsiro  = ici_is_coupled('MATSIRO')
     coupled_cama  = ici_is_coupled('CAMA')
@@ -85,7 +84,7 @@ module ici_module
     ! -- Define grid (grid)
       call define_grid()
 
-    call ici_init_time(now_date)
+    call ici_init_time(st_time%now_date)
 
     ! -- Get exchange interval (exint)
       call get_exint()
@@ -101,9 +100,7 @@ module ici_module
     ! -- module
     use constval_module, only: SZERO
     use initial_module, only: st_rech, st_riwd, st_step_flag
-    use prep_calculation, only: current_t, inter_time
-    use assign_boundary, only: read_rech, rech_cflag
-    use set_boundary, only: cflag_riv, criv, rech_num, rivnum
+    use set_boundary, only: st_rive
     use ici_api, only: ici_set_time, ici_get_data, ici_get_get_fill_value
     ! -- inout
 
@@ -112,27 +109,27 @@ module ici_module
     real(DP), allocatable :: rive_wd(:)
     logical :: wain_get, runa_get, runb_get, evas_get, evav_get, rivd_get
     !-------------------------------------------------------------------------------------------
-    if (current_t == DZERO) then
-      call ici_set_time(now_date, min(int_mat, int_cama))
+    if (st_time%current_t == DZERO) then
+      call ici_set_time(st_time%now_date, min(int_mat, int_cama))
     else
-      call ici_set_time(now_date, nint(inter_time))
+      call ici_set_time(st_time%now_date, nint(st_time%inter_time))
     end if
 
     if (coupled_matsiro .and. mat_get) then
-      if (.not. allocated(read_rech)) then
-        rech_num = ncals
-        allocate(read_rech(ncals))
+      if (.not. allocated(st_forc%read_rech)) then
+        st_bcnd%rech_num = ncals
+        allocate(st_forc%read_rech(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
-          read_rech(i) = SZERO
+          st_forc%read_rech(i) = SZERO
         end do
         !$omp end parallel do
       end if
-      if (.not. allocated(rech_cflag)) then
-        allocate(rech_cflag(ncals))
+      if (.not. allocated(st_bcnd%rech_cflag)) then
+        allocate(st_bcnd%rech_cflag(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
-          rech_cflag(i) = 1
+          st_bcnd%rech_cflag(i) = 1
         end do
         !$omp end parallel do
       end if
@@ -141,36 +138,36 @@ module ici_module
       call ici_get_data("runoff_base", roff_b, IS_GET_OK=runb_get)
       call ici_get_data("evap_soil", evap_s, IS_GET_OK=evas_get)
       call ici_get_data("evap_vegt", evap_v, IS_GET_OK=evav_get)
-      if (current_t == DZERO) then
+      if (st_time%current_t == DZERO) then
         mat_noval = ici_get_get_fill_value('water_input')
         if (wain_get .and. runa_get .and. runb_get .and. evas_get .and. evav_get) then
-          call calc_infil(water_in, roff_a, roff_b, evap_s, evap_v, read_rech)
+          call calc_infil(water_in, roff_a, roff_b, evap_s, evap_v, st_forc%read_rech)
           st_rech%etime = real(int_mat, kind=SP)
-        else if (my_rank == 0) then
+        else if (st_mpi%rank == 0) then
           call write_err_stop("Not get initial variables from MATSIRO.")
         end if
       else if (st_step_flag%rech == 1) then
         if (wain_get .or. runa_get .or. runb_get .or. evas_get .or. evav_get) then
-          call calc_infil(water_in, roff_a, roff_b, evap_s, evap_v, read_rech)
+          call calc_infil(water_in, roff_a, roff_b, evap_s, evap_v, st_forc%read_rech)
           st_rech%etime = st_rech%etime + real(int_mat, kind=SP)
         end if
       end if
     end if
 
     if (coupled_cama .and. cama_get) then
-      if (.not. allocated(criv%wd)) then
-        allocate(criv%wd(ncals))
+      if (.not. allocated(st_rive%calc%wd)) then
+        allocate(st_rive%calc%wd(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
-          criv%wd(i) = SZERO
+          st_rive%calc%wd(i) = SZERO
         end do
         !$omp end parallel do
       end if
-      if (.not. allocated(cflag_riv%wd)) then
-        allocate(cflag_riv%wd(ncals))
+      if (.not. allocated(st_rive%cflag%wd)) then
+        allocate(st_rive%cflag%wd(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
-          cflag_riv%wd(i) = 1
+          st_rive%cflag%wd(i) = 1
         end do
         !$omp end parallel do
       end if
@@ -181,17 +178,17 @@ module ici_module
       end do
       !$omp end parallel do
       call ici_get_data("rive_wdep", rive_wd, IS_GET_OK=rivd_get)
-      if (current_t == DZERO) then
+      if (st_time%current_t == DZERO) then
         cama_noval = ici_get_get_fill_value('rive_wdep')
         if (rivd_get) then
-          call conv_rive(rive_wd, cflag_riv%wd, criv%wd, rivnum%wd)
+          call conv_rive(rive_wd, st_rive%cflag%wd, st_rive%calc%wd, st_rive%num%wd)
           st_riwd%etime = real(int_cama, kind=SP)
-        else if (my_rank == 0) then
+        else if (st_mpi%rank == 0) then
           call write_err_stop("Not get initial variables from CaMa-Flood.")
         end if
       else if (st_step_flag%riwd == 1) then
         if (rivd_get) then
-          call conv_rive(rive_wd, cflag_riv%wd, criv%wd, rivnum%wd)
+          call conv_rive(rive_wd, st_rive%cflag%wd, st_rive%calc%wd, st_rive%num%wd)
           st_riwd%etime = st_riwd%etime + real(int_cama, kind=SP)
         end if
       end if
@@ -243,7 +240,7 @@ module ici_module
     use initial_module, only: st_in_type
     use allocate_solution, only: head_new, srat_new
     use allocate_output, only: roff_rive, roff_lake, roff_surf
-    use calc_output, only: calc_rivr_off, calc_lakr_off, calc_sufr_off
+    use calc_output, only: calc_wtable, calc_rivr_off, calc_lakr_off, calc_sufr_off
     ! -- inout
 
     ! -- local
@@ -311,12 +308,12 @@ module ici_module
 
       !$omp parallel
       !$omp do private(i)
-      do i = 1, rive_num
+      do i = 1, st_bcnd%rive_num
         roff_rive(i) = DZERO
       end do
       !$omp end do
       !$omp do private(i)
-      do i = 1, lake_num
+      do i = 1, st_bcnd%lake_num
         roff_lake(i) = DZERO
       end do
       !$omp end do
@@ -415,7 +412,6 @@ module ici_module
   ! put_initv -- Put initial variables
   !*********************************************************************************************
     ! -- module
-    use assign_calc, only: read_init
     ! -- inout
 
     ! -- local
@@ -431,7 +427,7 @@ module ici_module
     !$omp end parallel do
 
     call make_ici_put()
-    call change_ici_put(read_init, init_val)
+    call change_ici_put(st_hydr%read_init, init_val)
     call ici_put_data("hyd_head", reshape([init_val(:)*len_scal], [ncals,st_grid%nz]))
 
     deallocate(init_val)
@@ -629,7 +625,7 @@ module ici_module
   ! calc_wtab_depth -- Calculate water table depth
   !*********************************************************************************************
     ! -- module
-    use make_cell, only: surf_elev
+    use make_cell, only: st_geom
     ! -- inout
     real(DP), intent(in) :: wtab(:)
     real(DP), intent(out) :: wtab_depth(:)
@@ -645,7 +641,7 @@ module ici_module
 
     !$omp do private(i)
     do i = 1, ncals
-      wtab_depth(i) = surf_elev(i) - wtab(i)
+      wtab_depth(i) = st_geom%surf_elev(i) - wtab(i)
       if (wtab_depth(i) < DZERO) then
         wtab_depth(i) = DZERO
       end if
@@ -660,8 +656,6 @@ module ici_module
   ! calc_rive_flux -- Calculate river flux
   !*********************************************************************************************
     ! -- module
-    use calc_boundary, only: rive2cals
-    use set_boundary, only: rive_num
     use allocate_output, only: rive_sumtime
     ! -- inout
     real(DP), intent(in) :: rivoff(:)
@@ -670,9 +664,9 @@ module ici_module
     integer(I4) :: i, s
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i, s)
-    do i = 1, rive_num
-      s = rive2cals(i)
-      rivflux(i) = rivoff(i)/rech_area(s)/rive_sumtime
+    do i = 1, st_bcnd%rive_num
+      s = st_bcnd%rive2cals(i)
+      rivflux(i) = rivoff(i)/st_hydr%rech_area(s)/rive_sumtime
     end do
     !$omp end parallel do
 
@@ -685,8 +679,6 @@ module ici_module
   ! calc_lake_flux -- Calculate lake flux
   !*********************************************************************************************
     ! -- module
-    use calc_boundary, only: lake2cals
-    use set_boundary, only: lake_num
     use allocate_output, only: lake_sumtime
     ! -- inout
     real(DP), intent(in) :: lakoff(:)
@@ -695,9 +687,9 @@ module ici_module
     integer(I4) :: i, s
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i, s)
-    do i = 1, lake_num
-      s = lake2cals(i)
-      lakflux(i) = lakoff(i)/rech_area(s)/lake_sumtime
+    do i = 1, st_bcnd%lake_num
+      s = st_bcnd%lake2cals(i)
+      lakflux(i) = lakoff(i)/st_hydr%rech_area(s)/lake_sumtime
     end do
     !$omp end parallel do
 
@@ -719,7 +711,7 @@ module ici_module
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, ncals
-      sufflux(i) = sufoff(i)/rech_area(i)/surf_sumtime
+      sufflux(i) = sufoff(i)/st_hydr%rech_area(i)/surf_sumtime
     end do
     !$omp end parallel do
 

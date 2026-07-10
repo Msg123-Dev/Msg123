@@ -3,7 +3,9 @@ module calc_output
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE
   use set_cell, only: ncalc, ncals
-  use prep_calculation, only: delt
+  use set_condition, only: st_hydr, st_bcnd
+  use prep_calculation, only: st_time
+  use assign_boundary, only: st_forc
   use allocate_solution, only: head_new
   use allocate_output, only: st_msloc
 
@@ -23,7 +25,7 @@ module calc_output
   !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_grid
-    use set_cell, only: loc2glo_ijk, get_cals_grid
+    use set_cell, only: get_cals_grid, loc2glo_ijk
     use allocate_output, only: wtable
     ! -- inout
     real(DP), intent(in) :: hyd_head(:), deg_satu(:)
@@ -56,8 +58,8 @@ module calc_output
   ! calc_cell_mas -- Calculate cell massbalance
   !*********************************************************************************************
     ! -- modules
-    use calc_function, only: calc_mass
     use allocate_solution, only: head_old
+    use calc_function, only: calc_mass
     ! -- inout
 
     ! -- local
@@ -111,7 +113,7 @@ module calc_output
   ! calc_out_mass -- Calculate output massbalance
   !*********************************************************************************************
     ! -- modules
-    use assign_calc, only: mass_num, msout_tnum, mass2calc, int_mass
+    use assign_calc, only: mass_num, msout_tnum, int_mass, mass2calc
     use allocate_output, only: st_msglo
     ! -- inout
 
@@ -188,14 +190,10 @@ module calc_output
   !*********************************************************************************************
     ! -- modules
     use constval_module, only: DHALF
-    use make_cell, only: surf_elev, cell_cent
-    use set_condition, only: nseal, hydf_surf
-    use assign_boundary, only: read_seal
+    use make_cell, only: st_geom
     use calc_parameter, only: calc_hyd_upwind
-    use allocate_solution, only: crs_index, hydf_conn, inv_dis, surf_head, rel_perm,&
-                                 dir_conn, hydf_seal, dis_seal, seal2calc, seal2seal,&
-                                 dir_seal
-    use allocate_output, only: facev, pointv
+    use allocate_solution, only: dir_conn, dir_seal, surf_head, rel_perm, crs_index
+    use allocate_output, only: pointv, facev
     ! -- inout
 
     ! -- local
@@ -216,24 +214,25 @@ module calc_output
         ! -- Calculate hydradulic conductivity by upwind (hyd_upwind)
           call calc_hyd_upwind(-delhead, relp1, relp2, relat)
 
-        dir = dir_conn(ind) ; facev(i,dir) = hydf_conn(ind)*relat*delhead*inv_dis(ind)
+        dir = dir_conn(ind)
+        facev(i,dir) = st_hydr%hydf_conn(ind)*relat*delhead*st_hydr%inv_dis(ind)
       end do
     end do
     !$omp end do
 
     !$omp do private(i, invdis, delhead)
     do i = 1, ncals
-      invdis = DONE/(surf_elev(i)-cell_cent(i))
+      invdis = DONE/(st_geom%surf_elev(i)-st_geom%cell_cent(i))
       delhead = surf_head(i) - head_new(i)
-      facev(i,1) = hydf_surf(i)*delhead*invdis*rel_perm(i)
+      facev(i,1) = st_hydr%hydf_surf(i)*delhead*invdis*rel_perm(i)
     end do
     !$omp end do
 
     !$omp do private(i, c, s, dir, delhead)
-    do i = 1, nseal
-      c = seal2calc(i) ; dir = dir_seal(i) ; s = seal2seal(i)
-      delhead = read_seal(s) - head_new(c)
-      facev(c,dir) = hydf_seal(i)*delhead*dis_seal(i)*rel_perm(c)
+    do i = 1, st_bcnd%seal_num
+      c = st_bcnd%seal2calc(i) ; dir = dir_seal(i) ; s = st_bcnd%seal2seal(i)
+      delhead = st_forc%read_seal(s) - head_new(c)
+      facev(c,dir) = st_hydr%hydf_seal(i)*delhead*st_hydr%dis_seal(i)*rel_perm(c)
     end do
     !$omp end do
 
@@ -262,8 +261,6 @@ module calc_output
   ! calc_rivr_off -- Calculate river runoff
   !*********************************************************************************************
     ! -- modules
-    use calc_boundary, only: rive2cals
-    use set_boundary, only: rive_num
     use calc_function, only: func_riveterm
     use allocate_output, only: roff_rive, rive_sumtime
     ! -- inout
@@ -272,7 +269,7 @@ module calc_output
     integer(I4) :: i, s
     real(DP), allocatable :: rives(:), temp_rive(:)
     !-------------------------------------------------------------------------------------------
-    allocate(rives(ncals), temp_rive(rive_num))
+    allocate(rives(ncals), temp_rive(st_bcnd%rive_num))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncals
@@ -280,7 +277,7 @@ module calc_output
     end do
     !$omp end do
     !$omp do private(i)
-    do i = 1, rive_num
+    do i = 1, st_bcnd%rive_num
       temp_rive(i) = roff_rive(i)
     end do
     !$omp end do
@@ -290,15 +287,15 @@ module calc_output
       call func_riveterm(head_new, rives)
 
     !$omp parallel do private(i, s)
-    do i = 1, rive_num
-      s = rive2cals(i)
-      roff_rive(i) = temp_rive(i) - rives(s)*delt
+    do i = 1, st_bcnd%rive_num
+      s = st_bcnd%rive2cals(i)
+      roff_rive(i) = temp_rive(i) - rives(s)*st_time%delt
     end do
     !$omp end parallel do
 
     deallocate(rives, temp_rive)
 
-    rive_sumtime = rive_sumtime + delt
+    rive_sumtime = rive_sumtime + st_time%delt
 
   end subroutine calc_rivr_off
 
@@ -307,8 +304,6 @@ module calc_output
   ! calc_lakr_off -- Calculate lake runoff
   !*********************************************************************************************
     ! -- modules
-    use calc_boundary, only: lake2cals
-    use set_boundary, only: lake_num
     use calc_function, only: func_laketerm
     use allocate_output, only: roff_lake, lake_sumtime
     ! -- inout
@@ -317,7 +312,7 @@ module calc_output
     integer(I4) :: i, s
     real(DP), allocatable :: lakes(:), temp_lake(:)
     !-------------------------------------------------------------------------------------------
-    allocate(lakes(ncals), temp_lake(lake_num))
+    allocate(lakes(ncals), temp_lake(st_bcnd%lake_num))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncals
@@ -325,7 +320,7 @@ module calc_output
     end do
     !$omp end do
     !$omp do private(i)
-    do i = 1, lake_num
+    do i = 1, st_bcnd%lake_num
       temp_lake(i) = roff_lake(i)
     end do
     !$omp end do
@@ -335,15 +330,15 @@ module calc_output
       call func_laketerm(head_new, lakes)
 
     !$omp parallel do private(i, s)
-    do i = 1, lake_num
-      s = lake2cals(i)
-      roff_lake(i) = temp_lake(i) - lakes(s)*delt
+    do i = 1, st_bcnd%lake_num
+      s = st_bcnd%lake2cals(i)
+      roff_lake(i) = temp_lake(i) - lakes(s)*st_time%delt
     end do
     !$omp end parallel do
 
     deallocate(lakes, temp_lake)
 
-    lake_sumtime = lake_sumtime + delt
+    lake_sumtime = lake_sumtime + st_time%delt
 
   end subroutine calc_lakr_off
 
@@ -352,8 +347,8 @@ module calc_output
   ! calc_sufr_off -- Calculate surface runoff
   !*********************************************************************************************
     ! -- modules
-    use calc_function, only: func_surfterm
     use allocate_solution, only: surf_old
+    use calc_function, only: func_surfterm
     use allocate_output, only: roff_surf, surf_sumtime
     ! -- inout
 
@@ -374,13 +369,13 @@ module calc_output
 
     !$omp parallel do private(i)
     do i = 1, ncals
-      roff_surf(i) = temp_surf(i) - surfs(i)*delt
+      roff_surf(i) = temp_surf(i) - surfs(i)*st_time%delt
     end do
     !$omp end parallel do
 
     deallocate(surfs, temp_surf)
 
-    surf_sumtime = surf_sumtime + delt
+    surf_sumtime = surf_sumtime + st_time%delt
 
   end subroutine calc_sufr_off
 
@@ -389,10 +384,6 @@ module calc_output
   ! calc_dunr_off -- Calculate dunne runoff
   !*********************************************************************************************
     ! -- modules
-    use set_condition, only: rech_area
-    use assign_boundary, only: read_rech
-    use calc_boundary, only: calc_rech, rech2cals
-    use set_boundary, only: rech_num
     use allocate_output, only: roff_dunn, dunn_sumtime
     ! -- inout
 
@@ -400,32 +391,32 @@ module calc_output
     integer(I4) :: i, s
     real(DP), allocatable :: dunns(:), temp_dunn(:)
     !-------------------------------------------------------------------------------------------
-    allocate(dunns(rech_num), temp_dunn(rech_num))
+    allocate(dunns(st_bcnd%rech_num), temp_dunn(st_bcnd%rech_num))
     !$omp parallel
     !$omp do private(i)
-    do i = 1, rech_num
+    do i = 1, st_bcnd%rech_num
       dunns(i) = DZERO
       temp_dunn(i) = roff_dunn(i)
     end do
     !$omp end do
 
     !$omp do private(i, s)
-    do i = 1, rech_num
-      s = rech2cals(i)
-      dunns(i) = read_rech(i) - calc_rech(i)/rech_area(s)
+    do i = 1, st_bcnd%rech_num
+      s = st_bcnd%rech2cals(i)
+      dunns(i) = st_forc%read_rech(i) - st_forc%calc_rech(i)/st_hydr%rech_area(s)
     end do
     !$omp end do
 
     !$omp do private(i)
-    do i = 1, rech_num
-      roff_dunn(i) = temp_dunn(i) + dunns(i)*delt
+    do i = 1, st_bcnd%rech_num
+      roff_dunn(i) = temp_dunn(i) + dunns(i)*st_time%delt
     end do
     !$omp end do
     !$omp end parallel
 
     deallocate(dunns, temp_dunn)
 
-    dunn_sumtime = dunn_sumtime + delt
+    dunn_sumtime = dunn_sumtime + st_time%delt
 
   end subroutine calc_dunr_off
 
@@ -455,7 +446,7 @@ module calc_output
 
     !$omp parallel do private(i)
     do i = 1, ncalc
-      res_seal(i) = temp_seal(i) + sealr(i)*delt
+      res_seal(i) = temp_seal(i) + sealr(i)*st_time%delt
       res_snum(i) = i
     end do
     !$omp end parallel do
@@ -490,7 +481,7 @@ module calc_output
 
     !$omp parallel do private(i)
     do i = 1, ncals
-      res_rech(i) = temp_rech(i) + rechr(i)*delt
+      res_rech(i) = temp_rech(i) + rechr(i)*st_time%delt
       res_rnum(i) = i
     end do
     !$omp end parallel do
@@ -525,7 +516,7 @@ module calc_output
 
     !$omp parallel do private(i)
     do i = 1, ncalc
-      res_well(i) = temp_well(i) + wellr(i)*delt
+      res_well(i) = temp_well(i) + wellr(i)*st_time%delt
       res_wnum(i) = i
     end do
     !$omp end parallel do

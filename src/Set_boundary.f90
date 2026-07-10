@@ -2,14 +2,15 @@ module set_boundary
   ! -- modules
   use kind_module, only: I4, SP, DP
   use constval_module, only: SNOVAL, DNOVAL
-  use utility_module, only: write_logf, write_err_stop, get_ilen, conv_i2s
-  use initial_module, only: my_rank, st_in_type, st_in_path, st_in_unit, st_rivf_type,&
-                            st_lakf_type, in_type
+  use types_module, only: rlbc_set, bfview_set, bound_fview
+  use utility_module, only: st_mpi, write_logf, write_err_stop, get_ilen, conv_i2s
+  use initial_module, only: st_in_type, st_rivf_type, st_lakf_type, st_in_path, st_in_unit,&
+                            in_type
   use set_cell, only: ncals
-  use assign_boundary, only: assign_surfbv, assign_rilav
-  use calc_boundary, only: conv_rech2calc, calc_blld, calc_lsurf, calc_wlbd
+  use set_condition, only: st_hydr, st_bcnd
+  use assign_boundary, only: assign_surfbv, assign_rilav, st_forc
+  use calc_boundary, only: conv_rech2calc, calc_wlbd, calc_blld, calc_lsurf
 #ifdef MPI_MSG
-  use initial_module, only: pro_totn
   use mpi_utility, only: mpisum_val, bcast_file
   use mpi_set, only: cals_r4view, cals_r4hview
 #endif
@@ -18,56 +19,10 @@ module set_boundary
   private
   public :: set_bound
 
-  integer(I4), public :: rech_num = 0, well_num = 0, prec_num = 0
-  integer(I4), public :: evap_num = 0, rive_num = 0, lake_num = 0
-  real(DP), allocatable, public :: read_head(:)
-  real(DP), allocatable, public :: abyd_rive(:), abyd_lake(:)
-
-  type :: rive_cflag
-    integer(I4), allocatable :: wl(:), wd(:), bl(:), de(:), wi(:), le(:), ar(:)
-  end type rive_cflag
-  type(rive_cflag), public :: cflag_riv
-
-  type :: lake_cflag
-    integer(I4), allocatable :: wl(:), wd(:), bl(:), ar(:)
-  end type lake_cflag
-  type(lake_cflag), public :: cflag_lak
-
-  type :: calc_rive
-    real(SP), allocatable :: wl(:), wd(:), bl(:), de(:), wi(:), le(:), ar(:)
-  end type calc_rive
-  type(calc_rive), public :: criv
-
-  type :: calc_lake
-    real(SP), allocatable :: wl(:), wd(:), bl(:), ar(:)
-  end type calc_lake
-  type(calc_lake), public :: clak
-
-  type :: rinum
-    integer(I4) :: wl = 0, wd = 0, bl = 0, de = 0, wi = 0, le = 0, ar = 0
-  end type rinum
-  type(rinum), public :: rivnum
-
-  type :: lanum
-    integer(I4) :: wl = 0, wd = 0, bl = 0, ar = 0
-  end type lanum
-  type(lanum), public :: laknum
-
+  type(rlbc_set), public :: st_rive, st_lake
 #ifdef MPI_MSG
-  type :: bound_fview
-    integer(I4) :: seal = 0, rech = 0, well = 0, prec = 0, evap = 0
-  end type bound_fview
   type(bound_fview), public :: bfview
-
-  type :: river_fview
-    integer(I4) :: wl = 0, wd = 0, bl = 0, de = 0, wi = 0, le = 0
-  end type river_fview
-  type(river_fview), public :: rfview
-
-  type :: lake_fview
-    integer(I4) :: wl = 0, wd = 0, bl = 0, ar = 0
-  end type lake_fview
-  type(lake_fview), public :: lfview
+  type(bfview_set), public :: rfview, lfview
 #endif
 
   ! -- local
@@ -85,9 +40,7 @@ module set_boundary
     use open_file, only: open_in_rivef, open_in_lakef
     use set_cell, only: ncalc
     use set_condition, only: set_connect, set_srabyd, set_chabyd, set_wellconn
-    use assign_calc, only: read_ksx, read_ksy, read_ksz, read_init
-    use calc_boundary, only: calc_reprev, calc_rivea, count_rivecalc, count_lakecalc,&
-                             rive2cals, lake2cals, rive_bott, rive_area, lake_bott, lake_area
+    use calc_boundary, only: calc_reprev, count_rivecalc, count_lakecalc, calc_rivea
 #ifdef MPI_MSG
    use mpi_set, only: bcast_bound_ftype, bcast_solval
 #endif
@@ -101,7 +54,7 @@ module set_boundary
     character(:), allocatable :: num_str, err_mes
     !-------------------------------------------------------------------------------------------
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast boundary file type (bound_ftype)
         call bcast_bound_ftype()
     end if
@@ -124,27 +77,27 @@ module set_boundary
 
 #ifdef MPI_MSG
     ! -- Sum value for MPI (val)
-      call mpisum_val(rech_num, "recharge", sum_rechn)
-      call mpisum_val(prec_num, "precipitation", sum_precn)
-      call mpisum_val(evap_num, "evapotranspiration", sum_evapn)
+      call mpisum_val(st_bcnd%rech_num, "recharge", sum_rechn)
+      call mpisum_val(st_bcnd%prec_num, "precipitation", sum_precn)
+      call mpisum_val(st_bcnd%evap_num, "evapotranspiration", sum_evapn)
 #else
-    sum_rechn = rech_num ; sum_precn = prec_num ; sum_evapn = evap_num
+    sum_rechn = st_bcnd%rech_num ; sum_precn = st_bcnd%prec_num ; sum_evapn = st_bcnd%evap_num
 #endif
 
     if (sum_rechn == 0 .and. sum_precn /= 0 .and. sum_evapn /= 0) then
       ! -- Calculate recharge from precipitation and evapotranspiration (reprev)
-        call calc_reprev(rech_num)
-        call conv_rech2calc(rech_num)
-      if (my_rank == 0) then
+        call calc_reprev(st_bcnd%rech_num)
+        call conv_rech2calc(st_bcnd%rech_num)
+      if (st_mpi%rank == 0) then
         call write_logf("Recharge is calculated from precipitation and evapotranspiration.")
-        allocate(character(get_ilen(rech_num)) :: num_str)
+        allocate(character(get_ilen(st_bcnd%rech_num)) :: num_str)
         allocate(character(0) :: err_mes)
-        call conv_i2s(rech_num, num_str)
+        call conv_i2s(st_bcnd%rech_num, num_str)
         err_mes = "Set "//num_str//" recharge rate."
         call write_logf(err_mes)
         deallocate(num_str, err_mes)
       end if
-    else if (my_rank == 0) then
+    else if (st_mpi%rank == 0) then
       if (sum_rechn == 0 .and. sum_precn == 0 .and. sum_evapn /= 0) then
         call write_logf("Caution!! Specified only evapotranspiration in input file.")
       else if (sum_rechn == 0 .and. sum_precn /= 0 .and. sum_evapn == 0) then
@@ -174,10 +127,10 @@ module set_boundary
 
 #ifdef MPI_MSG
     ! -- Sum value for MPI (val)
-      call mpisum_val(rivnum%wl, "river water level", sum_riwln)
-      call mpisum_val(rivnum%bl, "river bottom level", sum_ribln)
+      call mpisum_val(st_rive%num%wl, "river water level", sum_riwln)
+      call mpisum_val(st_rive%num%bl, "river bottom level", sum_ribln)
 #else
-    sum_riwln = rivnum%wl ; sum_ribln = rivnum%bl
+    sum_riwln = st_rive%num%wl ; sum_ribln = st_rive%num%bl
 #endif
 
     if (sum_riwln == 0 .or. sum_ribln == 0) then
@@ -185,9 +138,9 @@ module set_boundary
         call set_riwd_info()
 #ifdef MPI_MSG
       ! -- Sum value for MPI (val)
-        call mpisum_val(rivnum%wd, "river water depth", sum_riwdn)
+        call mpisum_val(st_rive%num%wd, "river water depth", sum_riwdn)
 #else
-      sum_riwdn = rivnum%wd
+      sum_riwdn = st_rive%num%wd
 #endif
     end if
 
@@ -197,18 +150,18 @@ module set_boundary
 
 #ifdef MPI_MSG
       ! -- Sum value for MPI (val)
-        call mpisum_val(rivnum%de, "river depth", sum_riden)
+        call mpisum_val(st_rive%num%de, "river depth", sum_riden)
 #else
-      sum_riden = rivnum%de
+      sum_riden = st_rive%num%de
 #endif
       ! -- Set river bottom level (rive_bott)
         call set_rive_bott()
 
 #ifdef MPI_MSG
     ! -- Sum value for MPI (val)
-      call mpisum_val(rivnum%bl, "river bottom level", sum_ribln)
+      call mpisum_val(st_rive%num%bl, "river bottom level", sum_ribln)
 #else
-    sum_ribln = rivnum%bl
+    sum_ribln = st_rive%num%bl
 #endif
     end if
 
@@ -223,40 +176,41 @@ module set_boundary
 
 #ifdef MPI_MSG
     ! -- Sum value for MPI (val)
-      call mpisum_val(rivnum%wi, "river width", sum_riwin)
-      call mpisum_val(rivnum%le, "river length", sum_rilen)
+      call mpisum_val(st_rive%num%wi, "river width", sum_riwin)
+      call mpisum_val(st_rive%num%le, "river length", sum_rilen)
 #else
-    sum_riwin = rivnum%wi ; sum_rilen = rivnum%le
+    sum_riwin = st_rive%num%wi ; sum_rilen = st_rive%num%le
 #endif
 
     if (sum_riwin > 0 .and. sum_rilen > 0) then
-      allocate(cflag_riv%ar(ncals))
-      allocate(criv%ar(ncals))
+      allocate(st_rive%cflag%ar(ncals))
+      allocate(st_rive%calc%ar(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        cflag_riv%ar(i) = 0
-        criv%ar(i) = SNOVAL
+        st_rive%cflag%ar(i) = 0
+        st_rive%calc%ar(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Calculate river area (rivea)
-        call calc_rivea(cflag_riv%wi, cflag_riv%le, criv%wi, criv%le, cflag_riv%ar, criv%ar,&
-                        rivnum%ar)
+        call calc_rivea(st_rive%cflag%wi, st_rive%cflag%le, st_rive%calc%wi, st_rive%calc%le,&
+                        st_rive%cflag%ar, st_rive%calc%ar, st_rive%num%ar)
     end if
 
 #ifdef MPI_MSG
     ! -- Sum value for MPI (val)
-      call mpisum_val(rivnum%ar, "river area", sum_riarn)
+      call mpisum_val(st_rive%num%ar, "river area", sum_riarn)
 #else
-    sum_riarn = rivnum%ar
+    sum_riarn = st_rive%num%ar
 #endif
 
     if (sum_riwln /= 0 .and. sum_ribln /= 0 .and. sum_riarn /= 0) then
       ! -- Count river calculation (rivecalc)
-        call count_rivecalc(cflag_riv%wl, cflag_riv%bl, cflag_riv%ar, criv%wl, criv%bl,&
-                            criv%ar, rive_num)
+        call count_rivecalc(st_rive%cflag%wl, st_rive%cflag%bl, st_rive%cflag%ar,&
+                            st_rive%calc%wl, st_rive%calc%bl, st_rive%calc%ar,&
+                            st_bcnd%rive_num)
     end if
 
-    rivnum%wl = 0
+    st_rive%num%wl = 0
 
     if (st_in_type%lake == in_type(0)) then
 #ifdef MPI_MSG
@@ -278,10 +232,10 @@ module set_boundary
 
 #ifdef MPI_MSG
     ! -- Sum value for MPI (val)
-      call mpisum_val(laknum%wl, "lake water level", sum_lawln)
-      call mpisum_val(laknum%bl, "lake bottom level", sum_labln)
+      call mpisum_val(st_lake%num%wl, "lake water level", sum_lawln)
+      call mpisum_val(st_lake%num%bl, "lake bottom level", sum_labln)
 #else
-    sum_lawln = laknum%wl ; sum_labln = laknum%bl
+    sum_lawln = st_lake%num%wl ; sum_labln = st_lake%num%bl
 #endif
 
     if (sum_lawln == 0 .or. sum_labln == 0) then
@@ -289,9 +243,9 @@ module set_boundary
         call set_lawd_info()
 #ifdef MPI_MSG
       ! -- Sum value for MPI (val)
-        call mpisum_val(laknum%wd, "lake water depth", sum_lawdn)
+        call mpisum_val(st_lake%num%wd, "lake water depth", sum_lawdn)
 #else
-      sum_lawdn = laknum%wd
+      sum_lawdn = st_lake%num%wd
 #endif
     end if
 
@@ -303,71 +257,74 @@ module set_boundary
 
 #ifdef MPI_MSG
     ! -- Sum value for MPI (val)
-      call mpisum_val(laknum%ar, "lake area", sum_laarn)
+      call mpisum_val(st_lake%num%ar, "lake area", sum_laarn)
 #else
-    sum_laarn = laknum%ar
+    sum_laarn = st_lake%num%ar
 #endif
 
     if (sum_lawln /= 0 .and. sum_labln /= 0 .and. sum_laarn /= 0) then
       ! -- Count lake calculation cell (lakecalc)
-        call count_lakecalc(cflag_lak%wl, cflag_lak%bl, cflag_lak%ar, clak%wl, clak%bl,&
-                            clak%ar, lake_num)
+        call count_lakecalc(st_lake%cflag%wl, st_lake%cflag%bl, st_lake%cflag%ar,&
+                            st_lake%calc%wl, st_lake%calc%bl, st_lake%calc%ar,&
+                            st_bcnd%lake_num)
     end if
 
-    laknum%wl = 0
+    st_lake%num%wl = 0
 
     ! -- Set connectivity (connect)
-      call set_connect(read_ksx, read_ksy, read_ksz)
+      call set_connect(st_hydr%read_hydx, st_hydr%read_hydy, st_hydr%read_hydz)
 
-    if (well_num /= 0) then
+    if (st_bcnd%well_num /= 0) then
       ! -- Set well connectivity (wellconn)
-        call set_wellconn(well_num, read_ksx, read_ksy)
+        call set_wellconn(st_bcnd%well_num, st_hydr%read_hydx, st_hydr%read_hydy)
     end if
 
-    if (rive_num /= 0) then
-      allocate(abyd_rive(rive_num))
+    if (st_bcnd%rive_num /= 0) then
+      allocate(st_forc%abyd_rive(st_bcnd%rive_num))
       !$omp parallel do private(i)
-      do i = 1, rive_num
-        abyd_rive(i) = DZERO
+      do i = 1, st_bcnd%rive_num
+        st_forc%abyd_rive(i) = DZERO
       end do
       !$omp end parallel do
       ! -- Set surface&recharge area and area by distance (srabyd)
-        call set_srabyd(rive_num, rive_bott, rive_area, rive2cals, abyd_rive)
+        call set_srabyd(st_bcnd%rive_num, st_forc%rive_bott, st_forc%rive_area,&
+                        st_bcnd%rive2cals, st_forc%abyd_rive)
     end if
 
-    if (lake_num /= 0) then
-      allocate(abyd_lake(lake_num))
+    if (st_bcnd%lake_num /= 0) then
+      allocate(st_forc%abyd_lake(st_bcnd%lake_num))
       !$omp parallel do private(i)
-      do i = 1, lake_num
-        abyd_lake(i) = DZERO
+      do i = 1, st_bcnd%lake_num
+        st_forc%abyd_lake(i) = DZERO
       end do
       !$omp end parallel do
       ! -- Set surface&recharge area and area by distance (srabyd)
-        call set_srabyd(lake_num, lake_bott, lake_area, lake2cals, abyd_lake)
+        call set_srabyd(st_bcnd%lake_num, st_forc%lake_bott, st_forc%lake_area,&
+                        st_bcnd%lake2cals, st_forc%abyd_lake)
     end if
 
     ! -- Set charge area by distance (chabyd)
       call set_chabyd()
 
-    allocate(read_head(ncalc))
+    allocate(st_forc%read_head(ncalc))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc
-      read_head(:) = DZERO
+      st_forc%read_head(:) = DZERO
     end do
     !$omp end do
 
     !$omp do private(i)
     do i = 1, ncalc
-      read_head(i) = read_init(i)
+      st_forc%read_head(i) = st_hydr%read_init(i)
     end do
     !$omp end do
     !$omp end parallel
 
-    deallocate(read_init)
+    deallocate(st_hydr%read_init)
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast solution value (solval)
         call bcast_solval()
     end if
@@ -399,7 +356,7 @@ module set_boundary
 
     if (any(all_seal_mask)) then
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast file (file)
           call bcast_file(st_in_path%seal, st_in_unit%seal, "sea level")
       end if
@@ -433,7 +390,7 @@ module set_boundary
 
     else
       st_seal%totn = 0
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_logf("Set closed boundary problem.")
       end if
     end if
@@ -452,7 +409,6 @@ module set_boundary
     ! -- modules
     use initial_module, only: st_rech
     use open_file, only: open_in_rechf, st_intre
-    use assign_boundary, only: rech_cflag, read_rech
     ! -- inout
 
     ! -- local
@@ -466,7 +422,7 @@ module set_boundary
 
     if (any(all_rech_mask)) then
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast file (file)
           call bcast_file(st_in_path%rech, st_in_unit%rech, "recharge")
       end if
@@ -490,19 +446,20 @@ module set_boundary
     end if
 
     if (st_rech%totn > 0) then
-      allocate(rech_cflag(ncals))
-      allocate(read_rech(ncals))
+      allocate(st_bcnd%rech_cflag(ncals))
+      allocate(st_forc%read_rech(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        rech_cflag(i) = 0
-        read_rech(i) = SNOVAL
+        st_bcnd%rech_cflag(i) = 0
+        st_forc%read_rech(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Assign recharge value
-        call assign_surfbv(st_in_type%rech, st_intre%type, st_rech, rech_num, rech_cflag,&
-                           read_rech)
+        call assign_surfbv(st_in_type%rech, st_intre%type, st_rech, st_bcnd%rech_num,&
+                           st_bcnd%rech_cflag,&
+                           st_forc%read_rech)
 
-      call conv_rech2calc(rech_num)
+      call conv_rech2calc(st_bcnd%rech_num)
     end if
 
     deallocate(all_rech_type, all_rech_mask)
@@ -532,7 +489,7 @@ module set_boundary
 
     if (any(all_well_mask)) then
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast file (file)
           call bcast_file(st_in_path%well, st_in_unit%well, "well")
       end if
@@ -572,9 +529,9 @@ module set_boundary
       end if
     end if
 
-    well_num = 0
+    st_bcnd%well_num = 0
     ! -- Assign well value (wellv)
-      call assign_wellv(st_in_type%well, st_in_type%weks, st_in_type%weke, well_num)
+      call assign_wellv(st_in_type%well, st_in_type%weks, st_in_type%weke, st_bcnd%well_num)
 
     deallocate(all_well_type, all_well_mask)
 
@@ -587,7 +544,6 @@ module set_boundary
     ! -- modules
     use initial_module, only: st_prec
     use open_file, only: open_in_precf, st_intpr
-    use assign_boundary, only: prec_cflag, read_prec
     ! -- inout
 
     ! -- local
@@ -601,7 +557,7 @@ module set_boundary
 
     if (any(all_prec_mask)) then
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast file (file)
           call bcast_file(st_in_path%prec, st_in_unit%prec, "precipitation")
       end if
@@ -625,18 +581,19 @@ module set_boundary
     end if
 
     if (st_prec%totn > 0) then
-      allocate(prec_cflag(ncals))
-      allocate(read_prec(ncals))
+      allocate(st_bcnd%prec_cflag(ncals))
+      allocate(st_forc%read_prec(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        prec_cflag(i) = 0
-        read_prec(i) = SNOVAL
+        st_bcnd%prec_cflag(i) = 0
+        st_forc%read_prec(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Assign precipitation value
-        call assign_surfbv(st_in_type%prec, st_intpr%type, st_prec, prec_num, prec_cflag,&
-                           read_prec)
-      deallocate(prec_cflag)
+        call assign_surfbv(st_in_type%prec, st_intpr%type, st_prec, st_bcnd%prec_num,&
+                           st_bcnd%prec_cflag,&
+                           st_forc%read_prec)
+      deallocate(st_bcnd%prec_cflag)
     end if
 
     deallocate(all_prec_type, all_prec_mask)
@@ -650,7 +607,6 @@ module set_boundary
     ! -- modules
     use initial_module, only: st_evap
     use open_file, only: open_in_evapf, st_intev
-    use assign_boundary, only: evap_cflag, read_evap
     ! -- inout
 
     ! -- local
@@ -664,7 +620,7 @@ module set_boundary
 
     if (any(all_evap_mask)) then
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast file (file)
           call bcast_file(st_in_path%evap, st_in_unit%evap, "evapotranspiration")
       end if
@@ -688,18 +644,19 @@ module set_boundary
     end if
 
     if (st_evap%totn > 0) then
-      allocate(evap_cflag(ncals))
-      allocate(read_evap(ncals))
+      allocate(st_bcnd%evap_cflag(ncals))
+      allocate(st_forc%read_evap(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        evap_cflag(i) = 0
-        read_evap(i) = SNOVAL
+        st_bcnd%evap_cflag(i) = 0
+        st_forc%read_evap(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Assign evapotranspiration value
-        call assign_surfbv(st_in_type%evap, st_intev%type, st_evap, evap_num, evap_cflag,&
-                           read_evap)
-      deallocate(evap_cflag)
+        call assign_surfbv(st_in_type%evap, st_intev%type, st_evap, st_bcnd%evap_num,&
+                           st_bcnd%evap_cflag,&
+                           st_forc%read_evap)
+      deallocate(st_bcnd%evap_cflag)
     end if
 
     deallocate(all_evap_type, all_evap_mask)
@@ -717,16 +674,17 @@ module set_boundary
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(cflag_riv%wl(ncals))
-    allocate(criv%wl(ncals))
+    allocate(st_rive%cflag%wl(ncals))
+    allocate(st_rive%calc%wl(ncals))
     !$omp parallel do private(i)
     do i = 1, ncals
-      cflag_riv%wl(i) = 0
-      criv%wl(i) = SNOVAL
+      st_rive%cflag%wl(i) = 0
+      st_rive%calc%wl(i) = SNOVAL
     end do
     !$omp end parallel do
     ! -- Assign river water level value
-      call assign_rilav(st_rivf_type%wlev, 0, st_riwl, rivnum%wl, cflag_riv%wl, criv%wl)
+      call assign_rilav(st_rivf_type%wlev, 0, st_riwl, st_rive%num%wl, st_rive%cflag%wl,&
+                        st_rive%calc%wl)
 
   end subroutine set_riwl_info
 
@@ -741,16 +699,17 @@ module set_boundary
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(cflag_riv%bl(ncals))
-    allocate(criv%bl(ncals))
+    allocate(st_rive%cflag%bl(ncals))
+    allocate(st_rive%calc%bl(ncals))
     !$omp parallel do private(i)
     do i = 1, ncals
-      cflag_riv%bl(i) = 0
-      criv%bl(i) = SNOVAL
+      st_rive%cflag%bl(i) = 0
+      st_rive%calc%bl(i) = SNOVAL
     end do
     !$omp end parallel do
     ! -- Assign river bottom level value
-      call assign_rilav(st_rivf_type%blev, 0, st_ribl, rivnum%bl, cflag_riv%bl, criv%bl)
+      call assign_rilav(st_rivf_type%blev, 0, st_ribl, st_rive%num%bl, st_rive%cflag%bl,&
+                        st_rive%calc%bl)
 
   end subroutine set_ribl_info
 
@@ -766,16 +725,17 @@ module set_boundary
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
     if (st_riwd%totn > 0) then
-      allocate(cflag_riv%wd(ncals))
-      allocate(criv%wd(ncals))
+      allocate(st_rive%cflag%wd(ncals))
+      allocate(st_rive%calc%wd(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        cflag_riv%wd(i) = 0
-        criv%wd(i) = SNOVAL
+        st_rive%cflag%wd(i) = 0
+        st_rive%calc%wd(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Assign river water depth value
-        call assign_rilav(st_rivf_type%wdep, 0, st_riwd, rivnum%wd, cflag_riv%wd, criv%wd)
+        call assign_rilav(st_rivf_type%wdep, 0, st_riwd, st_rive%num%wd, st_rive%cflag%wd,&
+                          st_rive%calc%wd)
     end if
 
   end subroutine set_riwd_info
@@ -792,16 +752,17 @@ module set_boundary
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
     if (st_ride%totn > 0) then
-      allocate(cflag_riv%de(ncals))
-      allocate(criv%de(ncals))
+      allocate(st_rive%cflag%de(ncals))
+      allocate(st_rive%calc%de(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        cflag_riv%de(i) = 0
-        criv%de(i) = SNOVAL
+        st_rive%cflag%de(i) = 0
+        st_rive%calc%de(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Assign river depth value
-        call assign_rilav(st_rivf_type%dept, 0, st_ride, rivnum%de, cflag_riv%de, criv%de)
+        call assign_rilav(st_rivf_type%dept, 0, st_ride, st_rive%num%de, st_rive%cflag%de,&
+                          st_rive%calc%de)
     end if
 
   end subroutine set_ride_info
@@ -818,16 +779,17 @@ module set_boundary
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
     if (st_riwi%totn > 0) then
-      allocate(cflag_riv%wi(ncals))
-      allocate(criv%wi(ncals))
+      allocate(st_rive%cflag%wi(ncals))
+      allocate(st_rive%calc%wi(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        cflag_riv%wi(i) = 0
-        criv%wi(i) = SNOVAL
+        st_rive%cflag%wi(i) = 0
+        st_rive%calc%wi(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Assign river width value
-        call assign_rilav(st_rivf_type%widt, 0, st_riwi, rivnum%wi, cflag_riv%wi, criv%wi)
+        call assign_rilav(st_rivf_type%widt, 0, st_riwi, st_rive%num%wi, st_rive%cflag%wi,&
+                          st_rive%calc%wi)
     end if
 
   end subroutine set_riwi_info
@@ -844,16 +806,17 @@ module set_boundary
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
     if (st_rile%totn > 0) then
-      allocate(cflag_riv%le(ncals))
-      allocate(criv%le(ncals))
+      allocate(st_rive%cflag%le(ncals))
+      allocate(st_rive%calc%le(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        cflag_riv%le(i) = 0
-        criv%le(i) = SNOVAL
+        st_rive%cflag%le(i) = 0
+        st_rive%calc%le(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Assign river length value
-        call assign_rilav(st_rivf_type%leng, 0, st_rile, rivnum%le, cflag_riv%le, criv%le)
+        call assign_rilav(st_rivf_type%leng, 0, st_rile, st_rive%num%le, st_rive%cflag%le,&
+                          st_rive%calc%le)
     end if
 
   end subroutine set_rile_info
@@ -869,16 +832,17 @@ module set_boundary
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(cflag_lak%wl(ncals))
-    allocate(clak%wl(ncals))
+    allocate(st_lake%cflag%wl(ncals))
+    allocate(st_lake%calc%wl(ncals))
     !$omp parallel do private(i)
     do i = 1, ncals
-      cflag_lak%wl(i) = 0
-      clak%wl(i) = SNOVAL
+      st_lake%cflag%wl(i) = 0
+      st_lake%calc%wl(i) = SNOVAL
     end do
     !$omp end parallel do
     ! -- Assign lake water level value
-      call assign_rilav(st_lakf_type%wlev, 0, st_lawl, laknum%wl, cflag_lak%wl, clak%wl)
+      call assign_rilav(st_lakf_type%wlev, 0, st_lawl, st_lake%num%wl, st_lake%cflag%wl,&
+                        st_lake%calc%wl)
 
   end subroutine set_lawl_info
 
@@ -893,16 +857,17 @@ module set_boundary
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(cflag_lak%bl(ncals))
-    allocate(clak%bl(ncals))
+    allocate(st_lake%cflag%bl(ncals))
+    allocate(st_lake%calc%bl(ncals))
     !$omp parallel do private(i)
     do i = 1, ncals
-      cflag_lak%bl(i) = 0
-      clak%bl(i) = SNOVAL
+      st_lake%cflag%bl(i) = 0
+      st_lake%calc%bl(i) = SNOVAL
     end do
     !$omp end parallel do
     ! -- Assign lake bottom level value
-      call assign_rilav(st_lakf_type%blev, 0, st_labl, laknum%bl, cflag_lak%bl, clak%bl)
+      call assign_rilav(st_lakf_type%blev, 0, st_labl, st_lake%num%bl, st_lake%cflag%bl,&
+                        st_lake%calc%bl)
 
   end subroutine set_labl_info
 
@@ -918,16 +883,17 @@ module set_boundary
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
     if (st_lawd%totn > 0) then
-      allocate(cflag_lak%wd(ncals))
-      allocate(clak%wd(ncals))
+      allocate(st_lake%cflag%wd(ncals))
+      allocate(st_lake%calc%wd(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        cflag_lak%wd(i) = 0
-        clak%wd(i) = SNOVAL
+        st_lake%cflag%wd(i) = 0
+        st_lake%calc%wd(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Assign lake water depth value
-        call assign_rilav(st_lakf_type%wdep, 0, st_lawd, laknum%wd, cflag_lak%wd, clak%wd)
+        call assign_rilav(st_lakf_type%wdep, 0, st_lawd, st_lake%num%wd, st_lake%cflag%wd,&
+                          st_lake%calc%wd)
     end if
 
   end subroutine set_lawd_info
@@ -944,16 +910,17 @@ module set_boundary
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
     if (st_laar%totn > 0) then
-      allocate(cflag_lak%ar(ncals))
-      allocate(clak%ar(ncals))
+      allocate(st_lake%cflag%ar(ncals))
+      allocate(st_lake%calc%ar(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        cflag_lak%ar(i) = 0
-        clak%ar(i) = SNOVAL
+        st_lake%cflag%ar(i) = 0
+        st_lake%calc%ar(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Assign lake area value
-        call assign_rilav(st_lakf_type%area, 1, st_laar, laknum%ar, cflag_lak%ar, clak%ar)
+        call assign_rilav(st_lakf_type%area, 1, st_laar, st_lake%num%ar, st_lake%cflag%ar,&
+                          st_lake%calc%ar)
     end if
 
   end subroutine set_laar_info
@@ -971,32 +938,33 @@ module set_boundary
     !-------------------------------------------------------------------------------------------
     if (sum_riden /= 0) then
       ! -- Calculate bottom level from surface level (blsl)
-        call calc_blsl(cflag_riv%de, criv%de, cflag_riv%bl, criv%bl, rivnum%bl)
-      deallocate(cflag_riv%de, criv%de)
-      if (my_rank == 0) then
+        call calc_blsl(st_rive%cflag%de, st_rive%calc%de, st_rive%cflag%bl, st_rive%calc%bl,&
+                       st_rive%num%bl)
+      deallocate(st_rive%cflag%de, st_rive%calc%de)
+      if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
         err_mes = "River bottom level is calculated from surface elevation and river depth."
         call write_logf(err_mes)
       end if
     else if (sum_riwln /= 0 .and. sum_riwdn /= 0) then
       ! -- Calculate bottom level from water level and water depth (blld)
-        call calc_blld(cflag_riv%wl, criv%wl, cflag_riv%wd, criv%wd, cflag_riv%bl, criv%bl,&
-                       rivnum%bl)
-      deallocate(cflag_riv%wd, criv%wd)
-      if (my_rank == 0) then
+        call calc_blld(st_rive%cflag%wl, st_rive%calc%wl, st_rive%cflag%wd, st_rive%calc%wd,&
+                       st_rive%cflag%bl, st_rive%calc%bl, st_rive%num%bl)
+      deallocate(st_rive%cflag%wd, st_rive%calc%wd)
+      if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
         err_mes = "River bottom level is calculated from water level and water depth."
         call write_logf(err_mes)
       end if
     else if (sum_riwln /= 0 .and. sum_riwdn == 0) then
       ! -- Calculate level from surface (lsurf)
-        call calc_lsurf(cflag_riv%wl, cflag_riv%bl, criv%bl, rivnum%bl)
-      if (my_rank == 0) then
+        call calc_lsurf(st_rive%cflag%wl, st_rive%cflag%bl, st_rive%calc%bl, st_rive%num%bl)
+      if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
         err_mes = "River bottom level is setted to surface elevation."
         call write_logf(err_mes)
       end if
-    else if (sum_riwln == 0 .and. sum_riwdn /= 0 .and. my_rank == 0) then
+    else if (sum_riwln == 0 .and. sum_riwdn /= 0 .and. st_mpi%rank == 0) then
       allocate(character(0) :: err_mes)
       err_mes = "Only specified river water depth."
       call write_err_stop(err_mes)
@@ -1021,16 +989,16 @@ module set_boundary
     !-------------------------------------------------------------------------------------------
     if (sum_riwln == 0 .and. sum_ribln /= 0 .and. sum_riwdn /= 0) then
       ! -- Calculate water level from bottom level and water depth (wlbd)
-        call calc_wlbd(cflag_riv%bl, criv%bl, cflag_riv%wd, criv%wd, cflag_riv%wl, criv%wl,&
-                       rivnum%wl)
-      deallocate(cflag_riv%wd, criv%wd)
+        call calc_wlbd(st_rive%cflag%bl, st_rive%calc%bl, st_rive%cflag%wd, st_rive%calc%wd,&
+                       st_rive%cflag%wl, st_rive%calc%wl, st_rive%num%wl)
+      deallocate(st_rive%cflag%wd, st_rive%calc%wd)
 #ifdef MPI_MSG
       ! -- Sum value for MPI (val)
-        call mpisum_val(rivnum%wl, "river water level", sum_riwln)
+        call mpisum_val(st_rive%num%wl, "river water level", sum_riwln)
 #else
-      sum_riwln = rivnum%wl
+      sum_riwln = st_rive%num%wl
 #endif
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_logf("River water level is calculated from bottom level.")
         allocate(character(get_ilen(sum_riwln)) :: num_str)
         allocate(character(0) :: err_mes)
@@ -1039,13 +1007,13 @@ module set_boundary
         call write_logf(err_mes)
       end if
     else if (sum_riwln == 0 .and. sum_ribln /= 0 .and. sum_riden /= 0) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
         err_mes = "Not calculated river water level from river bottom level and river depth."
         call write_err_stop(err_mes)
       end if
     else if (sum_riwln == 0 .and. sum_ribln /= 0 .and. sum_riden == 0) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
         err_mes = "Not calculated river water level from only river bottom level."
         call write_err_stop(err_mes)
@@ -1075,10 +1043,10 @@ module set_boundary
     !-------------------------------------------------------------------------------------------
     if (sum_lawln == 0 .and. sum_labln /= 0 .and. sum_lawdn /= 0) then
       ! -- Calculate water level from bottom level and water depth (wlbd)
-        call calc_wlbd(cflag_lak%bl, clak%bl, cflag_lak%wd, clak%wd, cflag_lak%wl, clak%wl,&
-                       laknum%wl)
-      deallocate(cflag_lak%wd, clak%wd)
-      if (my_rank == 0) then
+        call calc_wlbd(st_lake%cflag%bl, st_lake%calc%bl, st_lake%cflag%wd, st_lake%calc%wd,&
+                       st_lake%cflag%wl, st_lake%calc%wl, st_lake%num%wl)
+      deallocate(st_lake%cflag%wd, st_lake%calc%wd)
+      if (st_mpi%rank == 0) then
         call write_logf("Lake water level is calculated from bottom level.")
         allocate(character(get_ilen(sum_lawln)) :: num_str)
         allocate(character(0) :: err_mes)
@@ -1088,10 +1056,10 @@ module set_boundary
       end if
     else if (sum_lawln /= 0 .and. sum_labln == 0 .and. sum_lawdn /= 0) then
       ! -- Calculate bottom level from water level and water depth (blld)
-        call calc_blld(cflag_lak%wl, clak%wl, cflag_lak%wd, clak%wd, cflag_lak%bl, clak%bl,&
-                       laknum%bl)
-      deallocate(cflag_lak%wd, clak%wd)
-      if (my_rank == 0) then
+        call calc_blld(st_lake%cflag%wl, st_lake%calc%wl, st_lake%cflag%wd, st_lake%calc%wd,&
+                       st_lake%cflag%bl, st_lake%calc%bl, st_lake%num%bl)
+      deallocate(st_lake%cflag%wd, st_lake%calc%wd)
+      if (st_mpi%rank == 0) then
         call write_logf("Lake bottom level is calculated from water level and water depth.")
         allocate(character(get_ilen(sum_labln)) :: num_str)
         allocate(character(0) :: err_mes)
@@ -1100,15 +1068,15 @@ module set_boundary
         call write_logf(err_mes)
       end if
     else if (sum_lawln == 0 .and. sum_labln == 0 .and. sum_lawdn /= 0) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
         err_mes = "Only specified lake water depth."
         call write_err_stop(err_mes)
       end if
     else if (sum_lawln == 0 .and. sum_labln /= 0 .and. sum_lawdn == 0) then
       ! -- Set level from surface (levsurf)
-        call calc_lsurf(cflag_lak%bl, cflag_lak%wl, clak%wl, laknum%wl)
-      if (my_rank == 0) then
+        call calc_lsurf(st_lake%cflag%bl, st_lake%cflag%wl, st_lake%calc%wl, st_lake%num%wl)
+      if (st_mpi%rank == 0) then
         call write_logf("Lake water level is setted to surface elevation.")
         allocate(character(get_ilen(sum_lawln)) :: num_str)
         allocate(character(0) :: err_mes)
@@ -1117,7 +1085,7 @@ module set_boundary
         call write_logf(err_mes)
       end if
     else if (sum_lawln /= 0 .and. sum_labln == 0 .and. sum_lawdn == 0) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
         err_mes = "Not calculated river bottom level."
         call write_err_stop(err_mes)

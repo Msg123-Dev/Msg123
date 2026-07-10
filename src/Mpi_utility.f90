@@ -1,8 +1,8 @@
 module mpi_utility
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use mpi_initfin, only: my_comm, abort_proc
-  use utility_module, only: log_fnum, my_rank
+  use mpi_initfin, only: abort_proc
+  use utility_module, only: log_fnum, st_mpi
   use mpi
 
   implicit none
@@ -65,12 +65,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0
-    call MPI_BARRIER(my_comm, ierr)
+    call MPI_BARRIER(st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Barrier in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine barrier_proc
@@ -89,12 +89,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0
-    call MPI_ALLREDUCE(loc_num, sum_num, 1, MPI_INTEGER, MPI_SUM, my_comm, ierr)
+    call MPI_ALLREDUCE(loc_num, sum_num, 1, MPI_INTEGER, MPI_SUM, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" value in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine mpisum_i4_scalar
@@ -113,12 +113,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0
-    call MPI_ALLREDUCE(loc_val, sum_val, 1, MPI_REAL4, MPI_SUM, my_comm, ierr)
+    call MPI_ALLREDUCE(loc_val, sum_val, 1, MPI_REAL4, MPI_SUM, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" value in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine mpisum_r4_scalar
@@ -137,12 +137,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0
-    call MPI_ALLREDUCE(loc_val, sum_val, 1, MPI_REAL8, MPI_SUM, my_comm, ierr)
+    call MPI_ALLREDUCE(loc_val, sum_val, 1, MPI_REAL8, MPI_SUM, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" value in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine mpisum_r8_scalar
@@ -162,12 +162,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; a_len = size(loc_array(:))
-    call MPI_ALLREDUCE(loc_array, sum_array, a_len, MPI_INTEGER, MPI_SUM, my_comm, ierr)
+    call MPI_ALLREDUCE(loc_array, sum_array, a_len, MPI_INTEGER, MPI_SUM, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" array in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine mpisum_i4_array
@@ -187,12 +187,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; a_len = size(loc_array(:))
-    call MPI_ALLREDUCE(loc_array, sum_array, a_len, MPI_REAL4, MPI_SUM, my_comm, ierr)
+    call MPI_ALLREDUCE(loc_array, sum_array, a_len, MPI_REAL4, MPI_SUM, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" array in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine mpisum_r4_array
@@ -212,12 +212,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; a_len = size(loc_array(:))
-    call MPI_ALLREDUCE(loc_array, sum_array, a_len, MPI_REAL8, MPI_SUM, my_comm, ierr)
+    call MPI_ALLREDUCE(loc_array, sum_array, a_len, MPI_REAL8, MPI_SUM, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" array in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine mpisum_r8_array
@@ -236,12 +236,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0
-    call MPI_ALLREDUCE(loc_num, max_num, 1, MPI_INTEGER, MPI_MAX, my_comm, ierr)
+    call MPI_ALLREDUCE(loc_num, max_num, 1, MPI_INTEGER, MPI_MAX, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" value in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine mpimax_i4_scalar
@@ -260,12 +260,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0
-    call MPI_ALLREDUCE(loc_val, max_val, 1, MPI_REAL4, MPI_MAX, my_comm, ierr)
+    call MPI_ALLREDUCE(loc_val, max_val, 1, MPI_REAL4, MPI_MAX, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" value in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine mpimax_r4_scalar
@@ -284,12 +284,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0
-    call MPI_ALLREDUCE(loc_val, max_val, 1, MPI_REAL8, MPI_MAX, my_comm, ierr)
+    call MPI_ALLREDUCE(loc_val, max_val, 1, MPI_REAL8, MPI_MAX, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" value in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine mpimax_r8_scalar
@@ -309,12 +309,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; a_len = size(loc_array(:))
-    call MPI_ALLREDUCE(loc_array, max_array, a_len, MPI_INTEGER, MPI_MAX, my_comm, ierr)
+    call MPI_ALLREDUCE(loc_array, max_array, a_len, MPI_INTEGER, MPI_MAX, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" array in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine mpimax_i4_array
@@ -334,12 +334,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; a_len = size(loc_array(:))
-    call MPI_ALLREDUCE(loc_array, max_array, a_len, MPI_REAL4, MPI_MAX, my_comm, ierr)
+    call MPI_ALLREDUCE(loc_array, max_array, a_len, MPI_REAL4, MPI_MAX, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" array in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine mpimax_r4_array
@@ -359,12 +359,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; a_len = size(loc_array(:))
-    call MPI_ALLREDUCE(loc_array, max_array, a_len, MPI_REAL8, MPI_MAX, my_comm, ierr)
+    call MPI_ALLREDUCE(loc_array, max_array, a_len, MPI_REAL8, MPI_MAX, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" array in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine mpimax_r8_array
@@ -382,12 +382,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0
-    call MPI_BCAST(iscalar, 1, MPI_INTEGER, 0, my_comm, ierr)
+    call MPI_BCAST(iscalar, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine bcast_i4_scalar
@@ -405,12 +405,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0
-    call MPI_BCAST(rscalar, 1, MPI_REAL4, 0, my_comm, ierr)
+    call MPI_BCAST(rscalar, 1, MPI_REAL4, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine bcast_r4_scalar
@@ -428,12 +428,12 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0
-    call MPI_BCAST(rscalar, 1, MPI_REAL8, 0, my_comm, ierr)
+    call MPI_BCAST(rscalar, 1, MPI_REAL8, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine bcast_r8_scalar
@@ -453,32 +453,32 @@ module mpi_utility
     !-------------------------------------------------------------------------------------------
     rank_num = 0 ; send_num = 0
     if (len_trim(adjustl(err_mes)) /= 0) then
-      rank_num = my_rank
+      rank_num = st_mpi%rank
     end if
 
     ierr = 0
-    call MPI_ALLREDUCE(rank_num, send_num, 1, MPI_INTEGER, MPI_MAX, my_comm, ierr)
+    call MPI_ALLREDUCE(rank_num, send_num, 1, MPI_INTEGER, MPI_MAX, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allreduce rank number in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
     str_len = len_trim(err_mes)
-    call MPI_BCAST(str_len, 1, MPI_INTEGER, send_num, my_comm, ierr)
+    call MPI_BCAST(str_len, 1, MPI_INTEGER, send_num, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path length in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
-    call MPI_BCAST(err_mes, str_len, MPI_CHARACTER, send_num, my_comm, ierr)
+    call MPI_BCAST(err_mes, str_len, MPI_CHARACTER, send_num, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast message in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine bcast_char
@@ -497,19 +497,19 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; str_len = len_trim(file_path)
-    call MPI_BCAST(str_len, 1, MPI_INTEGER, 0, my_comm, ierr)
+    call MPI_BCAST(str_len, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path length in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
-    call MPI_BCAST(file_path, str_len, MPI_CHARACTER, 0, my_comm, ierr)
+    call MPI_BCAST(file_path, str_len, MPI_CHARACTER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine bcast_file_path
@@ -529,27 +529,27 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; str_len = len_trim(file_path)
-    call MPI_BCAST(file_type, 1, MPI_INTEGER, 0, my_comm, ierr)
+    call MPI_BCAST(file_type, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file type in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
-    call MPI_BCAST(str_len, 1, MPI_INTEGER, 0, my_comm, ierr)
+    call MPI_BCAST(str_len, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path length in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
-    call MPI_BCAST(file_path, str_len, MPI_CHARACTER, 0, my_comm, ierr)
+    call MPI_BCAST(file_path, str_len, MPI_CHARACTER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine bcast_ftype_path
@@ -568,34 +568,34 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; str_len = len_trim(file_path) ; uni_len = len_trim(file_unit)
-    call MPI_BCAST(str_len, 1, MPI_INTEGER, 0, my_comm, ierr)
+    call MPI_BCAST(str_len, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path length in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
-    call MPI_BCAST(file_path, str_len, MPI_CHARACTER, 0, my_comm, ierr)
+    call MPI_BCAST(file_path, str_len, MPI_CHARACTER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
-    call MPI_BCAST(uni_len, 1, MPI_INTEGER, 0, my_comm, ierr)
+    call MPI_BCAST(uni_len, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file unit length in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
-    call MPI_BCAST(file_unit, uni_len, MPI_CHARACTER, 0, my_comm, ierr)
+    call MPI_BCAST(file_unit, uni_len, MPI_CHARACTER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file unit in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine bcast_path_unit
@@ -615,42 +615,42 @@ module mpi_utility
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; str_len = len_trim(file_path) ; uni_len = len_trim(file_unit)
-    call MPI_BCAST(file_type, 1, MPI_INTEGER, 0, my_comm, ierr)
+    call MPI_BCAST(file_type, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file type in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
-    call MPI_BCAST(str_len, 1, MPI_INTEGER, 0, my_comm, ierr)
+    call MPI_BCAST(str_len, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path length in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
-    call MPI_BCAST(file_path, str_len, MPI_CHARACTER, 0, my_comm, ierr)
+    call MPI_BCAST(file_path, str_len, MPI_CHARACTER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
-    call MPI_BCAST(uni_len, 1, MPI_INTEGER, 0, my_comm, ierr)
+    call MPI_BCAST(uni_len, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file unit length in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
-    call MPI_BCAST(file_unit, uni_len, MPI_CHARACTER, 0, my_comm, ierr)
+    call MPI_BCAST(file_unit, uni_len, MPI_CHARACTER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file unit in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine bcast_ftype_path_unit
@@ -672,43 +672,43 @@ module mpi_utility
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; str_len = len_trim(extr_path)
 
-    call MPI_BCAST(extr_type, 1, MPI_INTEGER, 0, my_comm, ierr)
+    call MPI_BCAST(extr_type, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file type in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
-    call MPI_BCAST(extr_step, 1, MPI_REAL4, 0, my_comm, ierr)
+    call MPI_BCAST(extr_step, 1, MPI_REAL4, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file step in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
-    call MPI_BCAST(extr_end, 1, MPI_REAL4, 0, my_comm, ierr)
+    call MPI_BCAST(extr_end, 1, MPI_REAL4, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file end time in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
-    call MPI_BCAST(str_len, 1, MPI_INTEGER, 0, my_comm, ierr)
+    call MPI_BCAST(str_len, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path length in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
-    call MPI_BCAST(extr_path, str_len, MPI_CHARACTER, 0, my_comm, ierr)
+    call MPI_BCAST(extr_path, str_len, MPI_CHARACTER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file path in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
   end subroutine bcast_extr_set
@@ -735,12 +735,12 @@ module mpi_utility
       rec_num(i) = 0
     end do
     !$omp end parallel do
-    call MPI_ALLGATHER(in_num, 1, MPI_INTEGER, rec_num, 1, MPI_INTEGER, my_comm, ierr)
+    call MPI_ALLGATHER(in_num, 1, MPI_INTEGER, rec_num, 1, MPI_INTEGER, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allgather "//err_mes//" in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
     allocate(rec_count(0:num_prot-1), rec_dis(0:num_prot-1))
@@ -759,12 +759,12 @@ module mpi_utility
     end do
 
     call MPI_ALLGATHERV(loc_array, in_num, MPI_INTEGER, glo_array, rec_count, rec_dis,&
-                        MPI_INTEGER, my_comm, ierr)
+                        MPI_INTEGER, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allgather "//err_mes//" array in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
     deallocate(rec_num, rec_count, rec_dis)
@@ -793,12 +793,12 @@ module mpi_utility
       rec_num(i) = 0
     end do
     !$omp end parallel do
-    call MPI_ALLGATHER(in_num, 1, MPI_INTEGER, rec_num, 1, MPI_INTEGER, my_comm, ierr)
+    call MPI_ALLGATHER(in_num, 1, MPI_INTEGER, rec_num, 1, MPI_INTEGER, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allgather "//err_mes//" in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
     allocate(rec_count(0:num_prot-1), rec_dis(0:num_prot-1))
@@ -817,12 +817,12 @@ module mpi_utility
     end do
 
     call MPI_ALLGATHERV(loc_array, in_num, MPI_REAL4, glo_array, rec_count, rec_dis,&
-                        MPI_REAL4, my_comm, ierr)
+                        MPI_REAL4, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allgather "//err_mes//" array in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
     deallocate(rec_num, rec_count, rec_dis)
@@ -851,12 +851,12 @@ module mpi_utility
       rec_num(i) = 0
     end do
     !$omp end parallel do
-    call MPI_ALLGATHER(in_num, 1, MPI_INTEGER, rec_num, 1, MPI_INTEGER, my_comm, ierr)
+    call MPI_ALLGATHER(in_num, 1, MPI_INTEGER, rec_num, 1, MPI_INTEGER, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allgather "//err_mes//" in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
     allocate(rec_count(0:num_prot-1), rec_dis(0:num_prot-1))
@@ -875,12 +875,12 @@ module mpi_utility
     end do
 
     call MPI_ALLGATHERV(loc_array, in_num, MPI_REAL8, glo_array, rec_count, rec_dis,&
-                        MPI_REAL8, my_comm, ierr)
+                        MPI_REAL8, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Allgather "//err_mes//" array in MPI program."
       end if
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
     end if
 
     deallocate(rec_num, rec_count, rec_dis)

@@ -1,219 +1,69 @@
 module initial_module
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: VARLEN, TIMELEN
+  use constval_module, only: TIMELEN
+  use types_module, only: sim_set, ctrl_set, grid_set, ftype_in, retn_in, parm_in, geog_in,&
+                          rive_in, lake_in, path_in, retn_path, parm_path, geog_path,&
+                          retn_fnum, parm_fnum, geog_fnum, unit_in, clas_set, retn_set,&
+                          parm_set, init_set, seal_set, surfb_set, well_set, surfw_set,&
+                          step_flag, ftype_out, path_out, unit_out, out_time, out_step
   use utility_module, only: log_fnum
 
   implicit none
   private
   public :: init_msg, init_log
-  integer(I4), public :: pro_totn = 1, my_rank = 0
-  integer(I4), public :: noclas_flag = 0
+
+  !file type
+  integer(I4), allocatable, public :: in_type(:), out_type(:)
+  !time unit
+  character(TIMELEN), allocatable, public :: unit_list(:)
 
   ! main file
-  type :: sim_set
-    integer(I4) :: sim_type, res_type, reg_type, reg_neib
-    integer(I4) :: sta_date(6), end_date(6)
-    character(:), allocatable :: sim_name, cal_unit, reg_name, inact_name
-    real(SP) :: end_time, ini_step, max_step, inc_fact, dec_fact, cal_fact
-  end type sim_set
   type(sim_set), public :: st_sim
 
-  type :: grid_set
-    integer(I4) :: nx, ny, nz, nxyz
-    integer(I4) :: fnum
-  end type grid_set
+  !input solution file
+  type(ctrl_set), public :: st_ctrl
+
   type(grid_set), public :: st_grid
 
   ! input ftype, path, unit
-  type :: ftype_in
-    integer(I4) :: grid, retn, parm, geog, init
-    integer(I4) :: seal, rech, well, weks, weke, rive, lake
-    integer(I4) :: prec, evap, wtab, mass
-  end type ftype_in
   type(ftype_in), public :: st_in_type
-
-  type :: retn_in
-    integer(I4) :: vana, vann, resi
-  end type retn_in
   type(retn_in), public :: st_retf_type
-
-  type :: parm_in
-    integer(I4) :: pakx, paky, pakz, pass, pats
-  end type parm_in
   type(parm_in), public :: st_parf_type
-
-  type :: geog_in
-    integer(I4) :: geoz, geor, geoa
-  end type geog_in
   type(geog_in), public :: st_geof_type
-
-  type :: rive_in
-    integer(I4) :: wlev, wdep, blev, dept, widt, leng
-  end type rive_in
   type(rive_in), public :: st_rivf_type
-
-  type :: lake_in
-    integer(I4) :: wlev, wdep, blev, area
-  end type lake_in
   type(lake_in), public :: st_lakf_type
 
-  type :: path_in
-    character(:), allocatable :: grid, retn, parm, geog, init
-    character(:), allocatable :: seal, rech, well, weks, weke, rive, lake
-    character(:), allocatable :: prec, evap, mass
-  end type path_in
   type(path_in), public :: st_in_path
-
-  type :: retn_path
-    character(:), allocatable :: vana, vann, resi
-  end type retn_path
   type(retn_path), public :: st_retn_path
-
-  type :: parm_path
-    character(:), allocatable :: pakx, paky, pakz, pass, pats
-  end type parm_path
   type(parm_path), public :: st_parm_path
-
-  type :: geog_path
-    character(:), allocatable :: geoz, geor, geoa
-  end type geog_path
   type(geog_path), public :: st_geog_path
 
-  type :: retn_fnum
-    integer(I4) :: vana, vann, resi
-  end type retn_fnum
   type(retn_fnum), public :: st_retn_fnum
-
-  type :: parm_fnum
-    integer(I4) :: pakx, paky, pakz, pass, pats
-  end type parm_fnum
   type(parm_fnum), public :: st_parm_fnum
-
-  type :: geog_fnum
-    integer(I4) :: geoz, geor, geoa
-  end type geog_fnum
   type(geog_fnum), public :: st_geog_fnum
 
-  type :: unit_in
-    character(:), allocatable :: init, seal, rech, well, prec, evap
-  end type unit_in
   type(unit_in), public :: st_in_unit
 
   ! input structure
-  type :: clas
-    integer(I4) :: totn, fnum
-    character(VARLEN), allocatable :: name(:)
-    integer(I4), allocatable :: num(:)
-    integer(I4), allocatable :: i(:,:), j(:,:), k(:,:)
-  end type clas
-  type(clas), public :: st_clas
+  type(clas_set), public :: st_clas
+  type(retn_set), public :: st_retn
+  type(parm_set), public :: st_parm
+  type(init_set), public :: st_init
+  type(seal_set), public :: st_seal
+  type(surfb_set), public :: st_rech, st_prec, st_evap
+  type(well_set), public :: st_well
+  type(surfw_set), public :: st_riwl, st_riwd, st_ribl, st_ride, st_riwi, st_rile
+  type(surfw_set), public :: st_lawl, st_lawd, st_labl, st_laar
 
-  type :: retn
-    integer(I4) :: totn, fnum
-    character(VARLEN), allocatable :: name(:)
-    real(SP), allocatable :: a(:), n(:), r(:)
-  end type retn
-  type(retn), public :: st_retn
-
-  type :: parm
-    integer(I4) :: totn, fnum
-    character(VARLEN), allocatable :: name(:)
-    real(SP), allocatable :: ksx(:), ksy(:), ksz(:), ss(:), ts(:)
-  end type parm
-  type(parm), public :: st_parm
-
-  type :: init
-    integer(I4) :: fnum
-    real(SP) :: multi, depth, rest_time
-  end type init
-  type(init), public :: st_init
-
-  type :: seal
-    integer(I4) :: totn, fnum
-    real(SP) :: etime, multi
-    character(VARLEN), allocatable :: name(:)
-    integer(I4), allocatable :: i(:), j(:), k(:)
-    real(SP), allocatable :: value(:)
-  end type seal
-  type(seal), public :: st_seal
-
-  type, public :: st_surfb
-    integer(I4) :: totn, fnum
-    real(SP) :: etime, uni_conv, multi
-    character(VARLEN), allocatable :: name(:)
-    real(SP), allocatable :: value(:)
-  end type st_surfb
-
-  type(st_surfb), public :: st_rech, st_prec, st_evap
-
-  type :: well
-    integer(I4) :: totn, fnum
-    real(SP) :: etime, uni_conv, multi
-    integer(I4), allocatable :: i(:), j(:), k(:), ij(:), ks(:), ke(:)
-    real(SP), allocatable :: value(:)
-  end type well
-  type(well), public :: st_well
-
-  type, public :: st_surfw
-    integer(I4) :: totn, fnum, inttype, intfnum
-    real(SP) :: etime, multi, intstep
-    character(VARLEN), allocatable :: name(:)
-    integer(I4), allocatable :: i(:), j(:)
-    real(SP), allocatable :: value(:)
-    character(:), allocatable :: intpath
-  end type st_surfw
-
-  type(st_surfw), public :: st_riwl, st_riwd, st_ribl, st_ride, st_riwi, st_rile
-  type(st_surfw), public :: st_lawl, st_lawd, st_labl, st_laar
-
-  type :: step_flag
-    integer(I4) :: seal, rech, well, prec, evap, riwl, riwd, ribl, ride, riwi, rile
-    integer(I4) :: lawl, lawd, labl, laar
-  end type step_flag
   type(step_flag), public :: st_step_flag
 
   ! output file number, path, unit
-  type :: ftype_out
-    integer(I4) :: srat, wtab, mass, velc, rivr, lakr, sufr, dunr, seal, rech, well, calg
-  end type ftype_out
   type(ftype_out), public :: st_out_type
-
-  type :: path_out
-    character(:), allocatable :: conv, head, rest, srat, wtab, mass, velx, vely, velz
-    character(:), allocatable :: rivr, lakr, sufr, dunr
-    character(:), allocatable :: seal, well, rech, calg
-  end type path_out
   type(path_out), public :: st_out_path
-
-  type :: unit_out
-    character(:), allocatable :: head, rest, srat, wtab, mass, velc
-    character(:), allocatable :: rivr, lakr, sufr, dunr
-    character(:), allocatable :: seal, well, rech
-  end type unit_out
   type(unit_out), public :: st_out_unit
-
-  type :: out_time
-    integer(I4) :: head, rest, srat, wtab, mass, velc, rivr, lakr, sufr, dunr
-    integer(I4) :: seal, well, rech
-  end type out_time
   type(out_time), public :: st_out_time
-
-  type :: out_step
-    real(SP) :: head, rest, srat, wtab, mass, velc, rivr, lakr, sufr, dunr
-    real(SP) :: seal, well, rech
-  end type out_step
   type(out_step), public :: st_out_step
-
-  !input solution file
-  integer(I4), public :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type
-  integer(I4), public :: nlevel, maxvcy_iter, amg_nlevel, max_sweep
-  real(DP), public :: criteria, errtol, newper, newper_inv
-  real(SP), public :: jac_omega, amg_theta
-  !time unit
-  character(TIMELEN), allocatable, public :: unit_list(:)
-  !file type
-  integer(I4), allocatable, public :: in_type(:), out_type(:)
 
   ! -- local
 
@@ -224,6 +74,7 @@ module initial_module
   ! init_msg -- Initialize msg
   !*********************************************************************************************
     ! -- module
+    use utility_module, only: st_mpi
 #ifdef MPI_MSG
     use mpi_initfin, only: init_mpi
 #endif
@@ -232,14 +83,15 @@ module initial_module
     ! -- local
 
     !-------------------------------------------------------------------------------------------
-    if (my_rank == 0) then
+    st_mpi%totn = 1 ; st_mpi%rank = 0 ; st_mpi%comm = 0
+    if (st_mpi%rank == 0) then
       ! -- Initialize log file (log)
         call init_log(in_stime)
     end if
 
 #ifdef MPI_MSG
     ! -- Initialize mpi (mpi)
-      call init_mpi(log_fnum, pro_totn, my_rank)
+      call init_mpi(log_fnum, st_mpi)
 #endif
 
 #ifdef ICI
@@ -285,9 +137,9 @@ module initial_module
   ! init_var -- Initialize variables
   !*********************************************************************************************
     ! -- module
-    use constval_module, only: SZERO, DZERO, DONE, SINFI, MACHI_EPS, INF_SPEC, INF_CLAS,&
-                               INF_POIN, INF_2DTX, INF_2DBI, INF_3DTX, INF_3DBI,&
-                               INF_EXTR, OUTF_TABL, OUTF_2DBI, OUTF_3DBI, CHALEN, TIMELEN
+    use constval_module, only: CHALEN, INF_SPEC, INF_CLAS, INF_POIN, INF_2DTX, INF_2DBI,&
+                               INF_3DTX, INF_3DBI, INF_EXTR, OUTF_TABL, OUTF_2DBI, OUTF_3DBI,&
+                               SZERO, SINFI, DZERO, DONE, MACHI_EPS
     ! -- inout
 
     ! -- local
@@ -344,24 +196,24 @@ module initial_module
     st_out_type%rech = 0 ; st_out_type%well = 0 ; st_out_type%calg = 0
 
     ! input solution file
-    tstep_type = 0 ; maxout_iter = 20 ; picard_iter = 0 ; maxinn_iter = 10 ; precon_type = 0
-    nlevel = 0 ; maxvcy_iter = 0 ; amg_nlevel = 0 ; max_sweep = 0
-    criteria = 1.00E-03_DP ; errtol = DZERO
-    newper = MACHI_EPS ; newper_inv = DONE/newper
-    jac_omega = 0.67_SP ; amg_theta = 0.05_SP
+    st_ctrl%tstep_type = 0 ; st_ctrl%maxout_iter = 20 ; st_ctrl%picard_iter = 0
+    st_ctrl%maxinn_iter = 10 ; st_ctrl%precon_type = 0 ; st_ctrl%nlevel = 0
+    st_ctrl%maxvcy_iter = 0 ; st_ctrl%amg_nlevel = 0 ; st_ctrl%max_sweep = 0
+    st_ctrl%criteria = 1.00E-03_DP ; st_ctrl%errtol = DZERO
+    st_ctrl%newper = MACHI_EPS ; st_ctrl%newper_inv = DONE/st_ctrl%newper
+    st_ctrl%jac_omega = 0.67_SP ; st_ctrl%amg_theta = 0.05_SP
 
     ! time unit
     unit_list = ["SEC", "MIN", "HOU", "DAY", "YEA"]
 
     !file type
     allocate(in_type(0:7), out_type(3))
-    in_type(:) = [INF_SPEC, INF_CLAS, INF_POIN, INF_2DTX, INF_2DBI, INF_3DTX, INF_3DBI,&
-                  INF_EXTR]
+    in_type(:) = [INF_SPEC, INF_CLAS, INF_POIN, INF_2DTX, INF_2DBI, INF_3DTX, INF_3DBI, INF_EXTR]
     out_type(:) = [OUTF_TABL, OUTF_2DBI, OUTF_3DBI]
 
-    st_sim%sim_name  = repeat(' ', CHALEN)
-    st_sim%cal_unit  = repeat(' ', TIMELEN)
-    st_sim%reg_name  = repeat(' ', CHALEN)
+    st_sim%sim_name = repeat(' ', CHALEN)
+    st_sim%cal_unit = repeat(' ', TIMELEN)
+    st_sim%reg_name = repeat(' ', CHALEN)
     st_sim%inact_name = repeat(' ', CHALEN)
 
     st_in_path%grid = repeat(' ', CHALEN)
@@ -430,24 +282,11 @@ module initial_module
     ! -- inout
 
     ! -- local
-    !$ integer(KIND=OMP_SCHED_KIND) :: kind
-    !$ integer(I4) :: chunk_size
+
     !-------------------------------------------------------------------------------------------
     ! set internal control variables
-
-    !$ call OMP_GET_SCHEDULE(kind, chunk_size)
-    !$ if (kind /= 1) then
-    !$   call OMP_SET_SCHEDULE(1, 0)
-    !$ end if
-
-    !$ if (OMP_GET_DYNAMIC()) then
-    !$   call OMP_SET_DYNAMIC(.false.)
-    !$ end if
-
-    !$ if (OMP_GET_NESTED()) then
-    !$   call OMP_SET_NESTED(.false.)
-    !$ end if
-
+    !$ call OMP_SET_SCHEDULE(1, 0)
+    !$ call OMP_SET_DYNAMIC(.false.)
     !$ call OMP_SET_MAX_ACTIVE_LEVELS(1)
 
   !$ end subroutine init_omp

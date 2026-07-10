@@ -1,9 +1,10 @@
 module assign_boundary
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: DZERO, SNOVAL
-  use initial_module, only: pro_totn, my_rank, in_type
-  use utility_module, only: close_file
+  use constval_module, only: SNOVAL, DZERO
+  use types_module, only: forc_set
+  use utility_module, only: st_mpi, close_file
+  use initial_module, only: in_type
   use read_module, only: read_clasf
   use read_input, only: len_scal_inv
   use set_cell, only: ncals
@@ -16,11 +17,7 @@ module assign_boundary
   implicit none
   private
   public :: assign_sealv, assign_surfbv, assign_wellv, assign_rilav
-
-  real(SP), allocatable, public :: read_seal(:), read_rech(:), read_well(:)
-  real(SP), allocatable, public :: read_prec(:), read_evap(:)
-  real(DP), allocatable, public :: well_top(:), well_bott(:), calc_well(:)
-  integer(I4), allocatable, public :: rech_cflag(:), prec_cflag(:), evap_cflag(:)
+  type(forc_set), public :: st_forc
 
   ! -- local
 
@@ -31,12 +28,12 @@ module assign_boundary
   ! assign_sealv -- Assign sea level value
   !*********************************************************************************************
     ! -- modules
-    use utility_module, only: get_ilen, conv_i2s, write_err_stop
-    use initial_module, only: st_seal, st_in_type
+    use utility_module, only: write_err_stop, get_ilen, conv_i2s
+    use initial_module, only: st_in_type, st_seal
     use read_module, only: read_3dpointf
     use open_file, only: st_intse
     use set_cell, only: ncell, seal_snum, seal_cnum
-    use set_condition, only: set_point2seal, set_2dfile2seal, set_3dfile2seal, set_bound2calc
+    use set_condition, only: set_point2seal, set_bound2calc, set_2dfile2seal, set_3dfile2seal
 #ifdef MPI_MSG
     use mpi_utility, only: bcast_char
     use mpi_set, only: bcast_3dpoint
@@ -52,12 +49,12 @@ module assign_boundary
     logical, allocatable :: seal_all_mask(:)
     !-------------------------------------------------------------------------------------------
     if (st_seal%totn > 0) then
-      allocate(read_seal(ncell), seal_cflag(ncell))
+      allocate(st_forc%read_seal(ncell), seal_cflag(ncell))
       allocate(seal_all_type(7), seal_all_mask(7))
       !$omp parallel
       !$omp do private(i)
       do i = 1, ncell
-        read_seal(i) = SNOVAL
+        st_forc%read_seal(i) = SNOVAL
         seal_cflag(i) = 0
       end do
       !$omp end do
@@ -77,15 +74,15 @@ module assign_boundary
           st_seal%name(i) = ""
         end do
         !$omp end parallel do
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call read_clasf(st_seal%fnum, st_seal%totn, st_seal%name, st_seal%value)
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           call bcast_clas_val(st_seal%totn, st_seal%name, st_seal%value)
         end if
 #endif
-        call set_clas2calc(st_seal%totn, st_seal%name, st_seal%value, read_seal,&
+        call set_clas2calc(st_seal%totn, st_seal%name, st_seal%value, st_forc%read_seal,&
                            seal_cflag, sealn)
         deallocate(st_seal%value, st_seal%name)
       else if (seal_ftype == in_type(2)) then
@@ -97,17 +94,17 @@ module assign_boundary
           st_seal%i(i) = 0 ; st_seal%j(i) = 0 ; st_seal%k(i) = 0
         end do
         !$omp end parallel do
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call read_3dpointf(st_seal%fnum, st_seal%totn, st_seal%i, st_seal%j, st_seal%k,&
                              st_seal%value)
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           call bcast_3dpoint(st_seal%totn, st_seal%i, st_seal%j, st_seal%k, st_seal%value)
         end if
 #endif
         call set_point2seal(st_seal%totn, st_seal%i, st_seal%j, st_seal%k, st_seal%value,&
-                            read_seal, seal_cflag, sealn)
+                            st_forc%read_seal, seal_cflag, sealn)
         deallocate(st_seal%i, st_seal%j, st_seal%k, st_seal%value)
       else
         if (seal_ftype == in_type(7)) then
@@ -120,14 +117,14 @@ module assign_boundary
 
         if (temp_ftype == in_type(3) .or. temp_ftype == in_type(4)) then
           call set_2dfile2seal(st_seal%fnum, seal_ftype, intse_type, seal_snum, SNOVAL,&
-                               read_seal, seal_cflag, sealn)
+                               st_forc%read_seal, seal_cflag, sealn)
         else if (temp_ftype == in_type(5) .or. temp_ftype == in_type(6)) then
           call set_3dfile2seal(st_seal%fnum, seal_ftype, intse_type, seal_cnum, SNOVAL,&
-                               read_seal, seal_cflag, sealn)
+                               st_forc%read_seal, seal_cflag, sealn)
         end if
         if (seal_ftype == in_type(7)) then
           if (intse_type == in_type(3) .or. intse_type == in_type(5)) then
-            if (my_rank == 0) then
+            if (st_mpi%rank == 0) then
               call close_file(st_seal%fnum)
             end if
           else if (intse_type == in_type(4) .or. intse_type == in_type(6)) then
@@ -140,11 +137,11 @@ module assign_boundary
         end if
       end if
 
-      if (seal_cnum /= sealn .or. my_rank == 0) then
+      if (seal_cnum /= sealn .or. st_mpi%rank == 0) then
         if (seal_cnum /= sealn) then
-          allocate(character(get_ilen(my_rank)) :: rank_str)
+          allocate(character(get_ilen(st_mpi%rank)) :: rank_str)
           allocate(character(len=0) :: err_mes)
-          call conv_i2s(my_rank, rank_str)
+          call conv_i2s(st_mpi%rank, rank_str)
           err_mes = "The number of sea grids is different in rank "//rank_str//"."
         end if
 #ifdef MPI_MSG
@@ -152,7 +149,7 @@ module assign_boundary
           call bcast_char(err_mes)
         end if
 #endif
-        if (my_rank == 0 .and. allocated(err_mes)) then
+        if (st_mpi%rank == 0 .and. allocated(err_mes)) then
           call write_err_stop(err_mes)
         end if
         if (allocated(err_mes)) then
@@ -171,12 +168,12 @@ module assign_boundary
           cell_seal(i) = DZERO
         end do
         !$omp end parallel do
-        call set_bound2calc(ncell, seal_cflag, read_seal, seal2cell, cell_seal)
-        deallocate(read_seal)
-        allocate(read_seal(sealn))
+        call set_bound2calc(ncell, seal_cflag, st_forc%read_seal, seal2cell, cell_seal)
+        deallocate(st_forc%read_seal)
+        allocate(st_forc%read_seal(sealn))
         !$omp parallel do private(i)
         do i = 1, sealn
-          read_seal(i) = real(cell_seal(i), kind=SP)*len_scal_inv
+          st_forc%read_seal(i) = real(cell_seal(i), kind=SP)*len_scal_inv
         end do
         !$omp end parallel do
         deallocate(seal_cflag, seal2cell, cell_seal)
@@ -191,10 +188,10 @@ module assign_boundary
   ! assign_surfbv -- Assign surface boundary value
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_surfb
+    use types_module, only: surfb_set
     ! -- inout
     integer(I4), intent(in) :: sb_ftype, int_ftype
-    type(st_surfb), intent(inout) :: sb_st
+    type(surfb_set), intent(inout) :: sb_st
     integer(I4), intent(out) :: sb_num
     integer(I4), intent(out) :: sb_cflag(:)
     real(SP), intent(out) :: read_sb(:)
@@ -212,11 +209,11 @@ module assign_boundary
           sb_st%name(i) = ""
         end do
         !$omp end parallel do
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call read_clasf(sb_st%fnum, sb_st%totn, sb_st%name, sb_st%value)
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           call bcast_clas_val(sb_st%totn, sb_st%name, sb_st%value)
         end if
 #endif
@@ -226,7 +223,7 @@ module assign_boundary
         call set_2dfile2cals(sb_st%fnum, sb_ftype, int_ftype, SNOVAL, read_sb, sb_cflag, sb_num)
         if (sb_ftype == in_type(7)) then
           if (int_ftype == in_type(3)) then
-            if (my_rank == 0) then
+            if (st_mpi%rank == 0) then
               call close_file(sb_st%fnum)
             end if
           else if (int_ftype == in_type(4)) then
@@ -257,7 +254,7 @@ module assign_boundary
     use initial_module, only: st_well
     use open_file, only: st_intwe
     use set_cell, only: ncalc
-    use set_condition, only: set_point2well, set_2dwell, set_well2index, set_3dfile2well,&
+    use set_condition, only: set_point2well, set_2dwell, set_3dfile2well, set_well2index,&
                              set_well3d2index, set_wellprop
     ! -- inout
     integer(I4), intent(in) :: well_ftype, weks_ftype, weke_ftype
@@ -325,24 +322,27 @@ module assign_boundary
 
       if (well_ftype == in_type(2) .or. any(well_ftype == type_2d) .or. &
           any(well_ftype == type_3d) .or. well_ftype == in_type(7)) then
-        allocate(well_top(num_well), well_bott(num_well), read_well(num_well))
+        allocate(st_forc%well_top(num_well), st_forc%well_bott(num_well),&
+                 st_forc%read_well(num_well))
         !$omp parallel do private(i)
         do i = 1, num_well
-          well_top(i) = DZERO ; well_bott(i) = DZERO ; read_well(i) = st_well%value(i)
+          st_forc%well_top(i) = DZERO
+          st_forc%well_bott(i) = DZERO
+          st_forc%read_well(i) = st_well%value(i)
         end do
         !$omp end parallel do
-        call set_wellprop(num_well, well_top, well_bott)
-        allocate(calc_well(ncalc))
+        call set_wellprop(num_well, st_forc%well_top, st_forc%well_bott)
+        allocate(st_forc%calc_well(ncalc))
         deallocate(st_well%value)
         !$omp parallel
         !$omp do private(i)
         do i = 1, ncalc
-          calc_well(i) = DZERO
+          st_forc%calc_well(i) = DZERO
         end do
         !$omp end do
         !$omp do private(i)
         do i = 1, num_well
-          read_well(i) = read_well(i)*(len_scal_inv**3)*st_well%uni_conv
+          st_forc%read_well(i) = st_forc%read_well(i)*(len_scal_inv**3)*st_well%uni_conv
         end do
         !$omp end do
         !$omp end parallel
@@ -357,7 +357,7 @@ module assign_boundary
   ! assign_rilav -- Assign river and lake value
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_surfw
+    use types_module, only: surfw_set
     use read_module, only: read_2dpointf
     use set_condition, only: set_point2surf
 #ifdef MPI_MSG
@@ -365,7 +365,7 @@ module assign_boundary
 #endif
     ! -- inout
     integer(I4), intent(in) :: rl_ftype, lake_aflag
-    type(st_surfw), intent(inout) :: rl_st
+    type(surfw_set), intent(inout) :: rl_st
     integer(I4), intent(out) :: rl_num
     integer(I4), intent(out) :: rl_cflag(:)
     real(SP), intent(out) :: calc_rl(:)
@@ -384,11 +384,11 @@ module assign_boundary
           rl_st%name(i) = ""
         end do
         !$omp end parallel do
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call read_clasf(rl_st%fnum, rl_st%totn, rl_st%name, rl_st%value)
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           call bcast_clas_val(rl_st%totn, rl_st%name, rl_st%value)
         end if
 #endif
@@ -403,11 +403,11 @@ module assign_boundary
           rl_st%i(i) = 0 ; rl_st%j(i) = 0
         end do
         !$omp end parallel do
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call read_2dpointf(rl_st%fnum, rl_st%totn, rl_st%i, rl_st%j, rl_st%value)
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           call bcast_2dpoint(rl_st%totn, rl_st%i, rl_st%j, rl_st%value)
         end if
 #endif
@@ -419,7 +419,7 @@ module assign_boundary
                              rl_cflag, rl_num)
         if (rl_ftype == in_type(7)) then
           if (rl_st%inttype == in_type(3)) then
-            if (my_rank == 0) then
+            if (st_mpi%rank == 0) then
               call close_file(rl_st%fnum)
             end if
           else if (rl_st%inttype == in_type(4)) then

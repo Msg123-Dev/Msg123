@@ -1,7 +1,8 @@
 module calc_parameter
   ! -- modules
   use kind_module, only: DP
-  use constval_module, only: DONE, DZERO
+  use constval_module, only: DZERO, DONE
+  use set_condition, only: st_hydr
 
   implicit none
   private
@@ -18,9 +19,8 @@ module calc_parameter
   !*********************************************************************************************
     ! -- modules
     use kind_module, only: I4
-    use constval_module, only: DTWO, DHALF
-    use make_cell, only: cell_top
-    use assign_calc, only: read_retn, read_reta, read_poro, read_resi, read_ss
+    use constval_module, only: DHALF, DTWO
+    use make_cell, only: st_geom
     ! -- inout
     integer(I4), intent(in) :: num
     real(DP), intent(in) :: pertur
@@ -44,24 +44,25 @@ module calc_parameter
 
     !$omp parallel do private(i, per_phead, retm, beta, theta, kr, se, ss)
     do i = 1, num
-      per_phead = pres(i) - cell_top(i) + pertur
+      per_phead = pres(i) - st_geom%cell_top(i) + pertur
       if (per_phead < DZERO) then
-        retm = DONE - DONE/read_retn(i)
+        retm = DONE - DONE/st_hydr%read_vann(i)
         if (per_phead <= phead0) then
-          beta = abs(per_phead*read_reta(i))**read_retn(i)
-          theta = read_resi(i) + (read_poro(i)-read_resi(i))*((DONE+beta))**(-retm)
+          beta = abs(per_phead*st_hydr%read_vana(i))**st_hydr%read_vann(i)
+          theta = st_hydr%read_resi(i) + (st_hydr%read_pors(i)-st_hydr%read_resi(i))*&
+                  ((DONE+beta))**(-retm)
         else
           beta = DZERO
-          theta = read_poro(i)
+          theta = st_hydr%read_pors(i)
         end if
-        srat(i) = theta/read_poro(i)
+        srat(i) = theta/st_hydr%read_pors(i)
         se = (DONE+beta)**(-retm)
         kr = se**(DHALF)*(DONE-(DONE-se**(DONE/retm))**retm)**DTWO
         ss = DZERO
       else
         srat(i) = DONE
         kr = DONE
-        ss = read_ss(i)
+        ss = st_hydr%read_spst(i)
       end if
       rperm(i) = kr
       temp_ss(i) = ss

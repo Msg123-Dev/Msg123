@@ -1,15 +1,17 @@
 module set_condition
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: SZERO, DZERO, DONE, SNOVAL
-  use initial_module, only: my_rank, st_sim, st_grid, st_well, in_type
+  use constval_module, only: SZERO, SNOVAL, DZERO, DONE
+  use types_module, only: hydr_set, bcnd_set
+  use utility_module, only: st_mpi
+  use initial_module, only: st_sim, st_grid, st_well, in_type
   use read_module, only: read_2dtxt, read_2dbin, read_3dtxt, read_3dbin, flat_2dto2d,&
                          flat_2dto3d, flat_3dto3d
-  use set_cell, only: ncalc, ncals, loc2glo_ijk, loc2glo_ij, neib_ncalc
-  use make_cell, only: cell_top, cell_bot
+  use set_cell, only: ncalc, ncals, neib_ncalc, loc2glo_ijk, loc2glo_ij
+  use make_cell, only: st_geom
 #ifdef MPI_MSG
-  use mpi_utility, only: mpimax_val
   use utility_module, only: get_ilen, conv_i2s
+  use mpi_utility, only: mpimax_val
   use mpi_read, only: read_mpi_file
   use mpi_set, only: scatter_xyval, scatter_xyzval
 #endif
@@ -41,15 +43,11 @@ module set_condition
     module procedure set_3dr8_calc
   end interface
 
-  integer(I4), public :: nseal, tconn_num
+  integer(I4), public :: tconn_num
   integer(I4), allocatable, public :: off_row(:), off_index(:), conn_dir(:), sea_dir(:)
-  real(DP), allocatable, public :: area_dis(:), sat_hydf(:), conn_dis(:)
-  real(DP), allocatable, public :: sea_hydf(:), sea_dis(:)
-  real(DP), allocatable, public :: surf_area(:), rech_area(:)
-  real(DP), allocatable, public :: hydf_surf(:), abyd_surf(:), abyd_well(:), sea_abyd(:)
-  integer(I4), allocatable, public :: well_index(:), well_conn(:)
-  integer(I4), allocatable, public :: sea2cal(:), sea2sea(:)
   integer(I4), allocatable, public :: left_off(:), right_off(:)
+  type(hydr_set), public :: st_hydr
+  type(bcnd_set), public :: st_bcnd
 
   ! -- local
   integer(I4), allocatable :: well_nflag(:)
@@ -323,7 +321,7 @@ module set_condition
     cnum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz ; gridxyz = st_grid%nxyz
     if (ftype == in_type(3) .or. int_ft == in_type(3)) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(array_read(gridx,gridy), array_flat(gridxyz))
         !$omp parallel
         !$omp do private(i)
@@ -443,7 +441,7 @@ module set_condition
     cnum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz ; gridxyz = st_grid%nxyz
     if (ftype == in_type(5) .or. int_ft == in_type(5)) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(array_read(gridx,gridy,gridz), array_flat(gridxyz))
         !$omp parallel
         !$omp do private(i)
@@ -559,7 +557,7 @@ module set_condition
         array_flat(i) = no_val
       end do
       !$omp end parallel do
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(array_read(gridx,gridy))
         !$omp parallel do private(j)
         do j = 1, gridy
@@ -655,7 +653,7 @@ module set_condition
         array_flat(i) = no_val
       end do
       !$omp end parallel do
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(array_read(gridx,gridy))
         !$omp parallel do private(j)
         do j = 1, gridy
@@ -751,7 +749,7 @@ module set_condition
         array_flat(i) = no_val
       end do
       !$omp end parallel do
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(array_read(gridx,gridy))
         !$omp parallel do private(j)
         do j = 1, gridy
@@ -851,7 +849,7 @@ module set_condition
         array_flat(i) = no_val
       end do
       !$omp end parallel do
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(array_read(gridx,gridy))
         !$omp parallel do private(j)
         do j = 1, gridy
@@ -983,7 +981,7 @@ module set_condition
         array_flat(i) = no_val
       end do
       !$omp end parallel do
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(array_read(gridx,gridy))
         !$omp parallel do private(j)
         do j = 1, gridy
@@ -1105,7 +1103,7 @@ module set_condition
         array_flat(i) = no_val
       end do
       !$omp end parallel do
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(array_read(gridx,gridy))
         !$omp parallel do private(j)
         do j = 1, gridy
@@ -1219,7 +1217,7 @@ module set_condition
         array_flat(i) = no_val
       end do
       !$omp end parallel do
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(array_read(gridx,gridy,gridz))
         !$omp parallel do private(k)
         do k = 1, gridz
@@ -1302,7 +1300,7 @@ module set_condition
         array_flat(i) = no_val
       end do
       !$omp end parallel do
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(array_read(gridx,gridy,gridz))
         !$omp parallel do private(k)
         do k = 1, gridz
@@ -1385,7 +1383,7 @@ module set_condition
         array_flat(i) = no_val
       end do
       !$omp end parallel do
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(array_read(gridx,gridy,gridz))
         !$omp parallel do private(k)
         do k = 1, gridz
@@ -1469,7 +1467,7 @@ module set_condition
     end do
     !$omp end parallel do
 
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       call read_wpointf(mw_fnum, rwn, rw_id, rw_i, rw_j, rw_ks, rw_ke, rw_val)
     end if
 
@@ -1557,7 +1555,7 @@ module set_condition
         call set_2dfile2cals(welle_fnum, we_ftype, wf_int_ft, 0, w_ke)
       end if
 
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         close(wells_fnum) ; close(welle_fnum)
       end if
 
@@ -1666,7 +1664,7 @@ module set_condition
         array_flat(i) = SZERO
       end do
       !$omp end parallel do
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(array_read(gridx,gridy,gridz))
         !$omp parallel do private(k)
         do k = 1, gridz
@@ -1751,7 +1749,7 @@ module set_condition
     integer(I4) :: i, k, index_count, c_num
     integer(I4), allocatable :: temp_wconn(:)
     !-------------------------------------------------------------------------------------------
-    allocate(temp_wconn(st_grid%nz*wnum), well_index(0:wnum))
+    allocate(temp_wconn(st_grid%nz*wnum), st_bcnd%well_index(0:wnum))
     !$omp parallel
     !$omp do private(i)
     do i = 1, st_grid%nz*wnum
@@ -1760,7 +1758,7 @@ module set_condition
     !$omp end do
     !$omp do private(i)
     do i = 1, wnum
-      well_index(i) = 0
+      st_bcnd%well_index(i) = 0
     end do
     !$omp end do
     !$omp end parallel
@@ -1772,13 +1770,13 @@ module set_condition
         c_num = st_grid%nx*st_grid%ny*(k-1) + st_well%ij(i)
         temp_wconn(index_count) = findloc(loc2glo_ijk(:), value = c_num, dim = 1)
       end do
-      well_index(i) = index_count
+      st_bcnd%well_index(i) = index_count
     end do
 
-    allocate(well_conn(index_count))
+    allocate(st_bcnd%well_conn(index_count))
     !$omp parallel do private(i)
     do i = 1, index_count
-      well_conn(i) = temp_wconn(i)
+      st_bcnd%well_conn(i) = temp_wconn(i)
     end do
     !$omp end parallel do
 
@@ -1798,19 +1796,19 @@ module set_condition
     ! -- local
     integer(I4) :: i, index_count
     !-------------------------------------------------------------------------------------------
-    allocate(well_conn(wnum), well_index(0:wnum))
-    well_index(0) = 0
+    allocate(st_bcnd%well_conn(wnum), st_bcnd%well_index(0:wnum))
+    st_bcnd%well_index(0) = 0
     !$omp parallel do private(i)
     do i = 1, wnum
-      well_conn(i) = 0 ; well_index(i) = 0
+      st_bcnd%well_conn(i) = 0 ; st_bcnd%well_index(i) = 0
     end do
     !$omp end parallel do
 
     index_count = 0
     do i = 1, wnum
       index_count = index_count + 1
-      well_conn(index_count) = w2c(i)
-      well_index(i) = index_count
+      st_bcnd%well_conn(index_count) = w2c(i)
+      st_bcnd%well_index(i) = index_count
     end do
 
   end subroutine set_well3d2index
@@ -1829,10 +1827,10 @@ module set_condition
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i, surf_calc, bott_calc)
     do i = 1, wnum
-      surf_calc = well_conn(well_index(i-1)+1)
-      bott_calc = well_conn(well_index(i))
-      wtop(i) = cell_top(surf_calc)
-      wbott(i) = cell_bot(bott_calc)
+      surf_calc = st_bcnd%well_conn(st_bcnd%well_index(i-1)+1)
+      bott_calc = st_bcnd%well_conn(st_bcnd%well_index(i))
+      wtop(i) = st_geom%cell_top(surf_calc)
+      wbott(i) = st_geom%cell_bot(bott_calc)
     end do
     !$omp end parallel do
 
@@ -1845,13 +1843,12 @@ module set_condition
     ! -- modules
     use constval_module, only: FACE
     use initial_module, only: st_out_type
-    use set_cell, only: calc2reg, seal_cnum, glo2loc_ijk, get_calc_grid
+    use set_cell, only: get_calc_grid, seal_cnum, calc2reg, glo2loc_ijk
     use make_cell, only: dis2face, face_area, area_r
 #ifdef MPI_MSG
-    use initial_module, only: pro_totn
-    use set_cell, only: neib_mpi_totn, neib_num, send_cind, recv_cind, send_citem,&
-                        recv_citem, send2recv
-    use mpi_set, only: senrec_faceval, senrec_neibval
+    use mpi_set, only: senrec_neibval, senrec_faceval
+    use set_cell, only: neib_mpi_totn, send_cind, recv_cind, send_citem, recv_citem, neib_num,&
+                        send2recv
 #endif
     ! -- inout
     real(SP), intent(in) :: cksx(:), cksy(:), cksz(:)
@@ -1871,17 +1868,17 @@ module set_condition
     totn_clac = ncalc + neib_ncalc
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz
     allocate(off_row(totn_clac*FACE), off_index(0:totn_clac), conn_dir(totn_clac*FACE))
-    allocate(area_dis(totn_clac*FACE), sat_hydf(totn_clac*FACE))
-    allocate(surf_area(ncals), rech_area(ncals))
-    allocate(hydf_surf(ncals), abyd_surf(ncals))
-    allocate(sea_abyd(seal_cnum*FACE), sea_hydf(seal_cnum*FACE))
+    allocate(st_hydr%area_dis(totn_clac*FACE), st_hydr%sat_hydf(totn_clac*FACE))
+    allocate(st_hydr%surf_area(ncals), st_hydr%rech_area(ncals))
+    allocate(st_hydr%hydf_surf(ncals), st_hydr%abyd_surf(ncals))
+    allocate(st_hydr%sea_abyd(seal_cnum*FACE), st_hydr%sea_hydf(seal_cnum*FACE))
     allocate(left_off(totn_clac*FACE), right_off(totn_clac*FACE))
     off_index(0) = 0
     !$omp parallel
     !$omp do private(i)
     do i = 1, totn_clac*FACE
       off_row(i) = 0 ; conn_dir(i) = 0
-      area_dis(i) = DZERO ; sat_hydf(i) = DZERO
+      st_hydr%area_dis(i) = DZERO ; st_hydr%sat_hydf(i) = DZERO
       left_off(i) = 0 ; right_off(i) = 0
     end do
     !$omp end do
@@ -1892,29 +1889,29 @@ module set_condition
     !$omp end do
     !$omp do private(i)
     do i = 1, ncals
-      surf_area(i) = DZERO ; rech_area(i) = DZERO
-      hydf_surf(i) = DZERO ; abyd_surf(i) = DZERO
+      st_hydr%surf_area(i) = DZERO ; st_hydr%rech_area(i) = DZERO
+      st_hydr%hydf_surf(i) = DZERO ; st_hydr%abyd_surf(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i)
     do i = 1, seal_cnum*FACE
-      sea_abyd(i) = DZERO ; sea_hydf(i) = DZERO
+      st_hydr%sea_abyd(i) = DZERO ; st_hydr%sea_hydf(i) = DZERO
     end do
     !$omp end do
     !$omp end parallel
 
     if (st_out_type%velc > 0) then
-      allocate(conn_dis(totn_clac*FACE))
-      allocate(sea_dis(seal_cnum*FACE), sea_dir(seal_cnum*FACE))
+      allocate(st_hydr%conn_dis(totn_clac*FACE))
+      allocate(st_hydr%sea_dis(seal_cnum*FACE), sea_dir(seal_cnum*FACE))
       !$omp parallel
       !$omp do private(i)
       do i = 1, totn_clac*FACE
-        conn_dis(i) = DZERO
+        st_hydr%conn_dis(i) = DZERO
       end do
       !$omp end do
       !$omp do private(i)
       do i = 1, seal_cnum*FACE
-        sea_dis(i) = DZERO
+        st_hydr%sea_dis(i) = DZERO
         sea_dir(i) = 0
       end do
       !$omp end do
@@ -1922,7 +1919,7 @@ module set_condition
     end if
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       allocate(reg_dis(totn_clac,FACE), reg_fare(totn_clac,FACE))
       !$omp parallel do private(j)
       do j = 1, FACE
@@ -2044,7 +2041,7 @@ module set_condition
     neib_ncalc = 0
 #endif
 
-    allocate(surf_dis(ncals), sea2cal(seal_cnum*FACE), sea2sea(seal_cnum*FACE))
+    allocate(surf_dis(ncals), st_bcnd%sea2cal(seal_cnum*FACE), st_bcnd%sea2sea(seal_cnum*FACE))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncals
@@ -2053,13 +2050,13 @@ module set_condition
     !$omp end do
     !$omp do private(i)
     do i = 1, seal_cnum*FACE
-      sea2cal(i) = 0 ; sea2sea(i) = 0
+      st_bcnd%sea2cal(i) = 0 ; st_bcnd%sea2sea(i) = 0
     end do
     !$omp end do
     !$omp end parallel
     deallocate(dis2face, face_area)
 
-    nseal = 0 ; tconn_num = 0 ; mpi_send = 0 ; left_num = 0 ; right_num = 0
+    st_bcnd%seal_num = 0 ; tconn_num = 0 ; mpi_send = 0 ; left_num = 0 ; right_num = 0
     do i = 1, totn_clac
       ! -- Get calculation number from grid number (calc_grid)
         call get_calc_grid(i, i_num, j_num, k_num)
@@ -2070,15 +2067,18 @@ module set_condition
         if (loc_u > 0) then
           off_num = loc_u ; tks = reg_cksz(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
-            sflag = 1 ; nseal = nseal + 1 ; sea2cal(nseal) = i
-            sea2sea(nseal) = off_num - totn_clac
+            sflag = 1
+            st_bcnd%seal_num = st_bcnd%seal_num + 1
+            st_bcnd%sea2cal(st_bcnd%seal_num) = i
+            st_bcnd%sea2sea(st_bcnd%seal_num) = off_num - totn_clac
             ! -- Set distance between adjacent cell (dis_adj)
               call set_dis_adj(1, sflag, i, off_num, dis1, dis2, dis12)
             ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            sea_abyd(nseal) = reg_fare(i,1)/dis12 ; sea_hydf(nseal) = hyd_face
+            st_hydr%sea_abyd(st_bcnd%seal_num) = reg_fare(i,1)/dis12
+            st_hydr%sea_hydf(st_bcnd%seal_num) = hyd_face
             if (st_out_type%velc > 0) then
-              sea_dis(nseal) = DONE/dis12 ; sea_dir(nseal) = 1
+              st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 1
             end if
           else if (0 < off_num .and. off_num <= ncalc) then
             if (calc2reg(i) == calc2reg(off_num) .or. st_sim%reg_neib == 1) then
@@ -2089,9 +2089,10 @@ module set_condition
                 call set_dis_adj(1, sflag, i, off_num, dis1, dis2, dis12)
               ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
                 call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-              area_dis(tconn_num) = reg_fare(i,1)/dis12 ; sat_hydf(tconn_num) = hyd_face
+              st_hydr%area_dis(tconn_num) = reg_fare(i,1)/dis12
+              st_hydr%sat_hydf(tconn_num) = hyd_face
               if (st_out_type%velc > 0) then
-                conn_dis(tconn_num) = DONE/dis12
+                st_hydr%conn_dis(tconn_num) = DONE/dis12
               end if
             end if
           else if (i <= ncalc) then !for mpi
@@ -2104,15 +2105,18 @@ module set_condition
               call set_dis_adj(1, sflag, i, calc_num, dis1, dis2, dis12)
             ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            area_dis(tconn_num) = reg_fare(i,1)/dis12 ; sat_hydf(tconn_num) = hyd_face
+            st_hydr%area_dis(tconn_num) = reg_fare(i,1)/dis12
+            st_hydr%sat_hydf(tconn_num) = hyd_face
             if (st_out_type%velc > 0) then
-              conn_dis(tconn_num) = DONE/dis12
+              st_hydr%conn_dis(tconn_num) = DONE/dis12
             end if
 #endif
           end if
         end if
       else if (i <= ncals) then
-        surf_area(i) = reg_fare(i,1) ; rech_area(i) = area_r(i) ; hydf_surf(i) = reg_cksz(i)
+        st_hydr%surf_area(i) = reg_fare(i,1)
+        st_hydr%rech_area(i) = area_r(i)
+        st_hydr%hydf_surf(i) = reg_cksz(i)
       end if
       ! north direction
       if (j_num /= 1) then
@@ -2120,15 +2124,18 @@ module set_condition
         if (loc_n > 0) then
           off_num = loc_n ; tks = reg_cksy(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
-            sflag = 1 ; nseal = nseal + 1 ; sea2cal(nseal) = i
-            sea2sea(nseal) = off_num - totn_clac
+            sflag = 1
+            st_bcnd%seal_num = st_bcnd%seal_num + 1
+            st_bcnd%sea2cal(st_bcnd%seal_num) = i
+            st_bcnd%sea2sea(st_bcnd%seal_num) = off_num - totn_clac
             ! -- Set distance between adjacent cell (dis_adj)
               call set_dis_adj(2, sflag, i, off_num, dis1, dis2, dis12)
             ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            sea_abyd(nseal) = reg_fare(i,2)/dis12 ; sea_hydf(nseal) = hyd_face
+            st_hydr%sea_abyd(st_bcnd%seal_num) = reg_fare(i,2)/dis12
+            st_hydr%sea_hydf(st_bcnd%seal_num) = hyd_face
             if (st_out_type%velc > 0) then
-              sea_dis(nseal) = DONE/dis12 ; sea_dir(nseal) = 2
+              st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 2
             end if
           else if (0 < off_num .and. off_num <= ncalc) then
             if (calc2reg(i) == calc2reg(off_num) .or. st_sim%reg_neib == 1) then
@@ -2139,9 +2146,10 @@ module set_condition
                 call set_dis_adj(2, sflag, i, off_num, dis1, dis2, dis12)
               ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
                 call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-              area_dis(tconn_num) = reg_fare(i,2)/dis12 ; sat_hydf(tconn_num) = hyd_face
+              st_hydr%area_dis(tconn_num) = reg_fare(i,2)/dis12
+              st_hydr%sat_hydf(tconn_num) = hyd_face
               if (st_out_type%velc > 0) then
-                conn_dis(tconn_num) = DONE/dis12
+                st_hydr%conn_dis(tconn_num) = DONE/dis12
               end if
             end if
           else if (i <= ncalc) then !for mpi
@@ -2154,9 +2162,10 @@ module set_condition
               call set_dis_adj(2, sflag, i, calc_num, dis1, dis2, dis12)
             ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            area_dis(tconn_num) = reg_fare(i,2)/dis12 ; sat_hydf(tconn_num) = hyd_face
+            st_hydr%area_dis(tconn_num) = reg_fare(i,2)/dis12
+            st_hydr%sat_hydf(tconn_num) = hyd_face
             if (st_out_type%velc > 0) then
-              conn_dis(tconn_num) = DONE/dis12
+              st_hydr%conn_dis(tconn_num) = DONE/dis12
             end if
 #endif
           end if
@@ -2168,15 +2177,18 @@ module set_condition
         if (loc_w > 0) then
           off_num = loc_w ; tks = reg_cksx(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
-            sflag = 1 ; nseal = nseal + 1 ; sea2cal(nseal) = i
-            sea2sea(nseal) = off_num - totn_clac
+            sflag = 1
+            st_bcnd%seal_num = st_bcnd%seal_num + 1
+            st_bcnd%sea2cal(st_bcnd%seal_num) = i
+            st_bcnd%sea2sea(st_bcnd%seal_num) = off_num - totn_clac
             ! -- Set distance between adjacent cell (dis_adj)
               call set_dis_adj(3, sflag, i, off_num, dis1, dis2, dis12)
             ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            sea_abyd(nseal) = reg_fare(i,3)/dis12 ; sea_hydf(nseal) = hyd_face
+            st_hydr%sea_abyd(st_bcnd%seal_num) = reg_fare(i,3)/dis12
+            st_hydr%sea_hydf(st_bcnd%seal_num) = hyd_face
             if (st_out_type%velc > 0) then
-              sea_dis(nseal) = DONE/dis12 ; sea_dir(nseal) = 3
+              st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 3
             end if
           else if (0 < off_num .and. off_num <= ncalc) then
             if (calc2reg(i) == calc2reg(off_num) .or. st_sim%reg_neib == 1) then
@@ -2187,9 +2199,10 @@ module set_condition
                 call set_dis_adj(3, sflag, i, off_num, dis1, dis2, dis12)
               ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
                 call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-              area_dis(tconn_num) = reg_fare(i,3)/dis12 ; sat_hydf(tconn_num) = hyd_face
+              st_hydr%area_dis(tconn_num) = reg_fare(i,3)/dis12
+              st_hydr%sat_hydf(tconn_num) = hyd_face
               if (st_out_type%velc > 0) then
-                conn_dis(tconn_num) = DONE/dis12
+                st_hydr%conn_dis(tconn_num) = DONE/dis12
               end if
             end if
           else if (i <= ncalc) then !for mpi
@@ -2202,9 +2215,10 @@ module set_condition
               call set_dis_adj(3, sflag, i, calc_num, dis1, dis2, dis12)
             ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            area_dis(tconn_num) = reg_fare(i,3)/dis12 ; sat_hydf(tconn_num) = hyd_face
+            st_hydr%area_dis(tconn_num) = reg_fare(i,3)/dis12
+            st_hydr%sat_hydf(tconn_num) = hyd_face
             if (st_out_type%velc > 0) then
-              conn_dis(tconn_num) = DONE/dis12
+              st_hydr%conn_dis(tconn_num) = DONE/dis12
             end if
 #endif
           end if
@@ -2216,15 +2230,18 @@ module set_condition
         if (loc_e > 0) then
           off_num = loc_e ; tks = reg_cksx(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
-            sflag = 1 ; nseal = nseal + 1 ; sea2cal(nseal) = i
-            sea2sea(nseal) = off_num - totn_clac
+            sflag = 1
+            st_bcnd%seal_num = st_bcnd%seal_num + 1
+            st_bcnd%sea2cal(st_bcnd%seal_num) = i
+            st_bcnd%sea2sea(st_bcnd%seal_num) = off_num - totn_clac
             ! -- Set distance between adjacent cell (dis_adj)
               call set_dis_adj(4, sflag, i, off_num, dis1, dis2, dis12)
             ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            sea_abyd(nseal) = reg_fare(i,4)/dis12 ; sea_hydf(nseal) = hyd_face
+            st_hydr%sea_abyd(st_bcnd%seal_num) = reg_fare(i,4)/dis12
+            st_hydr%sea_hydf(st_bcnd%seal_num) = hyd_face
             if (st_out_type%velc > 0) then
-              sea_dis(nseal) = DONE/dis12 ; sea_dir(nseal) = 4
+              st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 4
             end if
           else if (0 < off_num .and. off_num <= ncalc) then
             if (calc2reg(i) == calc2reg(off_num) .or. st_sim%reg_neib == 1) then
@@ -2235,9 +2252,10 @@ module set_condition
                 call set_dis_adj(4, sflag, i, off_num, dis1, dis2, dis12)
               ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
                 call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-              area_dis(tconn_num) = reg_fare(i,4)/dis12 ; sat_hydf(tconn_num) = hyd_face
+              st_hydr%area_dis(tconn_num) = reg_fare(i,4)/dis12
+              st_hydr%sat_hydf(tconn_num) = hyd_face
               if (st_out_type%velc > 0) then
-                conn_dis(tconn_num) = DONE/dis12
+                st_hydr%conn_dis(tconn_num) = DONE/dis12
               end if
             end if
           else if (i <= ncalc) then !for mpi
@@ -2250,9 +2268,10 @@ module set_condition
               call set_dis_adj(4, sflag, i, calc_num, dis1, dis2, dis12)
             ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            area_dis(tconn_num) = reg_fare(i,4)/dis12 ; sat_hydf(tconn_num) = hyd_face
+            st_hydr%area_dis(tconn_num) = reg_fare(i,4)/dis12
+            st_hydr%sat_hydf(tconn_num) = hyd_face
             if (st_out_type%velc > 0) then
-              conn_dis(tconn_num) = DONE/dis12
+              st_hydr%conn_dis(tconn_num) = DONE/dis12
             end if
 #endif
           end if
@@ -2264,15 +2283,18 @@ module set_condition
         if (loc_s > 0) then
           off_num = loc_s ; tks = reg_cksy(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
-            sflag = 1 ; nseal = nseal + 1 ; sea2cal(nseal) = i
-            sea2sea(nseal) = off_num - totn_clac
+            sflag = 1
+            st_bcnd%seal_num = st_bcnd%seal_num + 1
+            st_bcnd%sea2cal(st_bcnd%seal_num) = i
+            st_bcnd%sea2sea(st_bcnd%seal_num) = off_num - totn_clac
             ! -- Set distance between adjacent cell (dis_adj)
               call set_dis_adj(5, sflag, i, off_num, dis1, dis2, dis12)
             ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            sea_abyd(nseal) = reg_fare(i,5)/dis12 ; sea_hydf(nseal) = hyd_face
+            st_hydr%sea_abyd(st_bcnd%seal_num) = reg_fare(i,5)/dis12
+            st_hydr%sea_hydf(st_bcnd%seal_num) = hyd_face
             if (st_out_type%velc > 0) then
-              sea_dis(nseal) = DONE/dis12 ; sea_dir(nseal) = 5
+              st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 5
             end if
           else if (0 < off_num .and. off_num <= ncalc) then
             if (calc2reg(i) == calc2reg(off_num) .or. st_sim%reg_neib == 1) then
@@ -2283,9 +2305,10 @@ module set_condition
                 call set_dis_adj(5, sflag, i, off_num, dis1, dis2, dis12)
               ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
                 call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-              area_dis(tconn_num) = reg_fare(i,5)/dis12 ; sat_hydf(tconn_num) = hyd_face
+              st_hydr%area_dis(tconn_num) = reg_fare(i,5)/dis12
+              st_hydr%sat_hydf(tconn_num) = hyd_face
               if (st_out_type%velc > 0) then
-                conn_dis(tconn_num) = DONE/dis12
+                st_hydr%conn_dis(tconn_num) = DONE/dis12
               end if
             end if
           else if (i <= ncalc) then !for mpi
@@ -2298,9 +2321,10 @@ module set_condition
               call set_dis_adj(5, sflag, i, calc_num, dis1, dis2, dis12)
             ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            area_dis(tconn_num) = reg_fare(i,5)/dis12 ; sat_hydf(tconn_num) = hyd_face
+            st_hydr%area_dis(tconn_num) = reg_fare(i,5)/dis12
+            st_hydr%sat_hydf(tconn_num) = hyd_face
             if (st_out_type%velc > 0) then
-              conn_dis(tconn_num) = DONE/dis12
+              st_hydr%conn_dis(tconn_num) = DONE/dis12
             end if
 #endif
           end if
@@ -2312,15 +2336,18 @@ module set_condition
         if (loc_d > 0) then
           off_num = loc_d ; tks = reg_cksz(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
-            sflag = 1 ; nseal = nseal + 1 ; sea2cal(nseal) = i
-            sea2sea(nseal) = off_num - totn_clac
+            sflag = 1
+            st_bcnd%seal_num = st_bcnd%seal_num + 1
+            st_bcnd%sea2cal(st_bcnd%seal_num) = i
+            st_bcnd%sea2sea(st_bcnd%seal_num) = off_num - totn_clac
             ! -- Set distance between adjacent cell (dis_adj)
               call set_dis_adj(6, sflag, i, off_num, dis1, dis2, dis12)
             ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            sea_abyd(nseal) = reg_fare(i,6)/dis12 ; sea_hydf(nseal) = hyd_face
+            st_hydr%sea_abyd(st_bcnd%seal_num) = reg_fare(i,6)/dis12
+            st_hydr%sea_hydf(st_bcnd%seal_num) = hyd_face
             if (st_out_type%velc > 0) then
-              sea_dis(nseal) = DONE/dis12 ; sea_dir(nseal) = 6
+              st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 6
             end if
           else if (0 < off_num .and. off_num <= ncalc) then
             if (calc2reg(i) == calc2reg(off_num) .or. st_sim%reg_neib == 1) then
@@ -2331,9 +2358,10 @@ module set_condition
                 call set_dis_adj(6, sflag, i, off_num, dis1, dis2, dis12)
               ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
                 call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-              area_dis(tconn_num) = reg_fare(i,6)/dis12 ; sat_hydf(tconn_num) = hyd_face
+              st_hydr%area_dis(tconn_num) = reg_fare(i,6)/dis12
+              st_hydr%sat_hydf(tconn_num) = hyd_face
               if (st_out_type%velc > 0) then
-                conn_dis(tconn_num) = DONE/dis12
+                st_hydr%conn_dis(tconn_num) = DONE/dis12
               end if
             end if
           else if (i <= ncalc) then !for mpi
@@ -2346,9 +2374,10 @@ module set_condition
               call set_dis_adj(6, sflag, i, calc_num, dis1, dis2, dis12)
             ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            area_dis(tconn_num) = reg_fare(i,6)/dis12 ; sat_hydf(tconn_num) = hyd_face
+            st_hydr%area_dis(tconn_num) = reg_fare(i,6)/dis12
+            st_hydr%sat_hydf(tconn_num) = hyd_face
             if (st_out_type%velc > 0) then
-              conn_dis(tconn_num) = DONE/dis12
+              st_hydr%conn_dis(tconn_num) = DONE/dis12
             end if
 #endif
           end if
@@ -2380,20 +2409,20 @@ module set_condition
     integer(I4) :: i, j, k
     real(SP) :: cksxy
     !-------------------------------------------------------------------------------------------
-    allocate(abyd_well(well_index(wnum)))
+    allocate(st_hydr%abyd_well(st_bcnd%well_index(wnum)))
     !$omp parallel
     !$omp do private(i)
     do i = 1, wnum
-      abyd_well(i) = DZERO
+      st_hydr%abyd_well(i) = DZERO
     end do
     !$omp end do
 
     !$omp do private(i, j, k, cksxy)
     do i = 1, wnum
-      do k = well_index(i-1)+1, well_index(i)
-        j = well_conn(k)
+      do k = st_bcnd%well_index(i-1)+1, st_bcnd%well_index(i)
+        j = st_bcnd%well_conn(k)
         cksxy = (wksx(j)*wksy(j))**SHALF
-        abyd_well(k) = real(cksxy, kind=DP)*(cell_top(j)-cell_bot(j))
+        st_hydr%abyd_well(k) = real(cksxy, kind=DP)*(st_geom%cell_top(j)-st_geom%cell_bot(j))
       end do
     end do
     !$omp end do
@@ -2406,7 +2435,7 @@ module set_condition
   ! set_srabyd -- Set surface&recharge area and area by distance
   !*********************************************************************************************
     ! -- modules
-    use make_cell, only: cell_cent
+
     ! -- inout
     integer(I4), intent(in) :: surfn, surf2surf(:)
     real(DP), intent(in) :: bott_s(:), area_s(:)
@@ -2418,15 +2447,15 @@ module set_condition
     !$omp parallel do private(i, s, dis_s)
     do i = 1, surfn
       s = surf2surf(i)
-      dis_s = abs(bott_s(i) - cell_cent(s))
+      dis_s = abs(bott_s(i) - st_geom%cell_cent(s))
       abyd_surftemp(i) = abs(area_s(i))/dis_s
-      surf_area(s) = surf_area(s) - area_s(i)
-      rech_area(s) = rech_area(s) - area_s(i)
-      if (surf_area(s) < DZERO) then
-        surf_area(s) = DZERO
+      st_hydr%surf_area(s) = st_hydr%surf_area(s) - area_s(i)
+      st_hydr%rech_area(s) = st_hydr%rech_area(s) - area_s(i)
+      if (st_hydr%surf_area(s) < DZERO) then
+        st_hydr%surf_area(s) = DZERO
       end if
-      if (rech_area(s) < DZERO) then
-        rech_area(s) = DZERO
+      if (st_hydr%rech_area(s) < DZERO) then
+        st_hydr%rech_area(s) = DZERO
       end if
     end do
     !$omp end parallel do
@@ -2446,7 +2475,7 @@ module set_condition
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, ncals
-      abyd_surf(i) = surf_area(i)/surf_dis(i)
+      st_hydr%abyd_surf(i) = st_hydr%surf_area(i)/surf_dis(i)
     end do
     !$omp end parallel do
 

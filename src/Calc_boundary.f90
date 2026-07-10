@@ -1,21 +1,16 @@
 module calc_boundary
   ! -- modules
-  use kind_module, only: I4, SP, DP
+  use kind_module, only: I4, SP
   use constval_module, only: SZERO, DZERO
   use set_cell, only: ncals
-  use make_cell, only: surf_elev
-  use set_condition, only: set_bound2calc
-  use assign_boundary, only: read_rech, rech_cflag
+  use make_cell, only: st_geom
+  use set_condition, only: set_bound2calc, st_bcnd
+  use assign_boundary, only: st_forc
 
   implicit none
   private
   public :: calc_reprev, conv_rech2calc, count_rivecalc, count_lakecalc
   public :: calc_wlbd, calc_blld, calc_wlsl, calc_blsl, calc_lsurf, calc_rivea
-  integer(I4), allocatable, public :: rech2cals(:), rive2cals(:), lake2cals(:)
-  real(DP), allocatable, public :: calc_rech(:)
-  real(DP), allocatable, public :: rive_head(:), rive_bott(:), rive_area(:)
-  real(DP), allocatable, public :: lake_head(:), lake_bott(:), lake_area(:)
-
   ! -- local
 
   contains
@@ -28,7 +23,6 @@ module calc_boundary
     use constval_module, only: SNOVAL
     use initial_module, only: st_prec, st_evap
     use read_input, only: len_scal_inv
-    use assign_boundary, only: read_prec, read_evap
     ! -- inout
     integer(I4), intent(inout) :: rec_num
     ! -- local
@@ -38,19 +32,19 @@ module calc_boundary
     rec_num = 0 ; no_val = SNOVAL*len_scal_inv
     prec_noval = no_val*st_prec%uni_conv
     evap_noval = no_val*st_evap%uni_conv
-    allocate(rech_cflag(ncals), read_rech(ncals))
+    allocate(st_bcnd%rech_cflag(ncals), st_forc%read_rech(ncals))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncals
-      rech_cflag(i) = 0
-      read_rech(i) = SZERO
+      st_bcnd%rech_cflag(i) = 0
+      st_forc%read_rech(i) = SZERO
     end do
     !$omp end do
     !$omp do private(i) reduction(+:rec_num)
     do i = 1, ncals
-      if (read_prec(i) > prec_noval .and. read_evap(i) > evap_noval) then
-        read_rech(i) = read_prec(i) - read_evap(i)
-        rech_cflag(i) = 1 ; rec_num = rec_num + 1
+      if (st_forc%read_prec(i) > prec_noval .and. st_forc%read_evap(i) > evap_noval) then
+        st_forc%read_rech(i) = st_forc%read_prec(i) - st_forc%read_evap(i)
+        st_bcnd%rech_cflag(i) = 1 ; rec_num = rec_num + 1
       end if
     end do
     !$omp end do
@@ -69,19 +63,20 @@ module calc_boundary
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(rech2cals(rec_cnum), calc_rech(rec_cnum))
+    allocate(st_bcnd%rech2cals(rec_cnum), st_forc%calc_rech(rec_cnum))
     !$omp parallel do private(i)
     do i = 1, rec_cnum
-      rech2cals(i) = 0
-      calc_rech(i) = DZERO
+      st_bcnd%rech2cals(i) = 0
+      st_forc%calc_rech(i) = DZERO
     end do
     !$omp end parallel do
-    call set_bound2calc(ncals, rech_cflag, read_rech, rech2cals, calc_rech)
-    deallocate(read_rech, rech_cflag)
-    allocate(read_rech(rec_cnum))
+    call set_bound2calc(ncals, st_bcnd%rech_cflag, st_forc%read_rech, st_bcnd%rech2cals,&
+                        st_forc%calc_rech)
+    deallocate(st_forc%read_rech, st_bcnd%rech_cflag)
+    allocate(st_forc%read_rech(rec_cnum))
     !$omp parallel do private(i)
     do i = 1, rec_cnum
-      read_rech(i) = real(calc_rech(i), kind=SP)
+      st_forc%read_rech(i) = real(st_forc%calc_rech(i), kind=SP)
     end do
     !$omp end parallel do
 
@@ -196,7 +191,7 @@ module calc_boundary
     !$omp do private(i)
     do i = 1, ncals
       if (wd_flag(i) == 1) then
-        wl_calc(i) = real(surf_elev(i) + wd_calc(i), kind=SP)
+        wl_calc(i) = real(st_geom%surf_elev(i) + wd_calc(i), kind=SP)
         wl_flag(i) = 1
       end if
     end do
@@ -232,7 +227,7 @@ module calc_boundary
     !$omp do private(i)
     do i = 1, ncals
       if (de_flag(i) == 1) then
-        bl_calc(i) = real(surf_elev(i) - de_calc(i), kind=SP)
+        bl_calc(i) = real(st_geom%surf_elev(i) - de_calc(i), kind=SP)
         bl_flag(i) = 1
       end if
     end do
@@ -273,7 +268,7 @@ module calc_boundary
     !$omp do private(i)
     do i = 1, ncals
       if (in_flag(i) == 1) then
-        surf_out(i) = real(surf_elev(i), kind=SP)
+        surf_out(i) = real(st_geom%surf_elev(i), kind=SP)
         out_flag(i) = 1
       end if
     end do
@@ -361,23 +356,26 @@ module calc_boundary
     !$omp end do
     !$omp end parallel
 
-    allocate(rive2cals(riv_cnum))
+    allocate(st_bcnd%rive2cals(riv_cnum))
     !$omp parallel do private(i)
     do i = 1, riv_cnum
-      rive2cals(i) = 0
+      st_bcnd%rive2cals(i) = 0
     end do
     !$omp end parallel do
 
     if (riv_cnum > 0) then
-      allocate(rive_head(riv_cnum), rive_bott(riv_cnum), rive_area(riv_cnum))
+      allocate(st_forc%rive_head(riv_cnum), st_forc%rive_bott(riv_cnum),&
+               st_forc%rive_area(riv_cnum))
       !$omp parallel do private(i)
       do i = 1, riv_cnum
-        rive_head(i) = DZERO ; rive_bott(i) = DZERO ; rive_area(i) = DZERO
+        st_forc%rive_head(i) = DZERO
+        st_forc%rive_bott(i) = DZERO
+        st_forc%rive_area(i) = DZERO
       end do
       !$omp end parallel do
-      call set_bound2calc(ncals, rive_cflag, riv_wi, rive2cals, rive_head)
-      call set_bound2calc(ncals, rive_cflag, riv_bl, rive2cals, rive_bott)
-      call set_bound2calc(ncals, rive_cflag, riv_ar, rive2cals, rive_area)
+      call set_bound2calc(ncals, rive_cflag, riv_wi, st_bcnd%rive2cals, st_forc%rive_head)
+      call set_bound2calc(ncals, rive_cflag, riv_bl, st_bcnd%rive2cals, st_forc%rive_bott)
+      call set_bound2calc(ncals, rive_cflag, riv_ar, st_bcnd%rive2cals, st_forc%rive_area)
     end if
 
     deallocate(rive_cflag)
@@ -422,23 +420,26 @@ module calc_boundary
     !$omp end do
     !$omp end parallel
 
-    allocate(lake2cals(lak_cnum))
+    allocate(st_bcnd%lake2cals(lak_cnum))
     !$omp parallel do private(i)
     do i = 1, lak_cnum
-      lake2cals(i) = 0
+      st_bcnd%lake2cals(i) = 0
     end do
     !$omp end parallel do
 
     if (lak_cnum > 0) then
-      allocate(lake_head(lak_cnum), lake_bott(lak_cnum), lake_area(lak_cnum))
+      allocate(st_forc%lake_head(lak_cnum), st_forc%lake_bott(lak_cnum))
+      allocate(st_forc%lake_area(lak_cnum))
       !$omp parallel do private(i)
       do i = 1, lak_cnum
-        lake_head(i) = DZERO ; lake_bott(i) = DZERO ; lake_area(i) = DZERO
+        st_forc%lake_head(i) = DZERO
+        st_forc%lake_bott(i) = DZERO
+        st_forc%lake_area(i) = DZERO
       end do
       !$omp end parallel do
-      call set_bound2calc(ncals, lake_cflag, lak_wi, lake2cals, lake_head)
-      call set_bound2calc(ncals, lake_cflag, lak_bl, lake2cals, lake_bott)
-      call set_bound2calc(ncals, lake_cflag, lak_ar, lake2cals, lake_area)
+      call set_bound2calc(ncals, lake_cflag, lak_wi, st_bcnd%lake2cals, st_forc%lake_head)
+      call set_bound2calc(ncals, lake_cflag, lak_bl, st_bcnd%lake2cals, st_forc%lake_bott)
+      call set_bound2calc(ncals, lake_cflag, lak_ar, st_bcnd%lake2cals, st_forc%lake_area)
     end if
 
     deallocate(lake_cflag)

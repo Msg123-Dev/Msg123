@@ -1,10 +1,11 @@
 module read_input
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: SZERO, SONE, DNOVAL, CHALEN, TIMELEN
-  use utility_module, only: open_new_rtxt, close_file, write_logf, write_success,&
-                            write_err_stop, get_days
-  use initial_module, only: st_sim, st_in_type, st_in_path, st_in_unit, in_type, unit_list
+  use constval_module, only: CHALEN, TIMELEN, SZERO, SONE, DNOVAL
+  use utility_module, only: get_days, open_new_rtxt, close_file, write_logf, write_success,&
+                            write_err_stop
+  use initial_module, only: st_sim, st_ctrl, st_in_type, st_in_path, st_in_unit, unit_list,&
+                            in_type
 
   implicit none
   private
@@ -189,8 +190,7 @@ module read_input
   ! read_calc_time_list -- Read calculation time name list
   !*********************************************************************************************
     ! -- modules
-    use utility_module, only: conv_unit
-    use initial_module, only: my_rank
+    use utility_module, only: st_mpi, conv_unit
     ! -- inout
 
     ! -- local
@@ -211,7 +211,7 @@ module read_input
       call write_err_stop("Specify calculation time unit in main file.")
     else
       ! -- Convert unit (unit)
-        call conv_unit(my_rank, calc_unit, "main file", sdate, calc_multi)
+        call conv_unit(st_mpi%rank, calc_unit, "main file", sdate, calc_multi)
       if (st_sim%sim_type == 0) then
         end_time = end_time*calc_multi
       else if (st_sim%sim_type == 1) then
@@ -233,7 +233,7 @@ module read_input
   ! read_calc_reg_list -- Read calculation region name list
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: noclas_flag
+
     ! -- inout
 
     ! -- local
@@ -257,7 +257,7 @@ module read_input
         call read_clas_file(clas_fnum)
     else
       call write_logf("Set not to use classification file.")
-      noclas_flag = 1
+      st_ctrl%noclas_flag = 1
       if (calc_type == in_type(1)) then
         call write_err_stop("Set to use classification file in calc_type.")
       end if
@@ -347,41 +347,48 @@ module read_input
   ! read_sol_list -- Read solution name list
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: tstep_type, maxout_iter, picard_iter, criteria, maxinn_iter,&
-                              precon_type, nlevel
+
     ! -- inout
 
     ! -- local
     integer(I4) :: ierr
     real(SP) :: init_step, incr_multi, decr_multi, max_tstep
+    integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type
+    real(DP) :: criteria
     namelist/set_solution/init_step, tstep_type, incr_multi, decr_multi, max_tstep,&
                           maxout_iter, picard_iter, criteria, maxinn_iter, precon_type
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; init_step = SZERO ; incr_multi = SZERO ; decr_multi = SZERO ; max_tstep = SZERO
+    tstep_type = st_ctrl%tstep_type ; maxout_iter = st_ctrl%maxout_iter
+    picard_iter = st_ctrl%picard_iter ; maxinn_iter = st_ctrl%maxinn_iter
+    precon_type = st_ctrl%precon_type ; criteria = st_ctrl%criteria
     read(unit=main_fnum,nml=set_solution,iostat=ierr)
+    st_ctrl%tstep_type = tstep_type ; st_ctrl%maxout_iter = maxout_iter
+    st_ctrl%picard_iter = picard_iter ; st_ctrl%maxinn_iter = maxinn_iter
+    st_ctrl%precon_type = precon_type ; st_ctrl%criteria = criteria
 
     if (ierr /= 0) then
       call write_err_stop("While reading solution section in main file.")
-    else if (maxout_iter <= 0) then
+    else if (st_ctrl%maxout_iter <= 0) then
       call write_err_stop("Input a positive value for maximum number of outer iteration.")
-    else if (maxinn_iter <= 0) then
+    else if (st_ctrl%maxinn_iter <= 0) then
       call write_err_stop("Input a positive value for maximum number of inner iteration.")
-    else if (picard_iter < -1) then
+    else if (st_ctrl%picard_iter < -1) then
       call write_err_stop("Input a larger than -1 value for Picard iteration.")
-    else if (tstep_type < 0) then
+    else if (st_ctrl%tstep_type < 0) then
       call write_err_stop("Input a non-negative value for time step type.")
-    else if (tstep_type > 2) then
+    else if (st_ctrl%tstep_type > 2) then
       call write_err_stop("Input a valid value for time step type.")
-    else if (precon_type < 0) then
+    else if (st_ctrl%precon_type < 0) then
       call write_err_stop("Input a non-negative value for preconditoner type.")
-    else if (precon_type > 1) then
+    else if (st_ctrl%precon_type > 1) then
       call write_err_stop("Input a valid value for preconditoner type.")
-    else if (maxout_iter < picard_iter) then
+    else if (st_ctrl%maxout_iter < st_ctrl%picard_iter) then
       call write_err_stop("Picard iteration is larger than maximum number of outer iteration.")
     end if
 
-    nlevel = 1
-    if (precon_type /= 0 .and. precon_type /= 1) then
+    st_ctrl%nlevel = 1
+    if (st_ctrl%precon_type /= 0 .and. st_ctrl%precon_type /= 1) then
       call write_err_stop("Input a valid value for preconditoner type.")
     end if
 
@@ -390,7 +397,7 @@ module read_input
     st_sim%inc_fact = incr_multi
     st_sim%dec_fact = decr_multi
 
-    if (precon_type == 1) then
+    if (st_ctrl%precon_type == 1) then
       call read_amg_parm(main_fnum)
     end if
 
@@ -401,15 +408,23 @@ module read_input
   ! read_amg_parm -- Read amg parameter
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: amg_nlevel, maxvcy_iter, max_sweep, jac_omega, amg_theta
+
     ! -- inout
     integer(I4), intent(in) :: file_num
     ! -- local
     integer(I4) :: ierr
+    integer(I4) :: amg_nlevel, maxvcy_iter, max_sweep
+    real(SP) :: jac_omega, amg_theta
     namelist/set_amg/amg_nlevel, maxvcy_iter, max_sweep, jac_omega, amg_theta
     !-------------------------------------------------------------------------------------------
     ierr = 0
+    amg_nlevel = st_ctrl%amg_nlevel ; maxvcy_iter = st_ctrl%maxvcy_iter
+    max_sweep = st_ctrl%max_sweep ; jac_omega = st_ctrl%jac_omega
+    amg_theta = st_ctrl%amg_theta
     read(unit=file_num,nml=set_amg,iostat=ierr)
+    st_ctrl%amg_nlevel = amg_nlevel ; st_ctrl%maxvcy_iter = maxvcy_iter
+    st_ctrl%max_sweep = max_sweep ; st_ctrl%jac_omega = jac_omega
+    st_ctrl%amg_theta = amg_theta
     if (ierr /= 0) then
       call write_err_stop("While reading amg section in main file.")
     end if
@@ -1316,7 +1331,7 @@ module read_input
   ! set_output -- Set output
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: out_type, st_out_type, st_out_path, st_out_unit, st_out_time
+    use initial_module, only: st_out_type, st_out_path, st_out_unit, st_out_time, out_type
     ! -- inout
     integer(I4), intent(in) :: outv_num
     character(*), intent(in) :: vari_name(:)

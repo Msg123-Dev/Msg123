@@ -2,13 +2,11 @@ module mpi_solve
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO
-  use mpi_initfin, only: my_comm
-  use utility_module, only: write_err_stop
-  use initial_module, only: my_rank, pro_totn
-  use set_cell, only: ncalc, neib_mpi_totn, neib_num, send_cind, recv_cind, send_citem,&
-                      recv_citem
-  use allocate_solution, only: nreg_num, crs_index, dir_conn, left_offr
+  use utility_module, only: st_mpi, write_err_stop
   use mpi_utility, only: mpisum_val
+  use set_cell, only: ncalc, neib_mpi_totn, send_cind, recv_cind, send_citem, recv_citem,&
+                      neib_num
+  use allocate_solution, only: dir_conn, left_offr, nreg_num, crs_index
   use mpi
 
   implicit none
@@ -72,7 +70,7 @@ module mpi_solve
       buflen_send = isend_end - isend_sta + 1
       if (buflen_send /= 0) then
         call MPI_ISEND(sbufint(isend_sta), buflen_send, MPI_INTEGER, neib_num(i), 0,&
-                       my_comm, requ_send(i), ierr)
+                       st_mpi%comm, requ_send(i), ierr)
       end if
     end do
     do i = 1, neib_mpi_totn
@@ -81,7 +79,7 @@ module mpi_solve
       buflen_recv = irecv_end - irecv_sta + 1
       if (buflen_recv /= 0) then
         call MPI_IRECV(rbufint(irecv_sta), buflen_recv, MPI_INTEGER, neib_num(i), 0,&
-                       my_comm, requ_recv(i), ierr)
+                       st_mpi%comm, requ_recv(i), ierr)
       end if
     end do
     call MPI_WAITALL(neib_mpi_totn, requ_recv, stat_r, ierr)
@@ -153,7 +151,7 @@ module mpi_solve
       buflen_send = isend_end - isend_sta + 1
       if (buflen_send /= 0) then
         call MPI_ISEND(sbufreal(isend_sta), buflen_send, MPI_REAL8, neib_num(i), 0,&
-                       my_comm, requ_send(i), ierr)
+                       st_mpi%comm, requ_send(i), ierr)
       end if
     end do
     do i = 1, neib_mpi_totn
@@ -162,7 +160,7 @@ module mpi_solve
       buflen_recv = irecv_end - irecv_sta + 1
       if (buflen_recv /= 0) then
         call MPI_IRECV(rbufreal(irecv_sta), buflen_recv, MPI_REAL8, neib_num(i), 0,&
-                       my_comm, requ_recv(i), ierr)
+                       st_mpi%comm, requ_recv(i), ierr)
       end if
     end do
     call MPI_WAITALL(neib_mpi_totn, requ_recv, stat_r, ierr)
@@ -223,7 +221,7 @@ module mpi_solve
     !$omp end do
     !$omp end parallel
     rank_flag = 0 ; allp_flag = 0
-    prefix_loop: do while (allp_flag /= pro_totn)
+    prefix_loop: do while (allp_flag /= st_mpi%totn)
       do i = 1, ncalc
         if (fix_flag(i) == 0) then
           off_sta = crs_index(1)%offind(i-1) + 1
@@ -307,7 +305,7 @@ module mpi_solve
     !$omp end do
     !$omp end parallel
     rank_flag = 0 ; allp_flag = 0
-    forwfix_loop: do while (allp_flag /= pro_totn)
+    forwfix_loop: do while (allp_flag /= st_mpi%totn)
       do i = 1, ncalc
         if (fix_flag(i) == 0) then
           off_sta = crs_index(1)%offind(i-1) + 1
@@ -351,7 +349,7 @@ module mpi_solve
     !$omp end do
     !$omp end parallel
     rank_flag = 0 ; allp_flag = 0
-    backfix_loop: do while (allp_flag /= pro_totn)
+    backfix_loop: do while (allp_flag /= st_mpi%totn)
       do i = ncalc, 1, -1
         if (fix_flag(i) == 0) then
           off_sta = crs_index(1)%offind(i-1) + 1
@@ -410,23 +408,23 @@ module mpi_solve
 
     pnum = 0 ; wrank = 0
     if (abs(change) == abs_max_ch) then
-      pnum = my_rank
+      pnum = st_mpi%rank
       max_ch = change
     else
       max_ch = DNOVAL
     end if
 
     ierr = 0
-    call MPI_ALLREDUCE(pnum, wrank, 1, MPI_INTEGER, MPI_MAX, my_comm, ierr)
+    call MPI_ALLREDUCE(pnum, wrank, 1, MPI_INTEGER, MPI_MAX, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Allreduce absolute change process.")
       end if
     end if
 
-    call MPI_BCAST(max_ch, 1, MPI_REAL8, wrank, my_comm, ierr)
+    call MPI_BCAST(max_ch, 1, MPI_REAL8, wrank, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Broadcast absolute change value.")
       end if
     end if
@@ -449,56 +447,56 @@ module mpi_solve
     !-------------------------------------------------------------------------------------------
     pnum = 0 ; wrank = 0
     if (len_trim(adjustl(cval)) /= 0) then
-      pnum = my_rank
+      pnum = st_mpi%rank
     end if
 
     ierr = 0
-    call MPI_ALLREDUCE(pnum, wrank, 1, MPI_INTEGER, MPI_MAX, my_comm, ierr)
+    call MPI_ALLREDUCE(pnum, wrank, 1, MPI_INTEGER, MPI_MAX, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Allreduce max absolute change process.")
       end if
     end if
 
     str_len = len_trim(cval)
-    call MPI_BCAST(str_len, 1, MPI_INTEGER, wrank, my_comm, ierr)
+    call MPI_BCAST(str_len, 1, MPI_INTEGER, wrank, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Broadcast absolute change grid length information.")
       end if
     end if
 
-    call MPI_BCAST(cval, str_len, MPI_CHARACTER, wrank, my_comm, ierr)
+    call MPI_BCAST(cval, str_len, MPI_CHARACTER, wrank, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Broadcast absolute change grid information.")
       end if
     end if
 
-    call MPI_BCAST(cdmat, 1, MPI_REAL8, wrank, my_comm, ierr)
+    call MPI_BCAST(cdmat, 1, MPI_REAL8, wrank, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Broadcast absolute change diagonal information.")
       end if
     end if
 
-    call MPI_BCAST(crhs, 1, MPI_REAL8, wrank, my_comm, ierr)
+    call MPI_BCAST(crhs, 1, MPI_REAL8, wrank, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Broadcast absolute change right hand information.")
       end if
     end if
 
-    call MPI_BCAST(chead, 1, MPI_REAL8, wrank, my_comm, ierr)
+    call MPI_BCAST(chead, 1, MPI_REAL8, wrank, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Broadcast absolute change maximun value information.")
       end if
     end if
 
-    call MPI_BCAST(vmax, 1, MPI_REAL8, wrank, my_comm, ierr)
+    call MPI_BCAST(vmax, 1, MPI_REAL8, wrank, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Broadcast absolute change unknown value information.")
       end if
     end if

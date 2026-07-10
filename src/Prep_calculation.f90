@@ -2,21 +2,19 @@ module prep_calculation
   ! -- modules
   use kind_module, only: I4, SP, DP
   use constval_module, only: DZERO
+  use types_module, only: time_set
+  use utility_module, only: st_mpi
   use initial_module, only: st_in_type, st_in_path, in_type
   use set_cell, only: ncalc
+  use set_condition, only: st_hydr
 #ifdef MPI_MSG
-  use initial_module, only: pro_totn
   use mpi_set, only: cals_r4view, calc_r4view
 #endif
 
   implicit none
   private
   public :: prepare_calc
-  integer(I4), public :: now_date(6), out_iter, form_switch
-  real(SP), public :: current_t, inter_time
-  real(DP), public :: delt, delt_inv
-  real(DP), allocatable, public :: surf_top(:)
-  logical, public :: conv_flag
+  type(time_set), public :: st_time
 
   ! -- local
 
@@ -28,7 +26,7 @@ module prep_calculation
   !*********************************************************************************************
     ! -- modules
     use constval_module, only: SZERO, DONE, MACHI_EPS
-    use initial_module, only: newper, newper_inv, st_sim
+    use initial_module, only: st_sim, st_ctrl
     use read_input, only: len_scal_inv
     use check_condition, only: check_outf_cond
 #ifdef MPI_MSG
@@ -43,7 +41,7 @@ module prep_calculation
       call set_grid_info()
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast calculation file type (calc_ftype)
         call bcast_calc_ftype()
       ! -- Bcast simulation value (sim_val)
@@ -67,7 +65,7 @@ module prep_calculation
       call set_mass_info()
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast output file type (out_type)
         call bcast_out_type()
     end if
@@ -76,10 +74,10 @@ module prep_calculation
     ! -- Check output file condition (outf_cond)
       call check_outf_cond()
 
-    current_t = SZERO ; delt = DZERO ; delt_inv = DZERO
-    newper = MACHI_EPS*len_scal_inv ; newper_inv = DONE/newper
-    now_date(:) = st_sim%sta_date(:) ; out_iter = 0 ; form_switch = 0
-    conv_flag = .false.
+    st_time%current_t = SZERO ; st_time%delt = DZERO ; st_time%delt_inv = DZERO
+    st_ctrl%newper = MACHI_EPS*len_scal_inv ; st_ctrl%newper_inv = DONE/st_ctrl%newper
+    st_time%now_date(:) = st_sim%sta_date(:) ; st_time%out_iter = 0 ; st_time%form_switch = 0
+    st_time%conv_flag = .false.
 
   end subroutine prepare_calc
 
@@ -88,7 +86,6 @@ module prep_calculation
   ! set_grid_info -- Set grid information
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: my_rank
     use initial_module, only: st_grid
     use read_input, only: read_grid_file
     use make_cell, only: make_cell_info
@@ -97,7 +94,7 @@ module prep_calculation
     ! -- local
     integer(I4) :: nx, ny, nz
     !-------------------------------------------------------------------------------------------
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       nx = st_grid%nx ; ny = st_grid%ny ; nz = st_grid%nz
       ! -- Read grid file (grid_file)
         call read_grid_file(st_grid%fnum, nx, ny, nz, st_in_type%grid)
@@ -115,7 +112,7 @@ module prep_calculation
     ! -- modules
     use open_file, only: open_in_retnf
     use check_condition, only: check_calc_retn
-    use assign_calc, only: assign_retnv, read_reta, read_retn, read_resi
+    use assign_calc, only: assign_retnv
     ! -- inout
 
     ! -- local
@@ -132,7 +129,7 @@ module prep_calculation
       call assign_retnv(st_in_type%retn)
 
     ! -- Check calculation retention value (calc_retn)
-      call check_calc_retn(ncalc, read_reta, read_retn, read_resi)
+      call check_calc_retn(ncalc, st_hydr%read_vana, st_hydr%read_vann, st_hydr%read_resi)
 
   end subroutine set_retn_info
 
@@ -143,7 +140,7 @@ module prep_calculation
     ! -- modules
     use open_file, only: open_in_parmf
     use check_condition, only: check_calc_parm
-    use assign_calc, only: assign_parmv, read_ksx, read_ksy, read_ksz, read_ss, read_poro
+    use assign_calc, only: assign_parmv
     ! -- inout
 
     ! -- local
@@ -160,7 +157,8 @@ module prep_calculation
       call assign_parmv(st_in_type%parm)
 
     ! -- Check calculation parameter value (calc_para)
-      call check_calc_parm(ncalc, read_ksx, read_ksy, read_ksz, read_ss, read_poro)
+      call check_calc_parm(ncalc, st_hydr%read_hydx, st_hydr%read_hydy, st_hydr%read_hydz,&
+                           st_hydr%read_spst, st_hydr%read_pors)
 
   end subroutine set_parm_info
 
@@ -170,20 +168,20 @@ module prep_calculation
   !*********************************************************************************************
     ! -- modules
     use open_file, only: open_in_geogf
-    use make_cell, only: surf_elev
     use set_cell, only: ncals
-    use assign_calc, only: assign_geogv, surf_bott, surf_reli, geog_num
+    use make_cell, only: st_geom
+    use assign_calc, only: assign_geogv, geog_num
     ! -- inout
 
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(surf_bott(ncals), surf_top(ncals), surf_reli(ncals))
+    allocate(st_hydr%surf_bott(ncals), st_hydr%surf_top(ncals), st_hydr%surf_reli(ncals))
     !$omp parallel do private(i)
     do i = 1, ncals
-      surf_bott(i) = surf_elev(i)
-      surf_top(i) = surf_elev(i)
-      surf_reli(i) = DZERO
+      st_hydr%surf_bott(i) = st_geom%surf_elev(i)
+      st_hydr%surf_top(i) = st_geom%surf_elev(i)
+      st_hydr%surf_reli(i) = DZERO
     end do
     !$omp end parallel do
 
@@ -202,7 +200,7 @@ module prep_calculation
     if (geog_num /= 0) then
       !$omp parallel do private(i)
       do i = 1, ncals
-        surf_top(i) = surf_bott(i) + surf_reli(i)
+        st_hydr%surf_top(i) = st_hydr%surf_bott(i) + st_hydr%surf_reli(i)
       end do
       !$omp end parallel do
     end if
@@ -217,7 +215,7 @@ module prep_calculation
     use initial_module, only: st_in_unit
     use open_file, only: open_in_initf
     use check_condition, only: check_calc_init
-    use assign_calc, only: assign_initv, read_init
+    use assign_calc, only: assign_initv
 #ifdef MPI_MSG
 !    use mpi_utility, only: bcast_path_unit
     use mpi_utility, only: bcast_file
@@ -232,7 +230,7 @@ module prep_calculation
     !-------------------------------------------------------------------------------------------
     if (st_in_type%init /= in_type(7)) then
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast file (file)
           call bcast_file(st_in_path%init, st_in_unit%init, "initial")
       end if
@@ -268,7 +266,7 @@ module prep_calculation
       call assign_initv(st_in_type%init, st_in_unit%init)
 
     ! -- Check calculation initial value (calc_init)
-      call check_calc_init(ncalc, read_init)
+      call check_calc_init(ncalc, st_hydr%read_init)
 
   end subroutine set_init_info
 
@@ -296,7 +294,7 @@ module prep_calculation
 
     if (any(mass_mask)) then
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast file (file)
           call bcast_file(st_in_path%mass, "input massbalance")
       end if

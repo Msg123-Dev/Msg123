@@ -1,16 +1,16 @@
 module open_file
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: SZERO, SINFI, HOURSEC, CHALEN, TIMELEN
-  use utility_module, only: conv_unit, close_file, open_new_rtxt, open_new_rbin,&
-                            open_new_wtxt, write_err_stop, write_success, write_logf
-  use initial_module, only: st_sim, st_grid, st_step_flag, pro_totn, my_rank, in_type
+  use constval_module, only: CHALEN, TIMELEN, HOURSEC, SZERO, SINFI
+  use utility_module, only: st_mpi, open_new_rtxt, open_new_rbin, open_new_wtxt,&
+                            close_file, write_logf, write_success, write_err_stop, conv_unit
+  use initial_module, only: st_sim, st_grid, st_step_flag, in_type
   use read_module, only: skip_file, skip_file_int
 #ifdef MPI_MSG
-  use mpi_utility, only: bcast_val, bcast_file, bcast_extr_set
   use utility_module, only: log_fnum
-  use mpi_read, only: open_mpi_read_file, set_real4_fview, set_int4_fview,&
-                      skip_mpi_file, skip_mpi_file_int
+  use mpi_utility, only: bcast_val, bcast_file, bcast_extr_set
+  use mpi_read, only: open_mpi_read_file, set_int4_fview, set_real4_fview, skip_mpi_file,&
+                      skip_mpi_file_int
 #endif
 
   implicit none
@@ -21,11 +21,11 @@ module open_file
   public :: open_out_convf, open_out_binf, open_out_massf
   integer(I4), public :: wells_fnum, welle_fnum, inmas_fnum
 
-  type, public :: st_intf
+  type, public :: intf_set
     integer(I4) :: type, fnum
     real(SP) :: step
-  end type st_intf
-  type(st_intf), public :: st_intse, st_intre, st_intwe, st_intpr, st_intev
+  end type intf_set
+  type(intf_set), public :: st_intse, st_intre, st_intwe, st_intpr, st_intev
 
   ! -- local
 
@@ -53,7 +53,7 @@ module open_file
     namelist/inretn_path/in_vapath, in_vnpath, in_repath
     !-------------------------------------------------------------------------------------------
     in_vapath = "" ; in_vnpath = "" ; in_repath = ""
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       ! -- Open new read text file (new_rtxt)
         call open_new_rtxt(1, 1, retn_path, "input retention", st_retn%fnum)
       if (retn_type == in_type(0)) then
@@ -89,7 +89,7 @@ module open_file
     mess_resi = "input residual water content"
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast scalar value (val)
         call bcast_val(st_retn%totn, "retention number")
       if (retn_type == in_type(0)) then
@@ -126,13 +126,13 @@ module open_file
         end select
 
         if (retn_ftype(i) == in_type(3) .or. retn_ftype(i) == in_type(5)) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             ! -- Open new read text file (new_rtxt)
               call open_new_rtxt(1, 1, path_retn, mess_retn, retn_num)
           end if
 
 #ifdef MPI_MSG
-          if (pro_totn /= 1) then
+          if (st_mpi%totn /= 1) then
             ! -- Bcast scalar value (val)
               call bcast_val(retn_num, "retention file number")
           end if
@@ -187,7 +187,7 @@ module open_file
     namelist/inparm_path/in_kxpath, in_kypath, in_kzpath, in_sspath, in_tspath
     !-------------------------------------------------------------------------------------------
     in_kxpath = "" ; in_kypath = "" ; in_kzpath = "" ; in_sspath = "" ; in_tspath = ""
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       ! -- Open new read text file (new_rtxt)
         call open_new_rtxt(1, 1, parm_path, "input parameter", st_parm%fnum)
       if (parm_type == in_type(0)) then
@@ -225,7 +225,7 @@ module open_file
     mess_ts = "input porosity"
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast scalar value (val)
         call bcast_val(st_parm%totn, "parameter number")
       if (parm_type == in_type(0)) then
@@ -274,13 +274,13 @@ module open_file
         end select
 
         if (parm_ftype(i) == in_type(3) .or. parm_ftype(i) == in_type(5)) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             ! -- Open new read text file (new_rtxt)
               call open_new_rtxt(1, 1, path_parm, mess_parm, parm_num)
           end if
 
 #ifdef MPI_MSG
-          if (pro_totn /= 1) then
+          if (st_mpi%totn /= 1) then
             ! -- Bcast scalar value (val)
               call bcast_val(parm_num, "parameter file number")
           end if
@@ -338,7 +338,7 @@ module open_file
     namelist/ingeog_path/in_gzpath, in_grpath, in_gapath
     !-------------------------------------------------------------------------------------------
     in_gzpath = "" ; in_grpath = "" ;  in_gapath = ""
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       ! -- Open new read text file (new_rtxt)
         call open_new_rtxt(1, 1, geog_path, "input geography", geog_num)
 
@@ -364,7 +364,7 @@ module open_file
     mess_geoa = "input geography parameter"
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast file (file)
         call bcast_file(geoz_type, in_gzpath, mess_geoz)
         call bcast_file(geor_type, in_grpath, mess_geor)
@@ -395,13 +395,13 @@ module open_file
       end select
 
       if (geog_ftype(i) == in_type(3)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           ! -- Open new read text file (new_rtxt)
             call open_new_rtxt(1, 1, path_geog, mess_geog, geog_num)
         end if
 
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Bcast scalar value (val)
             call bcast_val(geog_num, "geography file number")
         end if
@@ -460,7 +460,7 @@ module open_file
     allocate(character(0) :: err_mes)
     err_mes = "input initial"
     if (any(init_mask)) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, init_path, err_mes, st_init%fnum)
       end if
@@ -483,7 +483,7 @@ module open_file
       st_init%multi = st_sim%cal_fact
     else
       ! -- Convert unit (unit)
-        call conv_unit(my_rank, init_unit, err_mes, st_sim%sta_date, st_init%multi)
+        call conv_unit(st_mpi%rank, init_unit, err_mes, st_sim%sta_date, st_init%multi)
     end if
 
     deallocate(txt_init_type)
@@ -527,7 +527,7 @@ module open_file
     st_intse%fnum = 0 ; st_intse%type = 0 ; st_intse%step = SZERO
 
     if (any(txt_seal_mask) .or. seal_type == in_type(1) .or. seal_type == in_type(2)) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, seal_path, "input "//vname, st_seal%fnum)
       end if
@@ -544,7 +544,7 @@ module open_file
     else if (seal_type == in_type(7)) then
       allocate(character(0) :: err_mes)
       err_mes = vname//" time interval"
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, seal_path, "input "//vname, intse_fnum)
         read(unit=intse_fnum,fmt=*,iostat=ierr) intse_type, intse_step, intse_end
@@ -558,7 +558,7 @@ module open_file
         st_intse%fnum = intse_fnum
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast extra setting (extr_set)
           call bcast_extr_set(intse_type, intse_step, intse_end, intsep, err_mes)
       end if
@@ -566,7 +566,7 @@ module open_file
       txt_seal_mask(:) = (intse_type == txt_seal_type(:))
       bin_seal_mask(:) = (intse_type == bin_seal_type(:))
       if (any(txt_seal_mask)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           ! -- Open new read text file (new_rtxt)
             call open_new_rtxt(1, 1, trim(adjustl(intsep)), "input "//err_mes, st_seal%fnum)
         end if
@@ -581,7 +581,7 @@ module open_file
           call open_new_rbin(1, 1, trim(adjustl(intsep)), "input "//err_mes, st_seal%fnum)
 #endif
       else
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call write_err_stop("Specified wrong number in "//err_mes//" file.")
         end if
       end if
@@ -590,25 +590,25 @@ module open_file
     end if
 
     if (len_trim(adjustl(seal_unit)) == 0) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_logf("Not specified "//vname//" time unit. Simulation time unit is used")
       end if
       st_seal%multi = SINFI ; st_seal%etime = SINFI
     else
       ! -- Convert unit (unit)
-        call conv_unit(my_rank, seal_unit, "input "//vname, st_sim%sta_date, st_seal%multi)
+        call conv_unit(st_mpi%rank, seal_unit, "input "//vname, st_sim%sta_date, st_seal%multi)
     end if
 
     st_seal%totn = st_grid%nxyz
 
     if (st_seal%multi /= SINFI) then
       if (any(txt_seal_mask) .or. seal_type == in_type(1) .or. seal_type == in_type(2)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call skip_file(seal_type, st_seal%fnum, vname, st_seal%multi, st_seal%totn,&
                          st_seal%etime)
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Bcast scalar value (val)
             call bcast_val(st_seal%totn, "sea level number")
         end if
@@ -624,11 +624,11 @@ module open_file
       else if (seal_type == in_type(7)) then
 #ifdef MPI_MSG
         if (any(txt_seal_mask)) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             call skip_file_int(intse_type, intse_fnum, st_seal%fnum, vname, st_seal%multi,&
                                intse_step, intse_end, st_seal%etime)
           end if
-          if (pro_totn /= 1) then
+          if (st_mpi%totn /= 1) then
             ! -- Bcast scalar value (val)
               call bcast_val(st_seal%fnum, vname//" file number")
           end if
@@ -642,21 +642,21 @@ module open_file
 #endif
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast scalar value (val)
           call bcast_val(st_seal%etime, vname//" end time value")
       end if
 #endif
     else
       if (seal_type == in_type(1) .or. seal_type == in_type(2)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           read(unit=st_seal%fnum,fmt=*,iostat=ierr) st_seal%totn
           if (ierr /= 0) then
             call write_err_stop("While reading the total number in "//vname//" file.")
           end if
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Bcast scalar value (val)
             call bcast_val(st_seal%totn, vname//" total number")
         end if
@@ -703,7 +703,7 @@ module open_file
     st_intre%fnum = 0 ; st_intre%type = 0 ; st_intre%step = SZERO
 
     if (rech_type == in_type(1) .or. rech_type == in_type(3)) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, rech_path, "input "//vname, st_rech%fnum)
       end if
@@ -720,7 +720,7 @@ module open_file
     else if (rech_type == in_type(7)) then
       allocate(character(0) :: err_mes)
       intre_type = 0 ; err_mes = vname//" time interval"
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, rech_path, "input "//vname, intre_fnum)
         read(unit=intre_fnum,fmt=*,iostat=ierr) intre_type, intre_step, intre_end
@@ -734,13 +734,13 @@ module open_file
         st_intre%fnum = intre_fnum
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast extra setting (extr_set)
           call bcast_extr_set(intre_type, intre_step, intre_end, intrep, err_mes)
       end if
 #endif
       if (intre_type == in_type(3)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           ! -- Open new read text file (new_rtxt)
             call open_new_rtxt(1, 1, trim(adjustl(intrep)), "input "//err_mes, st_rech%fnum)
         end if
@@ -755,7 +755,7 @@ module open_file
           call open_new_rbin(1, 1, trim(adjustl(intrep)), "input "//err_mes, st_rech%fnum)
 #endif
       else
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call write_err_stop("Specified wrong number in "//err_mes//" file.")
         end if
       end if
@@ -766,25 +766,25 @@ module open_file
     st_rech%uni_conv = 1.0E-3_SP/HOURSEC
 
     if (len_trim(adjustl(rech_unit)) == 0) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_logf("Not specified "//vname//" time unit. Simulation time unit is used")
       end if
       st_rech%multi = SINFI ; st_rech%etime = SINFI
     else
       ! -- Convert unit (unit)
-        call conv_unit(my_rank, rech_unit, "input "//vname, st_sim%sta_date, st_rech%multi)
+        call conv_unit(st_mpi%rank, rech_unit, "input "//vname, st_sim%sta_date, st_rech%multi)
     end if
 
     st_rech%totn = st_grid%nx*st_grid%ny
 
     if (st_rech%multi /= SINFI) then
       if (rech_type == in_type(1) .or. rech_type == in_type(3)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call skip_file(rech_type, st_rech%fnum, vname, st_rech%multi, st_rech%totn,&
                          st_rech%etime)
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Bcast scalar value (val)
             call bcast_val(st_rech%totn, vname//" total number")
         end if
@@ -801,11 +801,11 @@ module open_file
       else if (rech_type == in_type(7)) then
 #ifdef MPI_MSG
         if (intre_type == in_type(3)) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             call skip_file_int(intre_type, intre_fnum, st_rech%fnum, vname, st_rech%multi,&
                                intre_step, intre_end, st_rech%etime)
           end if
-          if (pro_totn /= 1) then
+          if (st_mpi%totn /= 1) then
             ! -- Bcast scalar value (val)
               call bcast_val(st_rech%fnum, vname//" file number")
           end if
@@ -819,14 +819,14 @@ module open_file
 #endif
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast scalar value (val)
           call bcast_val(st_rech%etime, vname//" end time value")
       end if
 #endif
     else
       if (rech_type == in_type(1)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           read(unit=st_rech%fnum,fmt=*,iostat=ierr) st_rech%totn
           if (ierr /= 0) then
             call write_err_stop("While reading the total number in "//vname//" file.")
@@ -854,7 +854,7 @@ module open_file
   ! open_in_wellf -- Open input well file
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: SONE, DAYSEC
+    use constval_module, only: DAYSEC, SONE
     use initial_module, only: st_well
     ! -- inout
     integer(I4), intent(in) :: well_type
@@ -886,7 +886,7 @@ module open_file
     st_intwe%fnum = 0 ; st_intwe%type = 0 ; st_intwe%step = SZERO
 
     if (any(txt_well_mask) .or. well_type == in_type(2)) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, well_path, "input "//vname, st_well%fnum)
       end if
@@ -903,7 +903,7 @@ module open_file
     else if (well_type == in_type(7)) then
       allocate(character(0) :: err_mes)
       err_mes = vname//" time interval"
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, well_path, "input "//vname, intwe_fnum)
         read(unit=intwe_fnum,fmt=*,iostat=ierr) intwe_type, intwe_step, intwe_end
@@ -917,7 +917,7 @@ module open_file
         st_intwe%fnum = intwe_fnum
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast extra setting (extr_set)
           call bcast_extr_set(intwe_type, intwe_step, intwe_end, intwep, err_mes)
       end if
@@ -925,7 +925,7 @@ module open_file
       txt_well_mask(:) = (txt_well_type(:) /= intwe_type)
       bin_well_mask(:) = (bin_well_type(:) /= intwe_type)
       if (any(txt_well_mask)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           ! -- Open new read text file (new_rtxt)
             call open_new_rtxt(1, 1, trim(adjustl(intwep)), "input "//err_mes, st_well%fnum)
         end if
@@ -940,7 +940,7 @@ module open_file
           call open_new_rbin(1, 1, trim(adjustl(intwep)), "input "//err_mes, st_well%fnum)
 #endif
       else
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call write_err_stop("Specified wrong number in "//err_mes//" file.")
         end if
       end if
@@ -951,25 +951,25 @@ module open_file
     st_well%uni_conv = SONE/DAYSEC
 
     if (len_trim(adjustl(well_unit)) == 0) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_logf("Not specified "//vname//" time unit. Simulation time unit is used")
       end if
       st_well%multi = SINFI ; st_well%etime = SINFI
     else
       ! -- Convert unit (unit)
-        call conv_unit(my_rank, well_unit, "input "//vname, st_sim%sta_date, st_well%multi)
+        call conv_unit(st_mpi%rank, well_unit, "input "//vname, st_sim%sta_date, st_well%multi)
     end if
 
     st_well%totn = st_grid%nxyz
 
     if (st_well%multi /= SINFI) then
       if (any(txt_well_mask) .or. well_type == in_type(2)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call skip_file(well_type, st_well%fnum, vname, st_well%multi, st_well%totn,&
                          st_well%etime)
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Bcast scalar value (val)
             call bcast_val(st_well%totn, vname//" total number")
         end if
@@ -985,11 +985,11 @@ module open_file
       else if (well_type == in_type(7)) then
 #ifdef MPI_MSG
         if (any(txt_well_mask)) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             call skip_file_int(intwe_type, intwe_fnum, st_well%fnum, vname, st_well%multi,&
                                intwe_step, intwe_end, st_well%etime)
           end if
-          if (pro_totn /= 1) then
+          if (st_mpi%totn /= 1) then
             ! -- Bcast scalar value (val)
               call bcast_val(st_well%fnum, vname//" file number")
           end if
@@ -1003,14 +1003,14 @@ module open_file
 #endif
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast scalar value (val)
           call bcast_val(st_well%etime, vname//" end time value")
       end if
 #endif
     else
       if (well_type == in_type(2)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           read(unit=st_well%fnum,fmt=*,iostat=ierr) st_well%totn
           if (ierr /= 0) then
             call write_err_stop("While reading the total number in "//vname//" file.")
@@ -1060,7 +1060,7 @@ module open_file
     vname = "well 2d"
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast file (file)
         call bcast_file(wells_path, vname//" start layer")
         call bcast_file(welle_path, vname//" end layer")
@@ -1068,14 +1068,14 @@ module open_file
 #endif
 
     if (weks_type == in_type(3)) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, wells_path, "input "//vname//" start layer", wells_fnum)
       end if
     end if
 
     if (weke_type == in_type(3)) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, welle_path, "input "//vname//" end layer", welle_fnum)
       end if
@@ -1139,7 +1139,7 @@ module open_file
     st_intpr%fnum = 0 ; st_intpr%type = 0 ; st_intpr%step = SZERO
 
     if (prec_type == in_type(1) .or. prec_type == in_type(3)) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, prec_path, "input "//vname, st_prec%fnum)
       end if
@@ -1157,7 +1157,7 @@ module open_file
       allocate(character(0) :: err_mes)
       intpr_type = 0 ; err_mes = ""
       err_mes = vname//" time interval"
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, prec_path, "input "//vname, intpr_fnum)
         read(unit=intpr_fnum,fmt=*,iostat=ierr) intpr_type, intpr_step, intpr_end
@@ -1171,13 +1171,13 @@ module open_file
         st_intpr%fnum = intpr_fnum
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast extra setting (extr_set)
           call bcast_extr_set(intpr_type, intpr_step, intpr_end, intprp, err_mes)
       end if
 #endif
       if (intpr_type == in_type(3)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           ! -- Open new read text file (new_rtxt)
             call open_new_rtxt(1, 1, trim(adjustl(intprp)), "input "//vname, st_prec%fnum)
         end if
@@ -1192,7 +1192,7 @@ module open_file
           call open_new_rbin(1, 1, trim(adjustl(intprp)), "input "//err_mes, st_prec%fnum)
 #endif
       else
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call write_err_stop("Specified wrong number in "//err_mes//" file.")
         end if
       end if
@@ -1203,25 +1203,25 @@ module open_file
     st_prec%uni_conv = 1.0E-3_SP/HOURSEC
 
     if (len_trim(adjustl(prec_unit)) == 0) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_logf("Not specified "//vname//" time unit. Simulation time unit is used")
       end if
       st_prec%multi = SINFI ; st_prec%etime = SINFI
     else
       ! -- Convert unit (unit)
-        call conv_unit(my_rank, prec_unit, "input "//vname, st_sim%sta_date, st_prec%multi)
+        call conv_unit(st_mpi%rank, prec_unit, "input "//vname, st_sim%sta_date, st_prec%multi)
     end if
 
     st_prec%totn = st_grid%nx*st_grid%ny
 
     if (st_prec%multi /= SINFI) then
       if (prec_type == in_type(1) .or. prec_type == in_type(3)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call skip_file(prec_type, st_prec%fnum, vname, st_prec%multi, st_prec%totn,&
                          st_prec%etime)
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Bcast scalar value (val)
             call bcast_val(st_prec%totn, vname//" total number")
         end if
@@ -1237,11 +1237,11 @@ module open_file
       else if (prec_type == in_type(7)) then
 #ifdef MPI_MSG
         if (intpr_type == in_type(3)) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             call skip_file_int(intpr_type, intpr_fnum, st_prec%fnum, vname, st_prec%multi,&
                                intpr_step, intpr_end, st_prec%etime)
           end if
-          if (pro_totn /= 1) then
+          if (st_mpi%totn /= 1) then
             ! -- Bcast scalar value (val)
               call bcast_val(st_prec%fnum, vname//" file number")
           end if
@@ -1255,14 +1255,14 @@ module open_file
 #endif
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast scalar value (val)
           call bcast_val(st_prec%etime, vname//" end time value")
       end if
 #endif
     else
       if (prec_type == in_type(1)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           read(unit=st_prec%fnum,fmt=*,iostat=ierr) st_prec%totn
           if (ierr /= 0) then
             call write_err_stop("While reading the total number in "//vname//" file.")
@@ -1312,7 +1312,7 @@ module open_file
     st_intev%fnum = 0 ; st_intev%type = 0 ; st_intev%step = SZERO
 
     if (evap_type == in_type(1) .or. evap_type == in_type(3)) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, evap_path, "input "//vname, st_evap%fnum)
       end if
@@ -1330,7 +1330,7 @@ module open_file
       allocate(character(0) :: err_mes)
       intev_type = 0 ; err_mes = ""
       err_mes = vname//" time interval"
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, evap_path, "input "//vname, intev_fnum)
         read(unit=intev_fnum,fmt=*,iostat=ierr) intev_type, intev_step, intev_end
@@ -1344,13 +1344,13 @@ module open_file
         st_intev%fnum = intev_fnum
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast extra setting (extr_set)
           call bcast_extr_set(intev_type, intev_step, intev_end, intevp, err_mes)
       end if
 #endif
       if (intev_type == in_type(3)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           ! -- Open new read text file (new_rtxt)
             call open_new_rtxt(1, 1, trim(adjustl(intevp)), "input "//err_mes, st_evap%fnum)
         end if
@@ -1365,7 +1365,7 @@ module open_file
           call open_new_rbin(1, 1, trim(adjustl(intevp)), "input "//err_mes, st_evap%fnum)
 #endif
       else
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call write_err_stop("Specified wrong number in "//err_mes//" file.")
         end if
       end if
@@ -1376,25 +1376,25 @@ module open_file
     st_evap%uni_conv = 1.0E-3_SP/HOURSEC
 
     if (len_trim(adjustl(evap_unit)) == 0) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_logf("Not specified "//vname//" time unit. Simulation time unit is used")
       end if
       st_evap%multi = SINFI ; st_evap%etime = SINFI
     else
       ! -- Convert unit (unit)
-        call conv_unit(my_rank, evap_unit, "input "//vname, st_sim%sta_date, st_evap%multi)
+        call conv_unit(st_mpi%rank, evap_unit, "input "//vname, st_sim%sta_date, st_evap%multi)
     end if
 
     st_evap%totn = st_grid%nx*st_grid%ny
 
     if (st_evap%multi /= SINFI) then
       if (evap_type == in_type(1) .or. evap_type == in_type(3)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call skip_file(evap_type, st_evap%fnum, vname, st_evap%multi, st_evap%totn,&
                          st_evap%etime)
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Bcast scalar value (val)
             call bcast_val(st_evap%totn, vname//" total number")
         end if
@@ -1410,11 +1410,11 @@ module open_file
       else if (evap_type == in_type(7)) then
 #ifdef MPI_MSG
         if (intev_type == in_type(3)) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             call skip_file_int(intev_type, intev_fnum, st_evap%fnum, vname, st_evap%multi,&
                                intev_step, intev_end, st_evap%etime)
           end if
-          if (pro_totn /= 1) then
+          if (st_mpi%totn /= 1) then
             ! -- Bcast scalar value (val)
               call bcast_val(st_evap%fnum, vname//" file number")
           end if
@@ -1428,14 +1428,14 @@ module open_file
 #endif
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast scalar value (val)
           call bcast_val(st_evap%etime, vname//" end time value")
       end if
 #endif
     else
       if (evap_type == in_type(1)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           read(unit=st_evap%fnum,fmt=*,iostat=ierr) st_evap%totn
           if (ierr /= 0) then
             call write_err_stop("While reading the total number in "//vname//" file.")
@@ -1496,7 +1496,7 @@ module open_file
     rile_unit = ""
     riwlv = 0 ; riwdv = 0 ; riblv = 0 ; ridev = 0 ; riwiv = 0 ; rilev = 0
 
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       ! -- Open new read text file (new_rtxt)
         call open_new_rtxt(1, 1, rive_path, "input river", rive_fnum)
       read(unit=rive_fnum,nml=inrive_type,iostat=ierr)
@@ -1523,7 +1523,7 @@ module open_file
     mess_le = "input river length"
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast file (file)
         call bcast_file(riwl_type, riwl_path, riwl_unit, mess_wl)
         call bcast_file(riwd_type, riwd_path, riwd_unit, mess_wd)
@@ -1576,7 +1576,7 @@ module open_file
       end select
 
       if (any(rivet(i) == riv_txt_type(:))) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           ! -- Open new read text file (new_rtxt)
             call open_new_rtxt(1, 1, path_rive, mess_rive, riven(i))
         end if
@@ -1598,7 +1598,7 @@ module open_file
 #endif
       else if (rivet(i) == in_type(7)) then
         err_mes = mess_rive//" time interval"
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           ! -- Open new read text file (new_rtxt)
             call open_new_rtxt(1, 1, path_rive, mess_rive, riven(i))
           read(unit=riven(i),fmt=*,iostat=ierr) intri_type, intri_step, intri_end
@@ -1611,13 +1611,13 @@ module open_file
           end if
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Bcast extra setting (extr_set)
             call bcast_extr_set(intri_type, intri_step, intri_end, intri_path, err_mes)
         end if
 #endif
         if (intri_type == in_type(3)) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             ! -- Open new read text file (new_rtxt)
               call open_new_rtxt(1, 1, trim(adjustl(intri_path)), err_mes, intri_num)
           end if
@@ -1634,14 +1634,14 @@ module open_file
           rive_view = nohv
 #endif
         else
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             call write_err_stop("Specified wrong number in "//err_mes//" file.")
           end if
         end if
       end if
 
       if (len_trim(adjustl(unit_rive)) == 0) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           err_mes = &
           "Not specified time unit in "//mess_rive//". Same value is used in simulation"
           call write_logf(err_mes)
@@ -1649,18 +1649,18 @@ module open_file
         rive_multi = SINFI ; rive_etime = SINFI
       else
         ! -- Convert unit (unit)
-          call conv_unit(my_rank, unit_rive, mess_rive, st_sim%sta_date, rive_multi)
+          call conv_unit(st_mpi%rank, unit_rive, mess_rive, st_sim%sta_date, rive_multi)
       end if
 
       rive_totn = st_grid%nx*st_grid%ny
 
       if (rive_multi /= SINFI) then
         if (any(rivet(i) == riv_txt_type(:))) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             call skip_file(rivet(i), riven(i), mess_rive, rive_multi, rive_totn, rive_etime)
           end if
 #ifdef MPI_MSG
-          if (pro_totn /= 1) then
+          if (st_mpi%totn /= 1) then
             ! -- Bcast scalar value (val)
               call bcast_val(rive_totn, mess_rive//" total number")
           end if
@@ -1674,11 +1674,11 @@ module open_file
         else if (rivet(i) == in_type(7)) then
 #ifdef MPI_MSG
           if (intri_type == in_type(3)) then
-            if (my_rank == 0) then
+            if (st_mpi%rank == 0) then
               call skip_file_int(intri_type, riven(i), intri_num, mess_rive, rive_multi,&
                                  intri_step, intri_end, rive_etime)
             end if
-            if (pro_totn /= 1) then
+            if (st_mpi%totn /= 1) then
               ! -- Bcast scalar value (val)
                 call bcast_val(intri_num, mess_rive//" file number")
             end if
@@ -1692,14 +1692,14 @@ module open_file
 #endif
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Bcast scalar value (val)
             call bcast_val(rive_etime, mess_rive//" end time value")
         end if
 #endif
       else
         if (rivet(i) == in_type(1) .or. rivet(i) == in_type(2)) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             read(unit=riven(i),fmt=*,iostat=ierr) rive_totn
             if (ierr /= 0) then
               err_mes = "While reading the total number in "//mess_rive//" file."
@@ -1845,7 +1845,7 @@ module open_file
     lawl_unit = "" ; lawd_unit = "" ; labl_unit = "" ; laar_unit = ""
     lawlv = 0 ; lawdv = 0 ; lablv = 0 ; laarv = 0
 
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       ! -- Open new read text file (new_rtxt)
         call open_new_rtxt(1, 1, lake_path, "input lake", lake_fnum)
       read(unit=lake_fnum,nml=inlake_type,iostat=ierr)
@@ -1870,7 +1870,7 @@ module open_file
     mess_ar = "input lake area"
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast file (file)
         call bcast_file(lawl_type, lawl_path, lawl_unit, mess_wl)
         call bcast_file(lawd_type, lawd_path, lawd_unit, mess_wd)
@@ -1913,7 +1913,7 @@ module open_file
       end select
 
       if (any(laket(i) == lak_txt_type(:))) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           ! -- Open new read text file (new_rtxt)
             call open_new_rtxt(1, 1, path_lake, mess_lake, laken(i))
         end if
@@ -1935,7 +1935,7 @@ module open_file
 #endif
       else if (laket(i) == in_type(7)) then
         err_mes = mess_lake//" time interval"
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           ! -- Open new read text file (new_rtxt)
             call open_new_rtxt(1, 1, path_lake, mess_lake, laken(i))
           read(unit=laken(i),fmt=*,iostat=ierr) intla_type, intla_step, intla_end
@@ -1948,13 +1948,13 @@ module open_file
           end if
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Bcast extra setting (extr_set)
             call bcast_extr_set(intla_type, intla_step, intla_end, intla_path, err_mes)
         end if
 #endif
         if (intla_type == in_type(3)) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             ! -- Open new read text file (new_rtxt)
               call open_new_rtxt(1, 1, trim(adjustl(intla_path)), err_mes, intla_num)
           end if
@@ -1971,14 +1971,14 @@ module open_file
           lake_view = nohv
 #endif
         else
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             call write_err_stop("Specified wrong number in "//err_mes//" file.")
           end if
         end if
       end if
 
       if (len_trim(adjustl(unit_lake)) == 0) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           err_mes = &
           "Not specified time unit in "//mess_lake//". Same value is used in simulation"
           call write_logf(err_mes)
@@ -1986,18 +1986,18 @@ module open_file
         lake_multi = SINFI ; lake_etime = SINFI
       else
         ! -- Convert unit (unit)
-          call conv_unit(my_rank, unit_lake, mess_lake, st_sim%sta_date, lake_multi)
+          call conv_unit(st_mpi%rank, unit_lake, mess_lake, st_sim%sta_date, lake_multi)
       end if
 
       lake_totn = st_grid%nx*st_grid%ny
 
       if (lake_multi /= SINFI) then
         if (any(laken(i) == lak_txt_type(:))) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             call skip_file(laket(i), laken(i), mess_lake, lake_multi, lake_totn, lake_etime)
           end if
 #ifdef MPI_MSG
-          if (pro_totn /= 1) then
+          if (st_mpi%totn /= 1) then
             ! -- Bcast scalar value (val)
               call bcast_val(lake_totn, mess_lake//" total number")
           end if
@@ -2011,11 +2011,11 @@ module open_file
         else if (laket(i) == in_type(7)) then
 #ifdef MPI_MSG
           if (intla_type == in_type(3)) then
-            if (my_rank == 0) then
+            if (st_mpi%rank == 0) then
               call skip_file_int(intla_type, laken(i), intla_num, mess_lake, lake_multi,&
                                  intla_step, intla_end, lake_etime)
             end if
-            if (pro_totn /= 1) then
+            if (st_mpi%totn /= 1) then
               ! -- Bcast scalar value (val)
                 call bcast_val(intla_num, mess_lake//" file number")
             end if
@@ -2029,14 +2029,14 @@ module open_file
 #endif
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Bcast scalar value (val)
             call bcast_val(lake_etime, mess_lake//" end time value")
         end if
 #endif
       else
         if (laket(i) == in_type(1) .or. laket(i) == in_type(2)) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             read(unit=laken(i),fmt=*,iostat=ierr) lake_totn
             if (ierr /= 0) then
               err_mes = "While reading the total number in "//mess_lake//" file."
@@ -2145,7 +2145,7 @@ module open_file
     end if
 
     if (any(in_mass_type == txt_mass_type)) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(1, 1, in_mass_path, "input massbalance", inmas_fnum)
       end if
@@ -2202,7 +2202,7 @@ module open_file
 #endif
     !-------------------------------------------------------------------------------------------
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
     ! -- Bcast file (file)
       call bcast_file(out_path, out_unit, out_chra)
     ! -- Bcast scalar value (val)
@@ -2218,7 +2218,7 @@ module open_file
 
     if (out_tint /= 0) then
       ! -- Convert unit (unit)
-        call conv_unit(my_rank, out_unit, out_chra, st_sim%sta_date, out_trel)
+        call conv_unit(st_mpi%rank, out_unit, out_chra, st_sim%sta_date, out_trel)
     end if
 
     out_trel = out_trel*out_tint
@@ -2240,13 +2240,13 @@ module open_file
     !-------------------------------------------------------------------------------------------
     allocate(character(0) :: out_chra)
     out_chra = "output massbalance"
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       ! -- Open new write text file (new_wtxt)
         call open_new_wtxt(out_mass_path, out_chra, out_mass_fnum)
     end if
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast file (file)
         call bcast_file(out_mass_path, out_mass_unit, out_chra)
       ! -- Bcast scalar value (val)
@@ -2258,7 +2258,7 @@ module open_file
 
     if (out_mass_time /= 0) then
       ! -- Convert unit (unit)
-        call conv_unit(my_rank, out_mass_unit, out_chra, st_sim%sta_date, st_out_step%mass)
+        call conv_unit(st_mpi%rank, out_mass_unit, out_chra, st_sim%sta_date, st_out_step%mass)
     end if
 
     st_out_step%mass = st_out_step%mass*out_mass_time

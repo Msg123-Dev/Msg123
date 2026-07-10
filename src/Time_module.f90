@@ -1,32 +1,29 @@
 module time_module
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: SZERO, DZERO, DONE, SNOVAL, DHALF
-  use initial_module, only: st_sim, st_in_type, my_rank, st_rivf_type, st_lakf_type,&
-                            st_step_flag, st_seal, st_rech, st_well, st_prec, st_evap,&
-                            st_riwl, st_riwd, st_ribl, st_ride, st_riwi, st_rile,&
-                            st_lawl, st_lawd, st_labl, st_laar
+  use constval_module, only: SZERO, SNOVAL, DZERO, DONE, DHALF
+  use utility_module, only: st_mpi
+  use initial_module, only: st_sim, st_ctrl, st_in_type, st_rivf_type, st_lakf_type, st_seal,&
+                            st_rech, st_prec, st_evap, st_well, st_riwl, st_riwd, st_ribl,&
+                            st_ride, st_riwi, st_rile, st_lawl, st_lawd, st_labl, st_laar,&
+                            st_step_flag
   use open_file, only: st_intre, st_intpr, st_intev
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc, ncals
-  use prep_calculation, only: current_t, delt, conv_flag
-  use set_condition, only: rech_area, well_index, well_conn, abyd_well
-  use assign_boundary, only: read_rech, read_well, read_prec, read_evap, well_top,&
-                             well_bott, calc_well
-  use calc_boundary, only: rech2cals, calc_rech
-  use set_boundary, only: rech_num, well_num, cflag_riv, cflag_lak, criv, clak, prec_num,&
-                          evap_num
-  use allocate_solution, only: head_new, surf_head, rel_perm, head_old
+  use set_condition, only: st_hydr, st_bcnd
+  use prep_calculation, only: st_time
+  use assign_boundary, only: st_forc
+  use set_boundary, only: st_rive, st_lake
+  use allocate_solution, only: head_old, head_new, surf_head, rel_perm
 
   implicit none
   private
   public :: update_tstep
-  real(SP), public :: now_time
 
   ! -- local
   integer(I4) :: timestep_num, boundstep
   real(SP) :: next_time
-  real(DP) :: delt_old1, delt_old2
+  real(DP) :: delt_old1
   real(DP), allocatable :: whead_new(:)
 
   contains
@@ -39,7 +36,6 @@ module time_module
     use constval_module, only: DSMAL
     use utility_module, only: write_err_stop
     use assign_calc, only: geog_num
-    use prep_calculation, only: delt_inv
 #ifdef ICI
     use ici_module, only: get_var
 #endif
@@ -51,7 +47,7 @@ module time_module
     ! -- Calculate next time step (nextst)
       call calc_nextst()
 
-    if (conv_flag .and. st_sim%sim_type == 1) then
+    if (st_time%conv_flag .and. st_sim%sim_type == 1) then
       ! -- Set next end time (nextet)
         call set_nextet()
       ! -- Set delta time (delt)
@@ -66,30 +62,30 @@ module time_module
       ! -- Set next variable (nextvar)
         call set_nextvar()
     else if (next_time > st_sim%end_time) then
-      delt = real(st_sim%end_time - current_t, kind=DP)
+      st_time%delt = real(st_sim%end_time - st_time%current_t, kind=DP)
     end if
 
-    if (delt < DSMAL .and. st_sim%sim_type /= -1 .and. my_rank == 0) then
+    if (st_time%delt < DSMAL .and. st_sim%sim_type /= -1 .and. st_mpi%rank == 0) then
       call write_err_stop("Time Step is too small.")
     else if (st_sim%sim_type /= -1) then
-      current_t = current_t + real(delt, kind=SP)
+      st_time%current_t = st_time%current_t + real(st_time%delt, kind=SP)
     else if (st_sim%sim_type == -1) then
-      current_t = SZERO
+      st_time%current_t = SZERO
     end if
 
-    now_time = current_t/st_sim%cal_fact
-    delt_inv = DONE/delt
+    st_time%now_time = st_time%current_t/st_sim%cal_fact
+    st_time%delt_inv = DONE/st_time%delt
 
-    if (conv_flag .or. timestep_num == 0) then
-      if (well_num /= 0) then
+    if (st_time%conv_flag .or. timestep_num == 0) then
+      if (st_bcnd%well_num /= 0) then
         ! -- Set virtual well head (vwell_head)
           call set_vwell_head()
       end if
-      if (rech_num /= 0) then
+      if (st_bcnd%rech_num /= 0) then
         !$omp parallel do private(i, s)
-        do i = 1, rech_num
-          s = rech2cals(i)
-          calc_rech(i) = read_rech(i)*rech_area(s)
+        do i = 1, st_bcnd%rech_num
+          s = st_bcnd%rech2cals(i)
+          st_forc%calc_rech(i) = st_forc%read_rech(i)*st_hydr%rech_area(s)
         end do
         !$omp end parallel do
         if (geog_num /= 0) then
@@ -108,18 +104,15 @@ module time_module
     ! -- modules
     use constval_module, only: DNOVAL
     use utility_module, only: conv_unit
-    use initial_module, only: st_init, tstep_type
+    use initial_module, only: st_init
     use read_input, only: len_scal
-    use prep_calculation, only: now_date, out_iter, inter_time
-    use set_boundary, only: read_head
     use calc_parameter, only: calc_srat_rperm
     use allocate_solution, only: srat_old, srat_new, surf_old
 #ifdef MPI_MSG
     use mpi_utility, only: bcast_val
-    use initial_module, only: pro_totn
     use mpi_write, only: write_mpi_3dbin
 #else
-    use write_module, only: write_header_bin, write_3dbin
+    use write_module, only: write_3dbin, write_header_bin
 #endif
     ! -- inout
 
@@ -129,13 +122,13 @@ module time_module
     real(SP), save :: resi_time
     real(DP), allocatable :: cell_srat(:)
     !-------------------------------------------------------------------------------------------
-    if (current_t == DZERO) then
+    if (st_time%current_t == DZERO) then
       timestep_num = 0 ; boundstep = 0
       delt_old1 = DZERO ; resi_time = SZERO
       if (st_sim%sim_type == -1) then
-        delt = DNOVAL
+        st_time%delt = DNOVAL
       else
-        delt = st_sim%ini_step
+        st_time%delt = st_sim%ini_step
       end if
 
       allocate(cell_srat(ncalc), calc2calc(ncalc))
@@ -146,11 +139,11 @@ module time_module
       end do
       !$omp end parallel do
       ! -- Calculate saturation and relative permeability (srat_rperm)
-        call calc_srat_rperm(ncalc, DZERO, read_head, cell_srat, rel_perm)
+        call calc_srat_rperm(ncalc, DZERO, st_forc%read_head, cell_srat, rel_perm)
       !$omp parallel
       !$omp do private(i)
       do i = 1, ncalc
-        head_old(i) = read_head(i) ; head_new(i) = read_head(i)
+        head_old(i) = st_forc%read_head(i) ; head_new(i) = st_forc%read_head(i)
         srat_old(i) = cell_srat(i) ; srat_new(i) = cell_srat(i)
         calc2calc(i) = i
       end do
@@ -158,7 +151,7 @@ module time_module
 
       !$omp do private(i)
       do i = 1, ncals
-        surf_head(i) = read_head(i)
+        surf_head(i) = st_forc%read_head(i)
       end do
       !$omp end do
       !$omp end parallel
@@ -166,7 +159,7 @@ module time_module
       deallocate(cell_srat)
 
       if (st_sim%sim_type /= -1) then
-        deallocate(read_head)
+        deallocate(st_forc%read_head)
       end if
 
       !$omp parallel do private(i)
@@ -176,57 +169,58 @@ module time_module
       !$omp end parallel do
 
       if (st_sim%res_type == 1) then
-        current_t = st_init%rest_time
+        st_time%current_t = st_init%rest_time
       end if
 
-      now_time = current_t/st_sim%cal_fact
+      st_time%now_time = st_time%current_t/st_sim%cal_fact
 
 #ifdef MPI_MSG
       ! -- Write MPI 3D binary file (mpi_3dbin)
-        call write_mpi_3dbin(st_out_fnum%head, ncalc, calc2calc, len_scal, head_new, now_time)
+        call write_mpi_3dbin(st_out_fnum%head, ncalc, calc2calc, len_scal, head_new,&
+                             st_time%now_time)
 #else
       ! -- Write header binary file (header_bin)
-        call write_header_bin(st_out_fnum%head, now_time)
+        call write_header_bin(st_out_fnum%head, st_time%now_time)
       ! -- Write 3D binary file (3dbin)
         call write_3dbin(st_out_fnum%head, ncalc, calc2calc, len_scal, head_new)
 #endif
       deallocate(calc2calc)
 
     else if (st_sim%sim_type >= 0) then
-      if (conv_flag) then
+      if (st_time%conv_flag) then
         if (timestep_num == 0) then
-          delt_old1 = delt
+          delt_old1 = st_time%delt
         end if
         timestep_num = timestep_num + 1
-        delt_old2 = delt_old1
-        delt_old1 = delt
+        delt_old1 = st_time%delt
 
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           ! -- Write boundary change information
             call write_bound_change(boundstep)
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Bcast scalar value (val)
             call bcast_val(boundstep, "boundary change number")
         end if
 #endif
         if (boundstep >= 1) then
-          inter_time = current_t - resi_time
+          st_time%inter_time = st_time%current_t - resi_time
           ! -- Set next date (date)
-            call set_date(inter_time, now_date, resi_time)
-          resi_time = current_t + resi_time
+            call set_date(st_time%inter_time, st_time%now_date, resi_time)
+          resi_time = st_time%current_t + resi_time
           if (trim(adjustl(st_sim%cal_unit)) == "YEA") then
-            call conv_unit(my_rank, st_sim%cal_unit, "main file", now_date, st_sim%cal_fact)
+            call conv_unit(st_mpi%rank, st_sim%cal_unit, "main file", st_time%now_date,&
+                           st_sim%cal_fact)
           end if
-          delt = delt
+          st_time%delt = st_time%delt
         else
-          select case (tstep_type)
+          select case (st_ctrl%tstep_type)
           case (0)
-            delt = delt*st_sim%inc_fact
+            st_time%delt = st_time%delt*st_sim%inc_fact
           case (1)
             ! -- Apply heuristic time stepping (heuri)
-              call apply_heuri(out_iter)
+              call apply_heuri(st_time%out_iter)
           end select
         end if
 
@@ -235,8 +229,8 @@ module time_module
           call set_valexc(ncalc, srat_new, srat_old)
           call set_valexc(ncals, surf_head, surf_old)
       else
-        current_t = current_t - real(delt, kind=SP)
-        delt = delt*st_sim%dec_fact
+        st_time%current_t = st_time%current_t - real(st_time%delt, kind=SP)
+        st_time%delt = st_time%delt*st_sim%dec_fact
         ! -- Set value exchange (valexc)
           call set_valexc(ncalc, head_old, head_new)
           call set_valexc(ncalc, srat_old, srat_new)
@@ -252,7 +246,7 @@ module time_module
         call set_valexc(ncalc, srat_new, srat_old)
     end if
 
-    next_time = current_t + real(delt, kind=SP)
+    next_time = st_time%current_t + real(st_time%delt, kind=SP)
 
   end subroutine calc_nextst
 
@@ -263,9 +257,8 @@ module time_module
     ! -- modules
     use utility_module, only: write_logf
     use initial_module, only: in_type
-    use open_file, only: st_intse, st_intwe
     use read_module, only: read_next, read_intn
-    use assign_boundary, only: read_seal
+    use open_file, only: st_intse, st_intwe
 #ifdef MPI_MSG
     use mpi_read, only: set_real4_fview
     use set_boundary, only: bfview, rfview, lfview
@@ -296,8 +289,8 @@ module time_module
       end if
 
       if (ierr /= 0) then
-        if (my_rank == 0) then
-          write(str_time,'(f0.3)') now_time
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
           err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
                     trim(st_sim%cal_unit)
           call write_logf(err_mes)
@@ -305,7 +298,7 @@ module time_module
         st_step_flag%seal = 0
         st_seal%etime = st_sim%end_time
       else
-        deallocate(read_seal)
+        deallocate(st_forc%read_seal)
       end if
     end if
 
@@ -326,8 +319,8 @@ module time_module
       end if
 
       if (ierr /= 0) then
-        if (my_rank == 0) then
-          write(str_time,'(f0.3)') now_time
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
           err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
                     trim(st_sim%cal_unit)
           call write_logf(err_mes)
@@ -335,9 +328,9 @@ module time_module
         st_step_flag%rech = 0
         st_rech%etime = st_sim%end_time
         ! -- Reset cell value (value)
-          call reset_value(rech_num, read_rech)
+          call reset_value(st_bcnd%rech_num, st_forc%read_rech)
       else
-        deallocate(read_rech, rech2cals, calc_rech)
+        deallocate(st_forc%read_rech, st_bcnd%rech2cals, st_forc%calc_rech)
       end if
     end if
 
@@ -358,8 +351,8 @@ module time_module
       end if
 
       if (ierr /= 0) then
-        if (my_rank == 0) then
-          write(str_time,'(f0.3)') now_time
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
           err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
                     trim(st_sim%cal_unit)
           call write_logf(err_mes)
@@ -367,11 +360,12 @@ module time_module
         st_step_flag%well = 0
         st_well%etime = st_sim%end_time
         ! -- Reset cell value (value)
-          call reset_value(well_num, read_well)
+          call reset_value(st_bcnd%well_num, st_forc%read_well)
       else
-        deallocate(read_well, calc_well, well_top, well_bott, well_index, well_conn)
-        if (well_num /= 0) then
-          deallocate(abyd_well)
+        deallocate(st_forc%read_well, st_forc%calc_well, st_forc%well_top, st_forc%well_bott,&
+                   st_bcnd%well_index, st_bcnd%well_conn)
+        if (st_bcnd%well_num /= 0) then
+          deallocate(st_hydr%abyd_well)
         end if
       end if
     end if
@@ -393,8 +387,8 @@ module time_module
       end if
 
       if (ierr /= 0) then
-        if (my_rank == 0) then
-          write(str_time,'(f0.3)') now_time
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
           err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
                     trim(st_sim%cal_unit)
           call write_logf(err_mes)
@@ -402,10 +396,10 @@ module time_module
         st_step_flag%prec = 0
         st_prec%etime = st_sim%end_time
         ! -- Reset cell value (value)
-          call reset_value(prec_num, read_prec)
+          call reset_value(st_bcnd%prec_num, st_forc%read_prec)
       else
-        if (prec_num > 0) then
-          deallocate(read_prec)
+        if (st_bcnd%prec_num > 0) then
+          deallocate(st_forc%read_prec)
         end if
       end if
     end if
@@ -427,8 +421,8 @@ module time_module
       end if
 
       if (ierr /= 0) then
-        if (my_rank == 0) then
-          write(str_time,'(f0.3)') now_time
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
           err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
                     trim(st_sim%cal_unit)
           call write_logf(err_mes)
@@ -436,10 +430,10 @@ module time_module
         st_step_flag%evap = 0
         st_evap%etime = st_sim%end_time
         ! -- Reset cell value (value)
-          call reset_value(evap_num, read_evap)
+          call reset_value(st_bcnd%evap_num, st_forc%read_evap)
       else
-        if (evap_num > 0) then
-          deallocate(read_evap)
+        if (st_bcnd%evap_num > 0) then
+          deallocate(st_forc%read_evap)
         end if
       end if
     end if
@@ -462,8 +456,8 @@ module time_module
       end if
 
       if (ierr /= 0) then
-        if (my_rank == 0) then
-          write(str_time,'(f0.3)') now_time
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
           err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
                     trim(st_sim%cal_unit)
           call write_logf(err_mes)
@@ -471,7 +465,7 @@ module time_module
         st_step_flag%riwl = 0
         st_riwl%etime = st_sim%end_time
       else
-        deallocate(cflag_riv%wl, criv%wl)
+        deallocate(st_rive%cflag%wl, st_rive%calc%wl)
       end if
     end if
 
@@ -493,8 +487,8 @@ module time_module
       end if
 
       if (ierr /= 0) then
-        if (my_rank == 0) then
-          write(str_time,'(f0.3)') now_time
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
           err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
                     trim(st_sim%cal_unit)
           call write_logf(err_mes)
@@ -522,8 +516,8 @@ module time_module
       end if
 
       if (ierr /= 0) then
-        if (my_rank == 0) then
-          write(str_time,'(f0.3)') now_time
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
           err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
                     trim(st_sim%cal_unit)
           call write_logf(err_mes)
@@ -531,7 +525,7 @@ module time_module
         st_step_flag%ribl = 0
         st_ribl%etime = st_sim%end_time
       else
-        deallocate(cflag_riv%bl, criv%bl)
+        deallocate(st_rive%cflag%bl, st_rive%calc%bl)
       end if
     end if
 
@@ -553,8 +547,8 @@ module time_module
       end if
 
       if (ierr /= 0) then
-        if (my_rank == 0) then
-          write(str_time,'(f0.3)') now_time
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
           err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
                     trim(st_sim%cal_unit)
           call write_logf(err_mes)
@@ -563,7 +557,7 @@ module time_module
         st_ride%etime = st_sim%end_time
       else
         if (st_ride%totn > 0) then
-          deallocate(cflag_riv%de, criv%de)
+          deallocate(st_rive%cflag%de, st_rive%calc%de)
         end if
       end if
     end if
@@ -586,8 +580,8 @@ module time_module
       end if
 
       if (ierr /= 0) then
-        if (my_rank == 0) then
-          write(str_time,'(f0.3)') now_time
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
           err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
                     trim(st_sim%cal_unit)
           call write_logf(err_mes)
@@ -596,7 +590,7 @@ module time_module
         st_riwi%etime = st_sim%end_time
       else
         if (st_riwi%totn > 0) then
-          deallocate(cflag_riv%wi, criv%wi)
+          deallocate(st_rive%cflag%wi, st_rive%calc%wi)
         end if
       end if
     end if
@@ -619,8 +613,8 @@ module time_module
       end if
 
       if (ierr /= 0) then
-        if (my_rank == 0) then
-          write(str_time,'(f0.3)') now_time
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
           err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
                     trim(st_sim%cal_unit)
           call write_logf(err_mes)
@@ -629,7 +623,7 @@ module time_module
         st_rile%etime = st_sim%end_time
       else
         if (st_rile%totn > 0) then
-          deallocate(cflag_riv%le, criv%le)
+          deallocate(st_rive%cflag%le, st_rive%calc%le)
         end if
       end if
     end if
@@ -652,8 +646,8 @@ module time_module
       end if
 
       if (ierr /= 0) then
-        if (my_rank == 0) then
-          write(str_time,'(f0.3)') now_time
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
           err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
                     trim(st_sim%cal_unit)
           call write_logf(err_mes)
@@ -661,7 +655,7 @@ module time_module
         st_step_flag%lawl = 0
         st_lawl%etime = st_sim%end_time
       else
-        deallocate(cflag_lak%wl, clak%wl)
+        deallocate(st_lake%cflag%wl, st_lake%calc%wl)
       end if
     end if
 
@@ -683,8 +677,8 @@ module time_module
       end if
 
       if (ierr /= 0) then
-        if (my_rank == 0) then
-          write(str_time,'(f0.3)') now_time
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
           err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
                     trim(st_sim%cal_unit)
           call write_logf(err_mes)
@@ -693,7 +687,7 @@ module time_module
         st_lawd%etime = st_sim%end_time
       else
         if (st_lawd%totn > 0) then
-          deallocate(cflag_lak%wd, clak%wd)
+          deallocate(st_lake%cflag%wd, st_lake%calc%wd)
         end if
       end if
     end if
@@ -716,8 +710,8 @@ module time_module
       end if
 
       if (ierr /= 0) then
-        if (my_rank == 0) then
-          write(str_time,'(f0.3)') now_time
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
           err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
                     trim(st_sim%cal_unit)
           call write_logf(err_mes)
@@ -725,7 +719,7 @@ module time_module
         st_step_flag%labl = 0
         st_labl%etime = st_sim%end_time
       else
-        deallocate(cflag_lak%bl, clak%bl)
+        deallocate(st_lake%cflag%bl, st_lake%calc%bl)
       end if
     end if
 
@@ -747,8 +741,8 @@ module time_module
       end if
 
       if (ierr /= 0) then
-        if (my_rank == 0) then
-          write(str_time,'(f0.3)') now_time
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
           err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
                     trim(st_sim%cal_unit)
           call write_logf(err_mes)
@@ -757,7 +751,7 @@ module time_module
         st_laar%etime = st_sim%end_time
       else
         if (st_laar%totn > 0) then
-          deallocate(cflag_lak%ar, clak%ar)
+          deallocate(st_lake%cflag%ar, st_lake%calc%ar)
         end if
       end if
     end if
@@ -784,19 +778,19 @@ module time_module
                    st_ride%etime, st_riwi%etime, st_rile%etime, st_lawl%etime,&
                    st_lawd%etime, st_labl%etime, st_laar%etime)
 
-    if (min_step == current_t) then
-      delt = delt
+    if (min_step == st_time%current_t) then
+      st_time%delt = st_time%delt
     else if (min_step < next_time .and. next_time < st_sim%end_time) then
-      delt = real(min_step - current_t, kind=DP)
+      st_time%delt = real(min_step - st_time%current_t, kind=DP)
     else if (next_time > st_sim%end_time) then
-      delt = real(st_sim%end_time - current_t, kind=DP)
+      st_time%delt = real(st_sim%end_time - st_time%current_t, kind=DP)
     end if
 
-    if (delt > st_sim%max_step) then
-      delt = real(st_sim%max_step, kind=DP)
+    if (st_time%delt > st_sim%max_step) then
+      st_time%delt = real(st_sim%max_step, kind=DP)
     end if
 
-    next_time = current_t + real(delt, kind=SP)
+    next_time = st_time%current_t + real(st_time%delt, kind=SP)
 
   end subroutine set_delt
 
@@ -805,15 +799,10 @@ module time_module
   ! set_nextvar -- Set next variable
   !*********************************************************************************************
     ! -- modules
-    use assign_calc, only: read_ksx, read_ksy
     use set_condition, only: set_srabyd, set_chabyd, set_wellconn
-    use assign_boundary, only: assign_sealv, assign_surfbv, assign_wellv, assign_rilav,&
-                               rech_cflag, prec_cflag, evap_cflag
-    use calc_boundary, only: calc_reprev, calc_rivea, calc_wlbd, conv_rech2calc,&
-                             count_rivecalc, count_lakecalc, rive2cals, lake2cals,&
-                             rive_head, lake_head, rive_bott, rive_area, lake_bott,&
-                             lake_area
-    use set_boundary, only: rive_num, lake_num, rivnum, laknum, abyd_rive, abyd_lake
+    use assign_boundary, only: assign_sealv, assign_surfbv, assign_wellv, assign_rilav
+    use calc_boundary, only: calc_reprev, conv_rech2calc, count_rivecalc, count_lakecalc,&
+                             calc_wlbd, calc_rivea
 #ifdef MPI_MSG
     use mpi_utility, only: mpisum_val
 #endif
@@ -836,18 +825,19 @@ module time_module
     end if
 
     if (st_step_flag%rech == 1) then
-      allocate(rech_cflag(ncals), read_rech(ncals))
+      allocate(st_bcnd%rech_cflag(ncals), st_forc%read_rech(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        rech_cflag(i) = 0
-        read_rech(i) = SNOVAL
+        st_bcnd%rech_cflag(i) = 0
+        st_forc%read_rech(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Assign recharge value
-        call assign_surfbv(st_in_type%rech, st_intre%type, st_rech, rech_num, rech_cflag,&
-                           read_rech)
+        call assign_surfbv(st_in_type%rech, st_intre%type, st_rech, st_bcnd%rech_num,&
+                           st_bcnd%rech_cflag,&
+                           st_forc%read_rech)
 
-      call conv_rech2calc(rech_num)
+      call conv_rech2calc(st_bcnd%rech_num)
 
       st_step_flag%rech = 0
     else if (st_rech%etime == next_time) then
@@ -856,12 +846,12 @@ module time_module
 
     if (st_step_flag%well == 1) then
       ! -- Assign well value (wellv)
-        call assign_wellv(st_in_type%well, st_in_type%weks, st_in_type%weke, well_num)
+        call assign_wellv(st_in_type%well, st_in_type%weks, st_in_type%weke, st_bcnd%well_num)
 
       st_step_flag%well = 0
-      if (well_num /= 0) then
+      if (st_bcnd%well_num /= 0) then
         ! -- Set well connectivity (wellconn)
-          call set_wellconn(well_num, read_ksx, read_ksy)
+          call set_wellconn(st_bcnd%well_num, st_hydr%read_hydx, st_hydr%read_hydy)
       end if
 
     else if (st_well%etime == next_time) then
@@ -871,18 +861,19 @@ module time_module
     prec_stepflag = 0
 
     if (st_step_flag%prec == 1) then
-      allocate(prec_cflag(ncals), read_prec(ncals))
+      allocate(st_bcnd%prec_cflag(ncals), st_forc%read_prec(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        prec_cflag(i) = 0
-        read_prec(i) = SNOVAL
+        st_bcnd%prec_cflag(i) = 0
+        st_forc%read_prec(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Assign precipitation value
-        call assign_surfbv(st_in_type%prec, st_intpr%type, st_prec, prec_num, prec_cflag,&
-                           read_prec)
+        call assign_surfbv(st_in_type%prec, st_intpr%type, st_prec, st_bcnd%prec_num,&
+                           st_bcnd%prec_cflag,&
+                           st_forc%read_prec)
       prec_stepflag = prec_stepflag + 1
-      deallocate(prec_cflag)
+      deallocate(st_bcnd%prec_cflag)
 
       st_step_flag%prec = 0
     else if (st_prec%etime == next_time) then
@@ -892,18 +883,19 @@ module time_module
     evap_stepflag = 0
 
     if (st_step_flag%evap == 1) then
-      allocate(evap_cflag(ncals), read_evap(ncals))
+      allocate(st_bcnd%evap_cflag(ncals), st_forc%read_evap(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        evap_cflag(i) = 0
-        read_evap(i) = SNOVAL
+        st_bcnd%evap_cflag(i) = 0
+        st_forc%read_evap(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Assign evapotranspiration value
-        call assign_surfbv(st_in_type%evap, st_intev%type, st_evap, evap_num, evap_cflag,&
-                           read_evap)
+        call assign_surfbv(st_in_type%evap, st_intev%type, st_evap, st_bcnd%evap_num,&
+                           st_bcnd%evap_cflag,&
+                           st_forc%read_evap)
       evap_stepflag = evap_stepflag + 1
-      deallocate(evap_cflag)
+      deallocate(st_bcnd%evap_cflag)
 
       st_step_flag%evap = 0
     else if (st_evap%etime == next_time) then
@@ -911,24 +903,25 @@ module time_module
     end if
 
     if (prec_stepflag /= 0 .or. evap_stepflag /= 0) then
-      deallocate(read_rech, rech2cals, calc_rech)
+      deallocate(st_forc%read_rech, st_bcnd%rech2cals, st_forc%calc_rech)
       ! -- Calculate recharge from precipitation and evapotranspiration (reprev)
-        call calc_reprev(rech_num)
-      call conv_rech2calc(rech_num)
+        call calc_reprev(st_bcnd%rech_num)
+      call conv_rech2calc(st_bcnd%rech_num)
     end if
 
     rive_stepflag = 0 ; rive_aflag = 0
 
     if (st_step_flag%riwl == 1) then
-      allocate(cflag_riv%wl(ncals), criv%wl(ncals))
+      allocate(st_rive%cflag%wl(ncals), st_rive%calc%wl(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        cflag_riv%wl(i) = 0
-        criv%wl(i) = SNOVAL
+        st_rive%cflag%wl(i) = 0
+        st_rive%calc%wl(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Assign river water level value
-        call assign_rilav(st_rivf_type%wlev, 0, st_riwl, rivnum%wl, cflag_riv%wl, criv%wl)
+        call assign_rilav(st_rivf_type%wlev, 0, st_riwl, st_rive%num%wl, st_rive%cflag%wl,&
+                          st_rive%calc%wl)
 
       st_step_flag%riwl = 0 ; rive_stepflag = rive_stepflag + 1
     else if (st_riwl%etime == next_time) then
@@ -936,15 +929,16 @@ module time_module
     end if
 
     if (st_step_flag%ribl == 1) then
-      allocate(cflag_riv%bl(ncals), criv%bl(ncals))
+      allocate(st_rive%cflag%bl(ncals), st_rive%calc%bl(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        cflag_riv%bl(i) = 0
-        criv%bl(i) = SNOVAL
+        st_rive%cflag%bl(i) = 0
+        st_rive%calc%bl(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Assign river bottom level value
-        call assign_rilav(st_rivf_type%blev, 0, st_ribl, rivnum%bl, cflag_riv%bl, criv%bl)
+        call assign_rilav(st_rivf_type%blev, 0, st_ribl, st_rive%num%bl, st_rive%cflag%bl,&
+                          st_rive%calc%bl)
 
       st_step_flag%ribl = 0 ; rive_stepflag = rive_stepflag + 1
     else if (st_ribl%etime == next_time) then
@@ -953,31 +947,32 @@ module time_module
 
     if (st_step_flag%riwd == 1) then
       if (st_riwd%totn > 0) then
-        allocate(cflag_riv%wd(ncals), criv%wd(ncals))
+        allocate(st_rive%cflag%wd(ncals), st_rive%calc%wd(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
-          cflag_riv%wd(i) = 0
-          criv%wd(i) = SNOVAL
+          st_rive%cflag%wd(i) = 0
+          st_rive%calc%wd(i) = SNOVAL
         end do
         !$omp end parallel do
       end if
       ! -- Assign river water depth value
-        call assign_rilav(st_rivf_type%wdep, 0, st_riwd, rivnum%wd, cflag_riv%wd, criv%wd)
+        call assign_rilav(st_rivf_type%wdep, 0, st_riwd, st_rive%num%wd, st_rive%cflag%wd,&
+                          st_rive%calc%wd)
 
 #ifdef MPI_MSG
       ! -- Sum value for MPI (val)
-        call mpisum_val(rivnum%wl, "river water level", sum_riwln)
-        call mpisum_val(rivnum%bl, "river bottom level", sum_ribln)
+        call mpisum_val(st_rive%num%wl, "river water level", sum_riwln)
+        call mpisum_val(st_rive%num%bl, "river bottom level", sum_ribln)
 #else
-      sum_riwln = rivnum%wl ; sum_ribln = rivnum%bl
+      sum_riwln = st_rive%num%wl ; sum_ribln = st_rive%num%bl
 #endif
 
       if (sum_riwln == 0 .and. sum_ribln /= 0) then
         ! -- Calculate water level from river bottom level (wlrb)
-          call calc_wlbd(cflag_riv%bl, criv%bl, cflag_riv%wd, criv%wd, cflag_riv%wl,&
-                         criv%wl, rivnum%wl)
-        rivnum%wl = 0
-        deallocate(cflag_riv%wd, criv%wd)
+          call calc_wlbd(st_rive%cflag%bl, st_rive%calc%bl, st_rive%cflag%wd, st_rive%calc%wd,&
+                         st_rive%cflag%wl, st_rive%calc%wl, st_rive%num%wl)
+        st_rive%num%wl = 0
+        deallocate(st_rive%cflag%wd, st_rive%calc%wd)
       end if
 
       st_step_flag%riwd = 0 ; rive_stepflag = rive_stepflag + 1
@@ -987,16 +982,17 @@ module time_module
 
     if (st_step_flag%riwi == 1) then
       if (st_riwi%totn > 0) then
-        allocate(cflag_riv%wi(ncals), criv%wi(ncals))
+        allocate(st_rive%cflag%wi(ncals), st_rive%calc%wi(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
-          cflag_riv%wi(i) = 0
-          criv%wi(i) = SNOVAL
+          st_rive%cflag%wi(i) = 0
+          st_rive%calc%wi(i) = SNOVAL
         end do
         !$omp end parallel do
       end if
       ! -- Assign river width value
-        call assign_rilav(st_rivf_type%widt, 0, st_riwi, rivnum%wi, cflag_riv%wi, criv%wi)
+        call assign_rilav(st_rivf_type%widt, 0, st_riwi, st_rive%num%wi, st_rive%cflag%wi,&
+                          st_rive%calc%wi)
 
       st_step_flag%riwi = 0 ; rive_aflag = rive_aflag + 1
     else if (st_riwi%etime == next_time) then
@@ -1005,16 +1001,17 @@ module time_module
 
     if (st_step_flag%rile == 1) then
       if (st_rile%totn > 0) then
-        allocate(cflag_riv%le(ncals), criv%le(ncals))
+        allocate(st_rive%cflag%le(ncals), st_rive%calc%le(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
-          cflag_riv%le(i) = 0
-          criv%le(i) = SNOVAL
+          st_rive%cflag%le(i) = 0
+          st_rive%calc%le(i) = SNOVAL
         end do
         !$omp end parallel do
       end if
       ! -- Assign river length value
-        call assign_rilav(st_rivf_type%leng, 0, st_rile, rivnum%le, cflag_riv%le, criv%le)
+        call assign_rilav(st_rivf_type%leng, 0, st_rile, st_rive%num%le, st_rive%cflag%le,&
+                          st_rive%calc%le)
 
       st_step_flag%rile = 0 ; rive_aflag = rive_aflag + 1
     else if (st_rile%etime == next_time) then
@@ -1024,51 +1021,55 @@ module time_module
     if (rive_aflag > 0) then
       !$omp parallel do private(i)
       do i = 1, ncals
-        cflag_riv%ar(i) = 0
-        criv%ar(i) = SNOVAL
+        st_rive%cflag%ar(i) = 0
+        st_rive%calc%ar(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Calculate river area (rivea)
-        call calc_rivea(cflag_riv%wi, cflag_riv%le, criv%wi, criv%le, cflag_riv%ar,&
-                        criv%ar, rivnum%ar)
+        call calc_rivea(st_rive%cflag%wi, st_rive%cflag%le, st_rive%calc%wi, st_rive%calc%le,&
+                        st_rive%cflag%ar, st_rive%calc%ar, st_rive%num%ar)
     end if
 
     if (rive_stepflag > 0) then
-      if (rive_num /= 0) then
-        allocate(temp_area(rive_num))
+      if (st_bcnd%rive_num /= 0) then
+        allocate(temp_area(st_bcnd%rive_num))
         !$omp parallel do private(i)
-        do i = 1, rive_num
-          temp_area(i) = -rive_area(i)
+        do i = 1, st_bcnd%rive_num
+          temp_area(i) = -st_forc%rive_area(i)
         end do
         !$omp end parallel do
         ! -- Set surface&recharge area and area by distance (srabyd)
-          call set_srabyd(rive_num, rive_bott, temp_area, rive2cals, abyd_rive)
-        deallocate(rive_head, rive_bott, rive_area, temp_area)
+          call set_srabyd(st_bcnd%rive_num, st_forc%rive_bott, temp_area,&
+                          st_bcnd%rive2cals, st_forc%abyd_rive)
+        deallocate(st_forc%rive_head, st_forc%rive_bott, st_forc%rive_area, temp_area)
       end if
-      deallocate(rive2cals)
+      deallocate(st_bcnd%rive2cals)
       ! -- Count river calculation (rivecalc)
-        call count_rivecalc(cflag_riv%wl, cflag_riv%bl, cflag_riv%ar, criv%wl, criv%bl,&
-                            criv%ar, rive_num)
-      if (rive_num /= 0) then
-        deallocate(abyd_rive)
-        allocate(abyd_rive(rive_num))
+        call count_rivecalc(st_rive%cflag%wl, st_rive%cflag%bl, st_rive%cflag%ar,&
+                            st_rive%calc%wl, st_rive%calc%bl, st_rive%calc%ar,&
+                            st_bcnd%rive_num)
+      if (st_bcnd%rive_num /= 0) then
+        deallocate(st_forc%abyd_rive)
+        allocate(st_forc%abyd_rive(st_bcnd%rive_num))
         !$omp parallel do private(i)
-        do i = 1, rive_num
-          abyd_rive(i) = DZERO
+        do i = 1, st_bcnd%rive_num
+          st_forc%abyd_rive(i) = DZERO
         end do
         !$omp end parallel do
         ! -- Set surface&recharge area and area by distance (srabyd)
-          call set_srabyd(rive_num, rive_bott, rive_area, rive2cals, abyd_rive)
+          call set_srabyd(st_bcnd%rive_num, st_forc%rive_bott, st_forc%rive_area,&
+                        st_bcnd%rive2cals, st_forc%abyd_rive)
       end if
     end if
 
     lake_stepflag = 0
 
     if (st_step_flag%lawl == 1) then
-      allocate(cflag_lak%wl(ncals), clak%wl(ncals))
-      cflag_lak%wl(:) = 0 ; clak%wl(:) = SNOVAL
+      allocate(st_lake%cflag%wl(ncals), st_lake%calc%wl(ncals))
+      st_lake%cflag%wl(:) = 0 ; st_lake%calc%wl(:) = SNOVAL
       ! -- Assign lake water level value
-        call assign_rilav(st_lakf_type%wlev, 0, st_lawl, laknum%wl, cflag_lak%wl, clak%wl)
+        call assign_rilav(st_lakf_type%wlev, 0, st_lawl, st_lake%num%wl, st_lake%cflag%wl,&
+                          st_lake%calc%wl)
 
       st_step_flag%lawl = 0 ; lake_stepflag = lake_stepflag + 1
     else if (st_lawl%etime == next_time) then
@@ -1076,15 +1077,16 @@ module time_module
     end if
 
     if (st_step_flag%labl == 1) then
-      allocate(cflag_lak%bl(ncals), clak%bl(ncals))
+      allocate(st_lake%cflag%bl(ncals), st_lake%calc%bl(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
-        cflag_lak%bl(i) = 0
-        clak%bl(i) = SNOVAL
+        st_lake%cflag%bl(i) = 0
+        st_lake%calc%bl(i) = SNOVAL
       end do
       !$omp end parallel do
       ! -- Assign lake bottom level value
-        call assign_rilav(st_lakf_type%blev, 0, st_labl, laknum%bl, cflag_lak%bl, clak%bl)
+        call assign_rilav(st_lakf_type%blev, 0, st_labl, st_lake%num%bl, st_lake%cflag%bl,&
+                          st_lake%calc%bl)
 
       st_step_flag%labl = 0 ; lake_stepflag = lake_stepflag + 1
     else if (st_labl%etime == next_time) then
@@ -1093,31 +1095,32 @@ module time_module
 
     if (st_step_flag%lawd == 1) then
       if (st_lawd%totn > 0) then
-        allocate(cflag_lak%wd(ncals), clak%wd(ncals))
+        allocate(st_lake%cflag%wd(ncals), st_lake%calc%wd(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
-          cflag_lak%wd(i) = 0
-          clak%wd(i) = SNOVAL
+          st_lake%cflag%wd(i) = 0
+          st_lake%calc%wd(i) = SNOVAL
         end do
         !$omp end parallel do
       end if
       ! -- Assign lake water depth value
-        call assign_rilav(st_lakf_type%wdep, 0, st_lawd, laknum%wd, cflag_lak%wd, clak%wd)
+        call assign_rilav(st_lakf_type%wdep, 0, st_lawd, st_lake%num%wd, st_lake%cflag%wd,&
+                          st_lake%calc%wd)
 
 #ifdef MPI_MSG
       ! -- Sum value for MPI (val)
-        call mpisum_val(laknum%wl, "lake water level", sum_lawln)
-        call mpisum_val(laknum%bl, "lake bottom level", sum_labln)
+        call mpisum_val(st_lake%num%wl, "lake water level", sum_lawln)
+        call mpisum_val(st_lake%num%bl, "lake bottom level", sum_labln)
 #else
-      sum_lawln = laknum%wl ; sum_labln = laknum%bl
+      sum_lawln = st_lake%num%wl ; sum_labln = st_lake%num%bl
 #endif
 
       if (sum_lawln == 0 .and. sum_labln /= 0) then
         ! -- Calculate water level from bottom level and water depth (wlbd)
-          call calc_wlbd(cflag_lak%bl, clak%bl, cflag_lak%wd, clak%wd, cflag_lak%wl,&
-                         clak%wl, laknum%wl)
-        laknum%wl = 0
-        deallocate(cflag_lak%wd, clak%wd)
+          call calc_wlbd(st_lake%cflag%bl, st_lake%calc%bl, st_lake%cflag%wd, st_lake%calc%wd,&
+                         st_lake%cflag%wl, st_lake%calc%wl, st_lake%num%wl)
+        st_lake%num%wl = 0
+        deallocate(st_lake%cflag%wd, st_lake%calc%wd)
       end if
 
       st_step_flag%lawd = 0 ; lake_stepflag = lake_stepflag + 1
@@ -1127,16 +1130,17 @@ module time_module
 
     if (st_step_flag%laar == 1) then
       if (st_laar%totn > 0) then
-        allocate(cflag_lak%ar(ncals), clak%ar(ncals))
+        allocate(st_lake%cflag%ar(ncals), st_lake%calc%ar(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
-          cflag_lak%ar(i) = 0
-          clak%ar(i) = SNOVAL
+          st_lake%cflag%ar(i) = 0
+          st_lake%calc%ar(i) = SNOVAL
         end do
         !$omp end parallel do
       end if
       ! -- Assign lake area value
-        call assign_rilav(st_lakf_type%area, 1, st_laar, laknum%ar, cflag_lak%ar, clak%ar)
+        call assign_rilav(st_lakf_type%area, 1, st_laar, st_lake%num%ar, st_lake%cflag%ar,&
+                          st_lake%calc%ar)
 
       st_step_flag%laar = 0 ; lake_stepflag = lake_stepflag + 1
     else if (st_laar%etime == next_time) then
@@ -1144,31 +1148,34 @@ module time_module
     end if
 
     if (lake_stepflag > 0) then
-      if (lake_num /= 0) then
-        allocate(temp_area(lake_num))
+      if (st_bcnd%lake_num /= 0) then
+        allocate(temp_area(st_bcnd%lake_num))
         !$omp parallel do private(i)
-        do i = 1, lake_num
-          temp_area(i) = -lake_area(i)
+        do i = 1, st_bcnd%lake_num
+          temp_area(i) = -st_forc%lake_area(i)
         end do
         !$omp end parallel do
         ! -- Set surface&recharge area and area by distance (srabyd)
-          call set_srabyd(lake_num, lake_bott, temp_area, lake2cals, abyd_lake)
-        deallocate(lake_head, lake_bott, lake_area, temp_area)
+          call set_srabyd(st_bcnd%lake_num, st_forc%lake_bott, temp_area,&
+                          st_bcnd%lake2cals, st_forc%abyd_lake)
+        deallocate(st_forc%lake_head, st_forc%lake_bott, st_forc%lake_area, temp_area)
       end if
-      deallocate(lake2cals)
+      deallocate(st_bcnd%lake2cals)
       ! -- Count lake calculation cell (lakecalc)
-        call count_lakecalc(cflag_lak%wl, cflag_lak%bl, cflag_lak%ar, clak%wl, clak%bl,&
-                            clak%ar, lake_num)
-      if (lake_num /= 0) then
-        deallocate(abyd_lake)
-        allocate(abyd_lake(lake_num))
+        call count_lakecalc(st_lake%cflag%wl, st_lake%cflag%bl, st_lake%cflag%ar,&
+                            st_lake%calc%wl, st_lake%calc%bl, st_lake%calc%ar,&
+                            st_bcnd%lake_num)
+      if (st_bcnd%lake_num /= 0) then
+        deallocate(st_forc%abyd_lake)
+        allocate(st_forc%abyd_lake(st_bcnd%lake_num))
         !$omp parallel do private(i)
-        do i = 1, lake_num
-          abyd_lake(i) = DZERO
+        do i = 1, st_bcnd%lake_num
+          st_forc%abyd_lake(i) = DZERO
         end do
         !$omp end parallel do
         ! -- Set surface&recharge area and area by distance (srabyd)
-          call set_srabyd(lake_num, lake_bott, lake_area, lake2cals, abyd_lake)
+          call set_srabyd(st_bcnd%lake_num, st_forc%lake_bott, st_forc%lake_area,&
+                        st_bcnd%lake2cals, st_forc%abyd_lake)
       end if
     end if
 
@@ -1195,7 +1202,7 @@ module time_module
 
     !$omp parallel do private(i)
     do i = 1, ncalc
-      calc_well(i) = DZERO
+      st_forc%calc_well(i) = DZERO
     end do
     !$omp end parallel do
 
@@ -1209,7 +1216,6 @@ module time_module
   ! change_recharge -- Change the recharge volume
   !*********************************************************************************************
     ! -- modules
-    use assign_calc, only: surf_bott, surf_parm, surf_reli
     ! -- inout
 
     ! -- local
@@ -1217,7 +1223,7 @@ module time_module
     real(DP) :: norm_elev
     real(DP), allocatable :: water_dep(:), rech_rati(:)
     !-------------------------------------------------------------------------------------------
-    allocate(water_dep(ncals), rech_rati(rech_num))
+    allocate(water_dep(ncals), rech_rati(st_bcnd%rech_num))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncals
@@ -1225,27 +1231,27 @@ module time_module
     end do
     !$omp end do
     !$omp do private(i)
-    do i = 1, rech_num
+    do i = 1, st_bcnd%rech_num
       rech_rati(i) = DONE
     end do
     !$omp end do
 
     !$omp do private(i, s, norm_elev)
-    do i = 1, rech_num
-      s = rech2cals(i)
-      water_dep(s) = head_new(s) - surf_bott(s)
-      if (read_rech(i) < SZERO .or. water_dep(s) < DZERO) then
+    do i = 1, st_bcnd%rech_num
+      s = st_bcnd%rech2cals(i)
+      water_dep(s) = head_new(s) - st_hydr%surf_bott(s)
+      if (st_forc%read_rech(i) < SZERO .or. water_dep(s) < DZERO) then
         rech_rati(i) = DONE
-      else if (water_dep(s) < surf_reli(s) .and. surf_reli(s) /= DZERO) then
-        norm_elev = water_dep(s)/surf_reli(s)
-        rech_rati(i) = norm_elev**surf_parm(s)
+      else if (water_dep(s) < st_hydr%surf_reli(s) .and. st_hydr%surf_reli(s) /= DZERO) then
+        norm_elev = water_dep(s)/st_hydr%surf_reli(s)
+        rech_rati(i) = norm_elev**st_hydr%surf_parm(s)
         rech_rati(i) = DONE - rech_rati(i)
-      else if (water_dep(s) >= surf_reli(s) .and. surf_reli(s) /= DZERO) then
+      else if (water_dep(s) >= st_hydr%surf_reli(s) .and. st_hydr%surf_reli(s) /= DZERO) then
         rech_rati(i) = DZERO
       else
         rech_rati(i) = DONE
       end if
-      calc_rech(i) = read_rech(i)*rech_area(s)*rech_rati(i)
+      st_forc%calc_rech(i) = st_forc%read_rech(i)*st_hydr%rech_area(s)*rech_rati(i)
     end do
     !$omp end do
     !$omp end parallel
@@ -1266,21 +1272,21 @@ module time_module
     integer(I4) :: i, j, k
     real(DP) :: tot_cond, tot_flux
     !-------------------------------------------------------------------------------------------
-    allocate(whead_new(well_num))
+    allocate(whead_new(st_bcnd%well_num))
     !$omp parallel
     !$omp do private(i)
-    do i = 1, well_num
+    do i = 1, st_bcnd%well_num
       whead_new(i) = DZERO
     end do
     !$omp end do
 
     !$omp do private(i, j, k, tot_cond, tot_flux)
-    do i = 1, well_num
+    do i = 1, st_bcnd%well_num
       tot_cond = DZERO ; tot_flux = DZERO
-      do k = well_index(i-1)+1, well_index(i)
-        j = well_conn(k)
-        tot_cond = tot_cond + rel_perm(j)*abyd_well(k)
-        tot_flux = tot_flux + rel_perm(j)*abyd_well(k)*head_new(j)
+      do k = st_bcnd%well_index(i-1)+1, st_bcnd%well_index(i)
+        j = st_bcnd%well_conn(k)
+        tot_cond = tot_cond + rel_perm(j)*st_hydr%abyd_well(k)
+        tot_flux = tot_flux + rel_perm(j)*st_hydr%abyd_well(k)*head_new(j)
       end do
       if (tot_cond /= DZERO) then
         whead_new(i) = tot_flux/tot_cond
@@ -1304,23 +1310,23 @@ module time_module
     real(DP) :: tot_cond
     real(DP), allocatable :: temp_whead(:)
     !-------------------------------------------------------------------------------------------
-    allocate(temp_whead(well_num))
+    allocate(temp_whead(st_bcnd%well_num))
     !$omp parallel
     !$omp do private(i)
-    do i = 1, well_num
+    do i = 1, st_bcnd%well_num
       temp_whead(i) = whead_new(i)
     end do
     !$omp end do
 
     !$omp do private(i, j, k, tot_cond)
-    do i = 1, well_num
+    do i = 1, st_bcnd%well_num
       tot_cond = DZERO
-      do k = well_index(i-1)+1, well_index(i)
-        j = well_conn(k)
-        tot_cond = tot_cond + rel_perm(j)*abyd_well(k)
+      do k = st_bcnd%well_index(i-1)+1, st_bcnd%well_index(i)
+        j = st_bcnd%well_conn(k)
+        tot_cond = tot_cond + rel_perm(j)*st_hydr%abyd_well(k)
       end do
       if (tot_cond /= DZERO) then
-        whead_new(i) = temp_whead(i) + read_well(i)/tot_cond
+        whead_new(i) = temp_whead(i) + st_forc%read_well(i)/tot_cond
 
 !        if (whead_new(i) > well_top(i)) then
 !          whead_new(i) = well_top(i)
@@ -1328,10 +1334,11 @@ module time_module
 !          whead_new(i) = well_bott(i)
 !        end if
 
-        do k = well_index(i-1)+1, well_index(i)
-          j = well_conn(k)
-          if (whead_new(i) > well_bott(i) .or. head_new(j) > well_bott(i)) then
-            calc_well(j) = calc_well(j) + rel_perm(j)*abyd_well(k)*(whead_new(i)-head_new(j))
+        do k = st_bcnd%well_index(i-1)+1, st_bcnd%well_index(i)
+          j = st_bcnd%well_conn(k)
+          if (whead_new(i) > st_forc%well_bott(i) .or. head_new(j) > st_forc%well_bott(i)) then
+            st_forc%calc_well(j) = st_forc%calc_well(j) + rel_perm(j)*st_hydr%abyd_well(k)*&
+                           (whead_new(i)-head_new(j))
           end if
         end do
       end if
@@ -1387,46 +1394,46 @@ module time_module
     !$omp parallel shared(conv_fnum, cond_format)
     !$omp single
     if (st_step_flag%rech == 1) then
-      write(conv_fnum,cond_format) "Changed recharge condition at ", now_time
+      write(conv_fnum,cond_format) "Changed recharge condition at ", st_time%now_time
     end if
     if (st_step_flag%well == 1) then
-      write(conv_fnum,cond_format) "Changed well condition at ", now_time
+      write(conv_fnum,cond_format) "Changed well condition at ", st_time%now_time
     end if
     if (st_step_flag%seal == 1) then
-      write(conv_fnum,cond_format) "Changed sea condition at ", now_time
+      write(conv_fnum,cond_format) "Changed sea condition at ", st_time%now_time
     end if
     if (st_step_flag%prec == 1) then
-      write(conv_fnum,cond_format) "Changed precipitation condition at ", now_time
+      write(conv_fnum,cond_format) "Changed precipitation condition at ", st_time%now_time
     end if
     if (st_step_flag%evap == 1) then
-      write(conv_fnum,cond_format) "Changed evapotranspiration condition at ", now_time
+      write(conv_fnum,cond_format) "Changed evapotranspiration condition at ", st_time%now_time
     end if
     if (st_step_flag%riwl == 1) then
-      write(conv_fnum,cond_format) "Changed river water level at ", now_time
+      write(conv_fnum,cond_format) "Changed river water level at ", st_time%now_time
     end if
     if (st_step_flag%riwd == 1) then
-      write(conv_fnum,cond_format) "Changed river water depth at ", now_time
+      write(conv_fnum,cond_format) "Changed river water depth at ", st_time%now_time
     end if
     if (st_step_flag%ribl == 1) then
-      write(conv_fnum,cond_format) "Changed river bottom level at ", now_time
+      write(conv_fnum,cond_format) "Changed river bottom level at ", st_time%now_time
     end if
     if (st_step_flag%ride == 1) then
-      write(conv_fnum,cond_format) "Changed river depth at ", now_time
+      write(conv_fnum,cond_format) "Changed river depth at ", st_time%now_time
     end if
     if (st_step_flag%riwi == 1) then
-      write(conv_fnum,cond_format) "Changed river width at ", now_time
+      write(conv_fnum,cond_format) "Changed river width at ", st_time%now_time
     end if
     if (st_step_flag%lawl == 1) then
-      write(conv_fnum,cond_format) "Changed lake water level at ", now_time
+      write(conv_fnum,cond_format) "Changed lake water level at ", st_time%now_time
     end if
     if (st_step_flag%lawd == 1) then
-      write(conv_fnum,cond_format) "Changed lake water depth at ", now_time
+      write(conv_fnum,cond_format) "Changed lake water depth at ", st_time%now_time
     end if
     if (st_step_flag%labl == 1) then
-      write(conv_fnum,cond_format) "Changed lake bottom level at ", now_time
+      write(conv_fnum,cond_format) "Changed lake bottom level at ", st_time%now_time
     end if
     if (st_step_flag%laar == 1) then
-      write(conv_fnum,cond_format) "Changed lake area at ", now_time
+      write(conv_fnum,cond_format) "Changed lake area at ", st_time%now_time
     end if
     !$omp end single
     !$omp end parallel
@@ -1530,19 +1537,19 @@ module time_module
   ! apply_heuri -- Apply heuristic time stepping
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: maxout_iter
+
     ! -- inout
     integer(I4), intent(in) :: out_num
     ! -- local
     integer(I4) :: incr_num, decr_num
     !-------------------------------------------------------------------------------------------
-    incr_num = int(maxout_iter*0.4) ; decr_num = int(maxout_iter*0.8)
+    incr_num = int(st_ctrl%maxout_iter*0.4) ; decr_num = int(st_ctrl%maxout_iter*0.8)
     if (out_num <= incr_num) then
-      delt = delt_old1*st_sim%inc_fact
+      st_time%delt = delt_old1*st_sim%inc_fact
     else if (out_num <= decr_num) then
-      delt = delt_old1
+      st_time%delt = delt_old1
     else
-      delt = delt_old1*st_sim%dec_fact
+      st_time%delt = delt_old1*st_sim%dec_fact
     end if
 
   end subroutine apply_heuri

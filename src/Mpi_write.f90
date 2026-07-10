@@ -2,10 +2,9 @@ module mpi_write
   ! -- modules
   use kind_module, only: I4, SP, DP
   use constval_module, only: SNOVAL, DZERO, DONE
-  use utility_module, only: write_err_write, write_err_stop
-  use initial_module, only: my_rank, st_grid
-  use set_cell, only: ncals, ncalc, neib_mpi_totn, loc2glo_ijk, get_calc_grid
-  use mpi_initfin, only: my_comm
+  use utility_module, only: st_mpi, write_err_write, write_err_stop
+  use initial_module, only: st_grid
+  use set_cell, only: get_calc_grid, ncalc, ncals, neib_mpi_totn, loc2glo_ijk
   use mpi
 
   implicit none
@@ -26,8 +25,8 @@ module mpi_write
   ! write_mpi_2dbin -- Write MPI 2d binary
   !*********************************************************************************************
     ! -- module
-    use set_cell, only: no_ncals, seal_snum
     use mpi_set, only: write_2d_ind
+    use set_cell, only: no_ncals, seal_snum
     ! -- inout
     integer(I4), intent(in) :: out_fh, out_totn
     integer(I4), intent(in) :: calc_num(:)
@@ -65,7 +64,7 @@ module mpi_write
     ierr = 0
     call MPI_FILE_WRITE(out_fh, vari_sp, all_ncals, MPI_REAL4, istat, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_write(out_fh)
       end if
     end if
@@ -80,8 +79,8 @@ module mpi_write
   ! write_mpi_3dbin -- Write MPI 3d binary
   !*********************************************************************************************
     ! -- module
-    use set_cell, only: no_ncalc, seal_cnum
     use mpi_set, only: write_3d_ind
+    use set_cell, only: no_ncalc, seal_cnum
     ! -- inout
     integer(I4), intent(in) :: out_fh, out_totn
     integer(I4), intent(in) :: calc_num(:)
@@ -119,7 +118,7 @@ module mpi_write
     ierr = 0
     call MPI_FILE_WRITE(out_fh, vari_sp, all_ncalc, MPI_REAL4, istat, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_write(out_fh)
       end if
     end if
@@ -163,7 +162,7 @@ module mpi_write
     ierr = 0 ; head_dis = 0
     call MPI_FILE_WRITE_AT_ALL(out_fh, head_dis, out_rest, ncalc+1, MPI_REAL8, istat, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_write(out_fh)
       end if
     end if
@@ -178,10 +177,10 @@ module mpi_write
   !*********************************************************************************************
     ! -- module
     use assign_calc, only: msout_tnum
-    use allocate_output, only: st_msout
+    use types_module, only: msout_set
     ! -- inout
     integer(I4), intent(in) :: num_mass
-    type(st_msout), intent(inout) :: inout_st
+    type(msout_set), intent(inout) :: inout_st
     ! -- local
     integer(I4) :: i, ierr
     real(DP), allocatable :: mpi_sto(:), mpi_con(:), mpi_sea(:), mpi_wel(:)
@@ -199,70 +198,70 @@ module mpi_write
     !$omp end parallel do
 
     ierr = 0
-    call MPI_REDUCE(inout_st%sto(1), mpi_sto(1), num_mass, MPI_REAL8, MPI_SUM, 0, my_comm, ierr)
+    call MPI_REDUCE(inout_st%sto(1), mpi_sto(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum storage for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%con(1), mpi_con(1), num_mass, MPI_REAL8, MPI_SUM, 0, my_comm, ierr)
+    call MPI_REDUCE(inout_st%con(1), mpi_con(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum connect flow for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%sea(1), mpi_sea(1), num_mass, MPI_REAL8, MPI_SUM, 0, my_comm, ierr)
+    call MPI_REDUCE(inout_st%sea(1), mpi_sea(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum sea discharge for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%wel(1), mpi_wel(1), num_mass, MPI_REAL8, MPI_SUM, 0, my_comm, ierr)
+    call MPI_REDUCE(inout_st%wel(1), mpi_wel(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum well pumping for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%rec(1), mpi_rec(1), num_mass, MPI_REAL8, MPI_SUM, 0, my_comm, ierr)
+    call MPI_REDUCE(inout_st%rec(1), mpi_rec(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum recharge for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%sur(1), mpi_sur(1), num_mass, MPI_REAL8, MPI_SUM, 0, my_comm, ierr)
+    call MPI_REDUCE(inout_st%sur(1), mpi_sur(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum surface runoff for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%riv(1), mpi_riv(1), num_mass, MPI_REAL8, MPI_SUM, 0, my_comm, ierr)
+    call MPI_REDUCE(inout_st%riv(1), mpi_riv(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum river runoff for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%lak(1), mpi_lak(1), num_mass, MPI_REAL8, MPI_SUM, 0, my_comm, ierr)
+    call MPI_REDUCE(inout_st%lak(1), mpi_lak(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum lake runoff for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%tot(1), mpi_tot(1), num_mass, MPI_REAL8, MPI_SUM, 0, my_comm, ierr)
+    call MPI_REDUCE(inout_st%tot(1), mpi_tot(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum total volume for massbalance.")
       end if
     end if
 
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       !$omp parallel do private(i)
       do i = 1, msout_tnum
         inout_st%sto(i) = mpi_sto(i) ; inout_st%con(i) = mpi_con(i)
@@ -285,8 +284,8 @@ module mpi_write
   ! set_senrec_wtab -- Set send and receive for water table
   !*********************************************************************************************
     ! -- module
-    use set_cell, only: neib_num, send_cind, send_citem
-    use allocate_solution, only: nreg_num, crs_index, dir_conn
+    use set_cell, only: send_cind, send_citem, neib_num
+    use allocate_solution, only: dir_conn, nreg_num, crs_index
     ! -- inout
 
     ! -- local
@@ -371,10 +370,9 @@ module mpi_write
   ! calc_mpi_wtable -- Calculate water table for MPI
   !*********************************************************************************************
     ! -- module
-    use initial_module, only: pro_totn
+    use mpi_utility, only: mpisum_val
     use set_cell, only: get_cals_grid
     use allocate_output, only: wtable
-    use mpi_utility, only: mpisum_val
     ! -- inout
     real(DP), intent(in) :: hnew(:), snew(:)
     ! -- local
@@ -451,21 +449,21 @@ module mpi_write
     rank_flag = 0 ; allp_flag = 0
     ! -- Set send flag (send_flag)
       call set_send_flag(send_flag)
-    wtab_fix_loop: do while (allp_flag /= pro_totn)
+    wtab_fix_loop: do while (allp_flag /= st_mpi%totn)
       ! -- Set send variable (send_vari)
-        call set_send_vari(recv_flag, send_flag, hnew, snew, recv_head, recv_srat,&
-                           send_head, send_srat)
+        call set_send_vari(recv_flag, send_flag, hnew, snew, recv_head, recv_srat, send_head,&
+                           send_srat)
 
       do i = 1, neib_wtab_stotn
         isend_sta = send_wtab_cind(i-1)+1 ; isend_end = send_wtab_cind(i)
         send_len = isend_end - isend_sta + 1
         if (send_len /= 0) then
           call MPI_ISEND(send_flag(isend_sta), send_len, MPI_INTEGER, neib_wtab_snum(i), 0,&
-                         my_comm, flag_send(i), ierr)
+                         st_mpi%comm, flag_send(i), ierr)
           call MPI_ISEND(send_head(isend_sta), send_len, MPI_REAL8, neib_wtab_snum(i), 1,&
-                         my_comm, head_send(i), ierr)
+                         st_mpi%comm, head_send(i), ierr)
           call MPI_ISEND(send_srat(isend_sta), send_len, MPI_REAL8, neib_wtab_snum(i), 2,&
-                         my_comm, srat_send(i), ierr)
+                         st_mpi%comm, srat_send(i), ierr)
         end if
       end do
 
@@ -474,11 +472,11 @@ module mpi_write
         recv_len = irecv_end - irecv_sta + 1
         if (irecv_end /= 0) then
           call MPI_IRECV(recv_flag(irecv_sta), recv_len, MPI_INTEGER, neib_wtab_rnum(i), 0,&
-                         my_comm, req_flag_recv(i), ierr)
+                         st_mpi%comm, req_flag_recv(i), ierr)
           call MPI_IRECV(recv_head(irecv_sta), recv_len, MPI_REAL8, neib_wtab_rnum(i), 1,&
-                         my_comm, req_head_recv(i), ierr)
+                         st_mpi%comm, req_head_recv(i), ierr)
           call MPI_IRECV(recv_srat(irecv_sta), recv_len, MPI_REAL8, neib_wtab_rnum(i), 2,&
-                         my_comm, req_srat_recv(i), ierr)
+                         st_mpi%comm, req_srat_recv(i), ierr)
         end if
       end do
 
@@ -486,7 +484,7 @@ module mpi_write
       call MPI_WAITALL(neib_wtab_rtotn, req_head_recv, stat_r, ierr)
       call MPI_WAITALL(neib_wtab_rtotn, req_srat_recv, stat_r, ierr)
       if (ierr /= MPI_SUCCESS) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call write_err_stop("Receive water table information.")
         end if
       end if
@@ -495,7 +493,7 @@ module mpi_write
       call MPI_WAITALL(neib_wtab_stotn, head_send, stat_s, ierr)
       call MPI_WAITALL(neib_wtab_stotn, srat_send, stat_s, ierr)
       if (ierr /= MPI_SUCCESS) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call write_err_stop("Send water table information.")
         end if
       end if

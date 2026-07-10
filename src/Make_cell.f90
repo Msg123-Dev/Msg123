@@ -1,16 +1,16 @@
 module make_cell
   ! -- modules
   use kind_module, only: I4, DP
-  use constval_module, only: DZERO, DHALF, FACE
+  use constval_module, only: FACE, DZERO, DHALF
+  use types_module, only: geom_set
   use read_input, only: glob_x, glob_y, glob_z
-  use set_cell, only: ncals, ncalc, get_calc_grid
+  use set_cell, only: get_calc_grid, ncalc, ncals
 
   implicit none
   private
   public :: make_cell_info
   real(DP), allocatable, public :: dis2face(:,:), face_area(:,:), area_r(:)
-  real(DP), allocatable, public :: cell_vol(:), surf_elev(:)
-  real(DP), allocatable, public :: cell_top(:), cell_cent(:), cell_bot(:)
+  type(geom_set), public :: st_geom
 
   ! -- local
   real(DP), allocatable :: fp_xw(:), fp_yw(:), fp_xs(:), fp_ys(:), fp_xe(:), fp_ye(:)
@@ -24,9 +24,9 @@ module make_cell
   ! make_cell_info -- Make cell information
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: my_rank, st_grid
+    use utility_module, only: st_mpi
+    use initial_module, only: st_grid
 #ifdef MPI_MSG
-    use initial_module, only: pro_totn
     use mpi_set, only: bcast_glob_xyzv
 #endif
     ! -- inout
@@ -34,7 +34,7 @@ module make_cell
     ! -- local
     integer(I4) :: j, k
     !-------------------------------------------------------------------------------------------
-    if (my_rank /= 0) then
+    if (st_mpi%rank /= 0) then
       allocate(glob_x(st_grid%nx+1,st_grid%ny+1), glob_y(st_grid%nx+1,st_grid%ny+1))
       allocate(glob_z(st_grid%nx+1,st_grid%ny+1,st_grid%nz+1))
       !$omp parallel
@@ -53,7 +53,7 @@ module make_cell
     end if
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast global xyz value (glob_xyzv)
         call bcast_glob_xyzv()
     end if
@@ -263,11 +263,11 @@ module make_cell
     real(DP) :: cx, cy, cz
     real(DP) :: x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4, z5, z6, z7, z8
     !-------------------------------------------------------------------------------------------
-    allocate(cell_vol(ncalc))
+    allocate(st_geom%cell_vol(ncalc))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc
-      cell_vol(i) = DZERO
+      st_geom%cell_vol(i) = DZERO
     end do
     !$omp end do
     ! make cell volume
@@ -283,18 +283,18 @@ module make_cell
       z5 = glob_z(xn,yn,zn+1) ; z6 = glob_z(xn+1,yn,zn+1)
       z7 = glob_z(xn+1,yn+1,zn+1) ; z8 = glob_z(xn,yn+1,zn+1)
 
-      cell_vol(i) = vol(cx, x1, x4, x4, cy, y1, y4, y4, cz, z1, z4, z8) + &
-                    vol(cx, x4, x1, x1, cy, y4, y1, y1, cz, z8, z5, z1) + &
-                    vol(cx, x2, x3, x3, cy, y2, y3, y3, cz, z2, z3, z7) + &
-                    vol(cx, x3, x2, x2, cy, y3, y2, y2, cz, z7, z6, z2) + &
-                    vol(cx, x1, x1, x2, cy, y1, y1, y2, cz, z1, z5, z6) + &
-                    vol(cx, x2, x2, x1, cy, y2, y2, y1, cz, z6, z2, z1) + &
-                    vol(cx, x4, x4, x3, cy, y4, y4, y3, cz, z4, z8, z7) + &
-                    vol(cx, x3, x3, x4, cy, y3, y3, y4, cz, z7, z3, z4) + &
-                    vol(cx, x1, x4, x3, cy, y1, y4, y3, cz, z1, z4, z3) + &
-                    vol(cx, x3, x2, x1, cy, y3, y2, y1, cz, z3, z2, z1) + &
-                    vol(cx, x1, x4, x3, cy, y1, y4, y3, cz, z5, z8, z7) + &
-                    vol(cx, x3, x2, x1, cy, y3, y2, y1, cz, z7, z6, z5)
+      st_geom%cell_vol(i) = vol(cx, x1, x4, x4, cy, y1, y4, y4, cz, z1, z4, z8) + &
+                            vol(cx, x4, x1, x1, cy, y4, y1, y1, cz, z8, z5, z1) + &
+                            vol(cx, x2, x3, x3, cy, y2, y3, y3, cz, z2, z3, z7) + &
+                            vol(cx, x3, x2, x2, cy, y3, y2, y2, cz, z7, z6, z2) + &
+                            vol(cx, x1, x1, x2, cy, y1, y1, y2, cz, z1, z5, z6) + &
+                            vol(cx, x2, x2, x1, cy, y2, y2, y1, cz, z6, z2, z1) + &
+                            vol(cx, x4, x4, x3, cy, y4, y4, y3, cz, z4, z8, z7) + &
+                            vol(cx, x3, x3, x4, cy, y3, y3, y4, cz, z7, z3, z4) + &
+                            vol(cx, x1, x4, x3, cy, y1, y4, y3, cz, z1, z4, z3) + &
+                            vol(cx, x3, x2, x1, cy, y3, y2, y1, cz, z3, z2, z1) + &
+                            vol(cx, x1, x4, x3, cy, y1, y4, y3, cz, z5, z8, z7) + &
+                            vol(cx, x3, x2, x1, cy, y3, y2, y1, cz, z7, z6, z5)
     end do
     !$omp end do
     !$omp end parallel
@@ -337,26 +337,26 @@ module make_cell
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(cell_top(ncalc), cell_cent(ncalc), cell_bot(ncalc))
-    allocate(surf_elev(ncals))
+    allocate(st_geom%cell_top(ncalc), st_geom%cell_cent(ncalc), st_geom%cell_bot(ncalc))
+    allocate(st_geom%surf_elev(ncals))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncals
-      cell_top(i) = DZERO ; cell_cent(i) = DZERO
-      cell_bot(i) = DZERO ; surf_elev(i) = DZERO
+      st_geom%cell_top(i) = DZERO ; st_geom%cell_cent(i) = DZERO
+      st_geom%cell_bot(i) = DZERO ; st_geom%surf_elev(i) = DZERO
     end do
     !$omp end do
     ! make cell top and bottom elevation
     !$omp do private(i)
     do i = 1, ncals
-      surf_elev(i) = fp_zt(i)
+      st_geom%surf_elev(i) = fp_zt(i)
     end do
     !$omp end do
 
     !$omp do private(i)
     do i = 1, ncalc
-      cell_top(i) = fp_zt(i) ; cell_bot(i) = fp_zb(i)
-      cell_cent(i) = DHALF*(fp_zt(i)+fp_zb(i))
+      st_geom%cell_top(i) = fp_zt(i) ; st_geom%cell_bot(i) = fp_zb(i)
+      st_geom%cell_cent(i) = DHALF*(fp_zt(i)+fp_zb(i))
     end do
     !$omp end do
     !$omp end parallel

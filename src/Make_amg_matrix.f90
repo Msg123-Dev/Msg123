@@ -2,6 +2,7 @@ module make_amg_matrix
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE
+  use initial_module, only: st_ctrl
   use allocate_solution, only: crs_index, array_var, pro_var, res_var
 
   implicit none
@@ -22,7 +23,6 @@ module make_amg_matrix
   ! make_amgmat -- Make amg matrix
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: nlevel, amg_nlevel
     use set_cell, only: amg_setflag
     ! -- inout
 
@@ -31,13 +31,13 @@ module make_amg_matrix
     !-------------------------------------------------------------------------------------------
     amg_setflag = 0
 
-    amg_level: do amglev = 2, amg_nlevel
+    amg_level: do amglev = 2, st_ctrl%amg_nlevel
       nfine = crs_index(amglev-1)%unknow
       if (nfine == 0) then
-        nlevel = amglev - 1
+        st_ctrl%nlevel = amglev - 1
         exit amg_level
       else
-        nlevel = amglev
+        st_ctrl%nlevel = amglev
       end if
       ! -- Make graph for next coase level matrix by filtering (grapfilt)
         call make_grapfilt()
@@ -72,8 +72,7 @@ module make_amg_matrix
   ! make_grapfilt -- Make graph for next coase level matrix by filtering
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: DTWO, FACE
-    use initial_module, only: amg_theta
+    use constval_module, only: FACE, DTWO
     ! -- inout
 
     ! -- local
@@ -111,7 +110,7 @@ module make_amg_matrix
         end if
         ddmat = array_var(amglev-1)%dmat(i)*array_var(amglev-1)%dmat(j)
         lulumat = array_var(amglev-1)%lumat(k)
-        if (lulumat**DTWO > abs(ddmat*amg_theta**DTWO) .and. ddmat*lulumat > DZERO) then
+        if (lulumat**DTWO > abs(ddmat*st_ctrl%amg_theta**DTWO) .and. ddmat*lulumat > DZERO) then
           nonaggr = nonaggr + 1
           nonaggr_lu(nonaggr) = k
         else
@@ -252,7 +251,7 @@ module make_amg_matrix
   ! make_prolomat -- Make prolongation matrix by soomthed aggregation method
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: jac_omega
+
     ! -- inout
 
     ! -- local
@@ -360,7 +359,7 @@ module make_amg_matrix
     !$omp parallel do private(i, k)
     do i = 1, nfine
       do k = 1, temp_prorow(i)
-        temp_prov(k,i) = temp_prov(k,i)*jac_omega/temp_dmat(i)
+        temp_prov(k,i) = temp_prov(k,i)*st_ctrl%jac_omega/temp_dmat(i)
       end do
     end do
     !$omp end parallel do
@@ -377,7 +376,7 @@ module make_amg_matrix
       if (k > temp_prorow(i)) then
         stop 'Unexpected error in smooth aggregat'
       end if
-      temp_prov(k,i) = temp_prov(k,i) + DONE - jac_omega
+      temp_prov(k,i) = temp_prov(k,i) + DONE - st_ctrl%jac_omega
     end do
 
     deallocate(glob2aggrn)

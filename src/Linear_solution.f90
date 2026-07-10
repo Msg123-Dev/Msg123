@@ -2,9 +2,10 @@ module linear_solution
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE, DINFI
-  use initial_module, only: precon_type, maxinn_iter, nlevel, pro_totn
-  use allocate_solution, only: nreg_num, array_var, crs_index, dir_conn
-  use prep_calculation, only: conv_flag
+  use utility_module, only: st_mpi
+  use initial_module, only: st_ctrl
+  use prep_calculation, only: st_time
+  use allocate_solution, only: dir_conn, nreg_num, crs_index, array_var
   use check_simulation, only: check_insol
   use calc_simulation, only: calc_l2norm2, calc_resi
 #ifdef MPI_MSG
@@ -63,7 +64,6 @@ module linear_solution
   !*********************************************************************************************
     ! -- module
     use allocate_solution, only: nreg_num
-    use prep_calculation, only: form_switch
     ! -- inout
     real(DP), intent(in) :: init_norm
     real(DP), intent(inout) :: inx(:)
@@ -79,10 +79,10 @@ module linear_solution
     !$omp end parallel do
 
     bnorm = init_norm
-    if (form_switch == 0) then
+    if (st_time%form_switch == 0) then
     ! -- Solve Preconditioned Conjugate Gradient method (pcg)
       call solve_pcg(1, inx)
-    else if (form_switch == 1) then
+    else if (st_time%form_switch == 1) then
     ! -- Solve Preconditioned Bi-Conjugate Gradient Stabilized method (bicgs)
       call solve_bicgs(1, inx)
     end if
@@ -134,9 +134,9 @@ module linear_solution
       call calc_resi(level, d_size, array_var(level)%dmat, array_var(level)%lumat, inx,&
                      array_var(level)%rhs, resi)
 
-    if (precon_type == 0) then
+    if (st_ctrl%precon_type == 0) then
 #ifdef MPI_MSG
-      if (pro_totn /= 1 .and. level == 1) then
+      if (st_mpi%totn /= 1 .and. level == 1) then
         ! -- Preconditon mpi incomplete lu diagonal (mpi_dilu)
           call precon_mpi_dilu(array_var(level)%dmat, array_var(level)%lumat, d)
       else
@@ -148,7 +148,7 @@ module linear_solution
         call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, d)
 #endif
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Send and Receive real vector value (rvectv)
           call senrec_rvectv(d)
       end if
@@ -156,16 +156,16 @@ module linear_solution
     end if
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Send and Receive real vector value (rvectv)
         call senrec_rvectv(resi)
     end if
 #endif
 
-    pcg_inter: do in_iter = 1, maxinn_iter
-      if (precon_type == 0) then
+    pcg_inter: do in_iter = 1, st_ctrl%maxinn_iter
+      if (st_ctrl%precon_type == 0) then
 #ifdef MPI_MSG
-        if (pro_totn /= 1 .and. level == 1) then
+        if (st_mpi%totn /= 1 .and. level == 1) then
           ! -- Solve mpi ilu factorization (ilu)
             call solve_mpi_ilu(resi, d, array_var(level)%lumat, z)
         else
@@ -176,7 +176,7 @@ module linear_solution
         ! -- Solve ilu factorization (ilu)
           call solve_ilu(level, d_size, resi, d, array_var(level)%lumat, z)
 #endif
-      else if (precon_type == 1) then
+      else if (st_ctrl%precon_type == 1) then
         ! -- Loop cycle for amg (amg)
           call loop_amg(level, resi, z)
       end if
@@ -189,7 +189,7 @@ module linear_solution
       !$omp end parallel do
 
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Sum value for MPI (val)
           call mpisum_val(sk, "sk l2-norm", sum_sk)
         sk = sum_sk
@@ -212,7 +212,7 @@ module linear_solution
       end if
 
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Send and Receive real vector value (rvectv)
           call senrec_rvectv(p)
       end if
@@ -228,7 +228,7 @@ module linear_solution
       !$omp end parallel do
 
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Sum value for MPI (val)
           call mpisum_val(sk2, "sk2 l2-norm", sum_sk)
         sk2 = sum_sk
@@ -246,7 +246,7 @@ module linear_solution
       ! -- Calculate l2norm square (l2norm2)
         call calc_l2norm2(level, resi, rnorm)
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Sum value for MPI (val)
           call mpisum_val(rnorm, "residual l2-norm", sum_rnorm)
         rnorm = sum_rnorm
@@ -256,14 +256,14 @@ module linear_solution
         call check_insol(bnorm, rnorm)
 
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Send and Receive real vector value (rvectv)
           call senrec_rvectv(resi)
           call senrec_rvectv(inx)
       end if
 #endif
 
-      if (conv_flag .or. in_iter == maxinn_iter) then
+      if (st_time%conv_flag .or. in_iter == st_ctrl%maxinn_iter) then
         exit pcg_inter
       else
         sk0 = sk
@@ -318,9 +318,9 @@ module linear_solution
       call calc_resi(level, d_size, array_var(level)%dmat, array_var(level)%lumat, inx,&
                      array_var(level)%rhs, resi)
 
-    if (precon_type == 0) then
+    if (st_ctrl%precon_type == 0) then
 #ifdef MPI_MSG
-      if (pro_totn /= 1 .and. level == 1) then
+      if (st_mpi%totn /= 1 .and. level == 1) then
         ! -- Preconditon mpi incomplete lu diagonal (mpi_dilu)
           call precon_mpi_dilu(array_var(level)%dmat, array_var(level)%lumat, d)
       else
@@ -332,7 +332,7 @@ module linear_solution
         call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, d)
 #endif
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Send and Receive real vector value (rvectv)
           call senrec_rvectv(d)
       end if
@@ -345,7 +345,7 @@ module linear_solution
     end do
     !$omp end parallel do
 
-    bicg_inter: do in_iter = 1, maxinn_iter
+    bicg_inter: do in_iter = 1, st_ctrl%maxinn_iter
       sk = DZERO
       !$omp parallel do private(n) reduction(+:sk)
       do n = 1, d_size
@@ -353,7 +353,7 @@ module linear_solution
       end do
       !$omp end parallel do
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Sum value for MPI (val)
           call mpisum_val(sk, "sk l2-norm", sum_sk)
         sk = sum_sk
@@ -375,15 +375,15 @@ module linear_solution
         !$omp end parallel do
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Send and Receive real vector value (rvectv)
           call senrec_rvectv(p)
       end if
 #endif
 
-      if (precon_type == 0) then
+      if (st_ctrl%precon_type == 0) then
 #ifdef MPI_MSG
-        if (pro_totn /= 1 .and. level == 1) then
+        if (st_mpi%totn /= 1 .and. level == 1) then
           ! -- Solve mpi ilu factorization (ilu)
             call solve_mpi_ilu(p, d, array_var(level)%lumat, z)
         else
@@ -394,13 +394,13 @@ module linear_solution
         ! -- Solve ilu factorization (ilu)
           call solve_ilu(level, d_size, p, d, array_var(level)%lumat, z)
 #endif
-      else if (precon_type == 1) then
+      else if (st_ctrl%precon_type == 1) then
         ! -- Loop cycle for amg (amg)
           call loop_amg(level, p, z)
       end if
 
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Send and Receive real vector value (rvectv)
           call senrec_rvectv(z)
       end if
@@ -416,7 +416,7 @@ module linear_solution
       end do
       !$omp end parallel do
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Sum value for MPI (val)
           call mpisum_val(sk2, "sk2 l2-norm", sum_sk)
         sk2 = sum_sk
@@ -434,7 +434,7 @@ module linear_solution
       ! -- Calculate l2norm square (l2norm2)
         call calc_l2norm2(level, resi, rnorm)
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Sum value for MPI (val)
           call mpisum_val(rnorm, "residual l2-norm", sum_rnorm)
         rnorm = sum_rnorm
@@ -444,19 +444,19 @@ module linear_solution
         call check_insol(bnorm, rnorm)
 
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Send and Receive real vector value (rvectv)
           call senrec_rvectv(resi)
           call senrec_rvectv(inx)
       end if
 #endif
 
-      if (conv_flag) then
+      if (st_time%conv_flag) then
         exit bicg_inter
       else
-        if (precon_type == 0) then
+        if (st_ctrl%precon_type == 0) then
 #ifdef MPI_MSG
-          if (pro_totn /= 1 .and. level == 1) then
+          if (st_mpi%totn /= 1 .and. level == 1) then
             ! -- Solve mpi ilu factorization (ilu)
               call solve_mpi_ilu(resi, d, array_var(level)%lumat, z)
           else
@@ -467,13 +467,13 @@ module linear_solution
           ! -- Solve ilu factorization (ilu)
             call solve_ilu(level, d_size, resi, d, array_var(level)%lumat, z)
 #endif
-        else if (precon_type == 1) then
+        else if (st_ctrl%precon_type == 1) then
         ! -- Loop cycle for amg (amg)
           call loop_amg(level, resi, z)
         end if
 
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Send and Receive real vector value (rvectv)
             call senrec_rvectv(z)
         end if
@@ -497,7 +497,7 @@ module linear_solution
         !$omp end parallel
 
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Sum value for MPI (val)
             call mpisum_val(ts, "ts l2-norm", sum_sk)
           ts = sum_sk
@@ -519,7 +519,7 @@ module linear_solution
         ! -- Calculate l2norm square (l2norm2)
           call calc_l2norm2(level, resi, rnorm)
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Sum value for MPI (val)
             call mpisum_val(rnorm, "residual l2-norm", sum_rnorm)
           rnorm = sum_rnorm
@@ -529,14 +529,14 @@ module linear_solution
           call check_insol(bnorm, rnorm)
 
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Send and Receive real vector value (rvectv)
             call senrec_rvectv(resi)
             call senrec_rvectv(inx)
         end if
 #endif
 
-        if (conv_flag .or. in_iter == maxinn_iter) then
+        if (st_time%conv_flag .or. in_iter == st_ctrl%maxinn_iter) then
           exit bicg_inter
         else
           sk0 = sk
@@ -554,7 +554,6 @@ module linear_solution
   ! loop_amg -- Loop cycle for amg
   !*********************************************************************************************
     ! -- module
-    use initial_module, only: maxvcy_iter
     use allocate_solution, only: pro_var, res_var
     ! -- inout
     integer(I4), intent(in) :: alevel
@@ -584,14 +583,14 @@ module linear_solution
     !$omp end do
     !$omp end parallel
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Preconditon mpi incomplete lu diagonal (mpi_dilu)
         call precon_mpi_dilu(array_var(alevel)%dmat, array_var(alevel)%lumat, dilu_d)
     else
       ! -- Preconditon incomplete lu diagonal (dilu)
         call precon_dilu(alevel, mgd_size, array_var(alevel)%dmat, array_var(alevel)%lumat, dilu_d)
     end if
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       call senrec_rvectv(dilu_d)
     end if
 #else
@@ -599,8 +598,8 @@ module linear_solution
       call precon_dilu(alevel, mgd_size, array_var(alevel)%dmat, array_var(alevel)%lumat, dilu_d)
 #endif
 
-    do v_iter = 1, maxvcy_iter  ! V-cycle loop
-      do vlevel = alevel, nlevel-1
+    do v_iter = 1, st_ctrl%maxvcy_iter  ! V-cycle loop
+      do vlevel = alevel, st_ctrl%nlevel-1
 
         d_size = crs_index(vlevel)%unknow
         lu_size = crs_index(vlevel)%lunum
@@ -629,12 +628,12 @@ module linear_solution
         !$omp end parallel
 
 #ifdef MPI_MSG
-        if (pro_totn /= 1 .and. vlevel == alevel) then
+        if (st_mpi%totn /= 1 .and. vlevel == alevel) then
           ! -- Send and Receive real vector value (rvectv)
             call senrec_rvectv(amg_tx(1:reg_size))
             call senrec_rvectv(amg_tb(1:reg_size))
         end if
-        if (pro_totn /= 1 .and. vlevel == alevel) then
+        if (st_mpi%totn /= 1 .and. vlevel == alevel) then
           ! -- Solve mpi ilu factorization (ilu)
             call solve_mpi_ilu(amg_tb(1:reg_size), amg_td(1:reg_size), amg_tlu(1:lu_size),&
                                amg_tx(1:reg_size))
@@ -650,7 +649,7 @@ module linear_solution
 #endif
 
 #ifdef MPI_MSG
-        if (pro_totn /= 1　.and. vlevel == alevel) then
+        if (st_mpi%totn /= 1 .and. vlevel == alevel) then
           ! -- Send and Receive real vector value (rvectv)
             call senrec_rvectv(amg_tx(1:reg_size))
         end if
@@ -661,7 +660,7 @@ module linear_solution
                          amg_tx(1:reg_size), amg_tb(1:reg_size), amg_tr(1:reg_size))
 
 #ifdef MPI_MSG
-        if (pro_totn /= 1　.and. vlevel == alevel) then
+        if (st_mpi%totn /= 1 .and. vlevel == alevel) then
           ! -- Send and Receive real vector value (rvectv)
             call senrec_rvectv(amg_tr(1:reg_size))
         end if
@@ -694,28 +693,28 @@ module linear_solution
         !$omp end parallel
       end do
 
-      d_size = crs_index(nlevel)%unknow
-      lu_size = crs_index(nlevel)%lunum
-      reg_size = size(array_var(nlevel)%x)
+      d_size = crs_index(st_ctrl%nlevel)%unknow
+      lu_size = crs_index(st_ctrl%nlevel)%lunum
+      reg_size = size(array_var(st_ctrl%nlevel)%x)
 
       !$omp parallel
       !$omp do private(i)
       do i = 1, d_size
-        amg_td(i) = array_var(nlevel)%dmat(i)
+        amg_td(i) = array_var(st_ctrl%nlevel)%dmat(i)
       end do
       !$omp end do
       !$omp do private(i)
       do i = 1, lu_size
-        amg_tlu(i) = array_var(nlevel)%lumat(i)
+        amg_tlu(i) = array_var(st_ctrl%nlevel)%lumat(i)
       end do
       !$omp end do
       !$omp do private(i)
       do i = 1, reg_size
-        amg_tx(i) = array_var(nlevel)%x(i)
-        amg_tb(i) = array_var(nlevel)%rhs(i)
+        amg_tx(i) = array_var(st_ctrl%nlevel)%x(i)
+        amg_tb(i) = array_var(st_ctrl%nlevel)%rhs(i)
       end do
       !$omp end do
-      if (nlevel == alevel) then
+      if (st_ctrl%nlevel == alevel) then
         !$omp do private(i)
         do i = 1, d_size
           amg_td(i) = dilu_d(i)
@@ -725,35 +724,35 @@ module linear_solution
       !$omp end parallel
 
 #ifdef MPI_MSG
-      if (pro_totn /= 1　.and. nlevel == alevel) then
+      if (st_mpi%totn /= 1 .and. st_ctrl%nlevel == alevel) then
         ! -- Send and Receive real vector value (rvectv)
           call senrec_rvectv(amg_tx(1:reg_size))
           call senrec_rvectv(amg_tb(1:reg_size))
       end if
-      if (pro_totn /= 1 .and. nlevel == alevel) then
+      if (st_mpi%totn /= 1 .and. st_ctrl%nlevel == alevel) then
         ! -- Solve mpi ilu factorization (ilu)
           call solve_mpi_ilu(amg_tb(1:reg_size), amg_td(1:d_size), amg_tlu(1:lu_size),&
                              amg_tx(1:reg_size))
       else
         ! -- Solve ilu factorization (ilu)
-          call solve_ilu(nlevel, d_size, amg_tb(1:reg_size), amg_td(1:d_size),&
+          call solve_ilu(st_ctrl%nlevel, d_size, amg_tb(1:reg_size), amg_td(1:d_size),&
                          amg_tlu(1:lu_size), amg_tx(1:reg_size))
       end if
 #else
         ! -- Solve ilu factorization (ilu)
-        call solve_ilu(nlevel, d_size, amg_tb(1:reg_size), amg_td(1:d_size),&
+        call solve_ilu(st_ctrl%nlevel, d_size, amg_tb(1:reg_size), amg_td(1:d_size),&
                        amg_tlu(1:lu_size), amg_tx(1:reg_size))
 #endif
 
 #ifdef MPI_MSG
-      if (pro_totn /= 1　.and. nlevel == alevel) then
+      if (st_mpi%totn /= 1 .and. st_ctrl%nlevel == alevel) then
         ! -- Send and Receive real vector value (rvectv)
           call senrec_rvectv(amg_tx(1:reg_size))
       end if
 #endif
-      array_var(nlevel)%x(:) = amg_tx(1:reg_size)
+      array_var(st_ctrl%nlevel)%x(:) = amg_tx(1:reg_size)
 
-      do vlevel = nlevel-1, alevel, -1
+      do vlevel = st_ctrl%nlevel-1, alevel, -1
         nfin = crs_index(vlevel+1)%unknow
         !$omp parallel
         !$omp do private(i)
@@ -801,12 +800,12 @@ module linear_solution
         !$omp end parallel
 
 #ifdef MPI_MSG
-        if (pro_totn /= 1　.and. vlevel == alevel) then
+        if (st_mpi%totn /= 1 .and. vlevel == alevel) then
           ! -- Send and Receive real vector value (rvectv)
             call senrec_rvectv(amg_tx(1:reg_size))
             call senrec_rvectv(amg_tb(1:reg_size))
         end if
-        if (pro_totn /= 1 .and. vlevel == alevel) then
+        if (st_mpi%totn /= 1 .and. vlevel == alevel) then
           ! -- Solve mpi ilu factorization (ilu)
             call solve_mpi_ilu(amg_tb(1:reg_size), amg_td(1:reg_size), amg_tlu(1:lu_size),&
                                amg_tx(1:reg_size))
@@ -825,7 +824,7 @@ module linear_solution
         array_var(vlevel)%rhs(:) = amg_tb(1:reg_size)
 
 #ifdef MPI_MSG
-        if (pro_totn /= 1　.and. vlevel == alevel) then
+        if (st_mpi%totn /= 1 .and. vlevel == alevel) then
           ! -- Send and Receive real vector value (rvectv)
             call senrec_rvectv(array_var(vlevel)%x)
             call senrec_rvectv(array_var(vlevel)%rhs)

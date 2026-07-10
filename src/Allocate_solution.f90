@@ -3,11 +3,12 @@ module allocate_solution
   use kind_module, only: I4, DP
   use constval_module, only: DZERO
   use set_cell, only: ncalc
+  use set_condition, only: st_hydr, st_bcnd
 
   implicit none
   private
   public :: allocate_solvar
-  integer(I4), allocatable, public :: seal2calc(:), seal2seal(:)
+  integer(I4), public :: nreg_num
   integer(I4), allocatable, public :: dir_conn(:), dir_seal(:)
   integer(I4), allocatable, public :: left_offr(:), right_offr(:)
   real(DP), allocatable, public :: head_old(:), srat_old(:)
@@ -15,9 +16,6 @@ module allocate_solution
   real(DP), allocatable, public :: srat_new(:)
   real(DP), allocatable, public :: surf_head(:), surf_old(:), surf_rati(:)
   real(DP), allocatable, public :: rel_perm(:)
-  real(DP), allocatable, public :: abyd_conn(:), hydf_conn(:), inv_dis(:)
-  real(DP), allocatable, public :: abyd_seal(:), hydf_seal(:), dis_seal(:)
-  integer(I4), public :: nreg_num
 
   type :: matrix_int
     integer(I4) :: unknow
@@ -108,11 +106,10 @@ module allocate_solution
   ! allocate_matvec -- Allocate matrix and vector
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: precon_type, st_out_type, amg_nlevel
-    use set_cell, only : neib_ncalc
-    use set_condition, only: tconn_num, nseal, off_row, off_index, area_dis, sat_hydf,&
-                             conn_dis, conn_dir, sea_hydf, sea_abyd, sea_dis, sea_dir,&
-                             sea2cal, sea2sea, left_off, right_off
+    use initial_module, only: st_ctrl, st_out_type
+    use set_cell, only: neib_ncalc
+    use set_condition, only: tconn_num, off_row, off_index, conn_dir, sea_dir, left_off,&
+                             right_off
     ! -- inout
 
     ! -- local
@@ -122,9 +119,9 @@ module allocate_solution
 
     allocate(head_new(nreg_num), head_pre(nreg_num), head_change(nreg_num))
     allocate(srat_new(nreg_num), rel_perm(nreg_num))
-    allocate(abyd_conn(tconn_num), hydf_conn(tconn_num))
-    allocate(abyd_seal(nseal), hydf_seal(nseal))
-    allocate(seal2calc(nseal), seal2seal(nseal))
+    allocate(st_hydr%abyd_conn(tconn_num), st_hydr%hydf_conn(tconn_num))
+    allocate(st_hydr%abyd_seal(st_bcnd%seal_num), st_hydr%hydf_seal(st_bcnd%seal_num))
+    allocate(st_bcnd%seal2calc(st_bcnd%seal_num), st_bcnd%seal2seal(st_bcnd%seal_num))
     allocate(dir_conn(tconn_num))
     !$omp parallel
     !$omp do private(i)
@@ -135,57 +132,58 @@ module allocate_solution
     !$omp end do
     !$omp do private(i)
     do i = 1, tconn_num
-      abyd_conn(i) = DZERO ; hydf_conn(i) = DZERO
+      st_hydr%abyd_conn(i) = DZERO ; st_hydr%hydf_conn(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i)
-    do i = 1, nseal
-      abyd_seal(i) = DZERO ; hydf_seal(i) = DZERO
-      abyd_seal(i) = DZERO ; hydf_seal(i) = DZERO
+    do i = 1, st_bcnd%seal_num
+      st_hydr%abyd_seal(i) = DZERO ; st_hydr%hydf_seal(i) = DZERO
+      st_hydr%abyd_seal(i) = DZERO ; st_hydr%hydf_seal(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i, k)
     do i = 1, nreg_num
       do k = off_index(i-1)+1, off_index(i)
-        abyd_conn(k) = area_dis(k) ; hydf_conn(k) = sat_hydf(k)
+        st_hydr%abyd_conn(k) = st_hydr%area_dis(k) ; st_hydr%hydf_conn(k) = st_hydr%sat_hydf(k)
         dir_conn(k) = conn_dir(k)
       end do
     end do
     !$omp end do
 
     !$omp do private(i)
-    do i = 1, nseal
-      abyd_seal(i) = sea_abyd(i) ; hydf_seal(i) = sea_hydf(i)
-      seal2calc(i) = sea2cal(i) ; seal2seal(i) = sea2sea(i)
+    do i = 1, st_bcnd%seal_num
+      st_hydr%abyd_seal(i) = st_hydr%sea_abyd(i) ; st_hydr%hydf_seal(i) = st_hydr%sea_hydf(i)
+      st_bcnd%seal2calc(i) = st_bcnd%sea2cal(i) ; st_bcnd%seal2seal(i) = st_bcnd%sea2sea(i)
     end do
     !$omp end do
     !$omp end parallel
 
-    deallocate(area_dis, sat_hydf, conn_dir)
-    deallocate(sea_abyd, sea_hydf)
+    deallocate(st_hydr%area_dis, st_hydr%sat_hydf, conn_dir)
+    deallocate(st_hydr%sea_abyd, st_hydr%sea_hydf)
+    deallocate(st_bcnd%sea2cal, st_bcnd%sea2sea)
 
     if (st_out_type%velc > 0) then
-      allocate(inv_dis(tconn_num))
-      allocate(dis_seal(nseal), dir_seal(nseal))
+      allocate(st_hydr%inv_dis(tconn_num))
+      allocate(st_hydr%dis_seal(st_bcnd%seal_num), dir_seal(st_bcnd%seal_num))
       !$omp parallel
       !$omp do private(i, k)
       do i = 1, ncalc
         do k = off_index(i-1)+1, off_index(i)
-          inv_dis(k) = conn_dis(k)
+          st_hydr%inv_dis(k) = st_hydr%conn_dis(k)
         end do
       end do
       !$omp end do
       !$omp do private(i)
-      do i = 1, nseal
-        dis_seal(i) = sea_dis(i) ; dir_seal(i) = sea_dir(i)
+      do i = 1, st_bcnd%seal_num
+        st_hydr%dis_seal(i) = st_hydr%sea_dis(i) ; dir_seal(i) = sea_dir(i)
       end do
       !$omp end do
       !$omp end parallel
-      deallocate(conn_dis)
-      deallocate(sea_dis, sea_dir)
+      deallocate(st_hydr%conn_dis)
+      deallocate(st_hydr%sea_dis, sea_dir)
     end if
 
-    allocate(crs_index(amg_nlevel), array_var(amg_nlevel))
+    allocate(crs_index(st_ctrl%amg_nlevel), array_var(st_ctrl%amg_nlevel))
     allocate(crs_index(1)%offrow(tconn_num), crs_index(1)%offind(0:nreg_num))
     allocate(left_offr(tconn_num), right_offr(tconn_num))
     allocate(array_var(1)%dmat(nreg_num), array_var(1)%lumat(tconn_num))
@@ -214,8 +212,8 @@ module allocate_solution
     crs_index(1)%unknow = ncalc ; crs_index(1)%lunum = tconn_num
     crs_index(1)%offind(0) = off_index(0)
 
-    if (precon_type == 1) then
-      allocate(pro_var(amg_nlevel), res_var(amg_nlevel))
+    if (st_ctrl%precon_type == 1) then
+      allocate(pro_var(st_ctrl%amg_nlevel), res_var(st_ctrl%amg_nlevel))
       allocate(array_var(1)%x(nreg_num))
       !$omp parallel do private(i)
       do i = 1, nreg_num

@@ -2,7 +2,9 @@ module allocate_output
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO
+  use types_module, only: msout_set
   use set_cell, only: ncalc, ncals
+  use set_condition, only: st_bcnd
   use assign_calc, only: msout_tnum
 
   implicit none
@@ -11,19 +13,14 @@ module allocate_output
   public :: allocate_wtab, allocate_mass, allocate_velc, allocate_rivr, allocate_lakr
   public :: allocate_sufr, allocate_dunr, allocate_sear, allocate_recr, allocate_welr
 
-  type, public :: st_msout
-    real(DP), allocatable :: sto(:), con(:), sea(:), wel(:), rec(:), sur(:), riv(:),&
-                             lak(:), tot(:)
-  end type st_msout
-  type(st_msout), public :: st_msloc, st_msglo
-
+  integer(I4), allocatable, public :: res_snum(:), res_rnum(:), res_wnum(:)
+  real(DP), public :: rive_sumtime, lake_sumtime, surf_sumtime, dunn_sumtime
   real(DP), allocatable, public :: wtable(:)
   real(DP), allocatable, public :: pointv(:,:), facev(:,:)
   real(DP), allocatable, public :: roff_rive(:), roff_lake(:), roff_surf(:), roff_dunn(:)
   real(DP), allocatable, public :: res_seal(:), res_rech(:), res_well(:)
-  integer(I4), allocatable, public :: res_snum(:), res_rnum(:), res_wnum(:)
-  real(DP), public :: rive_sumtime, lake_sumtime, surf_sumtime, dunn_sumtime
   character(:), allocatable, public :: ms_head
+  type(msout_set), public :: st_msloc, st_msglo
 
   contains
 
@@ -222,15 +219,14 @@ module allocate_output
   ! allocate_rivr -- Allocate river runoff
   !*********************************************************************************************
     ! -- modules
-    use set_boundary, only: rive_num
     ! -- inout
 
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(roff_rive(rive_num))
+    allocate(roff_rive(st_bcnd%rive_num))
     !$omp parallel do private(i)
-    do i = 1, rive_num
+    do i = 1, st_bcnd%rive_num
       roff_rive(i) = DZERO
     end do
     !$omp end parallel do
@@ -244,15 +240,14 @@ module allocate_output
   ! allocate_lakr -- Allocate lake runoff
   !*********************************************************************************************
     ! -- modules
-    use set_boundary, only: lake_num
     ! -- inout
 
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(roff_lake(lake_num))
+    allocate(roff_lake(st_bcnd%lake_num))
     !$omp parallel do private(i)
-    do i = 1, lake_num
+    do i = 1, st_bcnd%lake_num
       roff_lake(i) = DZERO
     end do
     !$omp end parallel do
@@ -288,15 +283,14 @@ module allocate_output
   ! allocate_dunr -- Allocate dunne runoff
   !*********************************************************************************************
     ! -- modules
-    use set_boundary, only: rech_num
     ! -- inout
 
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(roff_dunn(rech_num))
+    allocate(roff_dunn(st_bcnd%rech_num))
     !$omp parallel do private(i)
-    do i = 1, rech_num
+    do i = 1, st_bcnd%rech_num
       roff_dunn(i) = DZERO
     end do
     !$omp end parallel do

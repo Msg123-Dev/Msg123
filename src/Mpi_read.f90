@@ -1,9 +1,8 @@
 module mpi_read
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use mpi_initfin, only: my_comm
-  use utility_module, only: write_err_stop, write_err_read
-  use initial_module, only: my_rank, st_sim, st_grid, st_init, in_type
+  use utility_module, only: st_mpi, write_err_read, write_err_stop
+  use initial_module, only: st_sim, st_grid, st_init, in_type
   use mpi
 
   implicit none
@@ -45,14 +44,14 @@ module mpi_read
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
     ierr = 0
-    call MPI_FILE_OPEN(my_comm, mpi_path, MPI_MODE_RDONLY, MPI_INFO_NULL, mpi_fh, ierr)
+    call MPI_FILE_OPEN(st_mpi%comm, mpi_path, MPI_MODE_RDONLY, MPI_INFO_NULL, mpi_fh, ierr)
 
     if (ierr == MPI_SUCCESS) then
-      if (my_rank == 0 .and. write_flag == 1) then
+      if (st_mpi%rank == 0 .and. write_flag == 1) then
         call write_success("Open "//err_mes//" file", mpi_fh)
       end if
     else if (stop_flag == 1) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Open "//err_mes//" file.")
       end if
     end if
@@ -77,11 +76,11 @@ module mpi_read
     integer(KIND=MPI_OFFSET_KIND) :: offset
     !-------------------------------------------------------------------------------------------
     ierr = 0
-    call MPI_FILE_OPEN(my_comm, mpi_path, MPI_MODE_CREATE + MPI_MODE_WRONLY,&
-                       MPI_INFO_NULL, mpi_fh, ierr)
+    call MPI_FILE_OPEN(st_mpi%comm, mpi_path, MPI_MODE_CREATE + MPI_MODE_WRONLY, MPI_INFO_NULL,&
+                       mpi_fh, ierr)
 
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Open "//err_mes//" file.")
       end if
     end if
@@ -105,11 +104,11 @@ module mpi_read
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; head_dis = 0
-    call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_INTEGER, file_view, "native",&
-                           MPI_INFO_NULL, ierr)
+    call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_INTEGER, file_view, "native", MPI_INFO_NULL,&
+                           ierr)
 
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Set view "//err_mes//" file.")
       end if
     end if
@@ -130,11 +129,11 @@ module mpi_read
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; head_dis = 0
-    call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_REAL4, file_view, "native",&
-                           MPI_INFO_NULL, ierr)
+    call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_REAL4, file_view, "native", MPI_INFO_NULL,&
+                           ierr)
 
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Set view "//err_mes//" file.")
       end if
     end if
@@ -155,11 +154,11 @@ module mpi_read
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; head_dis = 0
-    call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_REAL8, file_view, "native",&
-                           MPI_INFO_NULL, ierr)
+    call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_REAL8, file_view, "native", MPI_INFO_NULL,&
+                           ierr)
 
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Set view "//err_mes//" file.")
       end if
     end if
@@ -198,7 +197,7 @@ module mpi_read
 
     call MPI_FILE_READ_ALL(fileh, read_rest, calc_num+1, MPI_REAL8, istat, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Read restart file in MPI program.")
       end if
     end if
@@ -345,7 +344,7 @@ module mpi_read
 
     call MPI_FILE_READ_ALL(fileh, read_val, mpi_rnum, MPI_INTEGER, istat, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_read(fileh)
       end if
     end if
@@ -408,7 +407,7 @@ module mpi_read
 
     call MPI_FILE_READ_ALL(fileh, read_val, mpi_rnum, MPI_REAL4, istat, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_read(fileh)
       end if
     end if
@@ -471,7 +470,7 @@ module mpi_read
 
     call MPI_FILE_READ_ALL(fileh, read_val, mpi_rnum, MPI_REAL8, istat, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_read(fileh)
       end if
     end if
@@ -527,7 +526,7 @@ module mpi_read
       call set_2dgrid_view(err_mes)
       call MPI_FILE_SET_VIEW(fnum, head_dis, MPI_REAL4, gview2d, "native", MPI_INFO_NULL, ierr)
       if (ierr /= MPI_SUCCESS) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call write_err_stop("Set view "//err_mes//" in MPI program.")
         end if
       end if
@@ -536,7 +535,7 @@ module mpi_read
       call set_3dgrid_view(err_mes)
       call MPI_FILE_SET_VIEW(fnum, head_dis, MPI_REAL4, gview3d, "native", MPI_INFO_NULL, ierr)
       if (ierr /= MPI_SUCCESS) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call write_err_stop("Set view "//err_mes//" in MPI program.")
         end if
       end if
@@ -549,7 +548,7 @@ module mpi_read
     do while (time_flag == 0)
       call MPI_FILE_READ_ALL(fnum, read_etime, 1, MPI_REAL4, istat, ierr)
       if (ierr /= MPI_SUCCESS) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call write_err_read(fnum)
         end if
       end if
@@ -558,7 +557,7 @@ module mpi_read
         time_flag = 1
         call MPI_FILE_SET_VIEW(fnum, read_head, MPI_REAL4, fview, "native", MPI_INFO_NULL,ierr)
         if (ierr /= MPI_SUCCESS) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             call write_err_stop("Set view "//err_mes//" in MPI program.")
           end if
         end if
@@ -566,14 +565,14 @@ module mpi_read
         time_flag = 1 ; read_head = head_dis*read_count*I4
         call MPI_FILE_SET_VIEW(fnum, read_head, MPI_REAL4, fview, "native", MPI_INFO_NULL, ierr)
         if (ierr /= MPI_SUCCESS) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             call write_err_stop("Set view "//err_mes//" in MPI program.")
           end if
         end if
       else
         call MPI_FILE_GET_POSITION(fnum, head_dis, ierr)
         if (ierr /= MPI_SUCCESS) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             call write_err_stop("Get position "//err_mes//" in MPI program.")
           end if
         end if
@@ -607,16 +606,16 @@ module mpi_read
       fetime = fetime*fmulti
       if (fetime <= st_init%rest_time .and. st_sim%res_type == 1) then
         call close_mpi_file(fnum)
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           read(unit=bnum,fmt='(a)',iostat=ierr) intpath
           if (ierr /= 0) then
             call write_err_read(bnum)
           end if
           file_len = len(intpath)
         end if
-        call MPI_BCAST(intpath, file_len, MPI_CHARACTER, 0, my_comm, ierr)
+        call MPI_BCAST(intpath, file_len, MPI_CHARACTER, 0, st_mpi%comm, ierr)
         if (ierr /= MPI_SUCCESS) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             call write_err_stop("Broadcast file path "//err_mes//" in MPI program.")
           end if
         end if
@@ -650,7 +649,7 @@ module mpi_read
 
     call MPI_TYPE_CREATE_STRUCT(1, xyblock, xydis, xytype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Create struct datatype "//emess//" in MPI program.")
       end if
     end if
@@ -659,21 +658,21 @@ module mpi_read
     extent = int((st_grid%nx*st_grid%ny+1)*4, kind=MPI_ADDRESS_KIND)
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, gview2d, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Resize struct datatype "//emess//" in MPI program.")
       end if
     end if
 
     call MPI_TYPE_COMMIT(gview2d, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Commit struct datatype "//emess//" in MPI program.")
       end if
     end if
 
     call MPI_TYPE_FREE(tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Free struct datatype "//emess//" in MPI program.")
       end if
     end if
@@ -702,7 +701,7 @@ module mpi_read
 
     call MPI_TYPE_CREATE_STRUCT(1, xyzblock, xyzdis, xyztype, tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Create struct datatype "//emess//" in MPI program.")
       end if
     end if
@@ -711,21 +710,21 @@ module mpi_read
     extent = int((st_grid%nxyz+1)*4, kind=MPI_ADDRESS_KIND)
     call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, gview3d, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Resize struct datatype "//emess//" in MPI program.")
       end if
     end if
 
     call MPI_TYPE_COMMIT(gview3d, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Commit struct datatype "//emess//" in MPI program.")
       end if
     end if
 
     call MPI_TYPE_FREE(tmptype, ierr)
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_stop("Free struct datatype "//emess//" in MPI program.")
       end if
     end if
@@ -747,10 +746,10 @@ module mpi_read
     integer(I4) :: ierr, mpi_fh
     character(:), allocatable :: err_mes
     !-------------------------------------------------------------------------------------------
-    call MPI_FILE_OPEN(my_comm, int_path, MPI_MODE_RDONLY, MPI_INFO_NULL, mpi_fh, ierr)
+    call MPI_FILE_OPEN(st_mpi%comm, int_path, MPI_MODE_RDONLY, MPI_INFO_NULL, mpi_fh, ierr)
 
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
         err_mes = "Open input"//int_name//" time interval file."
         call write_err_stop(err_mes)
@@ -776,7 +775,7 @@ module mpi_read
     call MPI_FILE_CLOSE(fileh, ierr)
 
     if (ierr /= MPI_SUCCESS) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call write_err_close(fileh)
       end if
     end if

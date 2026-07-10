@@ -2,10 +2,9 @@ module check_condition
   ! -- modules
   use kind_module, only: I4, SP
   use constval_module, only: SONE, SNOVAL
-  use utility_module, only: write_err_stop, get_ilen, conv_i2s
-  use initial_module, only: my_rank, st_grid, st_in_type, st_seal, in_type, out_type,&
-                            st_out_type, st_out_step, st_out_path, st_out_time,&
-                            st_out_unit
+  use utility_module, only: st_mpi, write_err_stop, get_ilen, conv_i2s
+  use initial_module, only: st_grid, st_in_type, st_seal, st_out_type, st_out_path,&
+                            st_out_unit, st_out_time, st_out_step, in_type, out_type
   use open_file, only: open_out_binf
   use read_input, only: len_scal, len_scal_inv
 #ifdef MPI_MSG
@@ -108,7 +107,7 @@ module check_condition
 #else
     sum_checkf = check_flag
 #endif
-    if (sum_checkf > 0 .and. my_rank == 0) then
+    if (sum_checkf > 0 .and. st_mpi%rank == 0) then
       allocate(character(get_ilen(sum_checkf)) :: str_num)
       allocate(character(len=0) :: err_mes)
       call conv_i2s(sum_checkf, str_num)
@@ -145,7 +144,7 @@ module check_condition
 #else
     sum_checkf = check_flag
 #endif
-    if (sum_checkf > 0 .and. my_rank == 0) then
+    if (sum_checkf > 0 .and. st_mpi%rank == 0) then
       allocate(character(get_ilen(sum_checkf)) :: str_num)
       allocate(character(len=0) :: err_mes)
       call conv_i2s(sum_checkf, str_num)
@@ -178,7 +177,7 @@ module check_condition
 #else
     sum_checkf = check_flag
 #endif
-    if (sum_checkf > 0 .and. my_rank == 0) then
+    if (sum_checkf > 0 .and. st_mpi%rank == 0) then
       allocate(character(get_ilen(sum_checkf)) :: str_num)
       allocate(character(len=0) :: err_mes)
       call conv_i2s(sum_checkf, str_num)
@@ -195,7 +194,7 @@ module check_condition
   !*********************************************************************************************
     ! -- modules
     use kind_module, only: SP
-    use utility_module, only: open_new_rtxt, open_new_rbin, write_err_read, write_success
+    use utility_module, only: open_new_rtxt, open_new_rbin, write_success, write_err_read
     ! -- inout
     integer(I4), intent(in) :: seal_ftype
     character(*), intent(in) :: seal_path, seal_unit
@@ -579,7 +578,7 @@ module check_condition
     ! -- local
 
     !-------------------------------------------------------------------------------------------
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       ! -- Open output convergence file (out_convf)
         call open_out_convf(st_out_path%conv, st_out_fnum%conv)
     end if
@@ -663,8 +662,8 @@ module check_condition
       allocate(character(len=0) :: out_mess)
       srat_file = 0 ; out_mess = "output saturation"
       ! -- Open output binary file (out_binf)
-        call open_out_binf(srat_file, st_out_time%srat, st_out_path%srat,&
-                           st_out_unit%srat, out_mess, st_out_step%srat)
+        call open_out_binf(srat_file, st_out_time%srat, st_out_path%srat, st_out_unit%srat,&
+                           out_mess, st_out_step%srat)
 
 #ifdef MPI_MSG
       ! -- Set real4 file view (real4_fview)
@@ -727,7 +726,7 @@ module check_condition
       ! -- Open output massbalance file (out_massf)
         call open_out_massf(st_out_time%mass, st_out_path%mass, st_out_unit%mass, mass_file)
         st_out_fnum%mass = mass_file
-    else if (my_rank == 0) then
+    else if (st_mpi%rank == 0) then
       call write_logf("Set not to use massbalance output function.")
     end if
 
@@ -751,8 +750,8 @@ module check_condition
       allocate(character(len=0) :: out_mess, new_velc)
       out_mess = "output velocity x direction" ; new_velc = st_out_path%velx
       ! -- Open output binary file (out_binf)
-        call open_out_binf(velc_file, st_out_time%velc, new_velc, st_out_unit%velc,&
-                           out_mess, st_out_step%velc)
+        call open_out_binf(velc_file, st_out_time%velc, new_velc, st_out_unit%velc, out_mess,&
+                           st_out_step%velc)
 #ifdef MPI_MSG
       ! -- Set real4 file view (real4_fview)
         call set_real4_fview(velc_file, write_3dview, out_mess)
@@ -761,8 +760,8 @@ module check_condition
 
       out_mess = "output velocity y direction" ; new_velc = st_out_path%vely
       ! -- Open output binary file (out_binf)
-        call open_out_binf(velc_file, st_out_time%velc, new_velc, st_out_unit%velc,&
-                           out_mess, st_out_step%velc)
+        call open_out_binf(velc_file, st_out_time%velc, new_velc, st_out_unit%velc, out_mess,&
+                           st_out_step%velc)
 #ifdef MPI_MSG
       ! -- Set real4 file view (real4_fview)
         call set_real4_fview(velc_file, write_3dview, out_mess)
@@ -771,8 +770,8 @@ module check_condition
 
       out_mess = "output velocity z direction" ; new_velc = st_out_path%velz
       ! -- Open output binary file (out_binf)
-        call open_out_binf(velc_file, st_out_time%velc, new_velc, st_out_unit%velc,&
-                           out_mess, st_out_step%velc)
+        call open_out_binf(velc_file, st_out_time%velc, new_velc, st_out_unit%velc, out_mess,&
+                           st_out_step%velc)
 #ifdef MPI_MSG
       ! -- Set real4 file view (real4_fview)
         call set_real4_fview(velc_file, write_3dview, out_mess)

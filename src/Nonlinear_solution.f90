@@ -1,18 +1,17 @@
 module nonlinear_solution
   ! -- modules
   use kind_module, only: I4, DP
-  use constval_module, only: DZERO, DHALF, DONE, DTWO, VARMAX
-  use initial_module, only: criteria
+  use constval_module, only: DZERO, DONE, DHALF, DTWO, VARMAX
+  use utility_module, only: st_mpi
+  use initial_module, only: st_ctrl
   use read_input, only: len_scal
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc
-  use prep_calculation, only: out_iter
-  use allocate_solution, only: nreg_num, array_var, head_new, head_pre, head_change
-  use time_module, only: now_time
-  use calc_simulation, only: calc_l2norm2
+  use prep_calculation, only: st_time
+  use allocate_solution, only: head_new, head_pre, head_change, nreg_num, array_var
   use calc_function, only: calc_func
+  use calc_simulation, only: calc_l2norm2
 #ifdef MPI_MSG
-  use initial_module, only: pro_totn
   use mpi_utility, only: mpisum_val
 #endif
 
@@ -28,10 +27,9 @@ module nonlinear_solution
   !*********************************************************************************************
     ! -- modules
     use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
-    use constval_module, only: XMAX, XMAX_INV, VARLEN
+    use constval_module, only: VARLEN, XMAX, XMAX_INV
     use utility_module, only: log_fnum
-    use initial_module, only: st_sim, maxout_iter, picard_iter, errtol, st_out_step, my_rank
-    use prep_calculation, only: current_t, delt, conv_flag, form_switch
+    use initial_module, only: st_sim, st_out_step
     use make_linearsystem, only: make_matvec
     use check_simulation, only: check_abserrmax
     use linear_solution, only: solve_linalg, in_iter
@@ -42,6 +40,7 @@ module nonlinear_solution
 
     ! -- local
     integer(I4) :: i
+    integer(I4) :: out_iter
     integer(I4) :: max_num, conv_fnum
     integer(I4) :: back_iter, beta_iter
     character(VARLEN) :: cxyzn
@@ -72,11 +71,12 @@ module nonlinear_solution
     ! -- Set for backtracking (backtr)
       call set_backtr(max_step)
 
-    outer_loop : do out_iter = 1, maxout_iter
+    outer_loop : do out_iter = 1, st_ctrl%maxout_iter
+      st_time%out_iter = out_iter
 
-      if (out_iter == 1) then
-        if (my_rank == 0) then
-          write(conv_fnum,10) now_time, trim(st_sim%cal_unit), delt
+      if (st_time%out_iter == 1) then
+        if (st_mpi%rank == 0) then
+          write(conv_fnum,10) st_time%now_time, trim(st_sim%cal_unit), st_time%delt
         end if
         allocate(new_func(ncalc))
         !$omp parallel do private(i)
@@ -88,12 +88,12 @@ module nonlinear_solution
         l2norm_pre = l2norm_new
       end if
 
-      if (picard_iter < 0) then
-        form_switch = 0
-      else if (out_iter > picard_iter) then
-        form_switch = 1
+      if (st_ctrl%picard_iter < 0) then
+        st_time%form_switch = 0
+      else if (st_time%out_iter > st_ctrl%picard_iter) then
+        st_time%form_switch = 1
       else
-        form_switch = 0
+        st_time%form_switch = 0
       end if
 
       back_iter = 0 ; beta_iter = 0
@@ -110,11 +110,11 @@ module nonlinear_solution
       ! -- Make coefficients matrix and constant vector (matvec)
         call make_matvec()
 
-      if (out_iter == 1) then
+      if (st_time%out_iter == 1) then
         ! -- Calculate l2 norm square (resl2norm2)
           call calc_l2norm2(1, array_var(1)%rhs, l2norm_new)
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Sum value for MPI (val)
             call mpisum_val(l2norm_new, "initial function l2-norm", sum_l2)
           l2norm_new = sum_l2
@@ -130,11 +130,11 @@ module nonlinear_solution
       end do
       !$omp end parallel do
 
-      conv_flag = .false.
+      st_time%conv_flag = .false.
       if (st_sim%sim_type /= -1) then
-        errtol = eater
+        st_ctrl%errtol = eater
       else
-        errtol = XMAX_INV**3
+        st_ctrl%errtol = XMAX_INV**3
       end if
       ! -- Solve linear algebra (linalg)
         call solve_linalg(l2norm_pre, head_change, l2norm_jac)
@@ -149,7 +149,7 @@ module nonlinear_solution
         call check_abserrmax(head_new, head_pre, max_var, max_unk, max_num)
 
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Check mpi max error (mpimaxerr)
           call check_mpimaxerr(max_var, max_unk, var_abs_max, unk_max, var_max)
         check_val = var_abs_max*len_scal ; max_unk = unk_max*len_scal
@@ -160,34 +160,34 @@ module nonlinear_solution
 #else
       check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk)*len_scal
 #endif
-      if (conv_flag .and. .not. ieee_is_nan(max_unk)) then
-          conv_flag = .false.
-        if (check_val <= criteria .and. max_unk < XMAX) then
-          conv_flag = .true.
+      if (st_time%conv_flag .and. .not. ieee_is_nan(max_unk)) then
+          st_time%conv_flag = .false.
+        if (check_val <= st_ctrl%criteria .and. max_unk < XMAX) then
+          st_time%conv_flag = .true.
         end if
       else if (ieee_is_nan(max_unk) .and. st_sim%sim_type /= -1) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           write(log_fnum,'(a)') "Nan detected."
         end if
         exit outer_loop
       else if (ieee_is_nan(max_unk) .and. st_sim%sim_type == -1) then
         st_sim%sim_type = 0
-        current_t = DZERO
-        if (my_rank == 0) then
+        st_time%current_t = DZERO
+        if (st_mpi%rank == 0) then
           write(log_fnum,'(a)') "Steady state calculation changes to timestep calculation."
           write(conv_fnum,15)
         end if
         exit outer_loop
       end if
 
-      if (.not. conv_flag .and. form_switch == 1) then
+      if (.not. st_time%conv_flag .and. st_time%form_switch == 1) then
         ! -- Run backtracking (backtr)
           call run_backtr(back_iter, back_flag, beta_iter, l2norm_new, l2norm_pre, l2norm_jac,&
                           lambda, gradient, max_step, new_func)
         ! -- Check absolute error max norm
           call check_abserrmax(head_new, head_pre, max_var, max_unk, max_num)
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Check mpi max error (mpimaxerr)
             call check_mpimaxerr(max_var, max_unk, var_abs_max, unk_max, var_max)
           check_val = var_abs_max*len_scal ; max_unk = unk_max*len_scal
@@ -200,12 +200,12 @@ module nonlinear_solution
 #endif
         if ((check_val >= VARMAX .or. max_unk >= XMAX) .and. st_sim%sim_type /= -1) then
           back_flag = .true.
-        else if (check_val <= criteria .and. max_unk < XMAX) then
-          conv_flag = .true.
+        else if (check_val <= st_ctrl%criteria .and. max_unk < XMAX) then
+          st_time%conv_flag = .true.
         else if (st_sim%sim_type == -1) then
           back_flag = .false.
         end if
-        if (.not. conv_flag .and. .not. back_flag) then
+        if (.not. st_time%conv_flag .and. .not. back_flag) then
           ! -- Set Eisenstat-Walker forcing term (eise_walk)
             call set_eise_walk(lambda, l2norm_new, l2norm_pre, l2norm_jac, gradient, eater)
         end if
@@ -216,7 +216,7 @@ module nonlinear_solution
       ! -- Calculate l2 norm square (resl2norm2)
         call calc_l2norm2(1, new_func, l2norm_new)
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Sum value for MPI (val)
           call mpisum_val(l2norm_new, "new function l2-norm", sum_l2)
         l2norm_new = sum_l2
@@ -238,42 +238,42 @@ module nonlinear_solution
       conv_head = head_new(max_num)*len_scal
 #endif
       conv_var = max_var*len_scal
-      if (my_rank == 0) then
-        write(conv_fnum,11) out_iter, in_iter, back_iter, conv_var, trim(adjustl(cxyzn)),&
-                            conv_dmat, conv_rhs, conv_head
+      if (st_mpi%rank == 0) then
+        write(conv_fnum,11) st_time%out_iter, in_iter, back_iter, conv_var,&
+                            trim(adjustl(cxyzn)), conv_dmat, conv_rhs, conv_head
       end if
       ! check outer_loop
-      if (conv_flag) then
+      if (st_time%conv_flag) then
         ! -- Calculate surface water level (surfw)
           call calc_surfw()
         if (st_out_step%rest == DZERO) then
           ! -- Write restart file (rest)
             call write_rest(head_new)
-        else if (mod(current_t,st_out_step%rest) == 0) then
+        else if (mod(st_time%current_t,st_out_step%rest) == 0) then
           ! -- Write restart file (rest)
             call write_rest(head_new)
         end if
         exit outer_loop
       else if (back_flag .and. st_sim%sim_type /= -1) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           write(conv_fnum,13)
         end if
         exit outer_loop
-      else if (out_iter == maxout_iter .and. st_sim%sim_type == -1) then
+      else if (st_time%out_iter == st_ctrl%maxout_iter .and. st_sim%sim_type == -1) then
         st_sim%sim_type = 0
-        current_t = DZERO
-        if (my_rank == 0) then
+        st_time%current_t = DZERO
+        if (st_mpi%rank == 0) then
           write(log_fnum,'(a)') "Steady state calculation changes to timestep calculation."
           write(conv_fnum,15)
         end if
         exit outer_loop
-      else if (out_iter == maxout_iter) then
-        if (my_rank == 0) then
+      else if (st_time%out_iter == st_ctrl%maxout_iter) then
+        if (st_mpi%rank == 0) then
           write(conv_fnum,14)
         end if
         exit outer_loop
       else if ((abs(conv_var) >= VARMAX .or. max_unk >= XMAX) .and. st_sim%sim_type /= -1) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           write(conv_fnum,12)
         end if
         exit outer_loop
@@ -290,7 +290,6 @@ module nonlinear_solution
   ! reset_matvec -- Reset coefficients matrix and constant vector
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: precon_type, nlevel
     use set_cell, only: amg_setflag
     use allocate_solution, only: crs_index, pro_var, res_var
     ! -- inout
@@ -302,8 +301,8 @@ module nonlinear_solution
     array_var(1)%dmat(:) = DZERO
     array_var(1)%rhs(:) = DZERO
 
-    if (precon_type == 1 .and. amg_setflag == 1) then
-      do i = 2, nlevel
+    if (st_ctrl%precon_type == 1 .and. amg_setflag == 1) then
+      do i = 2, st_ctrl%nlevel
         deallocate(array_var(i)%dmat, array_var(i)%rhs, array_var(i)%lumat, array_var(i)%x)
         deallocate(crs_index(i)%offrow, crs_index(i)%offind)
         deallocate(pro_var(i)%pindex, pro_var(i)%poffrow, pro_var(i)%pval)
@@ -362,7 +361,7 @@ module nonlinear_solution
     ! -- Calculate l2 norm square (resl2norm2)
       call calc_l2norm2(1, head_new, l2_xnew)
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Sum value for MPI (val)
         call mpisum_val(l2_xnew, "previous function l2-norm", sum_l2)
       l2_xnew = sum_l2
@@ -452,7 +451,7 @@ module nonlinear_solution
       call calc_vecjacf(1, head_pre, head_change, jacvec)
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Sum value for MPI (val)
         call mpisum_val(l2_pnorm, "change function l2-norm", sum_l2)
       l2_pnorm = sum_l2
@@ -497,7 +496,7 @@ module nonlinear_solution
     deallocate(jacvec)
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Sum value for MPI (val)
         call mpisum_val(l2_new, "current function l2-norm", sum_l2)
       l2_new = sum_l2
@@ -665,7 +664,7 @@ module nonlinear_solution
       call calc_l2norm2(1, new_f, l2_new)
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Sum value for MPI (val)
         call mpisum_val(l2_new, "backtracking new function l2-norm", sum_l2)
       l2_new = sum_l2
@@ -691,10 +690,10 @@ module nonlinear_solution
 #ifdef MPI_MSG
     i = 0
     ! -- Write mpi restart value (mpi_rest)
-      call write_mpi_rest(rest_fnum, now_time, len_scal, rest_head)
+      call write_mpi_rest(rest_fnum, st_time%now_time, len_scal, rest_head)
 #else
     rewind(rest_fnum)
-    write(rest_fnum) real(now_time, kind=DP)
+    write(rest_fnum) real(st_time%now_time, kind=DP)
     write(rest_fnum) (rest_head(i)*len_scal, i = 1, ncalc)
 #endif
 

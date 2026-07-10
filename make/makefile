@@ -97,6 +97,7 @@ endif
 OBJECTS = \
 $(OBJDIR)/Kind_module.o \
 $(OBJDIR)/Constval_module.o \
+$(OBJDIR)/Types_module.o \
 $(MPI_INITFIN) \
 $(OBJDIR)/Utility_module.o \
 $(MPI_UTILITY) \

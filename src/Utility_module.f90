@@ -1,10 +1,12 @@
 module utility_module
   ! -- modules
   use kind_module, only: I4
+  use types_module, only: mpi_set
 
   implicit none
   private
-  integer(I4), public :: log_fnum = 0, pro_totn = 1, my_rank = 0
+  integer(I4), public :: log_fnum = 0
+  type(mpi_set), public :: st_mpi
   public :: get_file_stat, get_days
   public :: open_new_rtxt, open_new_rbin, open_new_wtxt, open_new_wbin
   public :: close_file
@@ -317,7 +319,7 @@ module utility_module
 
 #ifdef MPI_MSG
     ! -- Abort process (proc)
-      call abort_proc(my_rank, log_fnum)
+      call abort_proc(st_mpi%rank, log_fnum)
 #endif
     stop
 
@@ -329,7 +331,7 @@ module utility_module
   !*********************************************************************************************
     ! -- modules
     use kind_module, only: SP
-    use constval_module, only: SONE, MINSEC, HOURSEC, DAYSEC
+    use constval_module, only: MINSEC, HOURSEC, DAYSEC, SONE
     ! -- inout
     integer(I4), intent(in) :: rank
     character(*), intent(in) :: time_char, mess_char

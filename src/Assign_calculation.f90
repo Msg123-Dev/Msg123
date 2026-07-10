@@ -1,12 +1,12 @@
 module assign_calc
   ! -- modules
-  use kind_module, only: I4, SP, DP
-  use constval_module, only: SZERO, SNOVAL, DNOVAL, VARLEN
-  use utility_module, only: write_err_stop, close_file
-  use initial_module, only: pro_totn, my_rank, st_grid, st_init, in_type
+  use kind_module, only: I4, SP
+  use constval_module, only: VARLEN, SZERO, SNOVAL, DNOVAL
+  use utility_module, only: close_file, write_err_stop, st_mpi
+  use initial_module, only: st_grid, st_init, in_type
   use read_input, only: len_scal, len_scal_inv
-  use set_cell, only: ncals, ncalc, glo2loc_ijk
-  use set_condition, only: set_clas2calc, set_2dfile2calc, set_3dfile2calc
+  use set_cell, only: ncalc, ncals, glo2loc_ijk
+  use set_condition, only: set_clas2calc, set_2dfile2calc, set_3dfile2calc, st_hydr
 #ifdef MPI_MSG
   use mpi_read, only: close_mpi_file
 #endif
@@ -16,11 +16,6 @@ module assign_calc
   public :: assign_retnv, assign_parmv, assign_geogv, assign_initv, assign_massv
   integer(I4), public :: geog_num = 0, mass_num = 0, msout_tnum
   integer(I4), allocatable, public :: int_mass(:), mass2calc(:)
-  real(SP), allocatable, public :: read_reta(:), read_retn(:), read_resi(:)
-  real(SP), allocatable, public :: read_ksx(:), read_ksy(:), read_ksz(:)
-  real(SP), allocatable, public :: read_ss(:), read_poro(:)
-  real(DP), allocatable, public :: surf_bott(:), surf_reli(:), surf_parm(:)
-  real(DP), allocatable, public :: read_init(:)
   character(VARLEN), allocatable, public :: massout_name(:)
 
   ! -- local
@@ -32,7 +27,7 @@ module assign_calc
   ! assign_retnv -- Assign retention value
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_retf_type, st_retn, st_retn_fnum
+    use initial_module, only: st_retf_type, st_retn_fnum, st_retn
 #ifdef MPI_MSG
     use mpi_set, only: bcast_retn_clas
 #endif
@@ -43,10 +38,12 @@ module assign_calc
     integer(I4), allocatable :: ret_fnum(:), ret_ftype(:)
     real(SP), allocatable :: ret_val(:)
     !-------------------------------------------------------------------------------------------
-    allocate(read_reta(ncalc), read_retn(ncalc), read_resi(ncalc))
+    allocate(st_hydr%read_vana(ncalc), st_hydr%read_vann(ncalc), st_hydr%read_resi(ncalc))
     !$omp parallel do private(i)
     do i = 1, ncalc
-      read_reta(i) = SNOVAL ; read_retn(i) = SNOVAL ; read_resi(i) = SNOVAL
+      st_hydr%read_vana(i) = SNOVAL
+      st_hydr%read_vann(i) = SNOVAL
+      st_hydr%read_resi(i) = SNOVAL
     end do
     !$omp end parallel do
 
@@ -74,19 +71,19 @@ module assign_calc
         case (1)
           !$omp parallel do private(j)
           do j = 1, ncalc
-            read_reta(j) = ret_val(j)
+            st_hydr%read_vana(j) = ret_val(j)
           end do
           !$omp end parallel do
         case (2)
           !$omp parallel do private(j)
           do j = 1, ncalc
-            read_retn(j) = ret_val(j)
+            st_hydr%read_vann(j) = ret_val(j)
           end do
           !$omp end parallel do
         case (3)
           !$omp parallel do private(j)
           do j = 1, ncalc
-            read_resi(j) = ret_val(j)
+            st_hydr%read_resi(j) = ret_val(j)
           end do
           !$omp end parallel do
         end select
@@ -104,7 +101,7 @@ module assign_calc
       end do
       !$omp end parallel do
 
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ierr = 0
         do i = 1, st_retn%totn
           read(unit=st_retn%fnum,fmt=*,iostat=ierr) st_retn%name(i), st_retn%a(i),&
@@ -115,30 +112,30 @@ module assign_calc
         end do
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         call bcast_retn_clas(st_retn%totn, st_retn%name, st_retn%a, st_retn%n, st_retn%r)
       end if
 #endif
-      call set_clas2calc(st_retn%totn, st_retn%name, st_retn%a, read_reta)
-      call set_clas2calc(st_retn%totn, st_retn%name, st_retn%n, read_retn)
-      call set_clas2calc(st_retn%totn, st_retn%name, st_retn%r, read_resi)
+      call set_clas2calc(st_retn%totn, st_retn%name, st_retn%a, st_hydr%read_vana)
+      call set_clas2calc(st_retn%totn, st_retn%name, st_retn%n, st_hydr%read_vann)
+      call set_clas2calc(st_retn%totn, st_retn%name, st_retn%r, st_hydr%read_resi)
       deallocate(st_retn%a, st_retn%n, st_retn%r)
     end if
 
     !$omp parallel do private(i)
     do i = 1, ncalc
-      read_reta(i) = read_reta(i)*len_scal
+      st_hydr%read_vana(i) = st_hydr%read_vana(i)*len_scal
     end do
     !$omp end parallel do
 
 #ifdef MPI_MSG
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       call close_file(st_retn%fnum)
     end if
     if (retn_ftype == in_type(0)) then
       do i = 1, 3
         if (ret_ftype(i) == in_type(3) .or. ret_ftype(i) == in_type(5)) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             call close_file(ret_fnum(i))
           end if
         else if (ret_ftype(i) == in_type(4) .or. ret_ftype(i) == in_type(6)) then
@@ -170,7 +167,7 @@ module assign_calc
   ! assign_parmv -- Assign parameter value
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_parf_type, st_parm, st_parm_fnum
+    use initial_module, only: st_parf_type, st_parm_fnum, st_parm
 #ifdef MPI_MSG
     use mpi_set, only: bcast_parm_clas
 #endif
@@ -181,12 +178,13 @@ module assign_calc
     integer(I4), allocatable :: par_ftype(:), par_fnum(:)
     real(SP), allocatable :: par_val(:)
     !-------------------------------------------------------------------------------------------
-    allocate(read_ksx(ncalc), read_ksy(ncalc), read_ksz(ncalc))
-    allocate(read_ss(ncalc), read_poro(ncalc))
+    allocate(st_hydr%read_hydx(ncalc), st_hydr%read_hydy(ncalc), st_hydr%read_hydz(ncalc))
+    allocate(st_hydr%read_spst(ncalc), st_hydr%read_pors(ncalc))
     !$omp parallel do private(i)
     do i = 1, ncalc
-      read_ksx(i) = SNOVAL ; read_ksy(i) = SNOVAL ; read_ksz(i) = SNOVAL
-      read_ss(i) = SNOVAL ; read_poro(i) = SNOVAL
+      st_hydr%read_hydx(i) = SNOVAL ; st_hydr%read_hydy(i) = SNOVAL
+      st_hydr%read_hydz(i) = SNOVAL ; st_hydr%read_spst(i) = SNOVAL
+      st_hydr%read_pors(i) = SNOVAL
     end do
     !$omp end parallel do
 
@@ -216,31 +214,31 @@ module assign_calc
         case (1)
           !$omp parallel do private(j)
           do j = 1, ncalc
-            read_ksx(j) = par_val(j)
+            st_hydr%read_hydx(j) = par_val(j)
           end do
           !$omp end parallel do
         case (2)
           !$omp parallel do private(j)
           do j = 1, ncalc
-            read_ksy(j) = par_val(j)
+            st_hydr%read_hydy(j) = par_val(j)
           end do
           !$omp end parallel do
         case (3)
           !$omp parallel do private(j)
           do j = 1, ncalc
-            read_ksz(j) = par_val(j)
+            st_hydr%read_hydz(j) = par_val(j)
           end do
           !$omp end parallel do
         case (4)
           !$omp parallel do private(j)
           do j = 1, ncalc
-            read_ss(j) = par_val(j)
+            st_hydr%read_spst(j) = par_val(j)
           end do
           !$omp end parallel do
         case (5)
           !$omp parallel do private(j)
           do j = 1, ncalc
-            read_poro(j) = par_val(j)
+            st_hydr%read_pors(j) = par_val(j)
           end do
           !$omp end parallel do
         end select
@@ -259,7 +257,7 @@ module assign_calc
       end do
       !$omp end parallel do
 
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         do i = 1, st_parm%totn
           read(unit=st_parm%fnum,fmt=*,iostat=ierr) st_parm%name(i), st_parm%ksx(i),&
                                                     st_parm%ksy(i), st_parm%ksz(i),&
@@ -271,34 +269,36 @@ module assign_calc
       end if
 
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         call bcast_parm_clas(st_parm%totn, st_parm%name, st_parm%ksx, st_parm%ksy,&
                              st_parm%ksz, st_parm%ss, st_parm%ts)
       end if
 #endif
-      call set_clas2calc(st_parm%totn, st_parm%name, st_parm%ksx, read_ksx)
-      call set_clas2calc(st_parm%totn, st_parm%name, st_parm%ksy, read_ksy)
-      call set_clas2calc(st_parm%totn, st_parm%name, st_parm%ksz, read_ksz)
-      call set_clas2calc(st_parm%totn, st_parm%name, st_parm%ss, read_ss)
-      call set_clas2calc(st_parm%totn, st_parm%name, st_parm%ts, read_poro)
+      call set_clas2calc(st_parm%totn, st_parm%name, st_parm%ksx, st_hydr%read_hydx)
+      call set_clas2calc(st_parm%totn, st_parm%name, st_parm%ksy, st_hydr%read_hydy)
+      call set_clas2calc(st_parm%totn, st_parm%name, st_parm%ksz, st_hydr%read_hydz)
+      call set_clas2calc(st_parm%totn, st_parm%name, st_parm%ss, st_hydr%read_spst)
+      call set_clas2calc(st_parm%totn, st_parm%name, st_parm%ts, st_hydr%read_pors)
       deallocate(st_parm%ksx, st_parm%ksy, st_parm%ksz, st_parm%ss, st_parm%ts)
     end if
 
     !$omp parallel do private(i)
     do i = 1, ncalc
-      read_ksx(i) = read_ksx(i)*len_scal_inv ; read_ksy(i) = read_ksy(i)*len_scal_inv
-      read_ksz(i) = read_ksz(i)*len_scal_inv ; read_ss(i) = read_ss(i)*len_scal
+      st_hydr%read_hydx(i) = st_hydr%read_hydx(i)*len_scal_inv
+      st_hydr%read_hydy(i) = st_hydr%read_hydy(i)*len_scal_inv
+      st_hydr%read_hydz(i) = st_hydr%read_hydz(i)*len_scal_inv
+      st_hydr%read_spst(i) = st_hydr%read_spst(i)*len_scal
     end do
     !$omp end parallel do
 
 #ifdef MPI_MSG
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       call close_file(st_parm%fnum)
     end if
     if (parm_ftype == in_type(0)) then
       do i = 1, 5
         if (par_ftype(i) == in_type(3) .or. par_ftype(i) == in_type(5)) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             call close_file(par_fnum(i))
           end if
         else if (par_ftype(i) == in_type(4) .or. par_ftype(i) == in_type(6)) then
@@ -346,12 +346,12 @@ module assign_calc
     real(SP), allocatable :: geo_val(:)
     !-------------------------------------------------------------------------------------------
     allocate(geo_fnum(3), geo_ftype(3))
-    allocate(geo_cflag(ncals), surf_parm(ncals))
+    allocate(geo_cflag(ncals), st_hydr%surf_parm(ncals))
     allocate(geo_val(ncals))
     !$omp parallel do private(i)
     do i = 1, ncals
       geo_cflag(i) = 0
-      surf_parm(i) = DZERO
+      st_hydr%surf_parm(i) = DZERO
     end do
     !$omp end parallel do
 
@@ -373,19 +373,19 @@ module assign_calc
       case (1)
         !$omp parallel do private(j)
         do j = 1, ncals
-          surf_bott(j) = geo_val(j)
+          st_hydr%surf_bott(j) = geo_val(j)
         end do
         !$omp end parallel do
       case (2)
         !$omp parallel do private(j)
         do j = 1, ncals
-          surf_reli(j) = geo_val(j)
+          st_hydr%surf_reli(j) = geo_val(j)
         end do
         !$omp end parallel do
       case (3)
         !$omp parallel do private(j)
         do j = 1, ncals
-          surf_parm(j) = geo_val(j)
+          st_hydr%surf_parm(j) = geo_val(j)
         end do
         !$omp end parallel do
       end select
@@ -395,15 +395,15 @@ module assign_calc
 
     !$omp parallel do private(i)
     do i = 1, ncals
-      surf_bott(i) = surf_bott(i)*len_scal_inv
-      surf_reli(i) = surf_reli(i)*len_scal_inv
+      st_hydr%surf_bott(i) = st_hydr%surf_bott(i)*len_scal_inv
+      st_hydr%surf_reli(i) = st_hydr%surf_reli(i)*len_scal_inv
     end do
     !$omp end parallel do
 
 #ifdef MPI_MSG
     do i = 1, 3
       if (geo_ftype(i) == in_type(3)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call close_file(geo_fnum(i))
         end if
       else if (geo_ftype(i) == in_type(4)) then
@@ -430,13 +430,14 @@ module assign_calc
   ! assign_initv -- Assign initial value
   !*********************************************************************************************
     ! -- modules
+    use kind_module, only: DP
     use set_cell, only: get_calc_grid
 #ifdef MPI_MSG
-    use mpi_utility, only: bcast_val, mpisum_val
+    use mpi_utility, only: mpisum_val, bcast_val
     use mpi_read, only: read_mpi_restf, read_mpi_head
     use mpi_set, only: bcast_init_dep, senrec_neibval
-    use set_cell, only: neib_ncalc, neib_mpi_totn, neib_num, send_cind, recv_cind,&
-                        send_citem, recv_citem, calc2recv
+    use set_cell, only: neib_mpi_totn, neib_ncalc, send_cind, recv_cind, send_citem,&
+                        recv_citem, neib_num, calc2recv
 #endif
     ! -- inout
     integer(I4), intent(in) :: init_ftype
@@ -451,10 +452,10 @@ module assign_calc
     real(DP), allocatable :: recv_init(:)
 #endif
     !-------------------------------------------------------------------------------------------
-    allocate(read_init(ncalc))
+    allocate(st_hydr%read_init(ncalc))
     !$omp parallel do private(i)
     do i = 1, ncalc
-      read_init(i) = DNOVAL
+      st_hydr%read_init(i) = DNOVAL
     end do
     !$omp end parallel do
 
@@ -462,14 +463,14 @@ module assign_calc
     if (init_ftype == in_type(0)) then
 #ifdef MPI_MSG
     ! -- Read mpi restart file (mpi_restf)
-      call read_mpi_restf(st_init%fnum, ncalc, temp_end, read_init)
+      call read_mpi_restf(st_init%fnum, ncalc, temp_end, st_hydr%read_init)
       call close_mpi_file(st_init%fnum)
 #else
       read(unit=st_init%fnum,iostat=ierr) temp_end
       if (ierr /= 0) then
         call write_err_stop("While reading header time in initial file.")
       end if
-      read(unit=st_init%fnum,iostat=ierr) (read_init(i), i = 1, ncalc)
+      read(unit=st_init%fnum,iostat=ierr) (st_hydr%read_init(i), i = 1, ncalc)
       if (ierr /= 0) then
         call write_err_stop("While reading initial value in initial file.")
       end if
@@ -478,7 +479,7 @@ module assign_calc
     st_init%rest_time = real(temp_end, kind=SP)
     !$omp parallel do private(i)
     do i = 1, ncalc
-      read_init(i) = read_init(i)*len_scal_inv
+      st_hydr%read_init(i) = st_hydr%read_init(i)*len_scal_inv
     end do
     !$omp end parallel do
 
@@ -486,7 +487,7 @@ module assign_calc
       init_fnum = st_init%fnum
       if (len_trim(adjustl(init_unit)) /= 0) then
         if (init_ftype == in_type(3) .or. init_ftype == in_type(5)) then
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             read(unit=init_fnum,fmt=*,iostat=ierr) st_init%rest_time
             if (ierr /= 0) then
               call write_err_stop("While reading header time in initial file.")
@@ -500,29 +501,29 @@ module assign_calc
           read(unit=init_fnum,iostat=ierr) temp_end
 #endif
           st_init%rest_time = real(temp_end, kind=SP)
-          if (ierr /= 0 .and. my_rank == 0) then
+          if (ierr /= 0 .and. st_mpi%rank == 0) then
             call write_err_stop("While reading header time in initial file.")
           end if
         end if
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Bcast scalar value (val)
             call bcast_val(st_init%rest_time, "restart time value")
         end if
 #endif
       end if
       if (init_ftype == in_type(3) .or. init_ftype == in_type(4)) then
-        call set_2dfile2calc(init_fnum, init_ftype, 0, ncals, DNOVAL, read_init)
+        call set_2dfile2calc(init_fnum, init_ftype, 0, ncals, DNOVAL, st_hydr%read_init)
       else if (init_ftype == in_type(5) .or. init_ftype == in_type(6)) then
-        call set_3dfile2calc(init_fnum, init_ftype, 0, DNOVAL, read_init)
+        call set_3dfile2calc(init_fnum, init_ftype, 0, DNOVAL, st_hydr%read_init)
       end if
       !$omp parallel do private(i)
       do i = 1, ncalc
-        read_init(i) = read_init(i)*len_scal_inv
+        st_hydr%read_init(i) = st_hydr%read_init(i)*len_scal_inv
       end do
       !$omp end parallel do
       if (init_ftype == in_type(3) .or. init_ftype == in_type(5)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call close_file(init_fnum)
         end if
       else if (init_ftype == in_type(4) .or. init_ftype == in_type(6)) then
@@ -536,7 +537,7 @@ module assign_calc
       st_init%rest_time = SZERO
       st_init%depth = st_init%depth*len_scal_inv
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast initial depth (init_dep)
           call bcast_init_dep()
       end if
@@ -546,7 +547,7 @@ module assign_calc
     end if
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       sum_init = 1
       allocate(recv_init(ncalc+neib_ncalc))
       !$omp parallel do private(i)
@@ -557,21 +558,21 @@ module assign_calc
       do while (sum_init /= 0)
         ! -- Send and Receive neighbor value (neibval)
           call senrec_neibval(neib_mpi_totn, neib_num, send_cind, recv_cind, send_citem,&
-                              recv_citem, read_init, recv_init)
+                              recv_citem, st_hydr%read_init, recv_init)
         do i = 1, ncalc
-          if (calc2recv(i) > 0 .and. read_init(i) == DNOVAL) then
-            read_init(i) = recv_init(calc2recv(i))
+          if (calc2recv(i) > 0 .and. st_hydr%read_init(i) == DNOVAL) then
+            st_hydr%read_init(i) = recv_init(calc2recv(i))
             call get_calc_grid(i, xn, yn, zn)
             do k = zn+1, st_grid%nz
               xyzn = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(yn-1) + xn
               j = 0 ; j = glo2loc_ijk(xyzn)
               if (j /= 0 .and. j <= ncalc) then
-                read_init(j) = read_init(i)
+                st_hydr%read_init(j) = st_hydr%read_init(i)
               end if
             end do
           end if
         end do
-        nov_num = count(read_init(:) == DNOVAL)
+        nov_num = count(st_hydr%read_init(:) == DNOVAL)
         ! -- Sum value for MPI (val)
           call mpisum_val(nov_num, "non initial", sum_init)
       end do
@@ -592,7 +593,7 @@ module assign_calc
     use open_file, only: inmas_fnum
     use set_condition, only: set_mass2calc
 #ifdef MPI_MSG
-    use mpi_utility, only: bcast_val, mpimax_val
+    use mpi_utility, only: mpimax_val, bcast_val
     use mpi_set, only: bcast_clas_val
 #endif
     ! -- inout
@@ -614,7 +615,7 @@ module assign_calc
     !$omp end parallel do
 
     if (mass_ftype == in_type(1)) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         read(unit=inmas_fnum,fmt=*,iostat=ierr) msout_tnum
         if (ierr /= 0) then
           call write_err_stop("While reading massbalance output number in mass file.")
@@ -623,7 +624,7 @@ module assign_calc
         end if
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
          call bcast_val(msout_tnum, "massbalance output number")
       end if
 #endif
@@ -642,7 +643,7 @@ module assign_calc
       end do
       !$omp end do
       !$omp end parallel
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         do i = 1, msout_tnum
           read(unit=inmas_fnum,fmt=*,iostat=ierr) massout_name(i)
           if (ierr /= 0) then
@@ -654,7 +655,7 @@ module assign_calc
       end if
 
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         call bcast_clas_val(msout_tnum, massout_name, clas_mass)
       end if
 #endif
@@ -676,7 +677,7 @@ module assign_calc
       end if
 
       if (mass_ftype == in_type(3) .or. mass_ftype == in_type(5)) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call close_file(massun)
         end if
       else if (mass_ftype == in_type(4) .or. mass_ftype == in_type(6)) then
@@ -733,7 +734,7 @@ module assign_calc
   !*********************************************************************************************
     ! -- modules
     use set_cell, only: get_cals_grid
-    use make_cell, only: surf_elev
+    use make_cell, only: st_geom
     ! -- inout
 
     ! -- local
@@ -746,7 +747,7 @@ module assign_calc
         xyzn = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(yn-1) + xn
         j = 0 ; j = glo2loc_ijk(xyzn)
         if (j /= 0 .and. j <= ncalc) then
-          read_init(j) = surf_elev(i) - st_init%depth
+          st_hydr%read_init(j) = st_geom%surf_elev(i) - st_init%depth
         end if
       end do
     end do

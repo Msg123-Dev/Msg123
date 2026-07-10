@@ -4,20 +4,20 @@ program msg123
 !***********************************************************************************************
   ! -- modules
   use kind_module, only: I4, DP
-  use utility_module, only: log_fnum
-  use initial_module, only: my_rank, init_msg, precon_type
+  use utility_module, only: log_fnum, st_mpi
+  use initial_module, only: init_msg, st_ctrl
   use read_input, only: read_main_file
   use set_cell, only: set_cell_info
-  use prep_calculation, only: prepare_calc, conv_flag
+  use prep_calculation, only: prepare_calc, st_time
   use set_boundary, only: set_bound
   use allocate_solution, only: allocate_solvar
   use calc_function, only: allocate_calfun
   use make_linearsystem, only: allocate_matvec
+  use check_simulation, only: check_lastts, lasttime_flag
   use linear_solution, only: allocate_amgalg
-  use time_module, only: update_tstep, now_time
+  use time_module, only: update_tstep
   use nonlinear_solution, only: calc_numsol
   use write_output, only: write_outf
-  use check_simulation, only: check_lastts, lasttime_flag
 #ifdef ICI
   use ici_module, only: set_mapt, put_initv, get_var, alloc_outvar, put_var, fin_ici
 #endif
@@ -37,7 +37,7 @@ program msg123
   12 format(/"Total cpu time : ", es15.6, " (sec)")
   13 format(/"Time loop cpu time : ", es15.6, " (sec)")
   !--------------------------------------------------------------------------------------------
-  if (my_rank == 0) then
+  if (st_mpi%rank == 0) then
     ! -- Start time
       call DATE_AND_TIME(values = sta_value)
     ! -- Calculation start time
@@ -47,7 +47,7 @@ program msg123
   ! -- Initialize msg (msg)
     call init_msg(sta_value)
 
-  if (my_rank == 0) then
+  if (st_mpi%rank == 0) then
     ! -- Read main files (main_file)
       call read_main_file()
   end if
@@ -81,12 +81,12 @@ program msg123
     call allocate_calfun()
   ! -- Allocate for matrix and vector (matvec)
     call allocate_matvec()
-  if (precon_type == 1) then
+  if (st_ctrl%precon_type == 1) then
     ! -- Allocate for amg algebra (amgalg)
       call allocate_amgalg()
   end if
 
-  if (my_rank == 0) then
+  if (st_mpi%rank == 0) then
     ! -- Time loop start time
       call CPU_TIME(loop_stime)
   end if
@@ -99,11 +99,11 @@ program msg123
     ! -- Calculate numerical solution (numsol)
       call calc_numsol()
 
-    if (conv_flag) then
+    if (st_time%conv_flag) then
       ! -- Check last time step conditions (lastts)
         call check_lastts()
       ! -- Write output file (outf)
-        call write_outf(now_time)
+        call write_outf(st_time%now_time)
 #ifdef ICI
       ! -- Put variables (var)
         call put_var()
@@ -122,10 +122,10 @@ program msg123
 
 #ifdef MPI_MSG
   ! -- Finalize mpi (mpi)
-    call fin_mpi(my_rank, log_fnum)
+    call fin_mpi(st_mpi%rank, log_fnum)
 #endif
 
-  if (my_rank == 0) then
+  if (st_mpi%rank == 0) then
     ! -- Time loop end time
       call CPU_TIME(loop_etime)
     ! -- Calculation end time

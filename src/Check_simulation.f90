@@ -2,7 +2,7 @@ module check_simulation
   ! -- modules
   use kind_module, only: I4, DP
   use initial_module, only: st_sim
-  use prep_calculation, only: current_t, conv_flag
+  use prep_calculation, only: st_time
 
   implicit none
   private
@@ -18,7 +18,7 @@ module check_simulation
   ! check_insol -- Check inner solution
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: errtol
+    use initial_module, only: st_ctrl
     ! -- inout
     real(DP), intent(in) :: bsum, rsum
     ! -- local
@@ -26,10 +26,10 @@ module check_simulation
     !-------------------------------------------------------------------------------------------
     rerr = sqrt(rsum/bsum)
 
-    if (rerr <= errtol) then
-      conv_flag = .true.
+    if (rerr <= st_ctrl%errtol) then
+      st_time%conv_flag = .true.
     else
-      conv_flag = .false.
+      st_time%conv_flag = .false.
     end if
 
   end subroutine check_insol
@@ -109,9 +109,9 @@ module check_simulation
 
     if (step_flag > 0) then
       write_flag = 1
-    else if (current_t >= st_sim%end_time) then
+    else if (st_time%current_t >= st_sim%end_time) then
       write_flag = 1
-    else if (conv_flag .and. st_sim%sim_type /= 1) then
+    else if (st_time%conv_flag .and. st_sim%sim_type /= 1) then
       write_flag = 1
     else
       write_flag = 0
@@ -130,9 +130,9 @@ module check_simulation
     ! -- local
 
     !-------------------------------------------------------------------------------------------
-    if (current_t >= st_sim%end_time) then
+    if (st_time%current_t >= st_sim%end_time) then
       lasttime_flag = 1
-    else if (conv_flag .and. st_sim%sim_type == -1) then
+    else if (st_time%conv_flag .and. st_sim%sim_type == -1) then
       lasttime_flag = 1
     else
       lasttime_flag = 0

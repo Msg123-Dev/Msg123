@@ -2,12 +2,11 @@ module read_module
   ! -- modules
   use kind_module, only: I4, SP, DP
   use constval_module, only: CHALEN
-  use utility_module, only: open_new_rtxt, open_new_rbin, write_err_read, write_logf
-  use initial_module, only: st_sim, st_grid, st_init, my_rank, in_type
+  use utility_module, only: st_mpi, open_new_rtxt, open_new_rbin, write_logf, write_err_read
+  use initial_module, only: st_sim, st_grid, st_init, in_type
 #ifdef MPI_MSG
-  use mpi_utility, only: bcast_val
   use utility_module, only: log_fnum
-  use initial_module, only: pro_totn
+  use mpi_utility, only: bcast_val
 #endif
 
   implicit none
@@ -1033,7 +1032,7 @@ module read_module
     allocate(character(0) :: err_mes)
     err_mes = "Read final step in "//mess//" file."
     if (ftype == in_type(1) .or. ftype == in_type(2)) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         read(unit=fnum,fmt=*,iostat=ierr) nx_totn, etime
         if (ierr /= 0) then
           call write_logf(err_mes)
@@ -1043,14 +1042,14 @@ module read_module
         end if
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast scalar value (val)
           call bcast_val(nx_totn, mess//" total number")
       end if
 #endif
 
     else if (any(ftype == type_txt(:))) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         read(unit=fnum,fmt=*,iostat=ierr) etime
         if (ierr /= 0) then
           call write_logf(err_mes)
@@ -1068,7 +1067,7 @@ module read_module
       read(unit=fnum,iostat=ierr) temp_etime
 #endif
       if (ierr /= 0) then
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           call write_logf(err_mes)
         end if
         flag = 0 ; etime = st_sim%end_time
@@ -1078,7 +1077,7 @@ module read_module
     end if
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast scalar value (val)
         call bcast_val(flag, mess//" flag value")
       ! -- Bcast scalar value (val)
@@ -1119,14 +1118,14 @@ module read_module
     ierr = 0
     allocate(character(0) :: err_mes)
     err_mes = "Read final step in "//mess//" timeseries file."
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       read(unit=fnum,fmt='(a)',iostat=ierr) nxi_path
       if (ierr /= 0) then
         call write_logf(err_mes)
       end if
     end if
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast scalar value (val)
         call bcast_val(ierr, mess//" error value")
       ! -- Bcast file (file)
@@ -1140,12 +1139,12 @@ module read_module
     end if
 
     if (any(ftype == type_txt(:))) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
           call open_new_rtxt(0, 0, trim(adjustl(nxi_path)), err_mes, intfn, ierr)
       end if
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast scalar value (val)
           call bcast_val(ierr, mess//" error value")
         ! -- Bcast scalar value (val)

@@ -1,8 +1,8 @@
 module set_cell
   ! -- modules
   use kind_module, only: I4
-  use utility_module, only: iquick_sort
-  use initial_module, only: pro_totn, my_rank, st_sim, st_grid, st_clas
+  use utility_module, only: st_mpi, iquick_sort
+  use initial_module, only: st_sim, st_grid, st_clas
 
   implicit none
   private
@@ -23,12 +23,13 @@ module set_cell
 
   ! -- local
   integer(I4) :: ns_unknow, nc_unknow
-  integer(I4) :: totnreg, loc_regn
+  integer(I4) :: totnreg, loc_regn, neib_hash
   integer(I4), allocatable :: glob_reg_flag(:), glob_mpi_flag(:)
   integer(I4), allocatable :: glob_clas_flag(:,:)
   integer(I4), allocatable :: calc_end(:), loc_nreg(:)
   integer(I4), allocatable :: l2g_ij(:), l2g_ijk(:)
   integer(I4), allocatable :: glo2loc_ij(:)
+  integer(I4), allocatable :: neib_hash_key(:), neib_hash_mpi(:), neib_hash_reg(:)
 
   contains
 
@@ -38,8 +39,7 @@ module set_cell
   !*********************************************************************************************
     ! -- modules
     use utility_module, only: open_new_wtxt, close_file
-    use initial_module, only: precon_type, amg_nlevel, st_out_type, st_out_path,&
-                              noclas_flag, out_type
+    use initial_module, only: st_ctrl, st_out_type, st_out_path, out_type
     use check_condition, only: check_calc_region
 #ifdef MPI_MSG
     use mpi_utility, only: barrier_proc, mpisum_val, gather_val
@@ -63,7 +63,7 @@ module set_cell
 #endif
     !-------------------------------------------------------------------------------------------
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast simulation flag (sim_flag)
         call bcast_sim_flag()
       ! -- Bcast xyz number (xyz_num)
@@ -71,15 +71,15 @@ module set_cell
     end if
 #endif
 
-    if (precon_type == 1) then
+    if (st_ctrl%precon_type == 1) then
       amg_setflag = 0
     else
-      amg_nlevel = 1
+      st_ctrl%amg_nlevel = 1
     end if
 
-    if (noclas_flag /= 1) then
+    if (st_ctrl%noclas_flag /= 1) then
 #ifdef MPI_MSG
-      if (pro_totn /= 1) then
+      if (st_mpi%totn /= 1) then
         ! -- Bcast classification setting (clas_set)
           call bcast_clas_set()
       end if
@@ -101,7 +101,7 @@ module set_cell
 
     nxy = st_grid%nx*st_grid%ny
 
-    if (my_rank == 0) then
+    if (st_mpi%rank == 0) then
       ! -- Set global region (glob_reg)
         call set_glob_reg()
       ! -- Divide calculation region for 2d (calc_reg_2d)
@@ -117,7 +117,7 @@ module set_cell
 !        ! -- Divide no calculation flag for 2d (nocalc_flag_2d)
 !          call div_nocalc_flag_2d()
 !      else if (st_sim%reg_type /= in_type(5) .and. st_sim%reg_type /= in_type(6) .and. &
-!               pro_totn < nxy) then
+!               st_mpi%totn < nxy) then
 !        ! -- Divide calculation region for 2d (calc_reg_2d)
 !          call div_calc_reg_2d()
 !        ! -- Divide no calculation flag for 2d (nocalc_flag_2d)
@@ -131,14 +131,14 @@ module set_cell
     end if
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Bcast global flag (glob_flag)
         call bcast_glob_flag(totnreg, glob_reg_flag, glob_mpi_flag)
     end if
 #endif
 
-    ncalc = count(glob_mpi_flag(:) == my_rank+1)
-    ncals = count(glob_mpi_flag(1:nxy) == my_rank+1)
+    ncalc = count(glob_mpi_flag(:) == st_mpi%rank+1)
+    ncals = count(glob_mpi_flag(1:nxy) == st_mpi%rank+1)
 
     allocate(glo2loc_ijk(st_grid%nxyz), l2g_ijk(ncalc))
     allocate(glo2loc_ij(nxy), l2g_ij(ncals))
@@ -229,19 +229,19 @@ module set_cell
     temp_locc(:) = pack(glo2loc_ijk(:), glo2loc_ijk(:) > mpi_ncalc)
     loc2glo_ijk((/ temp_locc /)) = pack(glob_num(:), glo2loc_ijk(:) > mpi_ncalc)
 
-    no_ncals = count(glob_mpi_flag(1:nxy) == -(my_rank+1))
-    no_ncalc = count(glob_mpi_flag(:) == -(my_rank+1))
+    no_ncals = count(glob_mpi_flag(1:nxy) == -(st_mpi%rank+1))
+    no_ncalc = count(glob_mpi_flag(:) == -(st_mpi%rank+1))
 
 #ifdef MPI_MSG
     allocate(loc2glo_nos(no_ncals), loc2glo_noc(no_ncalc))
-    loc2glo_nos(:) = pack(glob_num(1:nxy), (glob_mpi_flag(1:nxy) == -(my_rank+1)))
-    loc2glo_noc(:) = pack(glob_num(:), (glob_mpi_flag(:) == -(my_rank+1)))
+    loc2glo_nos(:) = pack(glob_num(1:nxy), (glob_mpi_flag(1:nxy) == -(st_mpi%rank+1)))
+    loc2glo_noc(:) = pack(glob_num(:), (glob_mpi_flag(:) == -(st_mpi%rank+1)))
 #endif
 
     deallocate(l2g_ij, l2g_ijk, temp_locs, temp_locc, glob_num, glob_mpi_flag)
 
 #ifdef MPI_MSG
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Sum value for MPI (val)
         call mpisum_val(ncals, "calculation surface number", ns_unknow)
       ! -- Sum value for MPI (val)
@@ -267,11 +267,11 @@ module set_cell
     end do
     !$omp end do
     !$omp end parallel
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       ! -- Gather array (val)
-        call gather_val(pro_totn, ncals, loc2glo_ij(1:ncals), cals_glob, "calculation number")
+        call gather_val(st_mpi%totn, ncals, loc2glo_ij(1:ncals), cals_glob, "calculation number")
       ! -- Gather array (val)
-        call gather_val(pro_totn, ncalc, loc2glo_ijk(1:ncalc), calc_glob, "calculation number")
+        call gather_val(st_mpi%totn, ncalc, loc2glo_ijk(1:ncalc), calc_glob, "calculation number")
     else
       !$omp parallel
       !$omp do private(i)
@@ -406,7 +406,7 @@ module set_cell
 
     deallocate(glo2loc_ij)
 
-    if (noclas_flag /= 1) then
+    if (st_ctrl%noclas_flag /= 1) then
       ! -- Set local cell classification (loc_cell_clas)
         call set_loc_cell_clas()
     end if
@@ -414,13 +414,13 @@ module set_cell
     deallocate(glob_clas_flag)
 
     if (st_out_type%calg == out_type(1)) then
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call open_new_wtxt(st_out_path%calg, "output calculation grid number", calg_num)
         write(calg_num,'(a)') "Calclation_No,I,J,K"
       end if
-      do n = 1, pro_totn
+      do n = 1, st_mpi%totn
 #ifdef MPI_MSG
-        if (pro_totn /= 1) then
+        if (st_mpi%totn /= 1) then
           ! -- Send and Receive region information (reg_info)
             call senrec_reg_info(n, loc_nreg, cur_nreg)
           pro_nreg = size(cur_nreg)
@@ -442,26 +442,26 @@ module set_cell
         end do
         !$omp end parallel do
 #endif
-        if (my_rank == 0) then
+        if (st_mpi%rank == 0) then
           write(calg_num,'(a,i0)') "Rank", n-1
         end if
         do i = 1, pro_nreg
-          if (my_rank == 0) then
+          if (st_mpi%rank == 0) then
             write(calg_num,'(a,i0)') "Region", cur_nreg(i)
           end if
           sta_calc = calc_end(i-1) ; end_calc = calc_end(i)
           do j = sta_calc+1, end_calc
-            if (n == my_rank+1) then
+            if (n == st_mpi%rank+1) then
               ! -- Get calculation number from grid number (calc_grid)
                 call get_calc_grid(j, i_num, j_num, k_num)
             end if
 #ifdef MPI_MSG
-            if (pro_totn /= 1) then
+            if (st_mpi%totn /= 1) then
               ! -- Send and Receive grid number (grid_num)
                 call senrec_grid_num(n, i_num, j_num, k_num)
             end if
 #endif
-            if (my_rank == 0) then
+            if (st_mpi%rank == 0) then
               write(calg_num,'(*(i0:,","))') j, i_num, j_num, k_num
             end if
           end do
@@ -472,7 +472,7 @@ module set_cell
 #endif
       end do
       deallocate(cur_nreg)
-      if (my_rank == 0) then
+      if (st_mpi%rank == 0) then
         call close_file(calg_num)
       end if
     end if
@@ -702,7 +702,7 @@ module set_cell
     !$omp end do
     !$omp end parallel
 
-    rough_divn = sum(reg_ncals(:))/pro_totn
+    rough_divn = sum(reg_ncals(:))/st_mpi%totn
     if (rough_divn == 0) then
       rough_divn = 1
     end if
@@ -722,8 +722,8 @@ module set_cell
     end do
 
     pro_num = 0
-    if (reg_mpi_end(totnreg) < pro_totn) then
-      do j = 1, pro_totn-reg_mpi_end(totnreg)
+    if (reg_mpi_end(totnreg) < st_mpi%totn) then
+      do j = 1, st_mpi%totn-reg_mpi_end(totnreg)
         max_reg = maxloc(reg_remain(:),1) ;
         reg_mpi_num(max_reg) = reg_mpi_num(max_reg) + 1
         if (reg_remain(max_reg) < reg_ncals(max_reg)/2) then
@@ -812,7 +812,7 @@ module set_cell
 !    !$omp end do
 !    !$omp end parallel
 !
-!    rough_divn = sum(reg_ncalc(:))/pro_totn
+!    rough_divn = sum(reg_ncalc(:))/st_mpi%totn
 !    if (rough_divn == 0) then
 !      rough_divn = 1
 !    end if
@@ -832,8 +832,8 @@ module set_cell
 !    end do
 !
 !    pro_num = 0
-!    if (reg_mpi_end(totnreg) < pro_totn) then
-!      do j = 1, pro_totn-reg_mpi_end(totnreg)
+!    if (reg_mpi_end(totnreg) < st_mpi%totn) then
+!      do j = 1, st_mpi%totn-reg_mpi_end(totnreg)
 !        max_reg = maxloc(reg_remain(:),1) ;
 !        reg_mpi_num(max_reg) = reg_mpi_num(max_reg) + 1
 !        if (reg_remain(max_reg) < reg_ncalc(max_reg)/2) then
@@ -903,16 +903,16 @@ module set_cell
     do k = 1, st_grid%nz
       nxyz0 = nxy*(k-1)+1 ; nxyz1 = nxy*k
       glo_nocals = count(glob_mpi_flag(nxyz0:nxyz1) == 0)
-      rough_divn = glo_nocals/pro_totn ; nocals_remain = mod(glo_nocals, pro_totn)
-      allocate(nocals_mpi_num(pro_totn), grid_num(nxy), nocals_glo_num(glo_nocals))
+      rough_divn = glo_nocals/st_mpi%totn ; nocals_remain = mod(glo_nocals, st_mpi%totn)
+      allocate(nocals_mpi_num(st_mpi%totn), grid_num(nxy), nocals_glo_num(glo_nocals))
       !$omp parallel
       !$omp do private(i)
-      do i = 1, pro_totn
+      do i = 1, st_mpi%totn
         nocals_mpi_num(i) = rough_divn
       end do
       !$omp end do
       !$omp do private(i)
-      do i = 1, pro_totn
+      do i = 1, st_mpi%totn
         if (i <= nocals_remain) then
           nocals_mpi_num(i) = nocals_mpi_num(i) + 1
         end if
@@ -929,7 +929,7 @@ module set_cell
       deallocate(grid_num)
 
       nocals_sta = 0 ; nocals_end = 0
-      do i = 1, pro_totn
+      do i = 1, st_mpi%totn
         nocals_end = nocals_sta + nocals_mpi_num(i)
         allocate(nocals_mpi_glo(nocals_end-nocals_sta))
         nocals_mpi_glo(:) = nocals_glo_num(nocals_sta+1:nocals_end)
@@ -961,16 +961,16 @@ module set_cell
 !    !-------------------------------------------------------------------------------------
 !    nxyz = st_grid%nxyz
 !    glo_nocalc = count(glob_mpi_flag(:) == 0)
-!    rough_divn = glo_nocalc/pro_totn ; nocalc_remain = mod(glo_nocalc, pro_totn)
-!    allocate(nocalc_mpi_num(pro_totn), grid_num(nxyz), nocalc_glo_num(glo_nocalc))
+!    rough_divn = glo_nocalc/st_mpi%totn ; nocalc_remain = mod(glo_nocalc, st_mpi%totn)
+!    allocate(nocalc_mpi_num(st_mpi%totn), grid_num(nxyz), nocalc_glo_num(glo_nocalc))
 !    !$omp parallel
 !    !$omp do private(i)
-!    do i = 1, pro_totn
+!    do i = 1, st_mpi%totn
 !      nocalc_mpi_num(i) = rough_divn
 !    end do
 !    !$omp end do
 !    !$omp do private(i)
-!    do i = 1, pro_totn
+!    do i = 1, st_mpi%totn
 !      if (i <= nocalc_remain) then
 !        nocalc_mpi_num(i) = nocalc_mpi_num(i) + 1
 !      end if
@@ -987,7 +987,7 @@ module set_cell
 !    deallocate(grid_num)
 !
 !    nocalc_sta = 0 ; nocalc_end = 0
-!    do i = 1, pro_totn
+!    do i = 1, st_mpi%totn
 !      nocalc_end = nocalc_sta + nocalc_mpi_num(i)
 !      allocate(nocalc_mpi_glo(nocalc_end-nocalc_sta))
 !      nocalc_mpi_glo(:) = nocalc_glo_num(nocalc_sta+1:nocalc_end)
@@ -1015,7 +1015,7 @@ module set_cell
     logical, allocatable :: mask(:)
     !-------------------------------------------------------------------------------------------
     allocate(temp_mpi_reg(ncalc), mask(ncalc))
-    temp_mpi_reg(:) = pack(glob_reg_flag(:), glob_mpi_flag(:) == my_rank+1)
+    temp_mpi_reg(:) = pack(glob_reg_flag(:), glob_mpi_flag(:) == st_mpi%rank+1)
     count_reg = 0
     !$omp parallel do private(i, mask), reduction(+:count_reg)
     do i = 1, totnreg
@@ -1049,7 +1049,7 @@ module set_cell
     do k = 1, st_grid%nz
       do i = 1, st_grid%nx*st_grid%ny
         ij = (k-1)*st_grid%nx*st_grid%ny + i
-        if (glob_mpi_flag(ij) == my_rank+1) then
+        if (glob_mpi_flag(ij) == st_mpi%rank+1) then
           reg_flag = 0
           if (count_reg /= 0) then
             do j = 1, count_reg
@@ -1108,7 +1108,7 @@ module set_cell
     integer(I4), allocatable :: temp_sort(:), sort_mpi_num(:), loc_send_num(:)
     integer(I4), allocatable :: mpi_l2g_ij(:), mpi_l2g_ijk(:), mpi_calc2reg(:)
     !-------------------------------------------------------------------------------------------
-    if (pro_totn /= 1) then
+    if (st_mpi%totn /= 1) then
       allocate(neib_glos(ncals))
       !$omp parallel do private(i)
       do i = 1, ncals
@@ -1124,7 +1124,7 @@ module set_cell
         ! north direction
         if (j_num /= 1) then
           n_num = g_num-st_grid%nx ; reg_num = glob_reg_flag(n_num)
-          if (reg_num > 0 .and. glob_mpi_flag(n_num) /= my_rank+1) then
+          if (reg_num > 0 .and. glob_mpi_flag(n_num) /= st_mpi%rank+1) then
             if (reg_num == glob_reg_flag(g_num) .or. st_sim%reg_neib == 1) then
               neib_ncals = neib_ncals + 1 ; neib_glos(neib_ncals) = n_num
             end if
@@ -1133,7 +1133,7 @@ module set_cell
         ! west direction
         if (i_num /= 1) then
           w_num = g_num-1 ; reg_num = glob_reg_flag(w_num)
-          if (reg_num > 0 .and. glob_mpi_flag(w_num) /= my_rank+1) then
+          if (reg_num > 0 .and. glob_mpi_flag(w_num) /= st_mpi%rank+1) then
             if (reg_num == glob_reg_flag(g_num) .or. st_sim%reg_neib == 1) then
               neib_ncals = neib_ncals + 1 ; neib_glos(neib_ncals) = w_num
             end if
@@ -1142,7 +1142,7 @@ module set_cell
         ! east direction
         if (i_num /= st_grid%nx) then
           e_num = g_num+1 ; reg_num = glob_reg_flag(e_num)
-          if (reg_num > 0 .and. glob_mpi_flag(e_num) /= my_rank+1) then
+          if (reg_num > 0 .and. glob_mpi_flag(e_num) /= st_mpi%rank+1) then
             if (reg_num == glob_reg_flag(g_num) .or. st_sim%reg_neib == 1) then
               neib_ncals = neib_ncals + 1 ; neib_glos(neib_ncals) = e_num
             end if
@@ -1151,7 +1151,7 @@ module set_cell
         ! south direction
         if (j_num /= st_grid%ny) then
           s_num = g_num+st_grid%nx ; reg_num = glob_reg_flag(s_num)
-          if (reg_num > 0 .and. glob_mpi_flag(s_num) /= my_rank+1) then
+          if (reg_num > 0 .and. glob_mpi_flag(s_num) /= st_mpi%rank+1) then
             if (reg_num == glob_reg_flag(g_num) .or. st_sim%reg_neib == 1) then
               neib_ncals = neib_ncals + 1 ; neib_glos(neib_ncals) = s_num
             end if
@@ -1159,12 +1159,12 @@ module set_cell
         end if
       end do
 
-      allocate(temp_neib_num(pro_totn), temp_neib_flag(pro_totn))
+      allocate(temp_neib_num(st_mpi%totn), temp_neib_flag(st_mpi%totn))
       allocate(temp_mpi_num(ncalc), neib_locc(ncalc))
       allocate(neib_gloc(ncalc), temp_calc_reg(ncalc))
       !$omp parallel
       !$omp do private(i)
-      do i = 1, pro_totn
+      do i = 1, st_mpi%totn
         temp_neib_num(i) = 0 ; temp_neib_flag(i) = 0
       end do
       !$omp end do
@@ -1184,7 +1184,7 @@ module set_cell
         ! up direction
         if (k_num /= 1) then
           u_num = g_num-st_grid%nx*st_grid%ny ; reg_num = glob_reg_flag(u_num)
-          if (reg_num > 0 .and. glob_mpi_flag(u_num) /= my_rank+1) then
+          if (reg_num > 0 .and. glob_mpi_flag(u_num) /= st_mpi%rank+1) then
             if (reg_num == glob_reg_flag(g_num) .or. st_sim%reg_neib == 1) then
               neib_ncalc = neib_ncalc + 1 ; neib_mpi_num = glob_mpi_flag(u_num)
               temp_calc_reg(neib_ncalc) = reg_num ; temp_mpi_num(neib_ncalc) = neib_mpi_num
@@ -1199,7 +1199,7 @@ module set_cell
         ! north direction
         if (j_num /= 1) then
           n_num = g_num-st_grid%nx ; reg_num = glob_reg_flag(n_num)
-          if (reg_num > 0 .and. glob_mpi_flag(n_num) /= my_rank+1) then
+          if (reg_num > 0 .and. glob_mpi_flag(n_num) /= st_mpi%rank+1) then
             if (reg_num == glob_reg_flag(g_num) .or. st_sim%reg_neib == 1) then
               neib_ncalc = neib_ncalc + 1 ; neib_mpi_num = glob_mpi_flag(n_num)
               temp_calc_reg(neib_ncalc) = reg_num ; temp_mpi_num(neib_ncalc) = neib_mpi_num
@@ -1214,7 +1214,7 @@ module set_cell
         ! west direction
         if (i_num /= 1) then
           w_num = g_num-1 ; reg_num = glob_reg_flag(w_num)
-          if (reg_num > 0 .and. glob_mpi_flag(w_num) /= my_rank+1) then
+          if (reg_num > 0 .and. glob_mpi_flag(w_num) /= st_mpi%rank+1) then
             if (reg_num == glob_reg_flag(g_num) .or. st_sim%reg_neib == 1) then
               neib_ncalc = neib_ncalc + 1 ; neib_mpi_num = glob_mpi_flag(w_num)
               temp_calc_reg(neib_ncalc) = reg_num ; temp_mpi_num(neib_ncalc) = neib_mpi_num
@@ -1229,7 +1229,7 @@ module set_cell
         ! east direction
         if (i_num /= st_grid%nx) then
           e_num = g_num+1 ; reg_num = glob_reg_flag(e_num)
-          if (reg_num > 0 .and. glob_mpi_flag(e_num) /= my_rank+1) then
+          if (reg_num > 0 .and. glob_mpi_flag(e_num) /= st_mpi%rank+1) then
             if (reg_num == glob_reg_flag(g_num) .or. st_sim%reg_neib == 1) then
               neib_ncalc = neib_ncalc + 1 ; neib_mpi_num = glob_mpi_flag(e_num)
               temp_calc_reg(neib_ncalc) = reg_num ; temp_mpi_num(neib_ncalc) = neib_mpi_num
@@ -1244,7 +1244,7 @@ module set_cell
         ! south direction
         if (j_num /= st_grid%ny) then
           s_num = g_num+st_grid%nx ; reg_num = glob_reg_flag(s_num)
-          if (reg_num > 0 .and. glob_mpi_flag(s_num) /= my_rank+1) then
+          if (reg_num > 0 .and. glob_mpi_flag(s_num) /= st_mpi%rank+1) then
             if (reg_num == glob_reg_flag(g_num) .or. st_sim%reg_neib == 1) then
               neib_ncalc = neib_ncalc + 1 ; neib_mpi_num = glob_mpi_flag(s_num)
               temp_calc_reg(neib_ncalc) = reg_num ; temp_mpi_num(neib_ncalc) = neib_mpi_num
@@ -1259,7 +1259,7 @@ module set_cell
         ! down direction
         if (k_num /= st_grid%nz) then
           d_num = g_num+st_grid%nx*st_grid%ny ; reg_num = glob_reg_flag(d_num)
-          if (reg_num > 0 .and. glob_mpi_flag(d_num) /= my_rank+1) then
+          if (reg_num > 0 .and. glob_mpi_flag(d_num) /= st_mpi%rank+1) then
             if (reg_num == glob_reg_flag(g_num) .or. st_sim%reg_neib == 1) then
               neib_ncalc = neib_ncalc + 1 ; neib_mpi_num = glob_mpi_flag(d_num)
               temp_calc_reg(neib_ncalc) = reg_num ; temp_mpi_num(neib_ncalc) = neib_mpi_num
@@ -1569,5 +1569,74 @@ module set_cell
     x_num = xy_num - (y_num-1)*st_grid%nx
 
   end subroutine get_calc_grid
+
+  subroutine set_hash_info(hash_key, hash_mpi, hash_reg)
+  !*********************************************************************************************
+  ! set_hash_info -- Set hash infomation
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(in) :: hash_key, hash_mpi, hash_reg
+    ! -- local
+    integer(I4) :: slot
+    !-------------------------------------------------------------------------------------------
+    slot = mod(hash_key - 1, neib_hash) + 1
+
+    do while (neib_hash_key(slot) /= 0 .and. neib_hash_key(slot) /= hash_key)
+      slot = mod(slot, neib_hash) + 1
+    end do
+
+    neib_hash_key(slot) = hash_key
+    neib_hash_mpi(slot) = hash_mpi
+    neib_hash_reg(slot) = hash_reg
+
+  end subroutine set_hash_info
+
+  subroutine get_hash_info(hash_key, find_flag, neib_mpi, neib_reg)
+  !*********************************************************************************************
+  ! get_hash_info -- Get hash infomation
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(in) :: hash_key
+    logical, intent(out) :: find_flag
+    integer(I4), intent(out) :: neib_mpi, neib_reg
+    ! -- local
+    integer(I4) :: slot
+    !-------------------------------------------------------------------------------------------
+    slot = mod(hash_key - 1, neib_hash) + 1
+
+    do while (neib_hash_key(slot) /= 0 .and. neib_hash_key(slot) /= hash_key)
+      slot = mod(slot, neib_hash) + 1
+    end do
+
+    if (neib_hash_key(slot) == hash_key) then
+      find_flag = .true. ; neib_mpi = neib_hash_mpi(slot) ; neib_reg = neib_hash_reg(slot)
+    else
+      find_flag = .false. ; neib_mpi = 0 ; neib_reg = 0
+    end if
+
+  end subroutine get_hash_info
+
+  function get_hash_size(table_num) result(hash_size)
+  !*********************************************************************************************
+  ! get_hash_size -- Get hash table size
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(in) :: table_num
+    ! -- local
+    integer(I4) :: hash_size
+    !-------------------------------------------------------------------------------------------
+    hash_size = table_num*2 + (table_num/2) + 3
+
+    if (mod(table_num, 2) == 0) then
+      hash_size = hash_size + 1
+    end if
+
+  end function get_hash_size
 
 end module set_cell

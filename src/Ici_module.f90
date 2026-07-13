@@ -3,7 +3,7 @@ module ici_module
   use kind_module, only: I4, SP, DP
   use constval_module, only: DZERO
   use utility_module, only: st_mpi
-  use initial_module, only: st_grid, st_out_type, out_type
+  use initial_module, only: out_type, st_grid, st_out_type
   use read_input, only: len_scal
   use set_cell, only: get_calc_grid, ncalc, ncals
   use set_condition, only: st_hydr, st_bcnd

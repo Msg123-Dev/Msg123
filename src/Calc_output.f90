@@ -2,7 +2,7 @@ module calc_output
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE
-  use set_cell, only: ncalc, ncals
+  use set_cell, only: ncalc, ncals, st_conn
   use set_condition, only: st_hydr, st_bcnd
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
@@ -25,7 +25,7 @@ module calc_output
   !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_grid
-    use set_cell, only: get_cals_grid, loc2glo_ijk
+    use set_cell, only: get_cals_grid
     use allocate_output, only: wtable
     ! -- inout
     real(DP), intent(in) :: hyd_head(:), deg_satu(:)
@@ -38,7 +38,7 @@ module calc_output
       call get_cals_grid(i, i_num, j_num)
       unsat: do k = st_grid%nz, 1, -1
         nijk = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
-        c_num = 0 ; c_num = findloc(loc2glo_ijk(:), value = nijk, dim = 1)
+        c_num = 0 ; c_num = findloc(st_conn%loc2glo_ijk(:), value = nijk, dim = 1)
         if (c_num /= 0 .and. c_num <= ncalc) then
           if (deg_satu(c_num) /= DONE) then
             wtable(i) = hyd_head(c_num)
@@ -262,7 +262,7 @@ module calc_output
   !*********************************************************************************************
     ! -- modules
     use calc_function, only: func_riveterm
-    use allocate_output, only: roff_rive, rive_sumtime
+    use allocate_output, only: rive_sumtime, roff_rive
     ! -- inout
 
     ! -- local
@@ -305,7 +305,7 @@ module calc_output
   !*********************************************************************************************
     ! -- modules
     use calc_function, only: func_laketerm
-    use allocate_output, only: roff_lake, lake_sumtime
+    use allocate_output, only: lake_sumtime, roff_lake
     ! -- inout
 
     ! -- local
@@ -349,7 +349,7 @@ module calc_output
     ! -- modules
     use allocate_solution, only: surf_old
     use calc_function, only: func_surfterm
-    use allocate_output, only: roff_surf, surf_sumtime
+    use allocate_output, only: surf_sumtime, roff_surf
     ! -- inout
 
     ! -- local
@@ -384,7 +384,7 @@ module calc_output
   ! calc_dunr_off -- Calculate dunne runoff
   !*********************************************************************************************
     ! -- modules
-    use allocate_output, only: roff_dunn, dunn_sumtime
+    use allocate_output, only: dunn_sumtime, roff_dunn
     ! -- inout
 
     ! -- local
@@ -426,7 +426,7 @@ module calc_output
   !*********************************************************************************************
     ! -- modules
     use calc_function, only: func_sealterm
-    use allocate_output, only: res_seal, res_snum
+    use allocate_output, only: res_snum, res_seal
     ! -- inout
 
     ! -- local
@@ -461,7 +461,7 @@ module calc_output
   !*********************************************************************************************
     ! -- modules
     use calc_function, only: func_rechterm
-    use allocate_output, only: res_rech, res_rnum
+    use allocate_output, only: res_rnum, res_rech
     ! -- inout
 
     ! -- local
@@ -496,7 +496,7 @@ module calc_output
   !*********************************************************************************************
     ! -- modules
     use calc_function, only: func_wellterm
-    use allocate_output, only: res_well, res_wnum
+    use allocate_output, only: res_wnum, res_well
     ! -- inout
 
     ! -- local

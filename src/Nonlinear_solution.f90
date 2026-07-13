@@ -8,7 +8,7 @@ module nonlinear_solution
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc
   use prep_calculation, only: st_time
-  use allocate_solution, only: head_new, head_pre, head_change, nreg_num, array_var
+  use allocate_solution, only: nreg_num, head_new, head_pre, head_change, array_var
   use calc_function, only: calc_func
   use calc_simulation, only: calc_l2norm2
 #ifdef MPI_MSG
@@ -21,13 +21,14 @@ module nonlinear_solution
 
   contains
 
-  subroutine calc_numsol()
+  subroutine calc_numsol(st_amgt, st_coef)
   !*********************************************************************************************
   ! calc_numsol -- Calculate numerical solution
   !*********************************************************************************************
     ! -- modules
     use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
     use constval_module, only: VARLEN, XMAX, XMAX_INV
+    use types_module, only: amgt_set, coef_set
     use utility_module, only: log_fnum
     use initial_module, only: st_sim, st_out_step
     use make_linearsystem, only: make_matvec
@@ -37,7 +38,8 @@ module nonlinear_solution
     use mpi_solve, only: check_mpimaxerr, bcast_convinfo
 #endif
     ! -- inout
-
+    type(amgt_set), intent(inout) :: st_amgt
+    type(coef_set), intent(inout) :: st_coef
     ! -- local
     integer(I4) :: i
     integer(I4) :: out_iter
@@ -108,7 +110,7 @@ module nonlinear_solution
       end if
 
       ! -- Make coefficients matrix and constant vector (matvec)
-        call make_matvec()
+        call make_matvec(st_coef)
 
       if (st_time%out_iter == 1) then
         ! -- Calculate l2 norm square (resl2norm2)
@@ -137,7 +139,7 @@ module nonlinear_solution
         st_ctrl%errtol = XMAX_INV**3
       end if
       ! -- Solve linear algebra (linalg)
-        call solve_linalg(l2norm_pre, head_change, l2norm_jac)
+        call solve_linalg(l2norm_pre, head_change, l2norm_jac, st_amgt)
 
       !$omp parallel do private(i)
       do i = 1, nreg_num

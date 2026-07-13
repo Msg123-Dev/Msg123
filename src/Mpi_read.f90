@@ -2,7 +2,7 @@ module mpi_read
   ! -- modules
   use kind_module, only: I4, SP, DP
   use utility_module, only: st_mpi, write_err_read, write_err_stop
-  use initial_module, only: st_sim, st_grid, st_init, in_type
+  use initial_module, only: in_type, st_sim, st_grid, st_init
   use mpi
 
   implicit none

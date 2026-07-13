@@ -4,6 +4,7 @@ program msg123
 !***********************************************************************************************
   ! -- modules
   use kind_module, only: I4, DP
+  use types_module, only: amgt_set, coef_set
   use utility_module, only: log_fnum, st_mpi
   use initial_module, only: init_msg, st_ctrl
   use read_input, only: read_main_file
@@ -31,6 +32,8 @@ program msg123
   integer(I4) :: i
   integer(I4) :: sta_value(8), end_value(8)
   real(DP) :: tot_stime, tot_etime, loop_stime, loop_etime
+  type(amgt_set) :: st_amgt
+  type(coef_set) :: st_coef
   ! -- format
   11 format(/"Run end date and time(yyyy/mm/dd hh:mm:ss) : ",i4,"/",i2.2,"/",i2.2,1x,i2,":",&
             i2.2,":",i2.2,/)
@@ -80,10 +83,10 @@ program msg123
   ! -- Allocate for calculate function value (calfun)
     call allocate_calfun()
   ! -- Allocate for matrix and vector (matvec)
-    call allocate_matvec()
+    call allocate_matvec(st_coef)
   if (st_ctrl%precon_type == 1) then
     ! -- Allocate for amg algebra (amgalg)
-      call allocate_amgalg()
+      call allocate_amgalg(st_amgt)
   end if
 
   if (st_mpi%rank == 0) then
@@ -97,7 +100,7 @@ program msg123
       call update_tstep()
 
     ! -- Calculate numerical solution (numsol)
-      call calc_numsol()
+      call calc_numsol(st_amgt, st_coef)
 
     if (st_time%conv_flag) then
       ! -- Check last time step conditions (lastts)

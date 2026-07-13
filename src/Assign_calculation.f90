@@ -2,10 +2,10 @@ module assign_calc
   ! -- modules
   use kind_module, only: I4, SP
   use constval_module, only: VARLEN, SZERO, SNOVAL, DNOVAL
-  use utility_module, only: close_file, write_err_stop, st_mpi
-  use initial_module, only: st_grid, st_init, in_type
+  use utility_module, only: st_mpi, close_file, write_err_stop
+  use initial_module, only: in_type, st_grid, st_init
   use read_input, only: len_scal, len_scal_inv
-  use set_cell, only: ncalc, ncals, glo2loc_ijk
+  use set_cell, only: ncalc, ncals, st_conn
   use set_condition, only: set_clas2calc, set_2dfile2calc, set_3dfile2calc, st_hydr
 #ifdef MPI_MSG
   use mpi_read, only: close_mpi_file
@@ -565,7 +565,7 @@ module assign_calc
             call get_calc_grid(i, xn, yn, zn)
             do k = zn+1, st_grid%nz
               xyzn = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(yn-1) + xn
-              j = 0 ; j = glo2loc_ijk(xyzn)
+              j = 0 ; j = st_conn%glo2loc_ijk(xyzn)
               if (j /= 0 .and. j <= ncalc) then
                 st_hydr%read_init(j) = st_hydr%read_init(i)
               end if
@@ -745,7 +745,7 @@ module assign_calc
       call get_cals_grid(i, xn, yn)
       do k = 1, st_grid%nz
         xyzn = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(yn-1) + xn
-        j = 0 ; j = glo2loc_ijk(xyzn)
+        j = 0 ; j = st_conn%glo2loc_ijk(xyzn)
         if (j /= 0 .and. j <= ncalc) then
           st_hydr%read_init(j) = st_geom%surf_elev(i) - st_init%depth
         end if

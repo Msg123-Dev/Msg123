@@ -4,7 +4,7 @@ module prep_calculation
   use constval_module, only: DZERO
   use types_module, only: time_set
   use utility_module, only: st_mpi
-  use initial_module, only: st_in_type, st_in_path, in_type
+  use initial_module, only: in_type, st_in_type, st_in_path
   use set_cell, only: ncalc
   use set_condition, only: st_hydr
 #ifdef MPI_MSG

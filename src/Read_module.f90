@@ -3,7 +3,7 @@ module read_module
   use kind_module, only: I4, SP, DP
   use constval_module, only: CHALEN
   use utility_module, only: st_mpi, open_new_rtxt, open_new_rbin, write_logf, write_err_read
-  use initial_module, only: st_sim, st_grid, st_init, in_type
+  use initial_module, only: in_type, st_sim, st_grid, st_init
 #ifdef MPI_MSG
   use utility_module, only: log_fnum
   use mpi_utility, only: bcast_val

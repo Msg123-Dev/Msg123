@@ -29,7 +29,7 @@ module allocate_output
   ! allocate_outvar -- Allocate output variable
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_in_type, st_out_type, in_type, out_type
+    use initial_module, only: in_type, out_type, st_in_type, st_out_type
     use assign_calc, only: massout_name
     ! -- inout
 

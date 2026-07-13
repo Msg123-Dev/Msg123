@@ -9,7 +9,6 @@ module make_cell
   implicit none
   private
   public :: make_cell_info
-  real(DP), allocatable, public :: dis2face(:,:), face_area(:,:), area_r(:)
   type(geom_set), public :: st_geom
 
   ! -- local
@@ -152,24 +151,24 @@ module make_cell
     integer(I4) :: i
     real(DP) :: dis2, dis3, dis4, dis5
     !-------------------------------------------------------------------------------------------
-    allocate(dis2face(ncalc,FACE))
+    allocate(st_geom%dis2face(ncalc,FACE))
     !$omp parallel
     !$omp do private(i)
     do i = 1, FACE
-      dis2face(:,i) = DZERO
+      st_geom%dis2face(:,i) = DZERO
     end do
     !$omp end do
     ! make distance between point and face center
     !$omp do private(i, dis2, dis3, dis4, dis5)
     do i = 1, ncalc
-      dis2face(i,1) = fp_zt(i) - cp_z(i)
-      dis2face(i,6) = cp_z(i) - fp_zb(i)
+      st_geom%dis2face(i,1) = fp_zt(i) - cp_z(i)
+      st_geom%dis2face(i,6) = cp_z(i) - fp_zb(i)
       dis3 = (cp_x(i)-fp_xw(i))**2 + (cp_y(i)-fp_yw(i))**2 + (cp_z(i)-fp_zw(i))**2
       dis4 = (cp_x(i)-fp_xe(i))**2 + (cp_y(i)-fp_ye(i))**2 + (cp_z(i)-fp_ze(i))**2
       dis2 = (cp_x(i)-fp_xn(i))**2 + (cp_y(i)-fp_yn(i))**2 + (cp_z(i)-fp_zn(i))**2
       dis5 = (cp_x(i)-fp_xs(i))**2 + (cp_y(i)-fp_ys(i))**2 + (cp_z(i)-fp_zs(i))**2
-      dis2face(i,3) = sqrt(dis3) ; dis2face(i,4) = sqrt(dis4)
-      dis2face(i,2) = sqrt(dis2) ; dis2face(i,5) = sqrt(dis5)
+      st_geom%dis2face(i,3) = sqrt(dis3) ; st_geom%dis2face(i,4) = sqrt(dis4)
+      st_geom%dis2face(i,2) = sqrt(dis2) ; st_geom%dis2face(i,5) = sqrt(dis5)
     end do
     !$omp end do
     !$omp end parallel
@@ -191,11 +190,11 @@ module make_cell
     integer(I4) :: i, xn, yn, zn
     real(DP) :: x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4, z5, z6, z7, z8
     !-------------------------------------------------------------------------------------------
-    allocate(face_area(ncalc,FACE))
+    allocate(st_geom%face_area(ncalc,FACE))
     !$omp parallel
     !$omp do private(i)
     do i = 1, FACE
-      face_area(:,i) = DZERO
+      st_geom%face_area(:,i) = DZERO
     end do
     !$omp end do
     ! make face area
@@ -210,12 +209,12 @@ module make_cell
       z5 = glob_z(xn,yn,zn+1) ; z6 = glob_z(xn+1,yn,zn+1)
       z7 = glob_z(xn+1,yn+1,zn+1) ; z8 = glob_z(xn,yn+1,zn+1)
 
-      face_area(i,1) = fa_2tri(x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4)
-      face_area(i,6) = fa_2tri(x1, x2, x3, x4, y1, y2, y3, y4, z5, z6, z7, z8)
-      face_area(i,3) = fa_2tri(x1, x1, x4, x4, y1, y1, y4, y4, z1, z5, z8, z4)
-      face_area(i,4) = fa_2tri(x2, x2, x3, x3, y2, y2, y3, y3, z2, z6, z7, z3)
-      face_area(i,2) = fa_2tri(x1, x2, x2, x1, y1, y2, y2, y1, z1, z2, z6, z5)
-      face_area(i,5) = fa_2tri(x4, x3, x3, x4, y4, y3, y3, y4, z4, z3, z7, z8)
+      st_geom%face_area(i,1) = fa_2tri(x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4)
+      st_geom%face_area(i,6) = fa_2tri(x1, x2, x3, x4, y1, y2, y3, y4, z5, z6, z7, z8)
+      st_geom%face_area(i,3) = fa_2tri(x1, x1, x4, x4, y1, y1, y4, y4, z1, z5, z8, z4)
+      st_geom%face_area(i,4) = fa_2tri(x2, x2, x3, x3, y2, y2, y3, y3, z2, z6, z7, z3)
+      st_geom%face_area(i,2) = fa_2tri(x1, x2, x2, x1, y1, y2, y2, y1, z1, z2, z6, z5)
+      st_geom%face_area(i,5) = fa_2tri(x4, x3, x3, x4, y4, y3, y3, y4, z4, z3, z7, z8)
     end do
     !$omp end do
     !$omp end parallel
@@ -377,11 +376,11 @@ module make_cell
     integer(I4) :: i, xn, yn
     real(DP) :: x1, x2, x3, x4, y1, y2, y3, y4
     !-------------------------------------------------------------------------------------------
-    allocate(area_r(ncals))
+    allocate(st_geom%area_r(ncals))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncals
-      area_r(i) = DZERO
+      st_geom%area_r(i) = DZERO
     end do
     !$omp end do
     ! make recharge area
@@ -392,7 +391,7 @@ module make_cell
       x4 = glob_x(xn,yn+1) ; y1 = glob_y(xn,yn) ; y2 = glob_y(xn+1,yn)
       y3 = glob_y(xn+1,yn+1) ; y4 = glob_y(xn,yn+1)
 
-      area_r(i) = rarea(x1, x2, x3, x4, y1, y2, y3, y4)
+      st_geom%area_r(i) = rarea(x1, x2, x3, x4, y1, y2, y3, y4)
     end do
     !$omp end do
     !$omp end parallel

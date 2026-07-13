@@ -4,7 +4,7 @@ module open_file
   use constval_module, only: CHALEN, TIMELEN, HOURSEC, SZERO, SINFI
   use utility_module, only: st_mpi, open_new_rtxt, open_new_rbin, open_new_wtxt,&
                             close_file, write_logf, write_success, write_err_stop, conv_unit
-  use initial_module, only: st_sim, st_grid, st_step_flag, in_type
+  use initial_module, only: in_type, st_sim, st_grid, st_step_flag
   use read_module, only: skip_file, skip_file_int
 #ifdef MPI_MSG
   use utility_module, only: log_fnum

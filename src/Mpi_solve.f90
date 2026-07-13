@@ -6,7 +6,7 @@ module mpi_solve
   use mpi_utility, only: mpisum_val
   use set_cell, only: ncalc, neib_mpi_totn, send_cind, recv_cind, send_citem, recv_citem,&
                       neib_num
-  use allocate_solution, only: dir_conn, left_offr, nreg_num, crs_index
+  use allocate_solution, only: nreg_num, dir_conn, left_offr, crs_index
   use mpi
 
   implicit none

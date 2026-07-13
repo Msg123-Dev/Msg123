@@ -31,7 +31,7 @@ module write_output
   ! write_outf -- write output file
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_out_type, st_out_step, out_type
+    use initial_module, only: out_type, st_out_type, st_out_step
     use check_simulation, only: check_outtiming, write_flag
     use allocate_output, only: allocate_outvar
     use calc_output, only: calc_cell_mas, calc_rivr_off, calc_lakr_off, calc_sufr_off,&
@@ -599,7 +599,7 @@ module write_output
   ! write_out_rivrf -- Write river runoff file
   !*********************************************************************************************
     ! -- modules
-    use allocate_output, only: roff_rive, rive_sumtime
+    use allocate_output, only: rive_sumtime, roff_rive
     ! -- inout
     real(SP), intent(in) :: time_out
     ! -- local
@@ -649,7 +649,7 @@ module write_output
   ! write_out_lakrf -- Write lake runoff file
   !*********************************************************************************************
     ! -- modules
-    use allocate_output, only: roff_lake, lake_sumtime
+    use allocate_output, only: lake_sumtime, roff_lake
     ! -- inout
     real(SP), intent(in) :: time_out
     ! -- local
@@ -699,7 +699,7 @@ module write_output
   ! write_out_sufrf -- Write surface runoff file
   !*********************************************************************************************
     ! -- modules
-    use allocate_output, only: roff_surf, surf_sumtime
+    use allocate_output, only: surf_sumtime, roff_surf
     ! -- inout
     real(SP), intent(in) :: time_out
     ! -- local
@@ -751,7 +751,7 @@ module write_output
   ! write_out_dunrf -- Write dunne runoff file
   !*********************************************************************************************
     ! -- modules
-    use allocate_output, only: roff_dunn, dunn_sumtime
+    use allocate_output, only: dunn_sumtime, roff_dunn
     ! -- inout
     real(SP), intent(in) :: time_out
     ! -- local
@@ -800,7 +800,7 @@ module write_output
   ! write_out_sealf -- Write sea results file
   !*********************************************************************************************
     ! -- modules
-    use allocate_output, only: res_seal, res_snum
+    use allocate_output, only: res_snum, res_seal
     ! -- inout
     real(SP), intent(in) :: time_out
     ! -- local
@@ -838,7 +838,7 @@ module write_output
   ! write_out_rechf -- Write recharge results file
   !*********************************************************************************************
     ! -- modules
-    use allocate_output, only: res_rech, res_rnum
+    use allocate_output, only: res_rnum, res_rech
     ! -- inout
     real(SP), intent(in) :: time_out
     ! -- local
@@ -877,7 +877,7 @@ module write_output
   ! write_out_wellf -- Write well pumping results file
   !*********************************************************************************************
     ! -- modules
-    use allocate_output, only: res_well, res_wnum
+    use allocate_output, only: res_wnum, res_well
     ! -- inout
     real(SP), intent(in) :: time_out
     ! -- local

@@ -5,12 +5,13 @@ module types_module
 
   implicit none
   private
-  public :: mpi_set, sim_set, ctrl_set, geom_set, time_set, grid_set, ftype_in, retn_in,&
-            parm_in, geog_in, rive_in, lake_in, path_in, retn_path, parm_path, geog_path,&
-            retn_fnum, parm_fnum, geog_fnum, unit_in, clas_set, retn_set, parm_set, init_set,&
-            seal_set, surfb_set, well_set, surfw_set, step_flag, ftype_out, path_out, unit_out,&
-            out_time, out_step, msout_set, hydr_set, bcnd_set, forc_set, bflag_set, bcalc_set,&
-            bcount_set, rlbc_set, bfview_set, bound_fview
+  public :: mpi_set, sim_set, ctrl_set, geom_set, time_set, grid_set, ftype_in, retn_in
+  public :: parm_in, geog_in, rive_in, lake_in, path_in, retn_path, parm_path, geog_path
+  public :: retn_fnum, parm_fnum, geog_fnum, unit_in, clas_set, retn_set, parm_set, init_set
+  public :: seal_set, surfb_set, well_set, surfw_set, step_flag, ftype_out, path_out, unit_out
+  public :: out_time, out_step, msout_set, hydr_set, bcnd_set, forc_set, bflag_set, bcalc_set
+  public :: bcount_set, rlbc_set, bfview_set, bound_fview
+  public :: kryl_set, amgt_set, coef_set, conn_set
 
   type :: mpi_set
     integer(I4) :: totn, rank, comm
@@ -37,6 +38,7 @@ module types_module
     real(DP), allocatable :: cell_top(:)
     real(DP), allocatable :: cell_cent(:)
     real(DP), allocatable :: cell_bot(:)
+    real(DP), allocatable :: dis2face(:,:), face_area(:,:), area_r(:)
   end type geom_set
 
   type :: time_set
@@ -262,5 +264,35 @@ module types_module
   type :: bound_fview
     integer(I4) :: seal = 0, rech = 0, well = 0, prec = 0, evap = 0
   end type bound_fview
+
+  type :: kryl_set
+    real(DP), allocatable :: resi(:)
+  end type kryl_set
+
+  type :: amgt_set
+    real(DP), allocatable :: td(:), tx(:), tb(:), tr(:), trhs(:), tfx(:), tlu(:)
+  end type amgt_set
+
+  type :: coef_set
+    real(DP), allocatable :: per_srat(:), per_relp(:)
+    real(DP), allocatable :: temp_rhs(:)
+    real(DP), allocatable :: stod(:), cond(:), sead(:), dmats(:)
+    real(DP), allocatable :: rivd(:), lakd(:), surd(:)
+    real(DP), allocatable :: deri_srat(:), deri_stor(:)
+    real(DP), allocatable :: deri_dcon(:), rel_hyd(:), deri_lucon(:), deri_con1(:), deri_con2(:)
+    real(DP), allocatable :: over_riv(:), deri_r(:), deri_ks_riv(:), delh_r(:)
+    real(DP), allocatable :: per_riv(:), rel_riv(:), tran_riv(:)
+    real(DP), allocatable :: over_lak(:), deri_l(:), deri_ks_lak(:), delh_l(:)
+    real(DP), allocatable :: per_lak(:), rel_lak(:), tran_lak(:)
+    real(DP), allocatable :: over_sur(:), deri_s(:), deri_ks_sur(:), delh_s(:), tran_sur(:)
+    real(DP), allocatable :: deri_sea(:), deri_ks_sea(:), delh_sea(:)
+    real(DP), allocatable :: per_sea(:), rel_sea(:), tran_sea(:)
+  end type coef_set
+
+  type :: conn_set
+    integer(I4), allocatable :: clas_flag(:,:)
+    integer(I4), allocatable :: calc2reg(:)
+    integer(I4), allocatable :: glo2loc_ijk(:), loc2glo_ijk(:), loc2glo_ij(:)
+  end type conn_set
 
 end module types_module

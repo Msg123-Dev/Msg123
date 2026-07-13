@@ -4,8 +4,8 @@ module set_boundary
   use constval_module, only: SNOVAL, DNOVAL
   use types_module, only: rlbc_set, bfview_set, bound_fview
   use utility_module, only: st_mpi, write_logf, write_err_stop, get_ilen, conv_i2s
-  use initial_module, only: st_in_type, st_rivf_type, st_lakf_type, st_in_path, st_in_unit,&
-                            in_type
+  use initial_module, only: in_type, st_in_type, st_rivf_type, st_lakf_type, st_in_path,&
+                            st_in_unit
   use set_cell, only: ncals
   use set_condition, only: st_hydr, st_bcnd
   use assign_boundary, only: assign_surfbv, assign_rilav, st_forc

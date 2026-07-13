@@ -4,8 +4,8 @@ module read_input
   use constval_module, only: CHALEN, TIMELEN, SZERO, SONE, DNOVAL
   use utility_module, only: get_days, open_new_rtxt, close_file, write_logf, write_success,&
                             write_err_stop
-  use initial_module, only: st_sim, st_ctrl, st_in_type, st_in_path, st_in_unit, unit_list,&
-                            in_type
+  use initial_module, only: in_type, unit_list, st_sim, st_ctrl, st_in_type, st_in_path,&
+                            st_in_unit
 
   implicit none
   private
@@ -1331,7 +1331,7 @@ module read_input
   ! set_output -- Set output
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_out_type, st_out_path, st_out_unit, st_out_time, out_type
+    use initial_module, only: out_type, st_out_type, st_out_path, st_out_unit, st_out_time
     ! -- inout
     integer(I4), intent(in) :: outv_num
     character(*), intent(in) :: vari_name(:)

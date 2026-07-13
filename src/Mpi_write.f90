@@ -4,7 +4,7 @@ module mpi_write
   use constval_module, only: SNOVAL, DZERO, DONE
   use utility_module, only: st_mpi, write_err_write, write_err_stop
   use initial_module, only: st_grid
-  use set_cell, only: get_calc_grid, ncalc, ncals, neib_mpi_totn, loc2glo_ijk
+  use set_cell, only: get_calc_grid, ncalc, ncals, neib_mpi_totn, st_conn
   use mpi
 
   implicit none
@@ -285,7 +285,7 @@ module mpi_write
   !*********************************************************************************************
     ! -- module
     use set_cell, only: send_cind, send_citem, neib_num
-    use allocate_solution, only: dir_conn, nreg_num, crs_index
+    use allocate_solution, only: nreg_num, dir_conn, crs_index
     ! -- inout
 
     ! -- local
@@ -524,7 +524,7 @@ module mpi_write
       call get_cals_grid(i, i_num, j_num)
       wtab: do k = st_grid%nz, 1, -1
         nxyz = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
-        loc_n = 0 ; loc_n = findloc(loc2glo_ijk(:), value = nxyz, dim = 1)
+        loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:), value = nxyz, dim = 1)
         if (loc_n /= 0) then
           loc_r = 0 ; loc_r = findloc(recv_wtab_citem(:), value = loc_n, dim = 1)
           if (loc_r == 0) then
@@ -573,7 +573,7 @@ module mpi_write
         call get_calc_grid(c_num, i_num, j_num, k_num)
         sr_flag: do k = st_grid%nz, k_num, -1
           nxyz = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
-          loc_n = 0 ; loc_n = findloc(loc2glo_ijk(:), value = nxyz, dim = 1)
+          loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:), value = nxyz, dim = 1)
           if (loc_n /= 0) then
             loc_r = 0 ; loc_r = findloc(recv_wtab_citem(:), value = loc_n, dim = 1)
             if (loc_r /= 0) then
@@ -616,7 +616,7 @@ module mpi_write
         call get_calc_grid(c_num, i_num, j_num, k_num)
         unsat: do k = st_grid%nz, k_num, -1
           nxyz = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
-          loc_n = 0 ; loc_n = findloc(loc2glo_ijk(:), value = nxyz, dim = 1)
+          loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:), value = nxyz, dim = 1)
           if (loc_n /= 0) then
             loc_r = 0 ; loc_r = findloc(recv_wtab_citem(:), value = loc_n, dim = 1)
             if (loc_r == 0) then

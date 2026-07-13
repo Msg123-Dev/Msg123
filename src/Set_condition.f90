@@ -4,10 +4,10 @@ module set_condition
   use constval_module, only: SZERO, SNOVAL, DZERO, DONE
   use types_module, only: hydr_set, bcnd_set
   use utility_module, only: st_mpi
-  use initial_module, only: st_sim, st_grid, st_well, in_type
+  use initial_module, only: in_type, st_sim, st_grid, st_well
   use read_module, only: read_2dtxt, read_2dbin, read_3dtxt, read_3dbin, flat_2dto2d,&
                          flat_2dto3d, flat_3dto3d
-  use set_cell, only: ncalc, ncals, neib_ncalc, loc2glo_ijk, loc2glo_ij
+  use set_cell, only: ncalc, ncals, neib_ncalc, st_conn
   use make_cell, only: st_geom
 #ifdef MPI_MSG
   use utility_module, only: get_ilen, conv_i2s
@@ -62,7 +62,6 @@ module set_condition
   !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_clas
-    use set_cell, only: clas_flag
     ! -- inout
     integer(I4), intent(in) :: tgn
     character(*), intent(in) :: tg_name(:)
@@ -89,7 +88,7 @@ module set_condition
           if (tg_name(i) == st_clas%name(k)) then
             !$omp parallel do private(j)
             do j = 1, out_num
-              if (clas_flag(j,k) == 1) then
+              if (st_conn%clas_flag(j,k) == 1) then
                 calc_val(j) = tg_val(i)
                 temp_flag(j) = 1
               end if
@@ -168,7 +167,7 @@ module set_condition
           do jj = jst, jen
             do kk = kst, ken
               c_num = gridx*(gridy*(kk-1) + (jj-1)) + ii
-              l_ijk = 0 ; l_ijk = findloc(loc2glo_ijk(:), value = c_num, dim = 1)
+              l_ijk = 0 ; l_ijk = findloc(st_conn%loc2glo_ijk(:), value = c_num, dim = 1)
               if (l_ijk > mpi_ncalc .and. l_ijk <= cnum) then
                 cell_val(l_ijk-mpi_ncalc) = tg_val(i)
                 tg_flag(l_ijk-mpi_ncalc) = 1
@@ -226,7 +225,7 @@ module set_condition
       do ii = ist, ien
         do jj = jst, jen
           s_num = gridx*(jj-1) + ii
-          l_ij = 0 ; l_ij = findloc(loc2glo_ij(:), value = s_num, dim = 1)
+          l_ij = 0 ; l_ij = findloc(st_conn%loc2glo_ij(:), value = s_num, dim = 1)
           if (l_ij > 0 .and. l_ij <= ncals) then
             cell_val(l_ij) = tg_val(i)
             tg_flag(l_ij) = 1
@@ -341,9 +340,9 @@ module set_condition
       end if
 #ifdef MPI_MSG
       ! -- Scatter xyz value (xyzval)
-        call scatter_xyzval(cnum, loc2glo_ijk, array_flat, val_out)
+        call scatter_xyzval(cnum, st_conn%loc2glo_ijk, array_flat, val_out)
 #else
-      call set_calcr4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
 
     else if (ftype == in_type(4) .or. int_ft == in_type(4)) then
@@ -365,7 +364,7 @@ module set_condition
       mpi_ncals = ncals + neib_ncals
       !$omp parallel do private(i, j, k, s)
       do i = 1, rsnum
-        s = 0 ; s = loc2glo_ij(mpi_ncals+i)
+        s = 0 ; s = st_conn%loc2glo_ij(mpi_ncals+i)
         if (s /= 0) then
           do j = 1, gridz
             k = gridx*gridy*(j-1) + s
@@ -375,7 +374,7 @@ module set_condition
       end do
       !$omp end parallel do
       deallocate(array_seas)
-      call set_calcr4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #else
       dummy = rsnum
       allocate(array_read(gridx,gridy), array_flat(gridxyz))
@@ -394,7 +393,7 @@ module set_condition
       call read_2dbin(fnum, gridx, gridy, no_val, array_read)
       call flat_2dto3d(gridx, gridy, gridz, array_read, array_flat)
       deallocate(array_read)
-      call set_calcr4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
     end if
 
@@ -461,9 +460,9 @@ module set_condition
       end if
 #ifdef MPI_MSG
       ! -- Scatter xyz value (xyzval)
-        call scatter_xyzval(cnum, loc2glo_ijk, array_flat, val_out)
+        call scatter_xyzval(cnum, st_conn%loc2glo_ijk, array_flat, val_out)
 #else
-      call set_calcr4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
 
     else if (ftype == in_type(6) .or. int_ft == in_type(6)) then
@@ -485,14 +484,14 @@ module set_condition
       mpi_ncalc = ncalc + neib_ncalc
       !$omp parallel do private(i, c)
       do i = 1, rcnum
-        c = 0 ; c = loc2glo_ijk(mpi_ncalc+i)
+        c = 0 ; c = st_conn%loc2glo_ijk(mpi_ncalc+i)
         if (c /= 0) then
           array_flat(c) = array_seac(i)
         end if
       end do
       !$omp end parallel do
       deallocate(array_seac)
-      call set_calcr4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #else
       dummy = rcnum
       allocate(array_read(gridx,gridy,gridz), array_flat(gridxyz))
@@ -511,7 +510,7 @@ module set_condition
       call read_3dbin(fnum, gridx, gridy, gridz, no_val, array_read)
       call flat_3dto3d(gridx, gridy, gridz, array_read, array_flat)
       deallocate(array_read)
-      call set_calcr4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
     end if
 
@@ -570,9 +569,9 @@ module set_condition
       end if
 #ifdef MPI_MSG
       ! -- Scatter xy value (xyval)
-        call scatter_xyval(snum, loc2glo_ij, array_flat, val_out)
+        call scatter_xyval(snum, st_conn%loc2glo_ij, array_flat, val_out)
 #else
-      call set_calci4(snum, loc2glo_ij, no_val, array_flat, val_out)
+      call set_calci4(snum, st_conn%loc2glo_ij, no_val, array_flat, val_out)
 #endif
 
     else if (ftype == in_type(4) .or. int_ft == in_type(4)) then
@@ -606,7 +605,7 @@ module set_condition
       call read_2dbin(fnum, gridx, gridy, no_val, array_read)
       array_flat(:) = reshape(array_read(:,:), shape(array_flat))
       deallocate(array_read)
-      call set_calci4(snum, loc2glo_ij, no_val, array_flat, val_out)
+      call set_calci4(snum, st_conn%loc2glo_ij, no_val, array_flat, val_out)
 #endif
     end if
 
@@ -666,9 +665,9 @@ module set_condition
       end if
 #ifdef MPI_MSG
       ! -- Scatter xy value (xyval)
-        call scatter_xyval(snum, loc2glo_ij, array_flat, val_out)
+        call scatter_xyval(snum, st_conn%loc2glo_ij, array_flat, val_out)
 #else
-      call set_calcr4(snum, loc2glo_ij, no_val, array_flat, val_out)
+      call set_calcr4(snum, st_conn%loc2glo_ij, no_val, array_flat, val_out)
 #endif
 
     else if (ftype == in_type(4) .or. int_ft == in_type(4)) then
@@ -702,7 +701,7 @@ module set_condition
       call read_2dbin(fnum, gridx, gridy, no_val, array_read)
       call flat_2dto2d(gridx, gridy, array_read, array_flat)
       deallocate(array_read)
-      call set_calcr4(snum, loc2glo_ij, no_val, array_flat, val_out)
+      call set_calcr4(snum, st_conn%loc2glo_ij, no_val, array_flat, val_out)
 #endif
     end if
 
@@ -762,9 +761,9 @@ module set_condition
       end if
 #ifdef MPI_MSG
       ! -- Scatter real xy value (rxyval)
-        call scatter_xyval(snum, loc2glo_ij, array_flat, val_out)
+        call scatter_xyval(snum, st_conn%loc2glo_ij, array_flat, val_out)
 #else
-      call set_calcr8(snum, loc2glo_ij, no_val, array_flat, val_out)
+      call set_calcr8(snum, st_conn%loc2glo_ij, no_val, array_flat, val_out)
 #endif
 
     else if (ftype == in_type(4) .or. int_ft == in_type(4)) then
@@ -798,7 +797,7 @@ module set_condition
       call read_2dbin(fnum, gridx, gridy, no_val, array_read)
       call flat_2dto2d(gridx, gridy, array_read, array_flat)
       deallocate(array_read)
-      call set_calcr8(snum, loc2glo_ij, no_val, array_flat, val_out)
+      call set_calcr8(snum, st_conn%loc2glo_ij, no_val, array_flat, val_out)
 #endif
     end if
 
@@ -867,9 +866,9 @@ module set_condition
       end if
 #ifdef MPI_MSG
       ! -- Scatter xyz value (xyzval)
-        call scatter_xyzval(cnum, loc2glo_ijk, array_flat, val_out)
+        call scatter_xyzval(cnum, st_conn%loc2glo_ijk, array_flat, val_out)
 #else
-      call set_calci4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calci4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
 
     else if (ftype == in_type(4) .or. int_ft == in_type(4)) then
@@ -891,7 +890,7 @@ module set_condition
       call read_mpi_file(ftype, int_ft, fnum, snum, array_surf)
       !$omp parallel do private(i, j, k, s)
       do i = 1, snum
-        s = 0 ; s = loc2glo_ij(i)
+        s = 0 ; s = st_conn%loc2glo_ij(i)
         if (s /= 0) then
           do k = 1, gridz
             j = gridx*gridy*(k-1) + s
@@ -905,7 +904,7 @@ module set_condition
       ! -- MAX value for MPI (val)
         call mpimax_val(array_temp, "file number "//str_fnum, array_flat)
       deallocate(array_surf, array_temp, str_fnum)
-      call set_calci4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calci4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #else
       dummy = snum
       allocate(array_read(gridx,gridy), array_flat(gridxyz))
@@ -929,7 +928,7 @@ module set_condition
       end do
       !$omp end parallel do
       deallocate(array_read)
-      call set_calci4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calci4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
     end if
 
@@ -994,9 +993,9 @@ module set_condition
       end if
 #ifdef MPI_MSG
       ! -- Scatter xyz value (xyzval)
-        call scatter_xyzval(cnum, loc2glo_ijk, array_flat, val_out)
+        call scatter_xyzval(cnum, st_conn%loc2glo_ijk, array_flat, val_out)
 #else
-      call set_calcr4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
 
     else if (ftype == in_type(4) .or. int_ft == in_type(4)) then
@@ -1018,7 +1017,7 @@ module set_condition
       call read_mpi_file(ftype, int_ft, fnum, snum, array_surf)
       !$omp parallel do private(i, j, k, s)
       do i = 1, snum
-        s = 0 ; s = loc2glo_ij(i)
+        s = 0 ; s = st_conn%loc2glo_ij(i)
         if (s /= 0) then
           do j = 1, gridz
             k = gridx*gridy*(j-1) + s
@@ -1032,7 +1031,7 @@ module set_condition
       ! -- MAX value for MPI (val)
         call mpimax_val(array_temp, "file number "//str_fnum, array_flat)
       deallocate(array_surf, array_temp, str_fnum)
-      call set_calcr4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #else
       dummy = snum
       allocate(array_read(gridx,gridy), array_flat(gridxyz))
@@ -1051,7 +1050,7 @@ module set_condition
       call read_2dbin(fnum, gridx, gridy, no_val, array_read)
       call flat_2dto3d(gridx, gridy, gridz, array_read, array_flat)
       deallocate(array_read)
-      call set_calcr4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
     end if
 
@@ -1116,9 +1115,9 @@ module set_condition
       end if
 #ifdef MPI_MSG
       ! -- Scatter xyz value (xyzval)
-        call scatter_xyzval(cnum, loc2glo_ijk, array_flat, val_out)
+        call scatter_xyzval(cnum, st_conn%loc2glo_ijk, array_flat, val_out)
 #else
-      call set_calcr8(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr8(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
 
     else if (ftype == in_type(4) .or. int_ft == in_type(4)) then
@@ -1140,7 +1139,7 @@ module set_condition
       call read_mpi_file(ftype, int_ft, fnum, snum, array_surf)
       !$omp parallel do private(i, j, k, s)
       do i = 1, snum
-        s = 0 ; s = loc2glo_ij(i)
+        s = 0 ; s = st_conn%loc2glo_ij(i)
         if (s /= 0) then
           do j = 1, gridz
             k = gridx*gridy*(j-1) + s
@@ -1154,7 +1153,7 @@ module set_condition
       ! -- MAX value for MPI (val)
         call mpimax_val(array_temp, "file number "//str_fnum, array_flat)
       deallocate(array_surf, array_temp, str_fnum)
-      call set_calcr8(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr8(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #else
       dummy = snum
       allocate(array_read(gridx,gridy), array_flat(gridxyz))
@@ -1173,7 +1172,7 @@ module set_condition
       call read_2dbin(fnum, gridx, gridy, no_val, array_read)
       call flat_2dto3d(gridx, gridy, gridz, array_read, array_flat)
       deallocate(array_read)
-      call set_calcr8(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr8(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
     end if
 
@@ -1230,9 +1229,9 @@ module set_condition
       end if
 #ifdef MPI_MSG
       ! -- Scatter xyz value (xyzval)
-        call scatter_xyzval(cnum, loc2glo_ijk, array_flat, val_out)
+        call scatter_xyzval(cnum, st_conn%loc2glo_ijk, array_flat, val_out)
 #else
-      call set_calci4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calci4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
 
     else if (ftype == in_type(6) .or. int_ft == in_type(6)) then
@@ -1255,7 +1254,7 @@ module set_condition
       call read_3dbin(fnum, gridx, gridy, gridz, no_val, array_read)
       array_flat(:) = reshape(array_read(:,:,:), shape(array_flat))
       deallocate(array_read)
-      call set_calci4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calci4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
     end if
 
@@ -1313,9 +1312,9 @@ module set_condition
       end if
 #ifdef MPI_MSG
       ! -- Scatter xyz value (xyzval)
-        call scatter_xyzval(cnum, loc2glo_ijk, array_flat, val_out)
+        call scatter_xyzval(cnum, st_conn%loc2glo_ijk, array_flat, val_out)
 #else
-      call set_calcr4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
 
     else if (ftype == in_type(6) .or. int_ft == in_type(6)) then
@@ -1338,7 +1337,7 @@ module set_condition
       call read_3dbin(fnum, gridx, gridy, gridz, no_val, array_read)
       call flat_3dto3d(gridx, gridy, gridz, array_read, array_flat)
       deallocate(array_read)
-      call set_calcr4(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
     end if
 
@@ -1396,9 +1395,9 @@ module set_condition
       end if
 #ifdef MPI_MSG
       ! -- Scatter xyz value (xyzval)
-        call scatter_xyzval(cnum, loc2glo_ijk, array_flat, val_out)
+        call scatter_xyzval(cnum, st_conn%loc2glo_ijk, array_flat, val_out)
 #else
-      call set_calcr8(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr8(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
 
     else if (ftype == in_type(6) .or. int_ft == in_type(6)) then
@@ -1421,7 +1420,7 @@ module set_condition
       call read_3dbin(fnum, gridx, gridy, gridz, no_val, array_read)
       call flat_3dto3d(gridx, gridy, gridz, array_read, array_flat)
       deallocate(array_read)
-      call set_calcr8(cnum, loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr8(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
     end if
 
@@ -1488,7 +1487,7 @@ module set_condition
     cwn = 0
     do i = 1, locwn
       c_num = st_grid%nx*(st_grid%ny*(rw_ks(i)-1) + (rw_j(i)-1)) + rw_i(i)
-      l_num = 0 ; l_num = findloc(loc2glo_ijk(:), value = c_num, dim = 1)
+      l_num = 0 ; l_num = findloc(st_conn%loc2glo_ijk(:), value = c_num, dim = 1)
       if (l_num /= 0 .and. l_num <= ncalc) then
         cwn = cwn + 1 ; s_num = st_grid%nx*(rw_j(i)-1) + rw_i(i)
         w_id(cwn) = rw_id(i) ; w_ij(cwn) = s_num
@@ -1622,7 +1621,7 @@ module set_condition
     !-------------------------------------------------------------------------------------------
     do i = 1, ncals
       if (wval(i) /= SZERO .and. wks(i) /= 0 .and. wke(i) /= 0) then
-        wij(i) = loc2glo_ij(i)
+        wij(i) = st_conn%loc2glo_ij(i)
         if (s2w(i) == 0) then
           wnum = wnum + 1
           s2w(i) = wnum
@@ -1677,9 +1676,9 @@ module set_condition
       end if
 #ifdef MPI_MSG
       ! -- Scatter xyz value (xyzval)
-        call scatter_xyzval(cnum, loc2glo_ijk, array_flat, val_out)
+        call scatter_xyzval(cnum, st_conn%loc2glo_ijk, array_flat, val_out)
 #else
-      call set_calcr4(cnum, loc2glo_ijk, SZERO, array_flat, val_out)
+      call set_calcr4(cnum, st_conn%loc2glo_ijk, SZERO, array_flat, val_out)
 #endif
 
     else if (ftype == in_type(6) .or. int_ft == in_type(6)) then
@@ -1702,7 +1701,7 @@ module set_condition
       call read_3dbin(wfnum, gridx, gridy, gridz, SZERO, array_read)
       call flat_3dto3d(gridx, gridy, gridz, array_read, array_flat)
       deallocate(array_read)
-      call set_calcr4(cnum, loc2glo_ijk, SZERO, array_flat, val_out)
+      call set_calcr4(cnum, st_conn%loc2glo_ijk, SZERO, array_flat, val_out)
 #endif
     end if
 
@@ -1768,7 +1767,7 @@ module set_condition
       do k = st_well%ks(i), st_well%ke(i)
         index_count = index_count + 1
         c_num = st_grid%nx*st_grid%ny*(k-1) + st_well%ij(i)
-        temp_wconn(index_count) = findloc(loc2glo_ijk(:), value = c_num, dim = 1)
+        temp_wconn(index_count) = findloc(st_conn%loc2glo_ijk(:), value = c_num, dim = 1)
       end do
       st_bcnd%well_index(i) = index_count
     end do
@@ -1843,8 +1842,7 @@ module set_condition
     ! -- modules
     use constval_module, only: FACE
     use initial_module, only: st_out_type
-    use set_cell, only: get_calc_grid, seal_cnum, calc2reg, glo2loc_ijk
-    use make_cell, only: dis2face, face_area, area_r
+    use set_cell, only: get_calc_grid, seal_cnum
 #ifdef MPI_MSG
     use mpi_set, only: senrec_neibval, senrec_faceval
     use set_cell, only: neib_mpi_totn, send_cind, recv_cind, send_citem, recv_citem, neib_num,&
@@ -1928,13 +1926,13 @@ module set_condition
       !$omp end parallel do
       ! -- Send and Receive face value (faceval)
         call senrec_faceval(neib_mpi_totn, neib_num, send_cind, recv_cind, send_citem,&
-                            recv_citem, dis2face, reg_dis)
+                            recv_citem, st_geom%dis2face, reg_dis)
         call senrec_faceval(neib_mpi_totn, neib_num, send_cind, recv_cind, send_citem,&
-                            recv_citem, face_area, reg_fare)
+                            recv_citem, st_geom%face_area, reg_fare)
       !$omp parallel do private(j)
       do j = 1, FACE
-        reg_dis(1:ncalc,j) = dis2face(1:ncalc,j)
-        reg_fare(1:ncalc,j) = face_area(1:ncalc,j)
+        reg_dis(1:ncalc,j) = st_geom%dis2face(1:ncalc,j)
+        reg_fare(1:ncalc,j) = st_geom%face_area(1:ncalc,j)
       end do
       !$omp end parallel do
 
@@ -2017,7 +2015,7 @@ module set_condition
       !$omp end do
       !$omp do private(j)
       do j = 1, FACE
-        reg_dis(:,j) = dis2face(:,j) ; reg_fare(:,j) = face_area(:,j)
+        reg_dis(:,j) = st_geom%dis2face(:,j) ; reg_fare(:,j) = st_geom%face_area(:,j)
       end do
       !$omp end do
       !$omp end parallel
@@ -2034,7 +2032,7 @@ module set_condition
     !$omp end do
     !$omp do private(j)
     do j = 1, FACE
-      reg_dis(:,j) = dis2face(:,j) ; reg_fare(:,j) = face_area(:,j)
+      reg_dis(:,j) = st_geom%dis2face(:,j) ; reg_fare(:,j) = st_geom%face_area(:,j)
     end do
     !$omp end do
     !$omp end parallel
@@ -2045,7 +2043,7 @@ module set_condition
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncals
-      surf_dis(i) = dis2face(i,1)
+      surf_dis(i) = st_geom%dis2face(i,1)
     end do
     !$omp end do
     !$omp do private(i)
@@ -2054,16 +2052,16 @@ module set_condition
     end do
     !$omp end do
     !$omp end parallel
-    deallocate(dis2face, face_area)
+    deallocate(st_geom%dis2face, st_geom%face_area)
 
     st_bcnd%seal_num = 0 ; tconn_num = 0 ; mpi_send = 0 ; left_num = 0 ; right_num = 0
     do i = 1, totn_clac
       ! -- Get calculation number from grid number (calc_grid)
         call get_calc_grid(i, i_num, j_num, k_num)
-      g_num = loc2glo_ijk(i)
+      g_num = st_conn%loc2glo_ijk(i)
       ! up direction
       if (k_num /= 1) then
-        u_num = g_num-gridx*gridy ; loc_u = glo2loc_ijk(u_num)
+        u_num = g_num-gridx*gridy ; loc_u = st_conn%glo2loc_ijk(u_num)
         if (loc_u > 0) then
           off_num = loc_u ; tks = reg_cksz(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
@@ -2081,7 +2079,7 @@ module set_condition
               st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 1
             end if
           else if (0 < off_num .and. off_num <= ncalc) then
-            if (calc2reg(i) == calc2reg(off_num) .or. st_sim%reg_neib == 1) then
+            if (st_conn%calc2reg(i) == st_conn%calc2reg(off_num) .or. st_sim%reg_neib == 1) then
               sflag = 0 ; aks = reg_cksz(off_num) ; tconn_num = tconn_num + 1
               off_row(tconn_num) = off_num ; conn_dir(tconn_num) = 1
               left_num = left_num + 1 ; left_off(tconn_num) = left_num
@@ -2115,12 +2113,12 @@ module set_condition
         end if
       else if (i <= ncals) then
         st_hydr%surf_area(i) = reg_fare(i,1)
-        st_hydr%rech_area(i) = area_r(i)
+        st_hydr%rech_area(i) = st_geom%area_r(i)
         st_hydr%hydf_surf(i) = reg_cksz(i)
       end if
       ! north direction
       if (j_num /= 1) then
-        n_num = g_num-gridx ; loc_n = glo2loc_ijk(n_num)
+        n_num = g_num-gridx ; loc_n = st_conn%glo2loc_ijk(n_num)
         if (loc_n > 0) then
           off_num = loc_n ; tks = reg_cksy(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
@@ -2138,7 +2136,7 @@ module set_condition
               st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 2
             end if
           else if (0 < off_num .and. off_num <= ncalc) then
-            if (calc2reg(i) == calc2reg(off_num) .or. st_sim%reg_neib == 1) then
+            if (st_conn%calc2reg(i) == st_conn%calc2reg(off_num) .or. st_sim%reg_neib == 1) then
               sflag = 0 ; aks = reg_cksy(off_num) ; tconn_num = tconn_num + 1
               off_row(tconn_num) = off_num ; conn_dir(tconn_num) = 2
               left_num = left_num + 1 ; left_off(tconn_num) = left_num
@@ -2173,7 +2171,7 @@ module set_condition
       end if
       ! west direction
       if (i_num /= 1) then
-        w_num = g_num-1 ; loc_w = glo2loc_ijk(w_num)
+        w_num = g_num-1 ; loc_w = st_conn%glo2loc_ijk(w_num)
         if (loc_w > 0) then
           off_num = loc_w ; tks = reg_cksx(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
@@ -2191,7 +2189,7 @@ module set_condition
               st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 3
             end if
           else if (0 < off_num .and. off_num <= ncalc) then
-            if (calc2reg(i) == calc2reg(off_num) .or. st_sim%reg_neib == 1) then
+            if (st_conn%calc2reg(i) == st_conn%calc2reg(off_num) .or. st_sim%reg_neib == 1) then
               sflag = 0 ; aks = reg_cksx(off_num) ; tconn_num = tconn_num + 1
               off_row(tconn_num) = off_num ; conn_dir(tconn_num) = 3
               left_num = left_num + 1 ; left_off(tconn_num) = left_num
@@ -2226,7 +2224,7 @@ module set_condition
       end if
       ! east direction
       if (i_num /= gridx) then
-        e_num = g_num+1 ; loc_e = glo2loc_ijk(e_num)
+        e_num = g_num+1 ; loc_e = st_conn%glo2loc_ijk(e_num)
         if (loc_e > 0) then
           off_num = loc_e ; tks = reg_cksx(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
@@ -2244,7 +2242,7 @@ module set_condition
               st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 4
             end if
           else if (0 < off_num .and. off_num <= ncalc) then
-            if (calc2reg(i) == calc2reg(off_num) .or. st_sim%reg_neib == 1) then
+            if (st_conn%calc2reg(i) == st_conn%calc2reg(off_num) .or. st_sim%reg_neib == 1) then
               sflag = 0 ; aks = reg_cksx(off_num) ; tconn_num = tconn_num + 1
               off_row(tconn_num) = off_num ; conn_dir(tconn_num) = 4
               right_num = right_num + 1 ; right_off(tconn_num) = right_num
@@ -2279,7 +2277,7 @@ module set_condition
       end if
       ! south direction
       if (j_num /= gridy) then
-        s_num = g_num+gridx ; loc_s = glo2loc_ijk(s_num)
+        s_num = g_num+gridx ; loc_s = st_conn%glo2loc_ijk(s_num)
         if (loc_s > 0) then
           off_num = loc_s ; tks = reg_cksy(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
@@ -2297,7 +2295,7 @@ module set_condition
               st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 5
             end if
           else if (0 < off_num .and. off_num <= ncalc) then
-            if (calc2reg(i) == calc2reg(off_num) .or. st_sim%reg_neib == 1) then
+            if (st_conn%calc2reg(i) == st_conn%calc2reg(off_num) .or. st_sim%reg_neib == 1) then
               sflag = 0 ; aks = reg_cksy(off_num) ; tconn_num = tconn_num + 1
               off_row(tconn_num) = off_num ; conn_dir(tconn_num) = 5
               right_num = right_num + 1 ; right_off(tconn_num) = right_num
@@ -2332,7 +2330,7 @@ module set_condition
       end if
       ! down direction
       if (k_num /= gridz) then
-        d_num = g_num+gridx*gridy ; loc_d = glo2loc_ijk(d_num)
+        d_num = g_num+gridx*gridy ; loc_d = st_conn%glo2loc_ijk(d_num)
         if (loc_d > 0) then
           off_num = loc_d ; tks = reg_cksz(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
@@ -2350,7 +2348,7 @@ module set_condition
               st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 6
             end if
           else if (0 < off_num .and. off_num <= ncalc) then
-            if (calc2reg(i) == calc2reg(off_num) .or. st_sim%reg_neib == 1) then
+            if (st_conn%calc2reg(i) == st_conn%calc2reg(off_num) .or. st_sim%reg_neib == 1) then
               sflag = 0 ; aks = reg_cksz(off_num) ; tconn_num = tconn_num + 1
               off_row(tconn_num) = off_num ; conn_dir(tconn_num) = 6
               right_num = right_num + 1 ; right_off(tconn_num) = right_num
@@ -2390,9 +2388,9 @@ module set_condition
 
     deallocate(reg_cksx, reg_cksy, reg_cksz)
     deallocate(reg_dis, reg_fare)
-    deallocate(area_r)
-    deallocate(calc2reg)
-    deallocate(glo2loc_ijk)
+    deallocate(st_geom%area_r)
+    deallocate(st_conn%calc2reg)
+    deallocate(st_conn%glo2loc_ijk)
 
   end subroutine set_connect
 

@@ -1,6 +1,7 @@
 module set_cell
   ! -- modules
   use kind_module, only: I4
+  use types_module, only: conn_set
   use utility_module, only: st_mpi, iquick_sort
   use initial_module, only: st_sim, st_grid, st_clas
 
@@ -10,9 +11,6 @@ module set_cell
   integer(I4), public :: amg_setflag
   integer(I4), public :: ncalc, ncals, ncell, nsurf, no_ncalc, no_ncals
   integer(I4), public :: seal_snum, seal_cnum, neib_mpi_totn, neib_ncals, neib_ncalc
-  integer(I4), allocatable, public :: clas_flag(:,:)
-  integer(I4), allocatable, public :: calc2reg(:)
-  integer(I4), allocatable, public :: glo2loc_ijk(:), loc2glo_ijk(:), loc2glo_ij(:)
 #ifdef MPI_MSG
   integer(I4), allocatable, public :: send_cind(:), recv_cind(:)
   integer(I4), allocatable, public :: send_citem(:), recv_citem(:)
@@ -20,6 +18,7 @@ module set_cell
   integer(I4), allocatable, public :: loc2glo_nos(:), loc2glo_noc(:)
   integer(I4), allocatable, public :: loc2unk_ij(:)
 #endif
+  type(conn_set), public :: st_conn
 
   ! -- local
   integer(I4) :: ns_unknow, nc_unknow
@@ -39,7 +38,7 @@ module set_cell
   !*********************************************************************************************
     ! -- modules
     use utility_module, only: open_new_wtxt, close_file
-    use initial_module, only: st_ctrl, st_out_type, st_out_path, out_type
+    use initial_module, only: out_type, st_ctrl, st_out_type, st_out_path
     use check_condition, only: check_calc_region
 #ifdef MPI_MSG
     use mpi_utility, only: barrier_proc, mpisum_val, gather_val
@@ -140,12 +139,12 @@ module set_cell
     ncalc = count(glob_mpi_flag(:) == st_mpi%rank+1)
     ncals = count(glob_mpi_flag(1:nxy) == st_mpi%rank+1)
 
-    allocate(glo2loc_ijk(st_grid%nxyz), l2g_ijk(ncalc))
+    allocate(st_conn%glo2loc_ijk(st_grid%nxyz), l2g_ijk(ncalc))
     allocate(glo2loc_ij(nxy), l2g_ij(ncals))
     !$omp parallel
     !$omp do private(i)
     do i = 1, st_grid%nxyz
-      glo2loc_ijk(i) = 0
+      st_conn%glo2loc_ijk(i) = 0
     end do
     !$omp end do
     !$omp do private(i)
@@ -190,18 +189,18 @@ module set_cell
     mpi_ncals = ncals + neib_ncals ; mpi_ncalc = ncalc + neib_ncalc
     nsurf = mpi_ncals + seal_snum ; ncell = mpi_ncalc + seal_cnum
 
-    allocate(loc2glo_ij(nsurf), loc2glo_ijk(ncell))
+    allocate(st_conn%loc2glo_ij(nsurf), st_conn%loc2glo_ijk(ncell))
     allocate(glob_num(st_grid%nxyz))
     allocate(temp_locs(seal_snum), temp_locc(seal_cnum))
     !$omp parallel
     !$omp do private(i)
     do i = 1, nsurf
-      loc2glo_ij(i) = 0
+      st_conn%loc2glo_ij(i) = 0
     end do
     !$omp end do
     !$omp do private(i)
     do i = 1, ncell
-      loc2glo_ijk(i) = 0
+      st_conn%loc2glo_ijk(i) = 0
     end do
     !$omp end do
     !$omp do private(i)
@@ -221,13 +220,13 @@ module set_cell
     !$omp end do
     !$omp end parallel
 
-    loc2glo_ij(:mpi_ncals) = l2g_ij(:)
-    loc2glo_ijk(:mpi_ncalc) = l2g_ijk(:)
+    st_conn%loc2glo_ij(:mpi_ncals) = l2g_ij(:)
+    st_conn%loc2glo_ijk(:mpi_ncalc) = l2g_ijk(:)
 
     temp_locs(:) = pack(glo2loc_ij(:), glo2loc_ij(:) > mpi_ncals)
-    loc2glo_ij((/ temp_locs /)) = pack(glob_num(1:nxy), glo2loc_ij(:) > mpi_ncals)
-    temp_locc(:) = pack(glo2loc_ijk(:), glo2loc_ijk(:) > mpi_ncalc)
-    loc2glo_ijk((/ temp_locc /)) = pack(glob_num(:), glo2loc_ijk(:) > mpi_ncalc)
+    st_conn%loc2glo_ij((/ temp_locs /)) = pack(glob_num(1:nxy), glo2loc_ij(:) > mpi_ncals)
+    temp_locc(:) = pack(st_conn%glo2loc_ijk(:), st_conn%glo2loc_ijk(:) > mpi_ncalc)
+    st_conn%loc2glo_ijk((/ temp_locc /)) = pack(glob_num(:), st_conn%glo2loc_ijk(:) > mpi_ncalc)
 
     no_ncals = count(glob_mpi_flag(1:nxy) == -(st_mpi%rank+1))
     no_ncalc = count(glob_mpi_flag(:) == -(st_mpi%rank+1))
@@ -269,19 +268,21 @@ module set_cell
     !$omp end parallel
     if (st_mpi%totn /= 1) then
       ! -- Gather array (val)
-        call gather_val(st_mpi%totn, ncals, loc2glo_ij(1:ncals), cals_glob, "calculation number")
+        call gather_val(st_mpi%totn, ncals, st_conn%loc2glo_ij(1:ncals), cals_glob,&
+                        "calculation number")
       ! -- Gather array (val)
-        call gather_val(st_mpi%totn, ncalc, loc2glo_ijk(1:ncalc), calc_glob, "calculation number")
+        call gather_val(st_mpi%totn, ncalc, st_conn%loc2glo_ijk(1:ncalc), calc_glob,&
+                        "calculation number")
     else
       !$omp parallel
       !$omp do private(i)
       do i = 1, ncals
-        cals_glob(i) = loc2glo_ij(i)
+        cals_glob(i) = st_conn%loc2glo_ij(i)
       end do
       !$omp end do
       !$omp do private(i)
       do i = 1, ncalc
-        calc_glob(i) = loc2glo_ijk(i)
+        calc_glob(i) = st_conn%loc2glo_ijk(i)
       end do
       !$omp end do
       !$omp end parallel
@@ -343,7 +344,8 @@ module set_cell
     glo2unk_ij((/ sort_sglo /)) = nsun_num(:)
     glo2unk_ijk((/ sort_cglo /)) = ncun_num(:)
     loc2unk_ij(:) = pack(glo2unk_ij(:), (glo2loc_ij(:) > 0 .and. glo2loc_ij(:) <= ncals))
-    loc2unk_ijk(:) = pack(glo2unk_ijk(:), (glo2loc_ijk(:) > 0 .and. glo2loc_ijk(:) <= ncalc))
+    loc2unk_ijk(:) = pack(glo2unk_ijk(:), (st_conn%glo2loc_ijk(:) > 0 .and.&
+                          st_conn%glo2loc_ijk(:) <= ncalc))
 
     deallocate(sort_sglo, nsun_num, glo2unk_ij)
     deallocate(sort_cglo, ncun_num, glo2unk_ijk)
@@ -352,7 +354,7 @@ module set_cell
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncals
-      sort_sglo(i) = loc2glo_ij(i)
+      sort_sglo(i) = st_conn%loc2glo_ij(i)
     end do
     !$omp end do
     !$omp do private(i)
@@ -362,13 +364,13 @@ module set_cell
     !$omp end do
     !$omp do private(i)
     do i = 1, seal_snum
-      sort_sglo(ncals+no_ncals+i) = loc2glo_ij(mpi_ncals+i)
+      sort_sglo(ncals+no_ncals+i) = st_conn%loc2glo_ij(mpi_ncals+i)
     end do
     !$omp end do
 
     !$omp do private(i)
     do i = 1, ncalc
-      sort_cglo(i) = loc2glo_ijk(i)
+      sort_cglo(i) = st_conn%loc2glo_ijk(i)
     end do
     !$omp end do
     !$omp do private(i)
@@ -378,7 +380,7 @@ module set_cell
     !$omp end do
     !$omp do private(i)
     do i = 1, seal_cnum
-      sort_cglo(ncalc+no_ncalc+i) = loc2glo_ijk(mpi_ncalc+i)
+      sort_cglo(ncalc+no_ncalc+i) = st_conn%loc2glo_ijk(mpi_ncalc+i)
     end do
     !$omp end do
     !$omp end parallel
@@ -387,14 +389,15 @@ module set_cell
     call iquick_sort(sort_cglo, 1, ncalc+no_ncalc+seal_cnum)
 
     ! -- Set calculation view (calc_view)
-      call set_calc_view(ncals, ncalc, loc2glo_ij, loc2glo_ijk)
+      call set_calc_view(ncals, ncalc, st_conn%loc2glo_ij, st_conn%loc2glo_ijk)
     ! -- Set seal view (seal_view)
-      call set_seal_view(seal_snum, seal_cnum, loc2glo_ij(mpi_ncals+1:),&
-                         loc2glo_ijk(mpi_ncalc+1:))
+      call set_seal_view(seal_snum, seal_cnum, st_conn%loc2glo_ij(mpi_ncals+1:),&
+                         st_conn%loc2glo_ijk(mpi_ncalc+1:))
     ! -- Set restart view (rest_view)
       call set_rest_view(ncalc, nc_unknow, loc2unk_ijk)
     ! -- Set write file view (write_fview)
-      call set_write_fview(ncals, ncalc, loc2glo_ij, loc2glo_ijk, sort_sglo, sort_cglo)
+      call set_write_fview(ncals, ncalc, st_conn%loc2glo_ij, st_conn%loc2glo_ijk,&
+                           sort_sglo, sort_cglo)
     deallocate(sort_sglo, sort_cglo)
 
 #ifdef ICI
@@ -1030,7 +1033,7 @@ module set_cell
     deallocate(temp_mpi_reg, mask)
 
     allocate(loc_nreg(loc_regn), temp_cend(0:loc_regn))
-    allocate(calc2reg(ncalc))
+    allocate(st_conn%calc2reg(ncalc))
     temp_cend(0) = 0
     !$omp parallel
     !$omp do private(i)
@@ -1040,7 +1043,7 @@ module set_cell
     !$omp end do
     !$omp do private(i)
     do i = 1, ncalc
-      calc2reg(i) = 0
+      st_conn%calc2reg(i) = 0
     end do
     !$omp end do
     !$omp end parallel
@@ -1069,8 +1072,8 @@ module set_cell
             l2g_ij(count_cals) = i ; glo2loc_ij(i) = count_cals
           end if
           count_calc = count_calc + 1 ; temp_cend(temp_nreg) = temp_cend(temp_nreg) + 1
-          l2g_ijk(count_calc) = ij ; glo2loc_ijk(ij) = count_calc
-          calc2reg(count_calc) = temp_nreg
+          l2g_ijk(count_calc) = ij ; st_conn%glo2loc_ijk(ij) = count_calc
+          st_conn%calc2reg(count_calc) = temp_nreg
         end if
       end do
     end do
@@ -1286,11 +1289,11 @@ module set_cell
       !$omp do private(i)
       do i = 1, ncalc
         mpi_l2g_ijk(i) = l2g_ijk(i)
-        mpi_calc2reg(i) = calc2reg(i)
+        mpi_calc2reg(i) = st_conn%calc2reg(i)
       end do
       !$omp end do
       !$omp end parallel
-      deallocate(l2g_ij, l2g_ijk, calc2reg)
+      deallocate(l2g_ij, l2g_ijk, st_conn%calc2reg)
 
       !$omp parallel
       !$omp do private(i, cals_niebn)
@@ -1305,7 +1308,7 @@ module set_cell
         calc_niebn = ncalc + i
         mpi_l2g_ijk(calc_niebn) = neib_gloc(i)
         mpi_calc2reg(calc_niebn) = temp_calc_reg(i)
-        glo2loc_ijk(neib_gloc(i)) = calc_niebn
+        st_conn%glo2loc_ijk(neib_gloc(i)) = calc_niebn
       end do
       !$omp end do
       !$omp end parallel
@@ -1313,7 +1316,7 @@ module set_cell
       deallocate(neib_glos, temp_calc_reg)
 
       allocate(l2g_ij(ncals+neib_ncals), l2g_ijk(ncalc+neib_ncalc))
-      allocate(calc2reg(ncalc+neib_ncalc))
+      allocate(st_conn%calc2reg(ncalc+neib_ncalc))
       !$omp parallel
       !$omp do private(i)
       do i = 1, ncals+neib_ncals
@@ -1323,7 +1326,7 @@ module set_cell
       !$omp do private(i)
       do i = 1, ncalc+neib_ncalc
         l2g_ijk(i) = mpi_l2g_ijk(i)
-        calc2reg(i) = mpi_calc2reg(i)
+        st_conn%calc2reg(i) = mpi_calc2reg(i)
       end do
       !$omp end do
       !$omp end parallel
@@ -1460,43 +1463,49 @@ module set_cell
       ! up direction
       if (k_num /= 1) then
         u_num = g_num-nxy
-        if (glob_reg_flag(u_num) == 0 .and. glo2loc_ijk(u_num) == 0) then
-          seal_cnum = seal_cnum + 1 ; glo2loc_ijk(u_num) = ncalc + neib_ncalc + seal_cnum
+        if (glob_reg_flag(u_num) == 0 .and. st_conn%glo2loc_ijk(u_num) == 0) then
+          seal_cnum = seal_cnum + 1
+          st_conn%glo2loc_ijk(u_num) = ncalc + neib_ncalc + seal_cnum
         end if
       end if
       ! north direction
       if (j_num /= 1) then
         n_num = g_num-st_grid%nx
-        if (glob_reg_flag(n_num) == 0 .and. glo2loc_ijk(n_num) == 0) then
-          seal_cnum = seal_cnum + 1 ; glo2loc_ijk(n_num) = ncalc + neib_ncalc + seal_cnum
+        if (glob_reg_flag(n_num) == 0 .and. st_conn%glo2loc_ijk(n_num) == 0) then
+          seal_cnum = seal_cnum + 1
+          st_conn%glo2loc_ijk(n_num) = ncalc + neib_ncalc + seal_cnum
         end if
       end if
       ! west direction
       if (i_num /= 1) then
         w_num = g_num-1
-        if (glob_reg_flag(w_num) == 0 .and. glo2loc_ijk(w_num) == 0) then
-          seal_cnum = seal_cnum + 1 ; glo2loc_ijk(w_num) = ncalc + neib_ncalc + seal_cnum
+        if (glob_reg_flag(w_num) == 0 .and. st_conn%glo2loc_ijk(w_num) == 0) then
+          seal_cnum = seal_cnum + 1
+          st_conn%glo2loc_ijk(w_num) = ncalc + neib_ncalc + seal_cnum
         end if
       end if
       ! east direction
       if (i_num /= st_grid%nx) then
         e_num = g_num+1
-        if (glob_reg_flag(e_num) == 0 .and. glo2loc_ijk(e_num) == 0) then
-          seal_cnum = seal_cnum + 1 ; glo2loc_ijk(e_num) = ncalc + neib_ncalc + seal_cnum
+        if (glob_reg_flag(e_num) == 0 .and. st_conn%glo2loc_ijk(e_num) == 0) then
+          seal_cnum = seal_cnum + 1
+          st_conn%glo2loc_ijk(e_num) = ncalc + neib_ncalc + seal_cnum
         end if
       end if
       ! south direction
       if (j_num /= st_grid%ny) then
         s_num = g_num+st_grid%nx
-        if (glob_reg_flag(s_num) == 0 .and. glo2loc_ijk(s_num) == 0) then
-          seal_cnum = seal_cnum + 1 ; glo2loc_ijk(s_num) = ncalc + neib_ncalc + seal_cnum
+        if (glob_reg_flag(s_num) == 0 .and. st_conn%glo2loc_ijk(s_num) == 0) then
+          seal_cnum = seal_cnum + 1
+          st_conn%glo2loc_ijk(s_num) = ncalc + neib_ncalc + seal_cnum
         end if
       end if
       ! down direction
       if (k_num /= st_grid%nz) then
         d_num = g_num+nxy
-        if (glob_reg_flag(d_num) == 0 .and. glo2loc_ijk(d_num) == 0) then
-          seal_cnum = seal_cnum + 1 ; glo2loc_ijk(d_num) = ncalc + neib_ncalc + seal_cnum
+        if (glob_reg_flag(d_num) == 0 .and. st_conn%glo2loc_ijk(d_num) == 0) then
+          seal_cnum = seal_cnum + 1
+          st_conn%glo2loc_ijk(d_num) = ncalc + neib_ncalc + seal_cnum
         end if
       end if
     end do
@@ -1514,17 +1523,17 @@ module set_cell
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(clas_flag(ncell,st_clas%totn))
+    allocate(st_conn%clas_flag(ncell,st_clas%totn))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncell
-      clas_flag(i,:) = 0
+      st_conn%clas_flag(i,:) = 0
     end do
     !$omp end do
     !$omp do private(i)
     do i = 1, st_grid%nxyz
-      if (glo2loc_ijk(i) > 0) then
-        clas_flag(glo2loc_ijk(i),:) = glob_clas_flag(i,:)
+      if (st_conn%glo2loc_ijk(i) > 0) then
+        st_conn%clas_flag(st_conn%glo2loc_ijk(i),:) = glob_clas_flag(i,:)
       end if
     end do
     !$omp end do
@@ -1544,7 +1553,7 @@ module set_cell
     ! -- local
     integer(I4) :: s_num
     !-------------------------------------------------------------------------------------------
-    s_num = loc2glo_ij(cal_num)
+    s_num = st_conn%loc2glo_ij(cal_num)
     y_num = (s_num-1)/st_grid%nx + 1
     x_num = s_num - (y_num-1)*st_grid%nx
 
@@ -1562,7 +1571,7 @@ module set_cell
     ! -- local
     integer(I4) :: c_num, xy_num
     !-------------------------------------------------------------------------------------------
-    c_num = loc2glo_ijk(cal_num)
+    c_num = st_conn%loc2glo_ijk(cal_num)
     z_num = (c_num-1)/(st_grid%nx*st_grid%ny) + 1
     xy_num = c_num - st_grid%nx*st_grid%ny*(z_num-1)
     y_num = (xy_num-1)/st_grid%nx + 1

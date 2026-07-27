@@ -1,7 +1,7 @@
 module utility_module
   ! -- modules
   use kind_module, only: I4
-  use types_module, only: mpi_set
+  use types_module, only: mpi_set, gmap_set
 
   implicit none
   private
@@ -13,7 +13,8 @@ module utility_module
   public :: write_logf, write_success
   public :: write_err_read, write_err_write, write_err_close, write_err_stop
   public :: conv_unit, get_ilen, conv_i2s
-  public :: iquick_sort
+  public :: iquick_sort, iquick_sort2
+  public :: gmap_init, gmap_put, gmap_get, gmap_free
 
   ! -- local
 
@@ -453,5 +454,138 @@ module utility_module
     end if
 
   end subroutine iquick_sort
+
+  recursive subroutine iquick_sort2(key_x, val_x, first, last)
+  !*********************************************************************************************
+  ! iquick_sort2 -- integer quick sort of key_x, carrying val_x along with the same swaps
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(inout) :: key_x(:), val_x(:)
+    integer(I4), intent(in) :: first, last
+    ! -- local
+    integer(I4) :: low_pos, high_pos, pivot, swap_tmp
+    !-------------------------------------------------------------------------------------------
+    pivot = key_x((first+last)/2) ; low_pos = first ; high_pos = last
+    do
+      do while(key_x(low_pos) < pivot)
+        low_pos = low_pos + 1
+      end do
+      do while(pivot < key_x(high_pos))
+        high_pos = high_pos - 1
+      end do
+      if (low_pos >= high_pos) then
+        exit
+      end if
+      swap_tmp = key_x(low_pos) ; key_x(low_pos) = key_x(high_pos) ; key_x(high_pos) = swap_tmp
+      swap_tmp = val_x(low_pos) ; val_x(low_pos) = val_x(high_pos) ; val_x(high_pos) = swap_tmp
+      low_pos = low_pos + 1 ; high_pos = high_pos - 1
+    end do
+    if (first < low_pos-1) then
+      call iquick_sort2(key_x, val_x, first, low_pos-1)
+    end if
+    if (high_pos+1 < last) then
+      call iquick_sort2(key_x, val_x, high_pos+1, last)
+    end if
+
+  end subroutine iquick_sort2
+
+  subroutine gmap_init(g_map, entry_num)
+  !*********************************************************************************************
+  ! gmap_init -- global to local map initialize
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    type(gmap_set), intent(inout) :: g_map
+    integer(I4), intent(in) :: entry_num
+    ! -- local
+    integer(I4) :: slot
+    !-------------------------------------------------------------------------------------------
+    g_map%table_num = entry_num*2 + (entry_num/2) + 3
+
+    if (mod(entry_num, 2) == 0) then
+      g_map%table_num = g_map%table_num + 1
+    end if
+
+    if (allocated(g_map%table_key)) then
+      deallocate(g_map%table_key, g_map%table_val)
+    end if
+    allocate(g_map%table_key(g_map%table_num), g_map%table_val(g_map%table_num))
+
+    !$omp parallel do private(slot)
+    do slot = 1, g_map%table_num
+      g_map%table_key(slot) = 0 ; g_map%table_val(slot) = 0
+    end do
+    !$omp end parallel do
+
+  end subroutine gmap_init
+
+  subroutine gmap_put(g_map, map_key, map_val)
+  !*********************************************************************************************
+  ! gmap_put -- global to local map put
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    type(gmap_set), intent(inout) :: g_map
+    integer(I4), intent(in) :: map_key, map_val
+    ! -- local
+    integer(I4) :: slot
+    !-------------------------------------------------------------------------------------------
+    slot = mod(map_key - 1, g_map%table_num) + 1
+
+    do while (g_map%table_key(slot) /= 0 .and. g_map%table_key(slot) /= map_key)
+      slot = mod(slot, g_map%table_num) + 1
+    end do
+
+    g_map%table_key(slot) = map_key ; g_map%table_val(slot) = map_val
+
+  end subroutine gmap_put
+
+  function gmap_get(g_map, map_key) result(map_val)
+  !*********************************************************************************************
+  ! gmap_get -- global to local map get
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    type(gmap_set), intent(in) :: g_map
+    integer(I4), intent(in) :: map_key
+    ! -- local
+    integer(I4) :: map_val, slot
+    !-------------------------------------------------------------------------------------------
+    slot = mod(map_key - 1, g_map%table_num) + 1
+
+    do while (g_map%table_key(slot) /= 0 .and. g_map%table_key(slot) /= map_key)
+      slot = mod(slot, g_map%table_num) + 1
+    end do
+
+    if (g_map%table_key(slot) == map_key) then
+      map_val = g_map%table_val(slot)
+    else
+      map_val = 0
+    end if
+
+  end function gmap_get
+
+  subroutine gmap_free(g_map)
+  !*********************************************************************************************
+  ! gmap_free -- global to local map free
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    type(gmap_set), intent(inout) :: g_map
+    ! -- local
+
+    !-------------------------------------------------------------------------------------------
+    if (allocated(g_map%table_key)) then
+      deallocate(g_map%table_key, g_map%table_val)
+    end if
+    g_map%table_num = 0
+
+  end subroutine gmap_free
 
 end module utility_module

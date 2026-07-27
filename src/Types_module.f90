@@ -11,7 +11,7 @@ module types_module
   public :: seal_set, surfb_set, well_set, surfw_set, step_flag, ftype_out, path_out, unit_out
   public :: out_time, out_step, msout_set, hydr_set, bcnd_set, forc_set, bflag_set, bcalc_set
   public :: bcount_set, rlbc_set, bfview_set, bound_fview
-  public :: kryl_set, amgt_set, coef_set, conn_set
+  public :: sol_set, kryl_set, amgt_set, coef_set, conn_set
 
   type :: mpi_set
     integer(I4) :: totn, rank, comm
@@ -264,6 +264,13 @@ module types_module
   type :: bound_fview
     integer(I4) :: seal = 0, rech = 0, well = 0, prec = 0, evap = 0
   end type bound_fview
+
+  type :: sol_set
+    real(DP), allocatable :: head_old(:), srat_old(:)
+    real(DP), allocatable :: surf_head(:), surf_old(:), surf_rati(:)
+    real(DP), allocatable :: head_new(:), head_pre(:), head_change(:)
+    real(DP), allocatable :: srat_new(:), rel_perm(:)
+  end type sol_set
 
   type :: kryl_set
     real(DP), allocatable :: resi(:)

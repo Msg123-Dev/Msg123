@@ -8,7 +8,7 @@ module make_linearsystem
   use set_condition, only: st_hydr, st_bcnd
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
-  use allocate_solution, only: nreg_num, head_new, srat_new, rel_perm, crs_index
+  use allocate_solution, only: nreg_num, st_sol, crs_index
 #ifdef MPI_MSG
   use utility_module, only: st_mpi
   use mpi_solve, only: senrec_rvectv
@@ -77,7 +77,7 @@ module make_linearsystem
     !$omp end parallel do
 
     ! -- Calculate function value (func)
-      call calc_func(head_new, st_coef%temp_rhs)
+      call calc_func(st_sol%head_new, st_coef%temp_rhs)
 
     array_var(1)%rhs(:) = -st_coef%temp_rhs(:)
 
@@ -132,7 +132,7 @@ module make_linearsystem
     !$omp end parallel do
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, st_ctrl%newper, head_new, st_coef%per_srat, st_coef%per_relp)
+      call calc_srat_rperm(ncalc, st_ctrl%newper, st_sol%head_new, st_coef%per_srat, st_coef%per_relp)
 
     if (st_sim%sim_type >= 0) then
       ! -- Form storage change (stochn)
@@ -208,21 +208,21 @@ module make_linearsystem
     !$omp end do
     !$omp do private(i)
     do i = 1, ncalc
-      deri_srat(i) = (per_srat(i)-srat_new(i))*st_ctrl%newper_inv
+      deri_srat(i) = (per_srat(i)-st_sol%srat_new(i))*st_ctrl%newper_inv
     end do
     !$omp end do
 
     if (st_time%form_switch == 1) then
       !$omp do private(i)
       do i = 1, ncalc
-        deri_stor(i) = alp(i)*deri_srat(i)*head_new(i)
+        deri_stor(i) = alp(i)*deri_srat(i)*st_sol%head_new(i)
       end do
       !$omp end do
     end if
 
     !$omp do private(i)
     do i = 1, ncalc
-      dmat_sto(i) = -(st_hydr%read_pors(i)*deri_srat(i)+alp(i)*srat_new(i)+deri_stor(i))&
+      dmat_sto(i) = -(st_hydr%read_pors(i)*deri_srat(i)+alp(i)*st_sol%srat_new(i)+deri_stor(i))&
                     *st_time%delt_inv*st_geom%cell_vol(i)
     end do
     !$omp end do
@@ -260,8 +260,8 @@ module make_linearsystem
       sta_ind = crs_index(1)%offind(i-1) ; end_ind = crs_index(1)%offind(i)
       do k = 1, end_ind-sta_ind
         ind = sta_ind + k ; j = crs_index(1)%offrow(ind)
-        delhead = head_new(j) - head_new(i)
-        relp1 = rel_perm(i) ; relp2 = rel_perm(j)
+        delhead = st_sol%head_new(j) - st_sol%head_new(i)
+        relp1 = st_sol%rel_perm(i) ; relp2 = st_sol%rel_perm(j)
 
         ! -- Calculate hydradulic conductivity by upwind (hyd_upwind)
           call calc_hyd_upwind(-delhead, relp1, relp2, relat)
@@ -282,8 +282,8 @@ module make_linearsystem
           ind = sta_ind + k
           j = crs_index(1)%offrow(ind)
 
-          delhead = head_new(j) - head_new(i)
-          relp1 = per_relp(i) ; relp2 = rel_perm(j)
+          delhead = st_sol%head_new(j) - st_sol%head_new(i)
+          relp1 = per_relp(i) ; relp2 = st_sol%rel_perm(j)
 
           per_head1 = -delhead + st_ctrl%newper
           per_head2 = -delhead - st_ctrl%newper
@@ -292,7 +292,7 @@ module make_linearsystem
             call calc_hyd_upwind(per_head1, relp1, relp2, relat)
           deri_hyd1 = st_hydr%hydf_conn(ind)*relat
 
-          relp1 = rel_perm(i) ; relp2 = per_relp(j)
+          relp1 = st_sol%rel_perm(i) ; relp2 = per_relp(j)
 
           ! -- Calculate hydradulic conductivity by upwind (hyd_upwind)
             call calc_hyd_upwind(per_head2, relp1, relp2, relat)
@@ -346,9 +346,9 @@ module make_linearsystem
     !$omp do private(i, s)
     do i = 1, st_bcnd%rive_num
       s = st_bcnd%rive2cals(i)
-      per_riv(i) = per_relp(s) ; rel_riv(i) = rel_perm(s)
-      if (head_new(s) >= st_forc%rive_bott(i)) then
-        delh_r(i) = st_forc%rive_head(i) - head_new(s)
+      per_riv(i) = per_relp(s) ; rel_riv(i) = st_sol%rel_perm(s)
+      if (st_sol%head_new(s) >= st_forc%rive_bott(i)) then
+        delh_r(i) = st_forc%rive_head(i) - st_sol%head_new(s)
         over_riv(i) = DONE
       else if (st_forc%rive_head(i) > st_forc%rive_bott(i)) then
         delh_r(i) = st_forc%rive_head(i) - st_forc%rive_bott(i)
@@ -406,9 +406,9 @@ module make_linearsystem
     !$omp do private(i, s)
     do i = 1, st_bcnd%lake_num
       s = st_bcnd%lake2cals(i)
-      per_lak(i) = per_relp(s) ; rel_lak(i) = rel_perm(s)
-      if (head_new(s) >= st_forc%lake_bott(i)) then
-        delh_l(i) = st_forc%lake_head(i) - head_new(s)
+      per_lak(i) = per_relp(s) ; rel_lak(i) = st_sol%rel_perm(s)
+      if (st_sol%head_new(s) >= st_forc%lake_bott(i)) then
+        delh_l(i) = st_forc%lake_head(i) - st_sol%head_new(s)
         over_lak(i) = DONE
       else if (st_forc%lake_head(i) > st_forc%lake_bott(i)) then
         delh_l(i) = st_forc%lake_head(i) - st_forc%lake_bott(i)
@@ -447,7 +447,6 @@ module make_linearsystem
   !*********************************************************************************************
     ! -- modules
 !    use make_cell, only: surf_elev
-    use allocate_solution, only: surf_head
     ! -- inout
     real(DP), intent(out) :: dmat_sur(:)
     real(DP), intent(in) :: per_relp(:)
@@ -464,47 +463,47 @@ module make_linearsystem
     !$omp end do
     !$omp do private(i)
     do i = 1, ncals
-!      if (head_new(i) >= surf_elev(i)) then
-!        if (surf_head(i) > surf_bott(i)) then
-!          delh_s(i) = surf_head(i) - head_new(i)
+!      if (st_sol%head_new(i) >= surf_elev(i)) then
+!        if (st_sol%surf_head(i) > surf_bott(i)) then
+!          delh_s(i) = st_sol%surf_head(i) - st_sol%head_new(i)
 !        else
-!          delh_s(i) = surf_elev(i) - head_new(i)
+!          delh_s(i) = surf_elev(i) - st_sol%head_new(i)
 !        end if
 !        over_sur(i) = DONE
-!      else if (surf_head(i) >= surf_elev(i)) then
-!        delh_s(i) = surf_head(i) - surf_elev(i)
+!      else if (st_sol%surf_head(i) >= surf_elev(i)) then
+!        delh_s(i) = st_sol%surf_head(i) - surf_elev(i)
 !        over_sur(i) = DZERO
 !      else
-!!        delh_s(i) = surf_head(i) - head_new(i)
+!!        delh_s(i) = st_sol%surf_head(i) - st_sol%head_new(i)
 !        delh_s(i) = DZERO
 !        over_sur(i) = DONE
 !      end if
 !      if (surf_reli(i) == DZERO) then
 !        delh_s(i) = DZERO
 !      else
-        if (head_new(i) >= st_hydr%surf_top(i)) then
-          if (surf_head(i) > st_hydr%surf_top(i)) then
-            delh_s(i) = surf_head(i) - head_new(i)
+        if (st_sol%head_new(i) >= st_hydr%surf_top(i)) then
+          if (st_sol%surf_head(i) > st_hydr%surf_top(i)) then
+            delh_s(i) = st_sol%surf_head(i) - st_sol%head_new(i)
           else
-            delh_s(i) = st_hydr%surf_top(i) - head_new(i)
+            delh_s(i) = st_hydr%surf_top(i) - st_sol%head_new(i)
           end if
           over_sur(i) = DONE
-        else if (head_new(i) >= st_hydr%surf_bott(i)) then
-          if (surf_head(i) > st_hydr%surf_bott(i)) then
-            delh_s(i) = surf_head(i) - head_new(i)
+        else if (st_sol%head_new(i) >= st_hydr%surf_bott(i)) then
+          if (st_sol%surf_head(i) > st_hydr%surf_bott(i)) then
+            delh_s(i) = st_sol%surf_head(i) - st_sol%head_new(i)
           else
-            delh_s(i) = st_hydr%surf_bott(i) - head_new(i)
+            delh_s(i) = st_hydr%surf_bott(i) - st_sol%head_new(i)
           end if
           over_sur(i) = DONE
-        else if(surf_head(i) > st_hydr%surf_bott(i)) then
-          delh_s(i) = surf_head(i) - st_hydr%surf_bott(i)
+        else if(st_sol%surf_head(i) > st_hydr%surf_bott(i)) then
+          delh_s(i) = st_sol%surf_head(i) - st_hydr%surf_bott(i)
           over_sur(i) = DZERO
         else
           delh_s(i) = DZERO
           over_sur(i) = DONE
         end if
         tran_sur(i) = st_hydr%hydf_surf(i)*st_hydr%abyd_surf(i)
-        deri_s(i) = -tran_sur(i)*rel_perm(i)
+        deri_s(i) = -tran_sur(i)*st_sol%rel_perm(i)
 !      end if
     end do
     !$omp end do
@@ -512,7 +511,7 @@ module make_linearsystem
     if (st_time%form_switch == 1) then
       !$omp do private(i)
       do i = 1, ncals
-        deri_ks_sur(i) = (per_relp(i)-rel_perm(i))*st_ctrl%newper_inv*delh_s(i)*tran_sur(i)&
+        deri_ks_sur(i) = (per_relp(i)-st_sol%rel_perm(i))*st_ctrl%newper_inv*delh_s(i)*tran_sur(i)&
                          *over_sur(i)
       end do
       !$omp end do
@@ -551,9 +550,9 @@ module make_linearsystem
     !$omp do private(i, c, s)
     do i = 1, st_bcnd%seal_num
       c = st_bcnd%seal2calc(i) ; s = st_bcnd%seal2seal(i)
-      delh_sea(i) = st_forc%read_seal(s) - head_new(c)
+      delh_sea(i) = st_forc%read_seal(s) - st_sol%head_new(c)
       per_sea(i) = per_relp(c)*st_hydr%hydf_seal(i)
-      rel_sea(i) = rel_perm(c)*st_hydr%hydf_seal(i)
+      rel_sea(i) = st_sol%rel_perm(c)*st_hydr%hydf_seal(i)
       deri_sea(i) = -rel_sea(i)*st_hydr%abyd_seal(i)
     end do
     !$omp end do

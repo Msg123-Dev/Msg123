@@ -238,7 +238,7 @@ module ici_module
   !*********************************************************************************************
     ! -- module
     use initial_module, only: st_in_type
-    use allocate_solution, only: head_new, srat_new
+    use allocate_solution, only: st_sol
     use allocate_output, only: roff_rive, roff_lake, roff_surf
     use calc_output, only: calc_wtable, calc_rivr_off, calc_lakr_off, calc_sufr_off
     ! -- inout
@@ -255,13 +255,13 @@ module ici_module
     end do
     !$omp end parallel do
 
-    call change_ici_put(head_new, head_ici)
+    call change_ici_put(st_sol%head_new, head_ici)
     call ici_put_data("hyd_head", reshape([head_ici(:)*len_scal], [ncals,st_grid%nz]))
 
     if (coupled_matsiro .and. mat_put) then
       if (st_out_type%wtab /= out_type(2)) then
         ! -- Calculate water table (wtable)
-          call calc_wtable(head_new, srat_new)
+          call calc_wtable(st_sol%head_new, st_sol%srat_new)
       end if
       allocate(wtab_dep(ncals))
       ! -- Calculate water table depth (wtab_depth)

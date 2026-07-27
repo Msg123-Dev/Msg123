@@ -8,7 +8,7 @@ module calc_function
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
   use calc_parameter, only: calc_srat_rperm
-  use allocate_solution, only: srat_new, rel_perm, crs_index
+  use allocate_solution, only: st_sol, crs_index
 #ifdef MPI_MSG
   use utility_module, only: st_mpi
   use mpi_solve, only: senrec_rvectv
@@ -58,7 +58,6 @@ module calc_function
   ! calc_func -- Calculate function value
   !*********************************************************************************************
     ! -- modules
-    use allocate_solution, only: surf_head
     ! -- inout
     real(DP), intent(inout) :: infx(:)
     real(DP), intent(out) :: funcv(:)
@@ -80,7 +79,7 @@ module calc_function
     !$omp end parallel
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, DZERO, infx, srat_new, rel_perm, alp_ss)
+      call calc_srat_rperm(ncalc, DZERO, infx, st_sol%srat_new, st_sol%rel_perm, alp_ss)
 
     if (st_sim%sim_type >= 0) then
       ! -- Function storage change (stochn)
@@ -91,7 +90,7 @@ module calc_function
     if (st_mpi%totn /= 1) then
       ! -- Send and Receive real vector value (rvectv)
         call senrec_rvectv(infx)
-        call senrec_rvectv(rel_perm)
+        call senrec_rvectv(st_sol%rel_perm)
     end if
 #endif
 
@@ -105,7 +104,7 @@ module calc_function
       call func_wellterm(welf)
 
     ! -- Function surface term (surfterm)
-      call func_surfterm(infx, surf_head, surf)
+      call func_surfterm(infx, st_sol%surf_head, surf)
 
     ! -- Function river term (riveterm)
       call func_riveterm(infx, rivf)
@@ -135,7 +134,6 @@ module calc_function
   ! calc_mass -- Calculate function value for massbalance
   !*********************************************************************************************
     ! -- modules
-    use allocate_solution, only: surf_old
     ! -- inout
     integer(I4), intent(in) :: sfla
     real(DP), intent(in) :: inmxo(:)
@@ -154,9 +152,9 @@ module calc_function
     !$omp end parallel do
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, DZERO, inmxo, srat_new, rel_perm, alp_ss_old)
+      call calc_srat_rperm(ncalc, DZERO, inmxo, st_sol%srat_new, st_sol%rel_perm, alp_ss_old)
     ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, DZERO, inmxn, srat_new, rel_perm, alp_ss_new)
+      call calc_srat_rperm(ncalc, DZERO, inmxn, st_sol%srat_new, st_sol%rel_perm, alp_ss_new)
 
     if (st_sim%sim_type >= 0) then
       ! -- Function storage change (stochn)
@@ -166,7 +164,7 @@ module calc_function
     if (st_mpi%totn /= 1) then
       ! -- Send and Receive real vector value (rvectv)
         call senrec_rvectv(inmxn)
-        call senrec_rvectv(rel_perm)
+        call senrec_rvectv(st_sol%rel_perm)
     end if
 #endif
 
@@ -181,7 +179,7 @@ module calc_function
 
     if (sfla == 0) then
       ! -- Function surface term (surfterm)
-        call func_surfterm(inmxn, surf_old, surm)
+        call func_surfterm(inmxn, st_sol%surf_old, surm)
     end if
 
     ! -- Function river term (riveterm)
@@ -220,7 +218,6 @@ module calc_function
   !*********************************************************************************************
     ! -- modules
     use make_cell, only: st_geom
-    use allocate_solution, only: head_old, srat_old
     ! -- inout
     real(DP), intent(in) :: infstoc(:), alp_new(:), alp_old(:)
     real(DP), intent(out) :: stofunc(:)
@@ -236,9 +233,9 @@ module calc_function
 
     !$omp do private(i)
     do i = 1, ncalc
-      ch_stor1(i) = alp_old(i)*srat_old(i)*head_old(i)
-      ch_stor2(i) = alp_new(i)*srat_new(i)*infstoc(i)
-      ch_stor(i) = (ch_stor2(i)-ch_stor1(i)) + st_hydr%read_pors(i)*(srat_new(i)-srat_old(i))
+      ch_stor1(i) = alp_old(i)*st_sol%srat_old(i)*st_sol%head_old(i)
+      ch_stor2(i) = alp_new(i)*st_sol%srat_new(i)*infstoc(i)
+      ch_stor(i) = (ch_stor2(i)-ch_stor1(i)) + st_hydr%read_pors(i)*(st_sol%srat_new(i)-st_sol%srat_old(i))
       stofunc(i) = -ch_stor(i)*st_time%delt_inv*st_geom%cell_vol(i)
     end do
     !$omp end do
@@ -273,7 +270,7 @@ module calc_function
       do k = 1, end_ind-sta_ind
         ind = sta_ind + k ; j = crs_index(1)%offrow(ind)
         delhead = infconn(j) - infconn(i)
-        relp1 = rel_perm(i) ; relp2 = rel_perm(j)
+        relp1 = st_sol%rel_perm(i) ; relp2 = st_sol%rel_perm(j)
 
         ! -- Calculate hydradulic conductivity by upwind (hyd_upwind)
           call calc_hyd_upwind(-delhead, relp1, relp2, relat)
@@ -337,7 +334,6 @@ module calc_function
   !*********************************************************************************************
     ! -- modules
 !    use make_cell, only: surf_elev
-    use allocate_solution, only: surf_rati
     ! -- inout
     real(DP), intent(in) :: infsurf(:), inshead(:)
     real(DP), intent(inout) :: surfunc(:)
@@ -359,17 +355,17 @@ module calc_function
 !        else
 !          delh_s(i) = surf_bott(i) - infsurf(i)
 !        end if
-!        surf_rati(i) = DONE
+!        st_sol%surf_rati(i) = DONE
 !      else if (inshead(i) >= surf_elev(i)) then
 !        delh_s(i) = inshead(i) - surf_elev(i)
-!        surf_rati(i) = DONE
+!        st_sol%surf_rati(i) = DONE
 !      else
 !!        delh_s(i) = inshead(i) - infsurf(i)
 !        delh_s(i) = DZERO
-!        surf_rati(i) = DONE
+!        st_sol%surf_rati(i) = DONE
 !      end if
 !      if (surf_reli(i) == DZERO) then
-!        surf_rati(i) = DONE ; delh_s(i) = DZERO
+!        st_sol%surf_rati(i) = DONE ; delh_s(i) = DZERO
 !      else if (infsurf(i) >= surf_top(i)) then
       if (infsurf(i) >= st_hydr%surf_top(i)) then
         if (inshead(i) > st_hydr%surf_top(i)) then
@@ -377,7 +373,7 @@ module calc_function
         else
           delh_s(i) = st_hydr%surf_top(i) - infsurf(i)
         end if
-        surf_rati(i) = DONE
+        st_sol%surf_rati(i) = DONE
       else if (infsurf(i) >= st_hydr%surf_bott(i)) then
         if (inshead(i) > st_hydr%surf_bott(i)) then
           delh_s(i) = inshead(i) - infsurf(i)
@@ -389,9 +385,9 @@ module calc_function
           if (elev_rati(i) > DONE) then
             elev_rati(i) = DONE
           end if
-          surf_rati(i) = elev_rati(i)**st_hydr%surf_parm(i)
+          st_sol%surf_rati(i) = elev_rati(i)**st_hydr%surf_parm(i)
         else
-          surf_rati(i) = DONE
+          st_sol%surf_rati(i) = DONE
         end if
       else if (inshead(i) > st_hydr%surf_bott(i)) then
         delh_s(i) = inshead(i) - st_hydr%surf_bott(i)
@@ -400,15 +396,15 @@ module calc_function
           if (elev_rati(i) > DONE) then
             elev_rati(i) = DONE
           end if
-          surf_rati(i) = elev_rati(i)**st_hydr%surf_parm(i)
+          st_sol%surf_rati(i) = elev_rati(i)**st_hydr%surf_parm(i)
         else
-          surf_rati(i) = DONE
+          st_sol%surf_rati(i) = DONE
         end if
       else
         delh_s(i) = DZERO
       end if
 
-      surfunc(i) = st_hydr%hydf_surf(i)*st_hydr%abyd_surf(i)*delh_s(i)*rel_perm(i)*surf_rati(i)
+      surfunc(i) = st_hydr%hydf_surf(i)*st_hydr%abyd_surf(i)*delh_s(i)*st_sol%rel_perm(i)*st_sol%surf_rati(i)
     end do
     !$omp end do
     !$omp end parallel
@@ -444,7 +440,7 @@ module calc_function
         delh_r(i) = DZERO
       end if
 
-      rivfunc(s) = st_hydr%hydf_surf(s)*st_forc%abyd_rive(i)*delh_r(i)*rel_perm(s)
+      rivfunc(s) = st_hydr%hydf_surf(s)*st_forc%abyd_rive(i)*delh_r(i)*st_sol%rel_perm(s)
     end do
     !$omp end do
     !$omp end parallel
@@ -480,7 +476,7 @@ module calc_function
         delh_l(i) = DZERO
       end if
 
-      lakfunc(s) = st_hydr%hydf_surf(s)*st_forc%abyd_lake(i)*delh_l(i)*rel_perm(s)
+      lakfunc(s) = st_hydr%hydf_surf(s)*st_forc%abyd_lake(i)*delh_l(i)*st_sol%rel_perm(s)
     end do
     !$omp end do
     !$omp end parallel
@@ -510,7 +506,7 @@ module calc_function
     do i = 1, st_bcnd%seal_num
       c = st_bcnd%seal2calc(i) ; s = st_bcnd%seal2seal(i)
       delhead = st_forc%read_seal(s) - infseal(c)
-      seal_flow(i) = st_hydr%hydf_seal(i)*rel_perm(c)*st_hydr%abyd_seal(i)*delhead
+      seal_flow(i) = st_hydr%hydf_seal(i)*st_sol%rel_perm(c)*st_hydr%abyd_seal(i)*delhead
     end do
     !$omp end do
 

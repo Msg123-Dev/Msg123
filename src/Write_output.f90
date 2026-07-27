@@ -9,7 +9,7 @@ module write_output
   use set_condition, only: st_hydr, st_bcnd
   use assign_calc, only: msout_tnum
   use prep_calculation, only: st_time
-  use allocate_solution, only: head_new, srat_new
+  use allocate_solution, only: st_sol
   use check_simulation, only: lasttime_flag
   use write_module, only: write_2dbin, write_3dbin, write_header_bin
 #ifdef MPI_MSG
@@ -125,7 +125,7 @@ module write_output
         rest_fnum = st_out_fnum%rest
 #ifdef MPI_MSG
         ! -- Write mpi restart file (mpi_rest)
-          call write_mpi_rest(rest_fnum, time_val, len_scal, head_new)
+          call write_mpi_rest(rest_fnum, time_val, len_scal, st_sol%head_new)
           call close_mpi_file(rest_fnum)
 #else
         ! -- Write restart file (out_restf)
@@ -340,7 +340,7 @@ module write_output
 
 #ifdef MPI_MSG
     ! -- Write MPI 3D binary file (mpi_3dbin)
-      call write_mpi_3dbin(head_fnum, ncalc, calc2calc, len_scal, head_new, time_out)
+      call write_mpi_3dbin(head_fnum, ncalc, calc2calc, len_scal, st_sol%head_new, time_out)
     if (lasttime_flag == 1) then
       call close_mpi_file(head_fnum)
     end if
@@ -348,7 +348,7 @@ module write_output
     ! -- Write header binary file (header_bin)
       call write_header_bin(head_fnum, time_out)
     ! -- Write 3D binary file (3dbin)
-      call write_3dbin(head_fnum, ncalc, calc2calc, len_scal, head_new)
+      call write_3dbin(head_fnum, ncalc, calc2calc, len_scal, st_sol%head_new)
     if (lasttime_flag == 1) then
       call close_file(head_fnum)
     end if
@@ -381,7 +381,7 @@ module write_output
 
 #ifdef MPI_MSG
     ! -- Write MPI 3D binary file (mpi_3dbin)
-      call write_mpi_3dbin(srat_fnum, ncalc, calc2calc, SONE, srat_new, time_out)
+      call write_mpi_3dbin(srat_fnum, ncalc, calc2calc, SONE, st_sol%srat_new, time_out)
     if (lasttime_flag == 1) then
       call close_mpi_file(srat_fnum)
     end if
@@ -389,7 +389,7 @@ module write_output
     ! -- Write header binary file (header_bin)
       call write_header_bin(srat_fnum, time_out)
     ! -- Write 3D binary file (3dbin)
-      call write_3dbin(srat_fnum, ncalc, calc2calc, SONE, srat_new)
+      call write_3dbin(srat_fnum, ncalc, calc2calc, SONE, st_sol%srat_new)
     if (lasttime_flag == 1) then
       call close_file(srat_fnum)
     end if
@@ -413,7 +413,7 @@ module write_output
     !-------------------------------------------------------------------------------------------
     rewind(fnum_rest)
     write(fnum_rest) real(time_out, kind=DP)
-    write(fnum_rest) (head_new(i)*len_scal, i = 1, ncalc)
+    write(fnum_rest) (st_sol%head_new(i)*len_scal, i = 1, ncalc)
     call close_file(fnum_rest)
 
   end subroutine write_out_restf
@@ -437,14 +437,14 @@ module write_output
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
     ! -- Calculate water table for MPI (mpi_wtable)
-      call calc_mpi_wtable(head_new, srat_new)
+      call calc_mpi_wtable(st_sol%head_new, st_sol%srat_new)
     else
     ! -- Calculate water table (wtable)
-      call calc_wtable(head_new, srat_new)
+      call calc_wtable(st_sol%head_new, st_sol%srat_new)
     end if
 #else
     ! -- Calculate water table (wtable)
-      call calc_wtable(head_new, srat_new)
+      call calc_wtable(st_sol%head_new, st_sol%srat_new)
 #endif
 
     allocate(cals2cals(ncals))

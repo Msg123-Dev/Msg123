@@ -8,7 +8,7 @@ module nonlinear_solution
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc
   use prep_calculation, only: st_time
-  use allocate_solution, only: nreg_num, head_new, head_pre, head_change, array_var
+  use allocate_solution, only: nreg_num, st_sol, array_var
   use calc_function, only: calc_func
   use calc_simulation, only: calc_l2norm2
 #ifdef MPI_MSG
@@ -127,8 +127,8 @@ module nonlinear_solution
 
       !$omp parallel do private(i)
       do i = 1, nreg_num
-        head_pre(i) = head_new(i)
-        head_change(i) = DZERO
+        st_sol%head_pre(i) = st_sol%head_new(i)
+        st_sol%head_change(i) = DZERO
       end do
       !$omp end parallel do
 
@@ -139,16 +139,16 @@ module nonlinear_solution
         st_ctrl%errtol = XMAX_INV**3
       end if
       ! -- Solve linear algebra (linalg)
-        call solve_linalg(l2norm_pre, head_change, l2norm_jac, st_amgt)
+        call solve_linalg(l2norm_pre, st_sol%head_change, l2norm_jac, st_amgt)
 
       !$omp parallel do private(i)
       do i = 1, nreg_num
-        head_new(i) = head_pre(i) + head_change(i)
+        st_sol%head_new(i) = st_sol%head_pre(i) + st_sol%head_change(i)
       end do
       !$omp end parallel do
 
       ! -- Check absolute error max norm
-        call check_abserrmax(head_new, head_pre, max_var, max_unk, max_num)
+        call check_abserrmax(st_sol%head_new, st_sol%head_pre, max_var, max_unk, max_num)
 
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
@@ -187,7 +187,7 @@ module nonlinear_solution
           call run_backtr(back_iter, back_flag, beta_iter, l2norm_new, l2norm_pre, l2norm_jac,&
                           lambda, gradient, max_step, new_func)
         ! -- Check absolute error max norm
-          call check_abserrmax(head_new, head_pre, max_var, max_unk, max_num)
+          call check_abserrmax(st_sol%head_new, st_sol%head_pre, max_var, max_unk, max_num)
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1) then
           ! -- Check mpi max error (mpimaxerr)
@@ -214,7 +214,7 @@ module nonlinear_solution
       end if
 
       ! -- Calculate function value (func)
-        call calc_func(head_new, new_func)
+        call calc_func(st_sol%head_new, new_func)
       ! -- Calculate l2 norm square (resl2norm2)
         call calc_l2norm2(1, new_func, l2norm_new)
 #ifdef MPI_MSG
@@ -230,14 +230,14 @@ module nonlinear_solution
       end if
       conv_dmat = array_var(1)%dmat(max_num)*len_scal**2
       conv_rhs = array_var(1)%rhs(max_num)*len_scal**3
-      conv_head = head_new(max_num)*len_scal
+      conv_head = st_sol%head_new(max_num)*len_scal
       ! -- Bcast converge information (convinfo)
         call bcast_convinfo(cxyzn, conv_dmat, conv_rhs, conv_head, max_var)
 #else
       cxyzn = get_cnum(max_num)
       conv_dmat = array_var(1)%dmat(max_num)*len_scal**2
       conv_rhs = array_var(1)%rhs(max_num)*len_scal**3
-      conv_head = head_new(max_num)*len_scal
+      conv_head = st_sol%head_new(max_num)*len_scal
 #endif
       conv_var = max_var*len_scal
       if (st_mpi%rank == 0) then
@@ -250,10 +250,10 @@ module nonlinear_solution
           call calc_surfw()
         if (st_out_step%rest == DZERO) then
           ! -- Write restart file (rest)
-            call write_rest(head_new)
+            call write_rest(st_sol%head_new)
         else if (mod(st_time%current_t,st_out_step%rest) == 0) then
           ! -- Write restart file (rest)
-            call write_rest(head_new)
+            call write_rest(st_sol%head_new)
         end if
         exit outer_loop
       else if (back_flag .and. st_sim%sim_type /= -1) then
@@ -322,7 +322,6 @@ module nonlinear_solution
     use set_cell, only: ncals
 !    use make_cell, only: surf_elev
 !    use prep_calculation, only: surf_bott
-    use allocate_solution, only: surf_head
     ! -- inout
 
     ! -- local
@@ -330,17 +329,17 @@ module nonlinear_solution
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, ncals
-!      if (head_new(i) <= surf_elev(i)) then
-!        surf_head(i) = head_new(i)
+!      if (st_sol%head_new(i) <= surf_elev(i)) then
+!        st_sol%surf_head(i) = st_sol%head_new(i)
 !      else
-!        surf_head(i) = surf_elev(i)
+!        st_sol%surf_head(i) = surf_elev(i)
 !      end if
       ! all surface head = surf_elev
-!      surf_head(i) = surf_elev(i)
+!      st_sol%surf_head(i) = surf_elev(i)
       ! all surface head = surf_bottom
-!      surf_head(i) = surf_bott(i)
-      ! all surface head = head_new
-      surf_head(i) = head_new(i)
+!      st_sol%surf_head(i) = surf_bott(i)
+      ! all surface head = st_sol%head_new
+      st_sol%surf_head(i) = st_sol%head_new(i)
     end do
     !$omp end parallel do
 
@@ -361,7 +360,7 @@ module nonlinear_solution
 #endif
     !-------------------------------------------------------------------------------------------
     ! -- Calculate l2 norm square (resl2norm2)
-      call calc_l2norm2(1, head_new, l2_xnew)
+      call calc_l2norm2(1, st_sol%head_new, l2_xnew)
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
       ! -- Sum value for MPI (val)
@@ -446,11 +445,11 @@ module nonlinear_solution
     end do
     !$omp end parallel do
     ! -- Calculate function value (func)
-      call calc_func(head_new, new_f)
+      call calc_func(st_sol%head_new, new_f)
     ! -- Calculate l2 norm square (resl2norm2)
-      call calc_l2norm2(1, head_change, l2_pnorm)
+      call calc_l2norm2(1, st_sol%head_change, l2_pnorm)
     ! -- Calculate vector by jacobi-free (vecjocf)
-      call calc_vecjacf(1, head_pre, head_change, jacvec)
+      call calc_vecjacf(1, st_sol%head_pre, st_sol%head_change, jacvec)
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
@@ -465,7 +464,7 @@ module nonlinear_solution
       maxpnorm = maxstep/sql2_pnorm
       !$omp parallel do private(i)
       do i = 1, ncalc
-        head_change(i) = head_change(i)*maxpnorm
+        st_sol%head_change(i) = st_sol%head_change(i)*maxpnorm
       end do
       !$omp end parallel do
       sql2_pnorm = maxstep
@@ -483,8 +482,8 @@ module nonlinear_solution
 
     !$omp do private(i, temp_lam) reduction(max:lam_length)
     do i = 1, ncalc
-      if (head_new(i) /= DZERO) then
-        temp_lam = abs(head_change(i))/abs(head_new(i))
+      if (st_sol%head_new(i) /= DZERO) then
+        temp_lam = abs(st_sol%head_change(i))/abs(st_sol%head_new(i))
         if (temp_lam > lam_length) then
           lam_length = temp_lam
         end if
@@ -656,12 +655,12 @@ module nonlinear_solution
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, nreg_num
-      head_new(i) = head_pre(i) + in_lam*head_change(i)
+      st_sol%head_new(i) = st_sol%head_pre(i) + in_lam*st_sol%head_change(i)
     end do
     !$omp end parallel do
 
     ! -- Calculate function value (func)
-      call calc_func(head_new, new_f)
+      call calc_func(st_sol%head_new, new_f)
     ! -- Calculate l2 norm square (resl2norm2)
       call calc_l2norm2(1, new_f, l2_new)
 

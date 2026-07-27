@@ -16,7 +16,7 @@ module check_condition
   implicit none
   private
   public :: check_calc_region, check_calc_retn, check_calc_parm, check_calc_init
-  public :: check_outf_cond
+  public :: check_outf_cond, read_sea_points
 
   type :: fnum_out
     integer(I4) :: conv, head, rest, srat, wtab, mass, velx, vely, velz
@@ -29,7 +29,7 @@ module check_condition
 
   contains
 
-  subroutine check_calc_region(gclas_flag, greg_flag)
+  subroutine check_calc_region(greg_flag)
   !*********************************************************************************************
   ! check_calc_region -- Check calculation region
   !*********************************************************************************************
@@ -37,7 +37,6 @@ module check_condition
     use constval_module, only: SZERO
     use initial_module, only: st_in_path, st_in_unit
     ! -- inout
-    integer(I4), intent(in) :: gclas_flag(:,:)
     integer(I4), intent(inout) :: greg_flag(:)
     ! -- local
     integer(I4) :: i, num_seal, num_calc
@@ -57,7 +56,7 @@ module check_condition
         check_seal(i) = SNOVAL
       end do
       !$omp end parallel do
-      call read_sealf(st_in_type%seal, st_seal%totn, gclas_flag, check_seal)
+      call read_sealf(st_in_type%seal, st_seal%totn, check_seal)
 
       num_seal = count(greg_flag(:) == 0)
       allocate(temp_seal(num_seal), mask(st_grid%nxyz))
@@ -81,6 +80,65 @@ module check_condition
     end if
 
   end subroutine check_calc_region
+
+  subroutine read_sea_points(sea_mode, sea_ptn, sp_i, sp_j, sp_k)
+  !*********************************************************************************************
+  ! read_sea_points -- Read sea input point file
+  !*********************************************************************************************
+    ! -- modules
+    use utility_module, only: close_file
+    use read_module, only: read_3dpointf
+    use initial_module, only: st_in_path, st_in_unit
+    ! -- inout
+    integer(I4), intent(out) :: sea_mode
+    integer(I4), intent(out) :: sea_ptn
+    integer(I4), allocatable, intent(out) :: sp_i(:), sp_j(:), sp_k(:)
+    ! -- local
+    integer(I4) :: p, npt, keep
+    integer(I4), allocatable :: r_i(:), r_j(:), r_k(:)
+    real(SP), allocatable :: r_v(:)
+    !-------------------------------------------------------------------------------------------
+    sea_ptn = 0
+    if (st_in_type%seal <= 0) then
+      sea_mode = 0
+      allocate(sp_i(1), sp_j(1), sp_k(1))
+      return
+    else if (st_in_type%seal == in_type(2)) then
+      call open_sealf(st_in_type%seal, st_in_path%seal, st_in_unit%seal)
+      npt = st_seal%totn
+      allocate(r_i(npt), r_j(npt), r_k(npt), r_v(npt))
+      call read_3dpointf(st_seal%fnum, npt, r_i, r_j, r_k, r_v)
+      call close_file(st_seal%fnum)
+
+      keep = 0
+      do p = 1, npt
+        if (r_v(p) /= SNOVAL) then
+          keep = keep + 1
+        end if
+      end do
+      sea_ptn = keep
+      allocate(sp_i(keep+1), sp_j(keep+1), sp_k(keep+1))
+      keep = 0
+      do p = 1, npt
+        if (r_v(p) /= SNOVAL) then
+          keep = keep + 1
+          sp_i(keep) = r_i(p) ; sp_j(keep) = r_j(p) ; sp_k(keep) = r_k(p)
+        end if
+      end do
+      deallocate(r_i, r_j, r_k, r_v)
+      sea_mode = 1
+    else if (st_in_type%seal == in_type(4)) then
+      sea_mode = 2
+      allocate(sp_i(1), sp_j(1), sp_k(1))
+    else if (st_in_type%seal == in_type(6)) then
+      sea_mode = 3
+      allocate(sp_i(1), sp_j(1), sp_k(1))
+    else
+      sea_mode = 9
+      allocate(sp_i(1), sp_j(1), sp_k(1))
+    end if
+
+  end subroutine read_sea_points
 
   subroutine check_calc_retn(calcn, calc_reta, calc_retn, calc_resi)
   !*********************************************************************************************
@@ -262,7 +320,7 @@ module check_condition
 
   end subroutine open_sealf
 
-  subroutine read_sealf(seal_ftype, seal_num, seal_clas, seal_val)
+  subroutine read_sealf(seal_ftype, seal_num, seal_val)
   !*********************************************************************************************
   ! read_sealf -- Read sea level value for check
   !*********************************************************************************************
@@ -272,7 +330,6 @@ module check_condition
     use read_module, only: read_clasf, read_3dpointf
     ! -- inout
     integer(I4), intent(in) :: seal_ftype, seal_num
-    integer(I4), intent(in) :: seal_clas(:,:)
     real(SP), intent(out) :: seal_val(:)
     ! -- local
     integer(I4) :: i, seal_fnum
@@ -296,7 +353,7 @@ module check_condition
       call read_clasf(seal_fnum, seal_num, seal_name, seal_read)
       call close_file(seal_fnum)
 
-      call set_clas2seal(seal_fnum, seal_name, seal_clas, seal_read, seal_val)
+      call set_clas2seal(seal_num, seal_name, seal_read, seal_val)
       deallocate(seal_read, seal_name)
     else if (seal_ftype == in_type(2)) then
       allocate(seal_read(seal_num))
@@ -408,20 +465,20 @@ module check_condition
 
   end subroutine check_read_val
 
-  subroutine set_clas2seal(clasn, clas_name, clas_set, clas_val, tg_val)
+  subroutine set_clas2seal(clasn, clas_name, clas_val, tg_val)
   !*********************************************************************************************
-  ! set_clas2seal -- Set sea level from classification
+  ! set_clas2seal -- Set sea level from classification. The cells of each named class are
+  !   expanded from its specs (i,j,k with -1 wildcards) instead of a global clas array. (段5-4b)
   !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_clas
     ! -- inout
     integer(I4), intent(in) :: clasn
     character(*), intent(in) :: clas_name(:)
-    integer(I4), intent(in) :: clas_set(:,:)
     real(SP), intent(in) :: clas_val(:)
     real(SP), intent(out) :: tg_val(:)
     ! -- local
-    integer(I4) :: i, j, k
+    integer(I4) :: i, k, p, ii, jj, kk, c_num, clasi, clasj, clask
     integer(I4), allocatable :: temp_clas(:)
     !-------------------------------------------------------------------------------------------
     allocate(temp_clas(clasn))
@@ -441,13 +498,52 @@ module check_condition
 
     do i = 1, clasn
       k = temp_clas(i)
-      !$omp parallel do private(j)
-      do j = 1, st_grid%nxyz
-        if (clas_set(j,k) == 1) then
-          tg_val(j) = clas_val(i)
+      if (k == 0) cycle
+      do p = 1, st_clas%num(k)
+        clasi = st_clas%i(p,k) ; clasj = st_clas%j(p,k) ; clask = st_clas%k(p,k)
+        if (clasi == -1 .and. clasj == -1 .and. clask == -1) then !all cells
+          tg_val(1:st_grid%nxyz) = clas_val(i)
+        else if (clasi == -1 .and. clasj == -1) then !i,j cells
+          do jj = 1, st_grid%ny
+            do ii = 1, st_grid%nx
+              c_num = st_grid%nx*(st_grid%ny*(clask-1) + (jj-1)) + ii
+              tg_val(c_num) = clas_val(i)
+            end do
+          end do
+        else if (clasi == -1 .and. clask == -1) then !i,k cells
+          do kk = 1, st_grid%nz
+            do ii = 1, st_grid%nx
+              c_num = st_grid%nx*(st_grid%ny*(kk-1) + (clasj-1)) + ii
+              tg_val(c_num) = clas_val(i)
+            end do
+          end do
+        else if (clasj == -1 .and. clask == -1) then !j,k cells
+          do kk = 1, st_grid%nz
+            do jj = 1, st_grid%ny
+              c_num = st_grid%nx*(st_grid%ny*(kk-1) + (jj-1)) + clasi
+              tg_val(c_num) = clas_val(i)
+            end do
+          end do
+        else if (clasi == -1) then !only i cell
+          do ii = 1, st_grid%nx
+            c_num = st_grid%nx*(st_grid%ny*(clask-1) + (clasj-1)) + ii
+            tg_val(c_num) = clas_val(i)
+          end do
+        else if (clasj == -1) then !only j cell
+          do jj = 1, st_grid%ny
+            c_num = st_grid%nx*(st_grid%ny*(clask-1) + (jj-1)) + clasi
+            tg_val(c_num) = clas_val(i)
+          end do
+        else if (clask == -1) then !only k cell
+          do kk = 1, st_grid%nz
+            c_num = st_grid%nx*(st_grid%ny*(kk-1) + (clasj-1)) + clasi
+            tg_val(c_num) = clas_val(i)
+          end do
+        else !others
+          c_num = st_grid%nx*(st_grid%ny*(clask-1) + (clasj-1)) + clasi
+          tg_val(c_num) = clas_val(i)
         end if
       end do
-      !$omp end parallel do
     end do
 
     deallocate(temp_clas)

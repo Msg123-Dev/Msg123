@@ -33,7 +33,8 @@ module assign_boundary
     use read_module, only: read_3dpointf
     use open_file, only: st_intse
     use set_cell, only: ncell, seal_snum, seal_cnum
-    use set_condition, only: set_point2seal, set_bound2calc, set_2dfile2seal, set_3dfile2seal
+    use set_condition, only: set_clas2seal, set_point2seal, set_bound2calc, set_2dfile2seal,&
+                             set_3dfile2seal
 #ifdef MPI_MSG
     use mpi_utility, only: bcast_char
     use mpi_set, only: bcast_3dpoint
@@ -82,7 +83,7 @@ module assign_boundary
           call bcast_clas_val(st_seal%totn, st_seal%name, st_seal%value)
         end if
 #endif
-        call set_clas2calc(st_seal%totn, st_seal%name, st_seal%value, st_forc%read_seal,&
+        call set_clas2seal(st_seal%totn, st_seal%name, st_seal%value, st_forc%read_seal,&
                            seal_cflag, sealn)
         deallocate(st_seal%value, st_seal%name)
       else if (seal_ftype == in_type(2)) then

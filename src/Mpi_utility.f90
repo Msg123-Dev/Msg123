@@ -8,9 +8,10 @@ module mpi_utility
   implicit none
   private
   public :: barrier_proc
-  public :: mpisum_val, mpimax_val
+  public :: mpisum_val, mpimax_val, mpiexscan_val
   public :: bcast_val, bcast_char, bcast_file, bcast_extr_set
   public :: gather_val
+  public :: alltoall_val, alltoallv_val
 
   interface mpisum_val
     module procedure mpisum_i4_scalar
@@ -30,8 +31,15 @@ module mpi_utility
     module procedure mpimax_r8_array
   end interface
 
+  interface mpiexscan_val
+    module procedure mpiexscan_i4_array
+    module procedure mpiexscan_r4_array
+    module procedure mpiexscan_r8_array
+  end interface
+
   interface bcast_val
     module procedure bcast_i4_scalar
+    module procedure bcast_i4_array
     module procedure bcast_r4_scalar
     module procedure bcast_r8_scalar
   end interface
@@ -47,6 +55,18 @@ module mpi_utility
     module procedure gather_i4_array
     module procedure gather_r4_array
     module procedure gather_r8_array
+  end interface
+
+  interface alltoall_val
+    module procedure alltoall_i4_array
+    module procedure alltoall_r4_array
+    module procedure alltoall_r8_array
+  end interface
+
+  interface alltoallv_val
+    module procedure alltoallv_i4_array
+    module procedure alltoallv_r4_array
+    module procedure alltoallv_r8_array
   end interface
 
   ! -- local
@@ -369,6 +389,90 @@ module mpi_utility
 
   end subroutine mpimax_r8_array
 
+  subroutine mpiexscan_i4_array(loc_array, err_mes, scan_array)
+  !*********************************************************************************************
+  ! mpiexscan_i4_array -- Exscan integer array for MPI
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    integer(I4), intent(in) :: loc_array(:)
+    character(*), intent(in) :: err_mes
+    integer(I4), intent(out) :: scan_array(:)
+    ! -- local
+    integer(I4) :: a_len
+    integer(I4) :: ierr
+    !-------------------------------------------------------------------------------------------
+    ierr = 0 ; a_len = size(loc_array(:))
+    call MPI_EXSCAN(loc_array, scan_array, a_len, MPI_INTEGER, MPI_SUM, st_mpi%comm, ierr)
+    if (st_mpi%rank == 0) then
+      scan_array(:) = 0
+    end if
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Exscan "//err_mes//" array in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+  end subroutine mpiexscan_i4_array
+
+  subroutine mpiexscan_r4_array(loc_array, err_mes, scan_array)
+  !*********************************************************************************************
+  ! mpiexscan_r4_array -- Exscan real4 array for MPI
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    real(SP), intent(in) :: loc_array(:)
+    character(*), intent(in) :: err_mes
+    integer(SP), intent(out) :: scan_array(:)
+    ! -- local
+    integer(I4) :: a_len
+    integer(I4) :: ierr
+    !-------------------------------------------------------------------------------------------
+    ierr = 0 ; a_len = size(loc_array(:))
+    call MPI_EXSCAN(loc_array, scan_array, a_len, MPI_REAL4, MPI_SUM, st_mpi%comm, ierr)
+    if (st_mpi%rank == 0) then
+      scan_array(:) = 0
+    end if
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Exscan "//err_mes//" array in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+  end subroutine mpiexscan_r4_array
+
+  subroutine mpiexscan_r8_array(loc_array, err_mes, scan_array)
+  !*********************************************************************************************
+  ! mpiexscan_r8_array -- Exscan real8 array for MPI
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    real(DP), intent(in) :: loc_array(:)
+    character(*), intent(in) :: err_mes
+    integer(DP), intent(out) :: scan_array(:)
+    ! -- local
+    integer(I4) :: a_len
+    integer(I4) :: ierr
+    !-------------------------------------------------------------------------------------------
+    ierr = 0 ; a_len = size(loc_array(:))
+    call MPI_EXSCAN(loc_array, scan_array, a_len, MPI_REAL8, MPI_SUM, st_mpi%comm, ierr)
+    if (st_mpi%rank == 0) then
+      scan_array(:) = 0
+    end if
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Exscan "//err_mes//" array in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+  end subroutine mpiexscan_r8_array
+
   subroutine bcast_i4_scalar(iscalar, err_mes)
   !*********************************************************************************************
   ! bcast_i4_scalar -- Bcast integer scalar value
@@ -391,6 +495,29 @@ module mpi_utility
     end if
 
   end subroutine bcast_i4_scalar
+
+  subroutine bcast_i4_array(iarray, err_mes)
+  !*********************************************************************************************
+  ! bcast_i4_array -- Bcast integer array value
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    integer(I4), intent(inout) :: iarray(:)
+    character(*), intent(in) :: err_mes
+    ! -- local
+    integer(I4) :: ierr, a_len
+    !-------------------------------------------------------------------------------------------
+    ierr = 0 ; a_len = size(iarray(:))
+    call MPI_BCAST(iarray, a_len, MPI_INTEGER, 0, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+  end subroutine bcast_i4_array
 
   subroutine bcast_r4_scalar(rscalar, err_mes)
   !*********************************************************************************************
@@ -886,5 +1013,182 @@ module mpi_utility
     deallocate(rec_num, rec_count, rec_dis)
 
   end subroutine gather_r8_array
+
+  subroutine alltoall_i4_array(send_array, err_mes, recv_array)
+  !*********************************************************************************************
+  ! alltoall_i4_array -- AlltoAll integer array
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    integer(I4), intent(in) :: send_array(:)
+    character(*), intent(in) :: err_mes
+    integer(I4), intent(out) :: recv_array(:)
+    ! -- local
+    integer(I4) :: ierr
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    call MPI_ALLTOALL(send_array, 1, MPI_INTEGER, recv_array, 1, MPI_INTEGER, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Alltoall "//err_mes//" in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+  end subroutine alltoall_i4_array
+
+  subroutine alltoall_r4_array(send_array, err_mes, recv_array)
+  !*********************************************************************************************
+  ! alltoall_r4_array -- AlltoAll real4 array
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    real(SP), intent(in) :: send_array(:)
+    character(*), intent(in) :: err_mes
+    real(SP), intent(out) :: recv_array(:)
+    ! -- local
+    integer(I4) :: ierr
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    call MPI_ALLTOALL(send_array, 1, MPI_REAL, recv_array, 1, MPI_REAL, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Alltoall "//err_mes//" in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+  end subroutine alltoall_r4_array
+
+  subroutine alltoall_r8_array(send_array, err_mes, recv_array)
+  !*********************************************************************************************
+  ! alltoall_r8_array -- AlltoAll real8 array
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    real(DP), intent(in) :: send_array(:)
+    character(*), intent(in) :: err_mes
+    real(DP), intent(out) :: recv_array(:)
+    ! -- local
+    integer(I4) :: ierr
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    call MPI_ALLTOALL(send_array, 1, MPI_REAL8, recv_array, 1, MPI_REAL8, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Alltoall "//err_mes//" in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+  end subroutine alltoall_r8_array
+
+  subroutine alltoallv_i4_array(send_buf, send_count, recv_count, err_mes, recv_buf)
+  !*********************************************************************************************
+  ! alltoallv_i4_array -- AlltoAll variable integer array
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    integer(I4), intent(in) :: send_buf(:)
+    integer(I4), intent(in) :: send_count(:)
+    integer(I4), intent(in) :: recv_count(:)
+    character(*), intent(in) :: err_mes
+    integer(I4), intent(out) :: recv_buf(:)
+    ! -- local
+    integer(I4) :: proc_id, send_pos, recv_pos, ierr
+    integer(I4), allocatable :: send_disp(:), recv_disp(:)
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    allocate(send_disp(0:st_mpi%totn-1), recv_disp(0:st_mpi%totn-1))
+    send_pos = 0 ; recv_pos = 0
+    do proc_id = 1, st_mpi%totn
+      send_disp(proc_id-1) = send_pos ; send_pos = send_pos + send_count(proc_id)
+      recv_disp(proc_id-1) = recv_pos ; recv_pos = recv_pos + recv_count(proc_id)
+    end do
+    call MPI_ALLTOALLV(send_buf, send_count, send_disp, MPI_INTEGER, recv_buf, recv_count,&
+                       recv_disp, MPI_INTEGER, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Alltoallv "//err_mes//" array in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+    deallocate(send_disp, recv_disp)
+
+  end subroutine alltoallv_i4_array
+
+  subroutine alltoallv_r4_array(send_buf, send_count, recv_count, err_mes, recv_buf)
+  !*********************************************************************************************
+  ! alltoallv_r4_array -- AlltoAll variable real4 array
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    real(SP), intent(in) :: send_buf(:)
+    integer(I4), intent(in) :: send_count(:)
+    integer(I4), intent(in) :: recv_count(:)
+    character(*), intent(in) :: err_mes
+    real(SP), intent(out) :: recv_buf(:)
+    ! -- local
+    integer(I4) :: proc_id, send_pos, recv_pos, ierr
+    integer(I4), allocatable :: send_disp(:), recv_disp(:)
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    allocate(send_disp(0:st_mpi%totn-1), recv_disp(0:st_mpi%totn-1))
+    send_pos = 0 ; recv_pos = 0
+    do proc_id = 1, st_mpi%totn
+      send_disp(proc_id-1) = send_pos ; send_pos = send_pos + send_count(proc_id)
+      recv_disp(proc_id-1) = recv_pos ; recv_pos = recv_pos + recv_count(proc_id)
+    end do
+    call MPI_ALLTOALLV(send_buf, send_count, send_disp, MPI_REAL, recv_buf, recv_count,&
+                       recv_disp, MPI_REAL, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Alltoallv "//err_mes//" array in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+    deallocate(send_disp, recv_disp)
+
+  end subroutine alltoallv_r4_array
+
+  subroutine alltoallv_r8_array(send_buf, send_count, recv_count, err_mes, recv_buf)
+  !*********************************************************************************************
+  ! alltoallv_r8_array -- AlltoAll variable real8 array
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    real(DP), intent(in) :: send_buf(:)
+    integer(I4), intent(in) :: send_count(:)
+    integer(I4), intent(in) :: recv_count(:)
+    character(*), intent(in) :: err_mes
+    real(DP), intent(out) :: recv_buf(:)
+    ! -- local
+    integer(I4) :: proc_id, send_pos, recv_pos, ierr
+    integer(I4), allocatable :: send_disp(:), recv_disp(:)
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    allocate(send_disp(0:st_mpi%totn-1), recv_disp(0:st_mpi%totn-1))
+    send_pos = 0 ; recv_pos = 0
+    do proc_id = 1, st_mpi%totn
+      send_disp(proc_id-1) = send_pos ; send_pos = send_pos + send_count(proc_id)
+      recv_disp(proc_id-1) = recv_pos ; recv_pos = recv_pos + recv_count(proc_id)
+    end do
+    call MPI_ALLTOALLV(send_buf, send_count, send_disp, MPI_REAL8, recv_buf, recv_count,&
+                       recv_disp, MPI_REAL8, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Alltoallv "//err_mes//" array in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+    deallocate(send_disp, recv_disp)
+
+  end subroutine alltoallv_r8_array
 
 end module mpi_utility

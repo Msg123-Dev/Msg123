@@ -11,6 +11,7 @@ module mpi_read
   public :: set_int4_fview, set_real4_fview, set_real8_fview
   public :: read_mpi_restf, read_mpi_head, read_mpi_file
   public :: skip_mpi_file, skip_mpi_file_int, close_mpi_file
+  public :: read_dist_calcreg, read_dist_seaval
 
   interface read_mpi_head
     module procedure read_mpi_i4head
@@ -357,7 +358,7 @@ module mpi_read
       !$omp end parallel do
     else
       !$omp parallel do private(i)
-      do i = 1, mpi_rnum
+      do i = 1, read_num
         read_out(i) = read_val(i+1)
       end do
       !$omp end parallel do
@@ -420,7 +421,7 @@ module mpi_read
       !$omp end parallel do
     else
       !$omp parallel do private(i)
-      do i = 1, mpi_rnum
+      do i = 1, read_num
         read_out(i) = read_val(i+1)
       end do
       !$omp end parallel do
@@ -483,7 +484,7 @@ module mpi_read
       !$omp end parallel do
     else
       !$omp parallel do private(i)
-      do i = 1, mpi_rnum
+      do i = 1, read_num
         read_out(i) = read_val(i+1)
       end do
       !$omp end parallel do
@@ -781,5 +782,135 @@ module mpi_read
     end if
 
   end subroutine close_mpi_file
+
+  subroutine read_dist_calcreg(reg_type, reg_flag, ncalc_out, totreg_out)
+  !*********************************************************************************************
+  ! read_dist_calcreg -- Read calc region file for distributed column
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(in) :: reg_type
+    integer(I4), intent(out) :: reg_flag(:)
+    integer(I4), intent(out) :: ncalc_out, totreg_out
+    ! -- local
+    integer(I4) :: nxy, base, rem, slab_ncol, slab_sta, i, k, ierr, mpi_fh, tot_col
+    integer(I4), allocatable :: slab(:,:), col_full(:), rec_num(:), rec_count(:), rec_dis(:)
+    integer(KIND=MPI_OFFSET_KIND) :: off
+    integer(I4) :: istat(MPI_STATUS_SIZE)
+    logical :: is_3d
+    !-------------------------------------------------------------------------------------------
+    nxy = st_grid%nx*st_grid%ny
+    is_3d = (reg_type == in_type(6))
+
+    ! -- geometric column
+    base = nxy/st_mpi%totn ; rem = mod(nxy, st_mpi%totn)
+    slab_ncol = base
+    if (st_mpi%rank < rem) then
+      slab_ncol = base + 1
+    end if
+    slab_sta = st_mpi%rank*base + min(st_mpi%rank, rem) + 1
+
+    if (is_3d) then
+      allocate(slab(max(slab_ncol,1), st_grid%nz))
+    else
+      allocate(slab(max(slab_ncol,1), 1))
+    end if
+
+    ierr = 0
+    call open_mpi_read_file(1, 0, trim(st_sim%reg_name), "calculation region", mpi_fh)
+    if (is_3d) then
+      do k = 1, st_grid%nz
+        off = (int(k-1, MPI_OFFSET_KIND)*int(nxy, MPI_OFFSET_KIND) &
+               + int(slab_sta-1, MPI_OFFSET_KIND)) * 4_MPI_OFFSET_KIND
+        call MPI_FILE_READ_AT_ALL(mpi_fh, off, slab(1,k), slab_ncol, MPI_INTEGER, istat, ierr)
+      end do
+    else
+      off = int(slab_sta-1, MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
+      call MPI_FILE_READ_AT_ALL(mpi_fh, off, slab(1,1), slab_ncol, MPI_INTEGER, istat, ierr)
+    end if
+    call MPI_FILE_CLOSE(mpi_fh, ierr)
+
+    ! -- rebuild the full region flag on every rank
+    allocate(col_full(nxy), rec_num(st_mpi%totn))
+    allocate(rec_count(0:st_mpi%totn-1), rec_dis(0:st_mpi%totn-1))
+    call MPI_ALLGATHER(slab_ncol, 1, MPI_INTEGER, rec_num, 1, MPI_INTEGER, st_mpi%comm, ierr)
+    tot_col = 0
+    do i = 1, st_mpi%totn
+      rec_dis(i-1) = tot_col ; rec_count(i-1) = rec_num(i) ; tot_col = tot_col + rec_num(i)
+    end do
+    do k = 1, st_grid%nz
+      if (is_3d) then
+        call MPI_ALLGATHERV(slab(1,k), slab_ncol, MPI_INTEGER, col_full, rec_count, rec_dis,&
+                            MPI_INTEGER, st_mpi%comm, ierr)
+      else
+        call MPI_ALLGATHERV(slab(1,1), slab_ncol, MPI_INTEGER, col_full, rec_count, rec_dis,&
+                            MPI_INTEGER, st_mpi%comm, ierr)
+      end if
+      !$omp parallel do private(i)
+      do i = 1, nxy
+        reg_flag((k-1)*nxy + i) = col_full(i)
+      end do
+      !$omp end parallel do
+    end do
+
+    totreg_out = 0 ; ncalc_out = 0
+    do i = 1, st_grid%nxyz
+      if (reg_flag(i) > totreg_out) then
+        totreg_out = reg_flag(i)
+      end if
+      if (reg_flag(i) > 0) then
+        ncalc_out = ncalc_out + 1
+      end if
+    end do
+
+    deallocate(slab, col_full, rec_num, rec_count, rec_dis)
+
+  end subroutine read_dist_calcreg
+
+  subroutine read_dist_seaval(is_3d, seal_path, read_sta, read_num, read_seaval)
+  !*********************************************************************************************
+  ! read_dist_seaval -- Read this rank's read-range sea levels from a binary sea file (段5-3c).
+  !   3dfile: value(g) is at byte (g-1)*4, so the read range [read_sta..] is a contiguous slab.
+  !   2dfile: value is per surface column; each rank reads the whole nxy surface field (a 2d
+  !   field is O(nxy)) and maps each read cell by its column.
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    logical, intent(in) :: is_3d
+    character(*), intent(in) :: seal_path
+    integer(I4), intent(in) :: read_sta, read_num
+    real(SP), intent(out) :: read_seaval(:)
+    ! -- local
+    integer(I4) :: nxy, i, g, ij, ierr, mpi_fh
+    integer(KIND=MPI_OFFSET_KIND) :: off
+    integer(I4) :: istat(MPI_STATUS_SIZE)
+    real(SP), allocatable :: col_full(:)
+    !-------------------------------------------------------------------------------------------
+    nxy = st_grid%nx*st_grid%ny
+    ierr = 0
+    call open_mpi_read_file(1, 0, trim(seal_path), "sea level distributed", mpi_fh)
+
+    if (is_3d) then
+      ! -- 3d: value(g) at byte (g-1)*4, so the read range is a contiguous slab
+      off = int(read_sta-1, MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
+      call MPI_FILE_READ_AT_ALL(mpi_fh, off, read_seaval, read_num, MPI_REAL4, istat, ierr)
+    else
+      ! -- 2d: each rank reads the whole nxy surface field, then maps each read cell by column
+      allocate(col_full(nxy))
+      off = 0_MPI_OFFSET_KIND
+      call MPI_FILE_READ_AT_ALL(mpi_fh, off, col_full, nxy, MPI_REAL4, istat, ierr)
+      do i = 1, read_num
+        g = read_sta + i - 1
+        ij = mod(g-1, nxy) + 1
+        read_seaval(i) = col_full(ij)
+      end do
+      deallocate(col_full)
+    end if
+
+    call MPI_FILE_CLOSE(mpi_fh, ierr)
+
+  end subroutine read_dist_seaval
 
 end module mpi_read

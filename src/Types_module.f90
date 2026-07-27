@@ -11,7 +11,7 @@ module types_module
   public :: seal_set, surfb_set, well_set, surfw_set, step_flag, ftype_out, path_out, unit_out
   public :: out_time, out_step, msout_set, hydr_set, bcnd_set, forc_set, bflag_set, bcalc_set
   public :: bcount_set, rlbc_set, bfview_set, bound_fview
-  public :: sol_set, kryl_set, amgt_set, coef_set, conn_set
+  public :: sol_set, kryl_set, amgt_set, coef_set, conn_set, gmap_set
 
   type :: mpi_set
     integer(I4) :: totn, rank, comm
@@ -301,5 +301,10 @@ module types_module
     integer(I4), allocatable :: calc2reg(:)
     integer(I4), allocatable :: glo2loc_ijk(:), loc2glo_ijk(:), loc2glo_ij(:)
   end type conn_set
+
+  type :: gmap_set
+    integer(I4) :: table_num = 0
+    integer(I4), allocatable :: table_key(:), table_val(:)
+  end type gmap_set
 
 end module types_module

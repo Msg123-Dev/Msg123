@@ -54,3 +54,6 @@
 # Environment files
 .env
 .env.*
+
+# Local backups
+src_backup_*/

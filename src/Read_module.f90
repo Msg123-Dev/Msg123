@@ -1267,7 +1267,7 @@ module read_module
     do k = 1, st_grid%nz
       do j = 1, st_grid%ny
         do i = 1, st_grid%nx
-          c_num = st_grid%nx*st_grid%ny*(k-1) + st_grid%ny*(j-1) + i
+          c_num = st_grid%nx*st_grid%ny*(k-1) + st_grid%nx*(j-1) + i
           tg_flag(c_num) = array_read(i,j,k)
           if (tg_flag(c_num) > 0) then
             c_count = c_count + 1

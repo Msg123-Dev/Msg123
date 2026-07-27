@@ -439,6 +439,11 @@ module set_boundary
 
       ! -- Open input recharge file (in_rechf)
         call open_in_rechf(st_in_type%rech, st_in_path%rech, st_in_unit%rech, bfview%rech)
+      ! -- open_in_rechf resets st_intre%type=0; restore the header flag for the direct
+      !    2d_bin-with-header case (in_type(7) is set correctly inside open_in_rechf)
+      if (st_in_type%rech == in_type(4) .and. len_trim(adjustl(st_in_unit%rech)) /= 0) then
+        st_intre%type = st_in_type%rech
+      end if
 #else
       ! -- Open input recharge file (in_rechf)
         call open_in_rechf(st_in_type%rech, st_in_path%rech, st_in_unit%rech)

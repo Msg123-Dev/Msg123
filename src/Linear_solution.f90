@@ -16,13 +16,39 @@ module linear_solution
 
   implicit none
   private
-  public :: allocate_amgalg, solve_linalg
+  public :: allocate_krylov, allocate_amgalg, solve_linalg
   integer(I4), public :: in_iter
 
   ! -- local
   real(DP) :: bnorm, rnorm
 
   contains
+
+  subroutine allocate_krylov(st_kryl)
+  !*********************************************************************************************
+  ! allocate_krylov -- Allocate for krylov work vectors
+  !*********************************************************************************************
+    ! -- module
+    ! -- inout
+    type(kryl_set), intent(inout) :: st_kryl
+    ! -- local
+    integer(I4) :: i
+    !-------------------------------------------------------------------------------------------
+    allocate(st_kryl%resi(nreg_num))
+    allocate(st_kryl%d(nreg_num), st_kryl%z(nreg_num), st_kryl%p(nreg_num))
+    allocate(st_kryl%q(nreg_num), st_kryl%v(nreg_num))
+    allocate(st_kryl%rs(nreg_num), st_kryl%t(nreg_num))
+
+    !$omp parallel do private(i)
+    do i = 1, nreg_num
+      st_kryl%resi(i) = DZERO
+      st_kryl%d(i) = DZERO ; st_kryl%z(i) = DZERO ; st_kryl%p(i) = DZERO
+      st_kryl%q(i) = DZERO ; st_kryl%v(i) = DZERO
+      st_kryl%rs(i) = DZERO ; st_kryl%t(i) = DZERO
+    end do
+    !$omp end parallel do
+
+  end subroutine allocate_krylov
 
   subroutine allocate_amgalg(st_amgt)
   !*********************************************************************************************
@@ -38,6 +64,7 @@ module linear_solution
     allocate(st_amgt%td(nreg_num), st_amgt%tx(nreg_num))
     allocate(st_amgt%tb(nreg_num), st_amgt%tr(nreg_num))
     allocate(st_amgt%trhs(nreg_num), st_amgt%tfx(nreg_num), st_amgt%tlu(tconn_num))
+    allocate(st_amgt%save_rhs(nreg_num), st_amgt%dilu_d(nreg_num))
 
     !$omp parallel
     !$omp do private(i)
@@ -45,6 +72,7 @@ module linear_solution
       st_amgt%td(i) = DZERO ; st_amgt%tx(i) = DZERO
       st_amgt%tb(i) = DZERO ; st_amgt%tr(i) = DZERO
       st_amgt%trhs(i) = DZERO ; st_amgt%tfx(i) = DZERO
+      st_amgt%save_rhs(i) = DZERO ; st_amgt%dilu_d(i) = DZERO
     end do
     !$omp end do
 
@@ -57,7 +85,7 @@ module linear_solution
 
   end subroutine allocate_amgalg
 
-  subroutine solve_linalg(init_norm, inx, last_norm, st_amgt)
+  subroutine solve_linalg(init_norm, inx, st_kryl, st_amgt, last_norm)
   !*********************************************************************************************
   ! solve_lnralg -- Solve linear algebra
   !*********************************************************************************************
@@ -66,13 +94,12 @@ module linear_solution
     ! -- inout
     real(DP), intent(in) :: init_norm
     real(DP), intent(inout) :: inx(:)
-    real(DP), intent(out) :: last_norm
+    type(kryl_set), intent(inout) :: st_kryl
     type(amgt_set), intent(inout) :: st_amgt
+    real(DP), intent(out) :: last_norm
     ! -- local
     integer(I4) :: n
-    type(kryl_set) :: st_kryl
     !-------------------------------------------------------------------------------------------
-    allocate(st_kryl%resi(nreg_num))
     !$omp parallel do private(n)
     do n = 1, nreg_num
       st_kryl%resi(n) = DZERO
@@ -90,8 +117,6 @@ module linear_solution
 
     last_norm = rnorm
 
-    deallocate(st_kryl%resi)
-
   end subroutine solve_linalg
 
   subroutine solve_pcg(level, inx, st_kryl, st_amgt)
@@ -108,7 +133,6 @@ module linear_solution
     ! -- local
     integer(I4) :: n, d_size, lu_size, reg_size
     real(DP) :: sk, sk0, sk2, alpha, beta
-    real(DP), allocatable :: d(:), z(:), p(:), q(:)
 #ifdef MPI_MSG
     real(DP) :: sum_sk, sum_rnorm
 #endif
@@ -118,17 +142,16 @@ module linear_solution
     reg_size = size(inx)
 
     sk = DZERO ; sk0 = DINFI ; sk2 = DZERO ; alpha = DZERO ; beta = DZERO
-    allocate(d(reg_size), z(reg_size), p(reg_size), q(d_size))
     !$omp parallel
     !$omp do private(n)
     do n = 1, reg_size
-      z(n) = DZERO ; p(n) = DZERO
-      d(n) = array_var(level)%dmat(n)
+      st_kryl%z(n) = DZERO ; st_kryl%p(n) = DZERO
+      st_kryl%d(n) = array_var(level)%dmat(n)
     end do
     !$omp end do
     !$omp do private(n)
     do n = 1, d_size
-      q(n) = DZERO
+      st_kryl%q(n) = DZERO
     end do
     !$omp end do
     !$omp end parallel
@@ -141,19 +164,19 @@ module linear_solution
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1 .and. level == 1) then
         ! -- Preconditon mpi incomplete lu diagonal (mpi_dilu)
-          call precon_mpi_dilu(array_var(level)%dmat, array_var(level)%lumat, d)
+          call precon_mpi_dilu(array_var(level)%dmat, array_var(level)%lumat, st_kryl%d)
       else
         ! -- Preconditon incomplete lu diagonal (dilu)
-          call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, d)
+          call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, st_kryl%d)
       end if
 #else
       ! -- Preconditon incomplete lu diagonal (dilu)
-        call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, d)
+        call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, st_kryl%d)
 #endif
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
         ! -- Send and Receive real vector value (rvectv)
-          call senrec_rvectv(d)
+          call senrec_rvectv(st_kryl%d)
       end if
 #endif
     end if
@@ -170,24 +193,24 @@ module linear_solution
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1 .and. level == 1) then
           ! -- Solve mpi ilu factorization (ilu)
-            call solve_mpi_ilu(st_kryl%resi, d, array_var(level)%lumat, z)
+            call solve_mpi_ilu(st_kryl%resi, st_kryl%d, array_var(level)%lumat, st_kryl%z)
         else
           ! -- Solve ilu factorization (ilu)
-            call solve_ilu(level, d_size, st_kryl%resi, d, array_var(level)%lumat, z)
+            call solve_ilu(level, d_size, st_kryl%resi, st_kryl%d, array_var(level)%lumat, st_kryl%z)
         end if
 #else
         ! -- Solve ilu factorization (ilu)
-          call solve_ilu(level, d_size, st_kryl%resi, d, array_var(level)%lumat, z)
+          call solve_ilu(level, d_size, st_kryl%resi, st_kryl%d, array_var(level)%lumat, st_kryl%z)
 #endif
       else if (st_ctrl%precon_type == 1) then
         ! -- Loop cycle for amg (amg)
-          call loop_amg(level, st_kryl%resi, z, st_amgt)
+          call loop_amg(level, st_kryl%resi, st_kryl%z, st_amgt)
       end if
 
       sk = DZERO
       !$omp parallel do private(n) reduction(+:sk)
       do n = 1, d_size
-        sk = sk + st_kryl%resi(n)*z(n)
+        sk = sk + st_kryl%resi(n)*st_kryl%z(n)
       end do
       !$omp end parallel do
 
@@ -202,14 +225,14 @@ module linear_solution
       if (in_iter == 1) then
         !$omp parallel do private(n)
         do n = 1, d_size
-          p(n) = z(n)
+          st_kryl%p(n) = st_kryl%z(n)
         end do
         !$omp end parallel do
       else
         beta = sk/sk0
         !$omp parallel do private(n)
         do n = 1, d_size
-          p(n) = z(n) + beta*p(n)
+          st_kryl%p(n) = st_kryl%z(n) + beta*st_kryl%p(n)
         end do
         !$omp end parallel do
       end if
@@ -217,16 +240,16 @@ module linear_solution
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
         ! -- Send and Receive real vector value (rvectv)
-          call senrec_rvectv(p)
+          call senrec_rvectv(st_kryl%p)
       end if
 #endif
       ! -- Calculate matrix-vector multiplication (matvec)
-        call calc_matvec(level, d_size, p, array_var(level)%dmat, array_var(level)%lumat, q)
+        call calc_matvec(level, d_size, st_kryl%p, array_var(level)%dmat, array_var(level)%lumat, st_kryl%q)
 
       sk2 = DZERO
       !$omp parallel do private(n) reduction(+:sk2)
       do n = 1, d_size
-        sk2 = sk2 + p(n)*q(n)
+        sk2 = sk2 + st_kryl%p(n)*st_kryl%q(n)
       end do
       !$omp end parallel do
 
@@ -241,8 +264,8 @@ module linear_solution
       alpha = sk/sk2
       !$omp parallel do private(n)
       do n = 1, d_size
-        inx(n) = inx(n) + alpha*p(n)
-        st_kryl%resi(n) = st_kryl%resi(n) - alpha*q(n)
+        inx(n) = inx(n) + alpha*st_kryl%p(n)
+        st_kryl%resi(n) = st_kryl%resi(n) - alpha*st_kryl%q(n)
       end do
       !$omp end parallel do
 
@@ -274,7 +297,6 @@ module linear_solution
 
     end do pcg_inter
 
-    deallocate(d, z, p, q)
 
   end subroutine solve_pcg
 
@@ -292,7 +314,6 @@ module linear_solution
     ! -- local
     integer(I4) :: n, d_size, lu_size, reg_size
     real(DP) :: sk, sk0, sk2, alpha, beta, bicgs_omega, ts, tt
-    real(DP), allocatable :: d(:), z(:), p(:), v(:), rs(:), t(:)
 #ifdef MPI_MSG
     real(DP) :: sum_sk, sum_rnorm
 #endif
@@ -303,18 +324,17 @@ module linear_solution
 
     sk = DZERO ; sk0 = DINFI ; sk2 = DZERO ; alpha = DZERO ; beta = DZERO
     bicgs_omega = DONE ; ts = DZERO ; tt = DZERO
-    allocate(d(reg_size), z(reg_size), p(reg_size), v(d_size), rs(d_size), t(d_size))
 
     !$omp parallel
     !$omp do private(n)
     do n = 1, reg_size
-      z(n) = DZERO ; p(n) = DZERO
-      d(n) = array_var(level)%dmat(n)
+      st_kryl%z(n) = DZERO ; st_kryl%p(n) = DZERO
+      st_kryl%d(n) = array_var(level)%dmat(n)
     end do
     !$omp end do
     !$omp do private(n)
     do n = 1, d_size
-      v(n) = DZERO ; rs(n) = DZERO ; t(n) = DZERO
+      st_kryl%v(n) = DZERO ; st_kryl%rs(n) = DZERO ; st_kryl%t(n) = DZERO
     end do
     !$omp end do
     !$omp end parallel
@@ -327,26 +347,26 @@ module linear_solution
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1 .and. level == 1) then
         ! -- Preconditon mpi incomplete lu diagonal (mpi_dilu)
-          call precon_mpi_dilu(array_var(level)%dmat, array_var(level)%lumat, d)
+          call precon_mpi_dilu(array_var(level)%dmat, array_var(level)%lumat, st_kryl%d)
       else
         ! -- Preconditon incomplete lu diagonal (dilu)
-          call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, d)
+          call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, st_kryl%d)
       end if
 #else
       ! -- Preconditon incomplete lu diagonal (dilu)
-        call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, d)
+        call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, st_kryl%d)
 #endif
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
         ! -- Send and Receive real vector value (rvectv)
-          call senrec_rvectv(d)
+          call senrec_rvectv(st_kryl%d)
       end if
 #endif
     end if
 
     !$omp parallel do private(n)
     do n = 1, d_size
-      rs(n) = st_kryl%resi(n)
+      st_kryl%rs(n) = st_kryl%resi(n)
     end do
     !$omp end parallel do
 
@@ -354,7 +374,7 @@ module linear_solution
       sk = DZERO
       !$omp parallel do private(n) reduction(+:sk)
       do n = 1, d_size
-        sk = sk + st_kryl%resi(n)*rs(n)
+        sk = sk + st_kryl%resi(n)*st_kryl%rs(n)
       end do
       !$omp end parallel do
 #ifdef MPI_MSG
@@ -368,21 +388,21 @@ module linear_solution
       if (in_iter == 1) then
         !$omp parallel do private(n)
         do n = 1, d_size
-          p(n) = st_kryl%resi(n)
+          st_kryl%p(n) = st_kryl%resi(n)
         end do
         !$omp end parallel do
       else
         beta = (sk/sk0)*(alpha/bicgs_omega)
         !$omp parallel do private(n)
         do n = 1, d_size
-          p(n) = st_kryl%resi(n) + beta*(p(n)-bicgs_omega*v(n))
+          st_kryl%p(n) = st_kryl%resi(n) + beta*(st_kryl%p(n)-bicgs_omega*st_kryl%v(n))
         end do
         !$omp end parallel do
       end if
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
         ! -- Send and Receive real vector value (rvectv)
-          call senrec_rvectv(p)
+          call senrec_rvectv(st_kryl%p)
       end if
 #endif
 
@@ -390,34 +410,34 @@ module linear_solution
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1 .and. level == 1) then
           ! -- Solve mpi ilu factorization (ilu)
-            call solve_mpi_ilu(p, d, array_var(level)%lumat, z)
+            call solve_mpi_ilu(st_kryl%p, st_kryl%d, array_var(level)%lumat, st_kryl%z)
         else
           ! -- Solve ilu factorization (ilu)
-            call solve_ilu(level, d_size, p, d, array_var(level)%lumat, z)
+            call solve_ilu(level, d_size, st_kryl%p, st_kryl%d, array_var(level)%lumat, st_kryl%z)
         end if
 #else
         ! -- Solve ilu factorization (ilu)
-          call solve_ilu(level, d_size, p, d, array_var(level)%lumat, z)
+          call solve_ilu(level, d_size, st_kryl%p, st_kryl%d, array_var(level)%lumat, st_kryl%z)
 #endif
       else if (st_ctrl%precon_type == 1) then
         ! -- Loop cycle for amg (amg)
-          call loop_amg(level, p, z, st_amgt)
+          call loop_amg(level, st_kryl%p, st_kryl%z, st_amgt)
       end if
 
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
         ! -- Send and Receive real vector value (rvectv)
-          call senrec_rvectv(z)
+          call senrec_rvectv(st_kryl%z)
       end if
 #endif
 
       ! -- Calculate matrix-vector multiplication (matvec)
-        call calc_matvec(level, d_size, z, array_var(level)%dmat, array_var(level)%lumat, v)
+        call calc_matvec(level, d_size, st_kryl%z, array_var(level)%dmat, array_var(level)%lumat, st_kryl%v)
 
       sk2 = DZERO
       !$omp parallel do private(n) reduction(+:sk2)
       do n = 1, d_size
-        sk2 = sk2 + v(n)*rs(n)
+        sk2 = sk2 + st_kryl%v(n)*st_kryl%rs(n)
       end do
       !$omp end parallel do
 #ifdef MPI_MSG
@@ -431,8 +451,8 @@ module linear_solution
 
       !$omp parallel do private(n)
       do n = 1, d_size
-        inx(n) = inx(n) + alpha*z(n)
-        st_kryl%resi(n) = st_kryl%resi(n) - alpha*v(n)
+        inx(n) = inx(n) + alpha*st_kryl%z(n)
+        st_kryl%resi(n) = st_kryl%resi(n) - alpha*st_kryl%v(n)
       end do
       !$omp end parallel do
 
@@ -463,40 +483,40 @@ module linear_solution
 #ifdef MPI_MSG
           if (st_mpi%totn /= 1 .and. level == 1) then
             ! -- Solve mpi ilu factorization (ilu)
-              call solve_mpi_ilu(st_kryl%resi, d, array_var(level)%lumat, z)
+              call solve_mpi_ilu(st_kryl%resi, st_kryl%d, array_var(level)%lumat, st_kryl%z)
           else
             ! -- Solve ilu factorization (ilu)
-              call solve_ilu(level, d_size, st_kryl%resi, d, array_var(level)%lumat, z)
+              call solve_ilu(level, d_size, st_kryl%resi, st_kryl%d, array_var(level)%lumat, st_kryl%z)
           end if
 #else
           ! -- Solve ilu factorization (ilu)
-            call solve_ilu(level, d_size, st_kryl%resi, d, array_var(level)%lumat, z)
+            call solve_ilu(level, d_size, st_kryl%resi, st_kryl%d, array_var(level)%lumat, st_kryl%z)
 #endif
         else if (st_ctrl%precon_type == 1) then
         ! -- Loop cycle for amg (amg)
-          call loop_amg(level, st_kryl%resi, z, st_amgt)
+          call loop_amg(level, st_kryl%resi, st_kryl%z, st_amgt)
         end if
 
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1) then
           ! -- Send and Receive real vector value (rvectv)
-            call senrec_rvectv(z)
+            call senrec_rvectv(st_kryl%z)
         end if
 #endif
 
         ! -- Calculate matrix-vector multiplication (matvec)
-          call calc_matvec(level, d_size, z, array_var(level)%dmat, array_var(level)%lumat, t)
+          call calc_matvec(level, d_size, st_kryl%z, array_var(level)%dmat, array_var(level)%lumat, st_kryl%t)
 
         ts = DZERO ; tt = DZERO
         !$omp parallel
         !$omp do private(n) reduction(+:ts)
         do n = 1, d_size
-          ts = ts + t(n)*st_kryl%resi(n)
+          ts = ts + st_kryl%t(n)*st_kryl%resi(n)
         end do
         !$omp end do
         !$omp do private(n) reduction(+:tt)
         do n = 1, d_size
-          tt = tt + t(n)*t(n)
+          tt = tt + st_kryl%t(n)*st_kryl%t(n)
         end do
         !$omp end do
         !$omp end parallel
@@ -516,8 +536,8 @@ module linear_solution
 
         !$omp parallel do private(n)
         do n = 1, d_size
-          inx(n) = inx(n) + bicgs_omega*z(n)
-          st_kryl%resi(n) = st_kryl%resi(n) - bicgs_omega*t(n)
+          inx(n) = inx(n) + bicgs_omega*st_kryl%z(n)
+          st_kryl%resi(n) = st_kryl%resi(n) - bicgs_omega*st_kryl%t(n)
         end do
         !$omp end parallel do
 
@@ -550,7 +570,6 @@ module linear_solution
 
     end do bicg_inter
 
-    deallocate(d, z, p, v, rs, t)
 
   end subroutine solve_bicgs
 
@@ -570,10 +589,8 @@ module linear_solution
     integer(I4) :: mgd_size, mgreg_size
     integer(I4) :: v_iter, vlevel, ncoa, nfin
     integer(I4) :: rst, ren, pst, pen
-    real(DP), allocatable :: save_rhs(:), dilu_d(:)
     !-------------------------------------------------------------------------------------------
     mgd_size = crs_index(alevel)%unknow ; mgreg_size = size(array_var(alevel)%x)
-    allocate(save_rhs(mgreg_size), dilu_d(mgreg_size))
     !$omp parallel
     !$omp do private(i)
     do i = 1, mgd_size
@@ -582,26 +599,26 @@ module linear_solution
     !$omp end do
     !$omp do private(i)
     do i = 1, mgreg_size
-      save_rhs(i) = array_var(alevel)%rhs(i)
+      st_amgt%save_rhs(i) = array_var(alevel)%rhs(i)
       array_var(alevel)%rhs(i) = r(i)
-      dilu_d(i) = DZERO
+      st_amgt%dilu_d(i) = DZERO
     end do
     !$omp end do
     !$omp end parallel
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
       ! -- Preconditon mpi incomplete lu diagonal (mpi_dilu)
-        call precon_mpi_dilu(array_var(alevel)%dmat, array_var(alevel)%lumat, dilu_d)
+        call precon_mpi_dilu(array_var(alevel)%dmat, array_var(alevel)%lumat, st_amgt%dilu_d)
     else
       ! -- Preconditon incomplete lu diagonal (dilu)
-        call precon_dilu(alevel, mgd_size, array_var(alevel)%dmat, array_var(alevel)%lumat, dilu_d)
+        call precon_dilu(alevel, mgd_size, array_var(alevel)%dmat, array_var(alevel)%lumat, st_amgt%dilu_d)
     end if
     if (st_mpi%totn /= 1) then
-      call senrec_rvectv(dilu_d)
+      call senrec_rvectv(st_amgt%dilu_d)
     end if
 #else
     ! -- Preconditon incomplete lu diagonal (dilu)
-      call precon_dilu(alevel, mgd_size, array_var(alevel)%dmat, array_var(alevel)%lumat, dilu_d)
+      call precon_dilu(alevel, mgd_size, array_var(alevel)%dmat, array_var(alevel)%lumat, st_amgt%dilu_d)
 #endif
 
     do v_iter = 1, st_ctrl%maxvcy_iter  ! V-cycle loop
@@ -627,7 +644,7 @@ module linear_solution
         if (vlevel == alevel) then
           !$omp do private(i)
           do i = 1, d_size
-            st_amgt%td(i) = dilu_d(i)
+            st_amgt%td(i) = st_amgt%dilu_d(i)
           end do
           !$omp end do
         end if
@@ -724,7 +741,7 @@ module linear_solution
       if (st_ctrl%nlevel == alevel) then
         !$omp do private(i)
         do i = 1, d_size
-          st_amgt%td(i) = dilu_d(i)
+          st_amgt%td(i) = st_amgt%dilu_d(i)
         end do
         !$omp end do
       end if
@@ -801,7 +818,7 @@ module linear_solution
         if (vlevel == alevel) then
           !$omp do private(i)
           do i = 1, d_size
-            st_amgt%td(i) = dilu_d(i)
+            st_amgt%td(i) = st_amgt%dilu_d(i)
           end do
           !$omp end do
         end if
@@ -851,12 +868,11 @@ module linear_solution
     !$omp end do
     !$omp do private(i)
     do i = 1, mgreg_size
-      array_var(alevel)%rhs(i) = save_rhs(i)
+      array_var(alevel)%rhs(i) = st_amgt%save_rhs(i)
     end do
     !$omp end do
     !$omp end parallel
 
-    deallocate(save_rhs)
 
   end subroutine loop_amg
 
@@ -917,45 +933,43 @@ module linear_solution
     ! -- local
     integer(I4) :: i, k
     integer(I4) :: off_sta, off_end, offr
-    real(DP), allocatable :: temp_outx(:)
+    real(DP) :: temp_outx
     !-------------------------------------------------------------------------------------------
-    allocate(temp_outx(npre))
     !$omp parallel do private(i)
     do i = 1, npre
       outx(i) = inrhs(i)
-      temp_outx(i) = DZERO
     end do
     !$omp end parallel do
 
     ! Forward Substitution
-!    !$omp parallel do private(i, k, s, off_sta, off_end, offr)
+!    !$omp parallel do private(i, k, off_sta, off_end, offr, temp_outx)
     do i = 1, npre
-      temp_outx(i) = outx(i)
+      temp_outx = outx(i)
       off_sta = crs_index(plevel)%offind(i-1) + 1
       off_end = crs_index(plevel)%offind(i)
       do k = off_sta, off_end
         offr = crs_index(plevel)%offrow(k)
         if (3 >= dir_conn(k)) then
-          temp_outx(i) = temp_outx(i) - inlumat(k)*outx(offr)
+          temp_outx = temp_outx - inlumat(k)*outx(offr)
         end if
       end do
-      outx(i) = temp_outx(i)/indmat(i)
+      outx(i) = temp_outx/indmat(i)
     end do
 !    !$omp end parallel do
 
     ! Backward Substitution
-!    !$omp parallel do private(i, k, s, off_sta, off_end, offr)
+!    !$omp parallel do private(i, k, off_sta, off_end, offr, temp_outx)
     do i = npre, 1, -1
-      temp_outx(i) = DZERO
+      temp_outx = DZERO
       off_sta = crs_index(plevel)%offind(i-1) + 1
       off_end = crs_index(plevel)%offind(i)
       do k = off_sta, off_end
         offr = crs_index(plevel)%offrow(k)
         if (3 < dir_conn(k)) then
-          temp_outx(i) = temp_outx(i) + inlumat(k)*outx(offr)
+          temp_outx = temp_outx + inlumat(k)*outx(offr)
         end if
       end do
-      outx(i) = outx(i) - temp_outx(i)/indmat(i)
+      outx(i) = outx(i) - temp_outx/indmat(i)
     end do
 !    !$omp end parallel do
 
@@ -974,28 +988,20 @@ module linear_solution
     ! -- local
     integer(I4) :: i, j, k
     integer(I4) :: off_sta, off_end
-    real(DP), allocatable :: temp_vec(:)
+    real(DP) :: temp_vec
     !-------------------------------------------------------------------------------------------
-    allocate(temp_vec(nmv))
-    !$omp parallel
-    !$omp do private(i)
+    !$omp parallel do private(i, j, k, off_sta, off_end, temp_vec)
     do i = 1, nmv
-      temp_vec(i) = DZERO
-    end do
-    !$omp end do
-    !$omp do private(i, j, k, off_sta, off_end)
-    do i = 1, nmv
-      temp_vec(i) = indmat(i)*invec(i)
+      temp_vec = indmat(i)*invec(i)
       off_sta = crs_index(mvlevel)%offind(i-1) + 1
       off_end = crs_index(mvlevel)%offind(i)
       do k = off_sta, off_end
         j = crs_index(mvlevel)%offrow(k)
-        temp_vec(i) = temp_vec(i) + inlumat(k)*invec(j)
+        temp_vec = temp_vec + inlumat(k)*invec(j)
       end do
-      outvec(i) = temp_vec(i)
+      outvec(i) = temp_vec
     end do
-    !$omp end do
-    !$omp end parallel
+    !$omp end parallel do
 
   end subroutine calc_matvec
 

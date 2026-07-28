@@ -1,6 +1,7 @@
 module write_output
   ! -- modules
   use kind_module, only: I4, SP, DP
+  use types_module, only: sol_set
   use constval_module, only: SZERO, DZERO
   use utility_module, only: st_mpi, close_file
   use read_input, only: len_scal
@@ -9,7 +10,6 @@ module write_output
   use set_condition, only: st_hydr, st_bcnd
   use assign_calc, only: msout_tnum
   use prep_calculation, only: st_time
-  use allocate_solution, only: st_sol
   use check_simulation, only: lasttime_flag
   use write_module, only: write_2dbin, write_3dbin, write_header_bin
 #ifdef MPI_MSG
@@ -26,7 +26,7 @@ module write_output
 
   contains
 
-  subroutine write_outf(time_val)
+  subroutine write_outf(time_val, st_sol)
   !*********************************************************************************************
   ! write_outf -- write output file
   !*********************************************************************************************
@@ -41,6 +41,7 @@ module write_output
 #endif
     ! -- inout
     real(SP), intent(in) :: time_val
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: rest_fnum
     integer(I4) :: header_flag = 0, allocate_flag = 0
@@ -70,22 +71,22 @@ module write_output
 
     if (st_out_type%mass == out_type(1)) then
       ! -- Calculate cell massbalance (cell_mas)
-        call calc_cell_mas()
+        call calc_cell_mas(st_sol)
     end if
 
     if (st_out_type%rivr == out_type(2)) then
       ! -- Calculate river runoff (rivr_off)
-        call calc_rivr_off()
+        call calc_rivr_off(st_sol)
     end if
 
     if (st_out_type%lakr == out_type(2)) then
       ! -- Calculate lake runoff (lakr_off)
-        call calc_lakr_off()
+        call calc_lakr_off(st_sol)
     end if
 
     if (st_out_type%sufr == out_type(2)) then
       ! -- Calculate surface runoff (sufr_off)
-        call calc_sufr_off()
+        call calc_sufr_off(st_sol)
     end if
 
     if (st_out_type%dunr == out_type(2)) then
@@ -95,7 +96,7 @@ module write_output
 
     if (st_out_type%seal == out_type(3)) then
       ! -- Calculate sea results (seal_res)
-        call calc_seal_res()
+        call calc_seal_res(st_sol)
     end if
 
     if (st_out_type%rech == out_type(2)) then
@@ -112,13 +113,13 @@ module write_output
 
       if (st_out_step%head == SZERO) then
         ! -- Write output head file (out_headf)
-          call write_out_headf(time_val)
+          call write_out_headf(time_val, st_sol)
       else if (mod(st_time%current_t,st_out_step%head) == 0) then
         ! -- Write output head file (out_headf)
-          call write_out_headf(time_val)
+          call write_out_headf(time_val, st_sol)
       else if (lasttime_flag == 1) then
         ! -- Write output head file (out_headf)
-          call write_out_headf(time_val)
+          call write_out_headf(time_val, st_sol)
       end if
 
       if (lasttime_flag == 1) then
@@ -129,33 +130,33 @@ module write_output
           call close_mpi_file(rest_fnum)
 #else
         ! -- Write restart file (out_restf)
-          call write_out_restf(rest_fnum, time_val)
+          call write_out_restf(rest_fnum, time_val, st_sol)
 #endif
       end if
 
       if (st_out_type%srat == out_type(3)) then
         if (st_out_step%srat == SZERO) then
           ! -- Write output saturation file (out_sratf)
-            call write_out_sratf(time_val)
+            call write_out_sratf(time_val, st_sol)
         else if (mod(st_time%current_t,st_out_step%srat) == 0) then
           ! -- Write output saturation file (out_sratf)
-            call write_out_sratf(time_val)
+            call write_out_sratf(time_val, st_sol)
         else if (lasttime_flag == 1) then
           ! -- Write output saturation file (out_sratf)
-            call write_out_sratf(time_val)
+            call write_out_sratf(time_val, st_sol)
         end if
       end if
 
       if (st_out_type%wtab == out_type(2)) then
         if (st_out_step%wtab == SZERO) then
           ! -- Write watertable file (out_wtabf)
-            call write_out_wtabf(time_val)
+            call write_out_wtabf(time_val, st_sol)
         else if (mod(st_time%current_t,st_out_step%wtab) == 0) then
           ! -- Write watertable file (out_wtabf)
-            call write_out_wtabf(time_val)
+            call write_out_wtabf(time_val, st_sol)
         else if (lasttime_flag== 1) then
           ! -- Write watertable file (out_wtabf)
-            call write_out_wtabf(time_val)
+            call write_out_wtabf(time_val, st_sol)
         end if
       end if
 
@@ -175,13 +176,13 @@ module write_output
       if (st_out_type%velc == out_type(3)) then
         if (st_out_step%velc == SZERO) then
           ! -- Write velocity file (out_velcf)
-            call write_out_velcf(time_val)
+            call write_out_velcf(time_val, st_sol)
         else if (mod(st_time%current_t,st_out_step%velc) == 0) then
           ! -- Write velocity file (out_velcf)
-            call write_out_velcf(time_val)
+            call write_out_velcf(time_val, st_sol)
         else if (lasttime_flag== 1) then
           ! -- Write velocity file (out_velcf)
-            call write_out_velcf(time_val)
+            call write_out_velcf(time_val, st_sol)
         end if
       end if
 
@@ -317,7 +318,7 @@ module write_output
 
   end subroutine write_mass_header
 
-  subroutine write_out_headf(time_out)
+  subroutine write_out_headf(time_out, st_sol)
   !*********************************************************************************************
   ! write_out_headf -- Write output head file
   !*********************************************************************************************
@@ -325,6 +326,7 @@ module write_output
 
     ! -- inout
     real(SP), intent(in) :: time_out
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, head_fnum
     integer(I4), allocatable :: calc2calc(:)
@@ -358,7 +360,7 @@ module write_output
 
   end subroutine write_out_headf
 
-  subroutine write_out_sratf(time_out)
+  subroutine write_out_sratf(time_out, st_sol)
   !*********************************************************************************************
   ! write_out_sratf -- Write output saturation file
   !*********************************************************************************************
@@ -366,6 +368,7 @@ module write_output
     use constval_module, only: SONE
     ! -- inout
     real(SP), intent(in) :: time_out
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, srat_fnum
     integer(I4), allocatable :: calc2calc(:)
@@ -399,7 +402,7 @@ module write_output
 
   end subroutine write_out_sratf
 
-  subroutine write_out_restf(fnum_rest, time_out)
+  subroutine write_out_restf(fnum_rest, time_out, st_sol)
   !*********************************************************************************************
   ! write_out_restf -- Write restart file
   !*********************************************************************************************
@@ -408,6 +411,7 @@ module write_output
     ! -- inout
     integer(I4), intent(in) :: fnum_rest
     real(SP), intent(in) :: time_out
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
@@ -418,7 +422,7 @@ module write_output
 
   end subroutine write_out_restf
 
-  subroutine write_out_wtabf(time_out)
+  subroutine write_out_wtabf(time_out, st_sol)
   !*********************************************************************************************
   ! write_out_wtabf -- Write watertable file
   !*********************************************************************************************
@@ -430,6 +434,7 @@ module write_output
 #endif
     ! -- inout
     real(SP), intent(in) :: time_out
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, wtab_fnum
     integer(I4), allocatable :: cals2cals(:)
@@ -529,7 +534,7 @@ module write_output
 
   end subroutine write_out_massf
 
-  subroutine write_out_velcf(time_out)
+  subroutine write_out_velcf(time_out, st_sol)
   !*********************************************************************************************
   ! write_out_velcf -- Write velocity file
   !*********************************************************************************************
@@ -538,13 +543,14 @@ module write_output
     use calc_output, only: calc_outvelc
     ! -- inout
     real(SP), intent(in) :: time_out
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, velx_fnum, vely_fnum, velz_fnum
     integer(I4), allocatable :: calc2calc(:)
     real(DP), allocatable :: velcx(:), velcy(:), velcz(:)
     !-------------------------------------------------------------------------------------------
     ! -- Calculate output velocity (outvelc)
-      call calc_outvelc()
+      call calc_outvelc(st_sol)
 
     allocate(calc2calc(ncalc))
     allocate(velcx(ncalc), velcy(ncalc), velcz(ncalc))

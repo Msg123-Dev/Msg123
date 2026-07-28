@@ -274,10 +274,13 @@ module types_module
 
   type :: kryl_set
     real(DP), allocatable :: resi(:)
+    real(DP), allocatable :: d(:), z(:), p(:), q(:)
+    real(DP), allocatable :: v(:), rs(:), t(:)
   end type kryl_set
 
   type :: amgt_set
     real(DP), allocatable :: td(:), tx(:), tb(:), tr(:), trhs(:), tfx(:), tlu(:)
+    real(DP), allocatable :: save_rhs(:), dilu_d(:)
   end type amgt_set
 
   type :: coef_set

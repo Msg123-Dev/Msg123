@@ -12,7 +12,6 @@ module allocate_solution
   integer(I4), public :: nreg_num
   integer(I4), allocatable, public :: dir_conn(:), dir_seal(:)
   integer(I4), allocatable, public :: left_offr(:), right_offr(:)
-  type(sol_set), public :: st_sol
 
   type :: matrix_int
     integer(I4) :: unknow
@@ -48,7 +47,7 @@ module allocate_solution
 
   contains
 
-  subroutine allocate_solvar()
+  subroutine allocate_solvar(st_sol)
   !*********************************************************************************************
   ! allocate_solvar -- Allocate solution variable for time step
   !*********************************************************************************************
@@ -56,18 +55,19 @@ module allocate_solution
 
     ! -- inout
 
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
 
     !-------------------------------------------------------------------------------------------
     ! -- Allocate timeupdate (timeup)
-      call allocate_timeup()
+      call allocate_timeup(st_sol)
 
     ! -- Allocate matrix and vector (matvec)
-      call allocate_matvec()
+      call allocate_matvec(st_sol)
 
   end subroutine allocate_solvar
 
-  subroutine allocate_timeup()
+  subroutine allocate_timeup(st_sol)
   !*********************************************************************************************
   ! allocate_timeup -- Allocate timeupdate
   !*********************************************************************************************
@@ -75,6 +75,7 @@ module allocate_solution
     use set_cell, only: ncals
     ! -- inout
 
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
@@ -98,7 +99,7 @@ module allocate_solution
 
   end subroutine allocate_timeup
 
-  subroutine allocate_matvec()
+  subroutine allocate_matvec(st_sol)
   !*********************************************************************************************
   ! allocate_matvec -- Allocate matrix and vector
   !*********************************************************************************************
@@ -109,6 +110,7 @@ module allocate_solution
                              right_off
     ! -- inout
 
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i, k
     !-------------------------------------------------------------------------------------------

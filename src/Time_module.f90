@@ -1,6 +1,7 @@
 module time_module
   ! -- modules
   use kind_module, only: I4, SP, DP
+  use types_module, only: sol_set
   use constval_module, only: SZERO, SNOVAL, DZERO, DONE, DHALF
   use utility_module, only: st_mpi
   use initial_module, only: st_sim, st_ctrl, st_in_type, st_rivf_type, st_lakf_type, st_seal,&
@@ -14,7 +15,6 @@ module time_module
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
   use set_boundary, only: st_rive, st_lake
-  use allocate_solution, only: st_sol
 
   implicit none
   private
@@ -28,7 +28,7 @@ module time_module
 
   contains
 
-  subroutine update_tstep()
+  subroutine update_tstep(st_sol)
   !*********************************************************************************************
   ! update_tstep -- Update time step
   !*********************************************************************************************
@@ -41,11 +41,12 @@ module time_module
 #endif
     ! -- inout
 
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i, s
     !-------------------------------------------------------------------------------------------
     ! -- Calculate next time step (nextst)
-      call calc_nextst()
+      call calc_nextst(st_sol)
 
     if (st_time%conv_flag .and. st_sim%sim_type == 1) then
       ! -- Set next end time (nextet)
@@ -79,7 +80,7 @@ module time_module
     if (st_time%conv_flag .or. timestep_num == 0) then
       if (st_bcnd%well_num /= 0) then
         ! -- Set virtual well head (vwell_head)
-          call set_vwell_head()
+          call set_vwell_head(st_sol)
       end if
       if (st_bcnd%rech_num /= 0) then
         !$omp parallel do private(i, s)
@@ -90,14 +91,14 @@ module time_module
         !$omp end parallel do
         if (geog_num /= 0) then
           ! -- Change the recharge volume
-            call change_recharge()
+            call change_recharge(st_sol)
         end if
       end if
     end if
 
   end subroutine update_tstep
 
-  subroutine calc_nextst()
+  subroutine calc_nextst(st_sol)
   !*********************************************************************************************
   ! calc_nextst -- Calculate next time step
   !*********************************************************************************************
@@ -115,6 +116,7 @@ module time_module
 #endif
     ! -- inout
 
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i
     integer(I4), allocatable :: calc2calc(:)
@@ -1185,7 +1187,7 @@ module time_module
 
   end subroutine set_nextvar
 
-  subroutine set_vwell_head()
+  subroutine set_vwell_head(st_sol)
   !*********************************************************************************************
   ! set_vwell_head -- Set virtual well head
   !*********************************************************************************************
@@ -1193,11 +1195,12 @@ module time_module
 
     ! -- inout
 
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
     ! -- Calculate virtual well head without well pumping (vheadout)
-      call calc_vheadout()
+      call calc_vheadout(st_sol)
 
     !$omp parallel do private(i)
     do i = 1, ncalc
@@ -1206,17 +1209,18 @@ module time_module
     !$omp end parallel do
 
     ! -- Calculate virtual well head with well puming (vheadin)
-      call calc_vheadin()
+      call calc_vheadin(st_sol)
 
   end subroutine set_vwell_head
 
-  subroutine change_recharge()
+  subroutine change_recharge(st_sol)
   !*********************************************************************************************
   ! change_recharge -- Change the recharge volume
   !*********************************************************************************************
     ! -- modules
     ! -- inout
 
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, s
     real(DP) :: norm_elev
@@ -1259,7 +1263,7 @@ module time_module
 
   end subroutine change_recharge
 
-  subroutine calc_vheadout()
+  subroutine calc_vheadout(st_sol)
   !*********************************************************************************************
   ! calc_vheadout -- Calculate virtual well head without well pumping
   !*********************************************************************************************
@@ -1267,6 +1271,7 @@ module time_module
 
     ! -- inout
 
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, j, k
     real(DP) :: tot_cond, tot_flux
@@ -1296,7 +1301,7 @@ module time_module
 
   end subroutine calc_vheadout
 
-  subroutine calc_vheadin()
+  subroutine calc_vheadin(st_sol)
   !*********************************************************************************************
   ! calc_vheadin -- Calculate virtual well head with well pumping
   !*********************************************************************************************
@@ -1304,6 +1309,7 @@ module time_module
 
     ! -- inout
 
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, j, k
     real(DP) :: tot_cond

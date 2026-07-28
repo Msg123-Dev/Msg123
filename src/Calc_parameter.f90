@@ -31,15 +31,7 @@ module calc_parameter
     integer(I4) :: i
     real(DP) :: retm, beta, theta, kr, se, ss
     real(DP) :: per_phead, phead0
-    real(DP), allocatable :: temp_ss(:)
     !-------------------------------------------------------------------------------------------
-    allocate(temp_ss(num))
-    !$omp parallel do private(i)
-    do i = 1, num
-      temp_ss(i) = DZERO
-    end do
-    !$omp end parallel do
-
     phead0 = DZERO
 
     !$omp parallel do private(i, per_phead, retm, beta, theta, kr, se, ss)
@@ -65,19 +57,11 @@ module calc_parameter
         ss = st_hydr%read_spst(i)
       end if
       rperm(i) = kr
-      temp_ss(i) = ss
+      if (present(sstor)) then
+        sstor(i) = ss
+      end if
     end do
     !$omp end parallel do
-
-    if (present(sstor)) then
-      !$omp parallel do private(i)
-      do i = 1, num
-        sstor(i) = temp_ss(i)
-      end do
-      !$omp end parallel do
-    end if
-
-    deallocate(temp_ss)
 
   end subroutine calc_srat_rperm
 

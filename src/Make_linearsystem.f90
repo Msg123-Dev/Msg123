@@ -2,13 +2,13 @@ module make_linearsystem
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE
-  use types_module, only: coef_set
+  use types_module, only: coef_set, sol_set
   use initial_module, only: st_ctrl
   use set_cell, only: ncalc, ncals
   use set_condition, only: st_hydr, st_bcnd
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
-  use allocate_solution, only: nreg_num, st_sol, crs_index
+  use allocate_solution, only: nreg_num, crs_index
 #ifdef MPI_MSG
   use utility_module, only: st_mpi
   use mpi_solve, only: senrec_rvectv
@@ -57,7 +57,7 @@ module make_linearsystem
 
   end subroutine allocate_matvec
 
-  subroutine make_matvec(st_coef)
+  subroutine make_matvec(st_coef, st_sol)
   !*********************************************************************************************
   ! make_matvec -- Make matrix and vector
   !*********************************************************************************************
@@ -67,6 +67,7 @@ module make_linearsystem
     use make_amg_matrix, only: make_amgmat
     ! -- inout
     type(coef_set), intent(inout) :: st_coef
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
@@ -77,12 +78,13 @@ module make_linearsystem
     !$omp end parallel do
 
     ! -- Calculate function value (func)
-      call calc_func(st_sol%head_new, st_coef%temp_rhs)
+      call calc_func(st_sol%head_old, st_sol%srat_old, st_sol%surf_head, st_sol%head_new,&
+                     st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, st_coef%temp_rhs)
 
     array_var(1)%rhs(:) = -st_coef%temp_rhs(:)
 
     ! -- Make matrix (matrix)
-      call make_matrix(array_var(1)%dmat, array_var(1)%lumat, st_coef)
+      call make_matrix(st_sol, array_var(1)%dmat, array_var(1)%lumat, st_coef)
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
@@ -99,7 +101,7 @@ module make_linearsystem
 
   end subroutine make_matvec
 
-  subroutine make_matrix(diamat, lumat, st_coef)
+  subroutine make_matrix(st_sol, diamat, lumat, st_coef)
   !*********************************************************************************************
   ! make_matrix -- Make matrix
   !*********************************************************************************************
@@ -108,6 +110,7 @@ module make_linearsystem
     use calc_parameter, only: calc_srat_rperm
     use calc_function, only: alp_ss
     ! -- inout
+    type(sol_set), intent(in) :: st_sol
     real(DP), intent(out) :: diamat(:), lumat(:)
     type(coef_set), intent(inout) :: st_coef
     ! -- local
@@ -132,12 +135,13 @@ module make_linearsystem
     !$omp end parallel do
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, st_ctrl%newper, st_sol%head_new, st_coef%per_srat, st_coef%per_relp)
+      call calc_srat_rperm(ncalc, st_ctrl%newper, st_sol%head_new, st_coef%per_srat,&
+                           st_coef%per_relp)
 
     if (st_sim%sim_type >= 0) then
       ! -- Form storage change (stochn)
         call form_stochn(alp_ss, st_coef%stod, st_coef%per_srat, st_coef%deri_srat,&
-                         st_coef%deri_stor)
+                         st_coef%deri_stor, st_sol)
     end if
 
 #ifdef MPI_MSG
@@ -148,27 +152,28 @@ module make_linearsystem
 #endif
 
     ! -- Form connect flow from adjacent cells (connflow)
-      call form_connflow(st_coef%cond, lumat, st_coef%per_relp, st_coef%deri_dcon,&
+      call form_connflow(st_coef%per_relp, st_sol, st_coef%cond, lumat, st_coef%deri_dcon,&
                          st_coef%rel_hyd, st_coef%deri_lucon, st_coef%deri_con1,&
                          st_coef%deri_con2)
 
     ! -- Set river boundary dmat (rivebound)
-      call set_rivebound(st_coef%rivd, st_coef%per_relp, st_coef%over_riv, st_coef%deri_r,&
-                         st_coef%deri_ks_riv, st_coef%delh_r, st_coef%per_riv, st_coef%rel_riv,&
-                         st_coef%tran_riv)
+      call set_rivebound(st_coef%per_relp, st_sol, st_coef%rivd, st_coef%over_riv,&
+                         st_coef%deri_r, st_coef%deri_ks_riv, st_coef%delh_r, st_coef%per_riv,&
+                         st_coef%rel_riv, st_coef%tran_riv)
 
     ! -- Set lake boundary dmat (lakebound)
-      call set_lakebound(st_coef%lakd, st_coef%per_relp, st_coef%over_lak, st_coef%deri_l,&
-                         st_coef%deri_ks_lak, st_coef%delh_l, st_coef%per_lak, st_coef%rel_lak,&
-                         st_coef%tran_lak)
+      call set_lakebound(st_coef%per_relp, st_sol, st_coef%lakd, st_coef%over_lak,&
+                         st_coef%deri_l, st_coef%deri_ks_lak, st_coef%delh_l, st_coef%per_lak,&
+                         st_coef%rel_lak, st_coef%tran_lak)
 
     ! -- Set surface boundary dmat (surfbound)
-      call set_surfbound(st_coef%surd, st_coef%per_relp, st_coef%over_sur, st_coef%deri_s,&
-                         st_coef%deri_ks_sur, st_coef%delh_s, st_coef%tran_sur)
+      call set_surfbound(st_coef%per_relp, st_sol, st_coef%surd, st_coef%over_sur,&
+                         st_coef%deri_s, st_coef%deri_ks_sur, st_coef%delh_s, st_coef%tran_sur)
 
     ! -- Set sea boundary dmat (seabound)
-      call set_seabound(st_coef%sead, st_coef%per_relp, st_coef%deri_sea, st_coef%deri_ks_sea,&
-                        st_coef%delh_sea, st_coef%per_sea, st_coef%rel_sea, st_coef%tran_sea)
+      call set_seabound(st_coef%per_relp, st_sol, st_coef%sead, st_coef%deri_sea,&
+                        st_coef%deri_ks_sea, st_coef%delh_sea, st_coef%per_sea,&
+                        st_coef%rel_sea, st_coef%tran_sea)
 
     !$omp parallel
     !$omp do private(s)
@@ -186,7 +191,7 @@ module make_linearsystem
 
   end subroutine make_matrix
 
-  subroutine form_stochn(alp, dmat_sto, per_srat, deri_srat, deri_stor)
+  subroutine form_stochn(alp, dmat_sto, per_srat, deri_srat, deri_stor, st_sol)
   !*********************************************************************************************
   ! form_stochn -- Form storage change
   !*********************************************************************************************
@@ -197,6 +202,7 @@ module make_linearsystem
     real(DP), intent(out) :: dmat_sto(:)
     real(DP), intent(in) :: per_srat(:)
     real(DP), intent(out) :: deri_srat(:), deri_stor(:)
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
@@ -230,17 +236,18 @@ module make_linearsystem
 
   end subroutine form_stochn
 
-  subroutine form_connflow(dmat_con, lumat_con, per_relp, deri_dcon, rel_hyd, deri_lucon,&
-                           deri_con1, deri_con2)
+  subroutine form_connflow(per_relp, st_sol, dmat_con, lumat_con, deri_dcon, rel_hyd,&
+                           deri_lucon, deri_con1, deri_con2)
   !*********************************************************************************************
   ! form_connflow -- Form connect flow from adjacent cells
   !*********************************************************************************************
     ! -- modules
     use calc_parameter, only: calc_hyd_upwind
     ! -- inout
+    real(DP), intent(in) :: per_relp(:)
+    type(sol_set), intent(in) :: st_sol
     real(DP), intent(out) :: dmat_con(:)
     real(DP), intent(out) :: lumat_con(:)
-    real(DP), intent(in) :: per_relp(:)
     real(DP), intent(out) :: deri_dcon(:), rel_hyd(:), deri_lucon(:), deri_con1(:), deri_con2(:)
     ! -- local
     integer(I4) :: i, j, k
@@ -321,15 +328,16 @@ module make_linearsystem
 
   end subroutine form_connflow
 
-  subroutine set_rivebound(dmat_riv, per_relp, over_riv, deri_r, deri_ks_riv, delh_r, per_riv,&
-                           rel_riv, tran_riv)
+  subroutine set_rivebound(per_relp, st_sol, dmat_riv, over_riv, deri_r, deri_ks_riv, delh_r,&
+                           per_riv, rel_riv, tran_riv)
   !*********************************************************************************************
   ! set_rivebound -- Set river boundary to dmat
   !*********************************************************************************************
     ! -- modules
     ! -- inout
-    real(DP), intent(inout) :: dmat_riv(:)
     real(DP), intent(in) :: per_relp(:)
+    type(sol_set), intent(in) :: st_sol
+    real(DP), intent(inout) :: dmat_riv(:)
     real(DP), intent(out) :: over_riv(:), deri_r(:), deri_ks_riv(:), delh_r(:), per_riv(:)
     real(DP), intent(out) :: rel_riv(:), tran_riv(:)
     ! -- local
@@ -381,15 +389,16 @@ module make_linearsystem
 
   end subroutine set_rivebound
 
-  subroutine set_lakebound(dmat_lak, per_relp, over_lak, deri_l, deri_ks_lak, delh_l, per_lak,&
-                           rel_lak, tran_lak)
+  subroutine set_lakebound(per_relp, st_sol, dmat_lak, over_lak, deri_l, deri_ks_lak, delh_l,&
+                           per_lak, rel_lak, tran_lak)
   !*********************************************************************************************
   ! set_lakebound -- Set lake boundary to dmat
   !*********************************************************************************************
     ! -- modules
     ! -- inout
-    real(DP), intent(inout) :: dmat_lak(:)
     real(DP), intent(in) :: per_relp(:)
+    type(sol_set), intent(in) :: st_sol
+    real(DP), intent(inout) :: dmat_lak(:)
     real(DP), intent(out) :: over_lak(:), deri_l(:), deri_ks_lak(:), delh_l(:), per_lak(:)
     real(DP), intent(out) :: rel_lak(:), tran_lak(:)
     ! -- local
@@ -441,15 +450,17 @@ module make_linearsystem
 
   end subroutine set_lakebound
 
-  subroutine set_surfbound(dmat_sur, per_relp, over_sur, deri_s, deri_ks_sur, delh_s, tran_sur)
+  subroutine set_surfbound(per_relp, st_sol, dmat_sur, over_sur, deri_s, deri_ks_sur, delh_s,&
+                           tran_sur)
   !*********************************************************************************************
   ! set_surfbound -- Set surface boundary to dmat
   !*********************************************************************************************
     ! -- modules
 !    use make_cell, only: surf_elev
     ! -- inout
-    real(DP), intent(out) :: dmat_sur(:)
     real(DP), intent(in) :: per_relp(:)
+    type(sol_set), intent(in) :: st_sol
+    real(DP), intent(out) :: dmat_sur(:)
     real(DP), intent(out) :: over_sur(:), deri_s(:), deri_ks_sur(:), delh_s(:), tran_sur(:)
     ! -- local
     integer(I4) :: i
@@ -526,15 +537,16 @@ module make_linearsystem
 
   end subroutine set_surfbound
 
-  subroutine set_seabound(dmat_sea, per_relp, deri_sea, deri_ks_sea, delh_sea, per_sea,&
+  subroutine set_seabound(per_relp, st_sol, dmat_sea, deri_sea, deri_ks_sea, delh_sea, per_sea,&
                           rel_sea, tran_sea)
   !*********************************************************************************************
   ! set_seabound -- Set sea boundary to dmat
   !*********************************************************************************************
     ! -- modules
     ! -- inout
-    real(DP), intent(inout) :: dmat_sea(:)
     real(DP), intent(in) :: per_relp(:)
+    type(sol_set), intent(in) :: st_sol
+    real(DP), intent(inout) :: dmat_sea(:)
     real(DP), intent(out) :: deri_sea(:), deri_ks_sea(:), delh_sea(:), per_sea(:), rel_sea(:)
     real(DP), intent(out) :: tran_sea(:)
     ! -- local

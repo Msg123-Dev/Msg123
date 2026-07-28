@@ -2,11 +2,11 @@ module calc_output
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE
+  use types_module, only: sol_set
   use set_cell, only: ncalc, ncals, st_conn
   use set_condition, only: st_hydr, st_bcnd
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
-  use allocate_solution, only: head_new
   use allocate_output, only: st_msloc
 
   implicit none
@@ -53,15 +53,15 @@ module calc_output
 
   end subroutine calc_wtable
 
-  subroutine calc_cell_mas()
+  subroutine calc_cell_mas(st_sol)
   !*********************************************************************************************
   ! calc_cell_mas -- Calculate cell massbalance
   !*********************************************************************************************
     ! -- modules
-    use allocate_solution, only: head_old
     use calc_function, only: calc_mass
     ! -- inout
 
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i
     real(DP), allocatable :: ms_st(:), ms_co(:), ms_se(:), ms_we(:)
@@ -83,8 +83,9 @@ module calc_output
     !$omp end parallel
 
     ! -- Calculate massbalance (mass)
-      call calc_mass(0, head_new, head_old, ms_st, ms_co, ms_se, ms_we, ms_re, ms_su,&
-                     ms_ri, ms_la)
+      call calc_mass(0, st_sol%head_old, st_sol%srat_old, st_sol%surf_old, st_sol%head_new,&
+                     ms_st, ms_co, ms_se, ms_we, ms_re, ms_su, ms_ri, ms_la, st_sol%srat_new,&
+                     st_sol%rel_perm, st_sol%surf_rati)
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc
@@ -184,7 +185,7 @@ module calc_output
 
   end subroutine calc_out_mass
 
-  subroutine calc_outvelc()
+  subroutine calc_outvelc(st_sol)
   !*********************************************************************************************
   ! calc_outvelc -- Calculate output velocity
   !*********************************************************************************************
@@ -192,10 +193,11 @@ module calc_output
     use constval_module, only: DHALF
     use make_cell, only: st_geom
     use calc_parameter, only: calc_hyd_upwind
-    use allocate_solution, only: dir_conn, dir_seal, surf_head, rel_perm, crs_index
+    use allocate_solution, only: dir_conn, dir_seal, crs_index
     use allocate_output, only: pointv, facev
     ! -- inout
 
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, j, k, c, s
     integer(I4) :: sta_ind, end_ind, ind
@@ -208,8 +210,8 @@ module calc_output
       sta_ind = crs_index(1)%offind(i-1) ; end_ind = crs_index(1)%offind(i)
       do k = 1, end_ind-sta_ind
         ind = sta_ind + k ; j = crs_index(1)%offrow(ind)
-        delhead = head_new(j) - head_new(i)
-        relp1 = rel_perm(i) ; relp2 = rel_perm(j)
+        delhead = st_sol%head_new(j) - st_sol%head_new(i)
+        relp1 = st_sol%rel_perm(i) ; relp2 = st_sol%rel_perm(j)
 
         ! -- Calculate hydradulic conductivity by upwind (hyd_upwind)
           call calc_hyd_upwind(-delhead, relp1, relp2, relat)
@@ -223,16 +225,16 @@ module calc_output
     !$omp do private(i, invdis, delhead)
     do i = 1, ncals
       invdis = DONE/(st_geom%surf_elev(i)-st_geom%cell_cent(i))
-      delhead = surf_head(i) - head_new(i)
-      facev(i,1) = st_hydr%hydf_surf(i)*delhead*invdis*rel_perm(i)
+      delhead = st_sol%surf_head(i) - st_sol%head_new(i)
+      facev(i,1) = st_hydr%hydf_surf(i)*delhead*invdis*st_sol%rel_perm(i)
     end do
     !$omp end do
 
     !$omp do private(i, c, s, dir, delhead)
     do i = 1, st_bcnd%seal_num
       c = st_bcnd%seal2calc(i) ; dir = dir_seal(i) ; s = st_bcnd%seal2seal(i)
-      delhead = st_forc%read_seal(s) - head_new(c)
-      facev(c,dir) = st_hydr%hydf_seal(i)*delhead*st_hydr%dis_seal(i)*rel_perm(c)
+      delhead = st_forc%read_seal(s) - st_sol%head_new(c)
+      facev(c,dir) = st_hydr%hydf_seal(i)*delhead*st_hydr%dis_seal(i)*st_sol%rel_perm(c)
     end do
     !$omp end do
 
@@ -256,7 +258,7 @@ module calc_output
 
   end subroutine calc_outvelc
 
-  subroutine calc_rivr_off()
+  subroutine calc_rivr_off(st_sol)
   !*********************************************************************************************
   ! calc_rivr_off -- Calculate river runoff
   !*********************************************************************************************
@@ -265,6 +267,7 @@ module calc_output
     use allocate_output, only: rive_sumtime, roff_rive
     ! -- inout
 
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, s
     real(DP), allocatable :: rives(:), temp_rive(:)
@@ -284,7 +287,7 @@ module calc_output
     !$omp end parallel
 
     ! -- Function river term (riveterm)
-      call func_riveterm(head_new, rives)
+      call func_riveterm(st_sol%head_new, st_sol%rel_perm, rives)
 
     !$omp parallel do private(i, s)
     do i = 1, st_bcnd%rive_num
@@ -299,7 +302,7 @@ module calc_output
 
   end subroutine calc_rivr_off
 
-  subroutine calc_lakr_off()
+  subroutine calc_lakr_off(st_sol)
   !*********************************************************************************************
   ! calc_lakr_off -- Calculate lake runoff
   !*********************************************************************************************
@@ -308,6 +311,7 @@ module calc_output
     use allocate_output, only: lake_sumtime, roff_lake
     ! -- inout
 
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, s
     real(DP), allocatable :: lakes(:), temp_lake(:)
@@ -327,7 +331,7 @@ module calc_output
     !$omp end parallel
 
     ! -- Function lake term (laketerm)
-      call func_laketerm(head_new, lakes)
+      call func_laketerm(st_sol%head_new, st_sol%rel_perm, lakes)
 
     !$omp parallel do private(i, s)
     do i = 1, st_bcnd%lake_num
@@ -342,16 +346,16 @@ module calc_output
 
   end subroutine calc_lakr_off
 
-  subroutine calc_sufr_off()
+  subroutine calc_sufr_off(st_sol)
   !*********************************************************************************************
   ! calc_sufr_off -- Calculate surface runoff
   !*********************************************************************************************
     ! -- modules
-    use allocate_solution, only: surf_old
     use calc_function, only: func_surfterm
     use allocate_output, only: surf_sumtime, roff_surf
     ! -- inout
 
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i
     real(DP), allocatable :: surfs(:), temp_surf(:)
@@ -365,7 +369,8 @@ module calc_output
     !$omp end parallel do
 
     ! -- Function surface term (surfterm)
-      call func_surfterm(head_new, surf_old, surfs)
+      call func_surfterm(st_sol%head_new, st_sol%surf_old, st_sol%rel_perm, surfs,&
+                         st_sol%surf_rati)
 
     !$omp parallel do private(i)
     do i = 1, ncals
@@ -420,7 +425,7 @@ module calc_output
 
   end subroutine calc_dunr_off
 
-  subroutine calc_seal_res()
+  subroutine calc_seal_res(st_sol)
   !*********************************************************************************************
   ! calc_seal_res -- Calculate sea level results
   !*********************************************************************************************
@@ -429,6 +434,7 @@ module calc_output
     use allocate_output, only: res_snum, res_seal
     ! -- inout
 
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i
     real(DP), allocatable :: sealr(:), temp_seal(:)
@@ -442,7 +448,7 @@ module calc_output
     !$omp end parallel do
 
     ! -- Function sea level term (sealterm)
-      call func_sealterm(head_new, sealr)
+      call func_sealterm(st_sol%head_new, st_sol%rel_perm, sealr)
 
     !$omp parallel do private(i)
     do i = 1, ncalc

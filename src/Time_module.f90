@@ -1,6 +1,7 @@
 module time_module
   ! -- modules
   use kind_module, only: I4, SP, DP
+  use types_module, only: sol_set
   use constval_module, only: SZERO, SNOVAL, DZERO, DONE, DHALF
   use utility_module, only: st_mpi
   use initial_module, only: st_sim, st_ctrl, st_in_type, st_rivf_type, st_lakf_type, st_seal,&
@@ -14,7 +15,6 @@ module time_module
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
   use set_boundary, only: st_rive, st_lake
-  use allocate_solution, only: head_old, head_new, surf_head, rel_perm
 
   implicit none
   private
@@ -28,7 +28,7 @@ module time_module
 
   contains
 
-  subroutine update_tstep()
+  subroutine update_tstep(st_sol)
   !*********************************************************************************************
   ! update_tstep -- Update time step
   !*********************************************************************************************
@@ -41,11 +41,12 @@ module time_module
 #endif
     ! -- inout
 
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i, s
     !-------------------------------------------------------------------------------------------
     ! -- Calculate next time step (nextst)
-      call calc_nextst()
+      call calc_nextst(st_sol)
 
     if (st_time%conv_flag .and. st_sim%sim_type == 1) then
       ! -- Set next end time (nextet)
@@ -79,7 +80,7 @@ module time_module
     if (st_time%conv_flag .or. timestep_num == 0) then
       if (st_bcnd%well_num /= 0) then
         ! -- Set virtual well head (vwell_head)
-          call set_vwell_head()
+          call set_vwell_head(st_sol)
       end if
       if (st_bcnd%rech_num /= 0) then
         !$omp parallel do private(i, s)
@@ -90,14 +91,14 @@ module time_module
         !$omp end parallel do
         if (geog_num /= 0) then
           ! -- Change the recharge volume
-            call change_recharge()
+            call change_recharge(st_sol)
         end if
       end if
     end if
 
   end subroutine update_tstep
 
-  subroutine calc_nextst()
+  subroutine calc_nextst(st_sol)
   !*********************************************************************************************
   ! calc_nextst -- Calculate next time step
   !*********************************************************************************************
@@ -107,7 +108,6 @@ module time_module
     use initial_module, only: st_init
     use read_input, only: len_scal
     use calc_parameter, only: calc_srat_rperm
-    use allocate_solution, only: srat_old, srat_new, surf_old
 #ifdef MPI_MSG
     use mpi_utility, only: bcast_val
     use mpi_write, only: write_mpi_3dbin
@@ -116,6 +116,7 @@ module time_module
 #endif
     ! -- inout
 
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i
     integer(I4), allocatable :: calc2calc(:)
@@ -139,19 +140,19 @@ module time_module
       end do
       !$omp end parallel do
       ! -- Calculate saturation and relative permeability (srat_rperm)
-        call calc_srat_rperm(ncalc, DZERO, st_forc%read_head, cell_srat, rel_perm)
+        call calc_srat_rperm(ncalc, DZERO, st_forc%read_head, cell_srat, st_sol%rel_perm)
       !$omp parallel
       !$omp do private(i)
       do i = 1, ncalc
-        head_old(i) = st_forc%read_head(i) ; head_new(i) = st_forc%read_head(i)
-        srat_old(i) = cell_srat(i) ; srat_new(i) = cell_srat(i)
+        st_sol%head_old(i) = st_forc%read_head(i) ; st_sol%head_new(i) = st_forc%read_head(i)
+        st_sol%srat_old(i) = cell_srat(i) ; st_sol%srat_new(i) = cell_srat(i)
         calc2calc(i) = i
       end do
       !$omp end do
 
       !$omp do private(i)
       do i = 1, ncals
-        surf_head(i) = st_forc%read_head(i)
+        st_sol%surf_head(i) = st_forc%read_head(i)
       end do
       !$omp end do
       !$omp end parallel
@@ -164,7 +165,7 @@ module time_module
 
       !$omp parallel do private(i)
       do i = 1, ncals
-        surf_old(i) = surf_head(i)
+        st_sol%surf_old(i) = st_sol%surf_head(i)
       end do
       !$omp end parallel do
 
@@ -176,13 +177,13 @@ module time_module
 
 #ifdef MPI_MSG
       ! -- Write MPI 3D binary file (mpi_3dbin)
-        call write_mpi_3dbin(st_out_fnum%head, ncalc, calc2calc, len_scal, head_new,&
+        call write_mpi_3dbin(st_out_fnum%head, ncalc, calc2calc, len_scal, st_sol%head_new,&
                              st_time%now_time)
 #else
       ! -- Write header binary file (header_bin)
         call write_header_bin(st_out_fnum%head, st_time%now_time)
       ! -- Write 3D binary file (3dbin)
-        call write_3dbin(st_out_fnum%head, ncalc, calc2calc, len_scal, head_new)
+        call write_3dbin(st_out_fnum%head, ncalc, calc2calc, len_scal, st_sol%head_new)
 #endif
       deallocate(calc2calc)
 
@@ -225,16 +226,16 @@ module time_module
         end if
 
         ! -- Set value exchange (valexc)
-          call set_valexc(ncalc, head_new, head_old)
-          call set_valexc(ncalc, srat_new, srat_old)
-          call set_valexc(ncals, surf_head, surf_old)
+          call set_valexc(ncalc, st_sol%head_new, st_sol%head_old)
+          call set_valexc(ncalc, st_sol%srat_new, st_sol%srat_old)
+          call set_valexc(ncals, st_sol%surf_head, st_sol%surf_old)
       else
         st_time%current_t = st_time%current_t - real(st_time%delt, kind=SP)
         st_time%delt = st_time%delt*st_sim%dec_fact
         ! -- Set value exchange (valexc)
-          call set_valexc(ncalc, head_old, head_new)
-          call set_valexc(ncalc, srat_old, srat_new)
-          call set_valexc(ncals, surf_old, surf_head)
+          call set_valexc(ncalc, st_sol%head_old, st_sol%head_new)
+          call set_valexc(ncalc, st_sol%srat_old, st_sol%srat_new)
+          call set_valexc(ncals, st_sol%surf_old, st_sol%surf_head)
         if (st_sim%sim_type == 1) then
           ! -- Reset stepflag (stepf)
             call reset_stepf()
@@ -242,8 +243,8 @@ module time_module
       end if
     else if (st_sim%sim_type == -1) then
       ! -- Set value exchange (valexc)
-        call set_valexc(ncalc, head_new, head_old)
-        call set_valexc(ncalc, srat_new, srat_old)
+        call set_valexc(ncalc, st_sol%head_new, st_sol%head_old)
+        call set_valexc(ncalc, st_sol%srat_new, st_sol%srat_old)
     end if
 
     next_time = st_time%current_t + real(st_time%delt, kind=SP)
@@ -1186,7 +1187,7 @@ module time_module
 
   end subroutine set_nextvar
 
-  subroutine set_vwell_head()
+  subroutine set_vwell_head(st_sol)
   !*********************************************************************************************
   ! set_vwell_head -- Set virtual well head
   !*********************************************************************************************
@@ -1194,11 +1195,12 @@ module time_module
 
     ! -- inout
 
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
     ! -- Calculate virtual well head without well pumping (vheadout)
-      call calc_vheadout()
+      call calc_vheadout(st_sol)
 
     !$omp parallel do private(i)
     do i = 1, ncalc
@@ -1207,17 +1209,18 @@ module time_module
     !$omp end parallel do
 
     ! -- Calculate virtual well head with well puming (vheadin)
-      call calc_vheadin()
+      call calc_vheadin(st_sol)
 
   end subroutine set_vwell_head
 
-  subroutine change_recharge()
+  subroutine change_recharge(st_sol)
   !*********************************************************************************************
   ! change_recharge -- Change the recharge volume
   !*********************************************************************************************
     ! -- modules
     ! -- inout
 
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, s
     real(DP) :: norm_elev
@@ -1239,7 +1242,7 @@ module time_module
     !$omp do private(i, s, norm_elev)
     do i = 1, st_bcnd%rech_num
       s = st_bcnd%rech2cals(i)
-      water_dep(s) = head_new(s) - st_hydr%surf_bott(s)
+      water_dep(s) = st_sol%head_new(s) - st_hydr%surf_bott(s)
       if (st_forc%read_rech(i) < SZERO .or. water_dep(s) < DZERO) then
         rech_rati(i) = DONE
       else if (water_dep(s) < st_hydr%surf_reli(s) .and. st_hydr%surf_reli(s) /= DZERO) then
@@ -1260,7 +1263,7 @@ module time_module
 
   end subroutine change_recharge
 
-  subroutine calc_vheadout()
+  subroutine calc_vheadout(st_sol)
   !*********************************************************************************************
   ! calc_vheadout -- Calculate virtual well head without well pumping
   !*********************************************************************************************
@@ -1268,6 +1271,7 @@ module time_module
 
     ! -- inout
 
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, j, k
     real(DP) :: tot_cond, tot_flux
@@ -1285,8 +1289,8 @@ module time_module
       tot_cond = DZERO ; tot_flux = DZERO
       do k = st_bcnd%well_index(i-1)+1, st_bcnd%well_index(i)
         j = st_bcnd%well_conn(k)
-        tot_cond = tot_cond + rel_perm(j)*st_hydr%abyd_well(k)
-        tot_flux = tot_flux + rel_perm(j)*st_hydr%abyd_well(k)*head_new(j)
+        tot_cond = tot_cond + st_sol%rel_perm(j)*st_hydr%abyd_well(k)
+        tot_flux = tot_flux + st_sol%rel_perm(j)*st_hydr%abyd_well(k)*st_sol%head_new(j)
       end do
       if (tot_cond /= DZERO) then
         whead_new(i) = tot_flux/tot_cond
@@ -1297,7 +1301,7 @@ module time_module
 
   end subroutine calc_vheadout
 
-  subroutine calc_vheadin()
+  subroutine calc_vheadin(st_sol)
   !*********************************************************************************************
   ! calc_vheadin -- Calculate virtual well head with well pumping
   !*********************************************************************************************
@@ -1305,6 +1309,7 @@ module time_module
 
     ! -- inout
 
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, j, k
     real(DP) :: tot_cond
@@ -1323,7 +1328,7 @@ module time_module
       tot_cond = DZERO
       do k = st_bcnd%well_index(i-1)+1, st_bcnd%well_index(i)
         j = st_bcnd%well_conn(k)
-        tot_cond = tot_cond + rel_perm(j)*st_hydr%abyd_well(k)
+        tot_cond = tot_cond + st_sol%rel_perm(j)*st_hydr%abyd_well(k)
       end do
       if (tot_cond /= DZERO) then
         whead_new(i) = temp_whead(i) + st_forc%read_well(i)/tot_cond
@@ -1336,9 +1341,9 @@ module time_module
 
         do k = st_bcnd%well_index(i-1)+1, st_bcnd%well_index(i)
           j = st_bcnd%well_conn(k)
-          if (whead_new(i) > st_forc%well_bott(i) .or. head_new(j) > st_forc%well_bott(i)) then
-            st_forc%calc_well(j) = st_forc%calc_well(j) + rel_perm(j)*st_hydr%abyd_well(k)*&
-                           (whead_new(i)-head_new(j))
+          if (whead_new(i) > st_forc%well_bott(i) .or. st_sol%head_new(j) > st_forc%well_bott(i)) then
+            st_forc%calc_well(j) = st_forc%calc_well(j) + st_sol%rel_perm(j)*st_hydr%abyd_well(k)*&
+                           (whead_new(i)-st_sol%head_new(j))
           end if
         end do
       end if

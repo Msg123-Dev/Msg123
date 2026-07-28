@@ -2,6 +2,7 @@ module allocate_solution
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO
+  use types_module, only: sol_set
   use set_cell, only: ncalc
   use set_condition, only: st_hydr, st_bcnd
 
@@ -11,11 +12,6 @@ module allocate_solution
   integer(I4), public :: nreg_num
   integer(I4), allocatable, public :: dir_conn(:), dir_seal(:)
   integer(I4), allocatable, public :: left_offr(:), right_offr(:)
-  real(DP), allocatable, public :: head_old(:), srat_old(:)
-  real(DP), allocatable, public :: head_new(:), head_pre(:), head_change(:)
-  real(DP), allocatable, public :: srat_new(:)
-  real(DP), allocatable, public :: surf_head(:), surf_old(:), surf_rati(:)
-  real(DP), allocatable, public :: rel_perm(:)
 
   type :: matrix_int
     integer(I4) :: unknow
@@ -51,7 +47,7 @@ module allocate_solution
 
   contains
 
-  subroutine allocate_solvar()
+  subroutine allocate_solvar(st_sol)
   !*********************************************************************************************
   ! allocate_solvar -- Allocate solution variable for time step
   !*********************************************************************************************
@@ -59,18 +55,19 @@ module allocate_solution
 
     ! -- inout
 
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
 
     !-------------------------------------------------------------------------------------------
     ! -- Allocate timeupdate (timeup)
-      call allocate_timeup()
+      call allocate_timeup(st_sol)
 
     ! -- Allocate matrix and vector (matvec)
-      call allocate_matvec()
+      call allocate_matvec(st_sol)
 
   end subroutine allocate_solvar
 
-  subroutine allocate_timeup()
+  subroutine allocate_timeup(st_sol)
   !*********************************************************************************************
   ! allocate_timeup -- Allocate timeupdate
   !*********************************************************************************************
@@ -78,30 +75,31 @@ module allocate_solution
     use set_cell, only: ncals
     ! -- inout
 
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(head_old(ncalc), srat_old(ncalc))
-    allocate(surf_head(ncals), surf_old(ncals), surf_rati(ncals))
+    allocate(st_sol%head_old(ncalc), st_sol%srat_old(ncalc))
+    allocate(st_sol%surf_head(ncals), st_sol%surf_old(ncals), st_sol%surf_rati(ncals))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc
-      head_old(i) = DZERO
-      srat_old(i) = DZERO
+      st_sol%head_old(i) = DZERO
+      st_sol%srat_old(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i)
     do i = 1, ncals
-      surf_head(i) = DZERO
-      surf_old(i) = DZERO
-      surf_rati(i) = DZERO
+      st_sol%surf_head(i) = DZERO
+      st_sol%surf_old(i) = DZERO
+      st_sol%surf_rati(i) = DZERO
     end do
     !$omp end do
     !$omp end parallel
 
   end subroutine allocate_timeup
 
-  subroutine allocate_matvec()
+  subroutine allocate_matvec(st_sol)
   !*********************************************************************************************
   ! allocate_matvec -- Allocate matrix and vector
   !*********************************************************************************************
@@ -112,13 +110,14 @@ module allocate_solution
                              right_off
     ! -- inout
 
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i, k
     !-------------------------------------------------------------------------------------------
     nreg_num = ncalc + neib_ncalc
 
-    allocate(head_new(nreg_num), head_pre(nreg_num), head_change(nreg_num))
-    allocate(srat_new(nreg_num), rel_perm(nreg_num))
+    allocate(st_sol%head_new(nreg_num), st_sol%head_pre(nreg_num), st_sol%head_change(nreg_num))
+    allocate(st_sol%srat_new(nreg_num), st_sol%rel_perm(nreg_num))
     allocate(st_hydr%abyd_conn(tconn_num), st_hydr%hydf_conn(tconn_num))
     allocate(st_hydr%abyd_seal(st_bcnd%seal_num), st_hydr%hydf_seal(st_bcnd%seal_num))
     allocate(st_bcnd%seal2calc(st_bcnd%seal_num), st_bcnd%seal2seal(st_bcnd%seal_num))
@@ -126,8 +125,8 @@ module allocate_solution
     !$omp parallel
     !$omp do private(i)
     do i = 1, nreg_num
-      head_new(i) = DZERO ; head_pre(i) = DZERO ; head_change(i) = DZERO
-      srat_new(i) = DZERO ; rel_perm(i) = DZERO ; dir_conn(i) = 0
+      st_sol%head_new(i) = DZERO ; st_sol%head_pre(i) = DZERO ; st_sol%head_change(i) = DZERO
+      st_sol%srat_new(i) = DZERO ; st_sol%rel_perm(i) = DZERO ; dir_conn(i) = 0
     end do
     !$omp end do
     !$omp do private(i)

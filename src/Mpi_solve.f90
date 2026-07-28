@@ -11,13 +11,66 @@ module mpi_solve
 
   implicit none
   private
+  public :: allocate_mpisolve
   public :: senrec_ivectv, senrec_rvectv
   public :: precon_mpi_dilu, solve_mpi_ilu
   public :: check_mpimaxerr, bcast_convinfo
 
   ! -- local
+  ! Persistent work buffers. Sizes are fixed once the domain decomposition and the
+  ! matrix structure are set up, so they are allocated once in allocate_mpisolve.
+  integer, allocatable :: requ_send(:), requ_recv(:)
+  integer, allocatable :: stat_s(:,:), stat_r(:,:)
+  integer(I4), allocatable :: sbufint(:), rbufint(:)
+  real(DP), allocatable :: sbufreal(:), rbufreal(:)
+  integer(I4), allocatable :: fix_flag(:), offr_flag(:)
+  real(DP), allocatable :: temp_pred(:), temp_outx(:)
 
   contains
+
+  subroutine allocate_mpisolve()
+  !*********************************************************************************************
+  ! allocate_mpisolve -- Allocate for mpi solve work buffers
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i
+    integer(I4) :: nsenrev, off_row_num
+    !-------------------------------------------------------------------------------------------
+    nsenrev = max(send_cind(neib_mpi_totn), recv_cind(neib_mpi_totn))
+    off_row_num = crs_index(1)%offind(nreg_num)
+
+    allocate(requ_send(neib_mpi_totn), requ_recv(neib_mpi_totn))
+    allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
+    allocate(sbufint(nsenrev), rbufint(nsenrev))
+    allocate(sbufreal(nsenrev), rbufreal(nsenrev))
+    allocate(fix_flag(nreg_num), offr_flag(off_row_num))
+    allocate(temp_pred(nreg_num), temp_outx(nreg_num))
+
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, nsenrev
+      sbufint(i) = 0 ; rbufint(i) = 0
+      sbufreal(i) = DZERO ; rbufreal(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, nreg_num
+      fix_flag(i) = 0
+      temp_pred(i) = DZERO ; temp_outx(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, off_row_num
+      offr_flag(i) = 0
+    end do
+    !$omp end do
+    !$omp end parallel
+
+  end subroutine allocate_mpisolve
 
   subroutine senrec_ivectv(ivector)
   !*********************************************************************************************
@@ -31,12 +84,7 @@ module mpi_solve
     integer(I4) :: i, j, k, jj, kk, ierr
     integer(I4) :: nsenrev, isend_sta, isend_end, irecv_sta, irecv_end
     integer(I4) :: buflen_send, buflen_recv
-    integer, allocatable :: requ_send(:), requ_recv(:)
-    integer, allocatable :: stat_s(:,:), stat_r(:,:)
-    integer(I4), allocatable :: sbufint(:), rbufint(:)
     !-------------------------------------------------------------------------------------------
-    allocate(requ_send(neib_mpi_totn), requ_recv(neib_mpi_totn))
-    allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
     !$omp parallel do private(i)
     do i = 1, neib_mpi_totn
       requ_send(i) = MPI_REQUEST_NULL ; requ_recv(i) = MPI_REQUEST_NULL
@@ -46,7 +94,6 @@ module mpi_solve
 
     ierr = 0
     nsenrev = max(send_cind(neib_mpi_totn), recv_cind(neib_mpi_totn))
-    allocate(sbufint(nsenrev), rbufint(nsenrev))
     !$omp parallel
     !$omp do private(i)
     do i = 1, nsenrev
@@ -96,7 +143,6 @@ module mpi_solve
     !$omp end do
     !$omp end parallel
 
-    deallocate(requ_send, requ_recv, stat_s, stat_r, sbufint, rbufint)
 
   end subroutine senrec_ivectv
 
@@ -112,12 +158,7 @@ module mpi_solve
     integer(I4) :: i, j, k, jj, kk, ierr
     integer(I4) :: nsenrev, isend_sta, isend_end, irecv_sta, irecv_end
     integer(I4) :: buflen_send, buflen_recv
-    integer, allocatable :: requ_send(:), requ_recv(:)
-    integer, allocatable :: stat_s(:,:), stat_r(:,:)
-    real(DP), allocatable :: sbufreal(:), rbufreal(:)
     !-------------------------------------------------------------------------------------------
-    allocate(requ_send(neib_mpi_totn), requ_recv(neib_mpi_totn))
-    allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
     !$omp parallel do private(i)
     do i = 1, neib_mpi_totn
       requ_send(i) = MPI_REQUEST_NULL ; requ_recv(i) = MPI_REQUEST_NULL
@@ -127,7 +168,6 @@ module mpi_solve
 
     ierr = 0
     nsenrev = max(send_cind(neib_mpi_totn), recv_cind(neib_mpi_totn))
-    allocate(sbufreal(nsenrev), rbufreal(nsenrev))
     !$omp parallel
     !$omp do private(i)
     do i = 1, nsenrev
@@ -177,7 +217,6 @@ module mpi_solve
     !$omp end do
     !$omp end parallel
 
-    deallocate(requ_send, requ_recv, stat_s, stat_r, sbufreal, rbufreal)
 
   end subroutine senrec_rvectv
 
@@ -196,12 +235,8 @@ module mpi_solve
     integer(I4) :: offr, offr2, off_left, off_row_num
     integer(I4) :: rank_flag, allp_flag
     real(DP) :: d_invk
-    integer(I4), allocatable :: fix_flag(:), offr_flag(:)
-    real(DP), allocatable :: temp_pred(:)
     !-------------------------------------------------------------------------------------------
     off_row_num = crs_index(1)%offind(nreg_num)
-    allocate(fix_flag(nreg_num), offr_flag(off_row_num))
-    allocate(temp_pred(nreg_num))
     !$omp parallel
     !$omp do private(i)
     do i = 1, nreg_num
@@ -262,7 +297,6 @@ module mpi_solve
         call mpisum_val(rank_flag, "check precondtion", allp_flag)
     end do prefix_loop
 
-    deallocate(fix_flag, offr_flag)
 
   end subroutine precon_mpi_dilu
 
@@ -280,12 +314,8 @@ module mpi_solve
     integer(I4) :: off_sta, off_end, offr
     integer(I4) :: off_row_num, off_left, off_right
     integer(I4) :: rank_flag, allp_flag
-    integer(I4), allocatable :: fix_flag(:), offr_flag(:)
-    real(DP), allocatable :: temp_outx(:)
     !-------------------------------------------------------------------------------------------
     off_row_num = crs_index(1)%offind(nreg_num)
-    allocate(fix_flag(nreg_num), offr_flag(off_row_num))
-    allocate(temp_outx(nreg_num))
     !$omp parallel
     !$omp do private(i)
     do i = 1, nreg_num
@@ -379,8 +409,6 @@ module mpi_solve
         call mpisum_val(rank_flag, "backward substitution", allp_flag)
     end do backfix_loop
 
-    deallocate(fix_flag, offr_flag)
-    deallocate(temp_outx)
 
   end subroutine solve_mpi_ilu
 

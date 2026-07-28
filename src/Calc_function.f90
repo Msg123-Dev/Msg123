@@ -8,7 +8,7 @@ module calc_function
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
   use calc_parameter, only: calc_srat_rperm
-  use allocate_solution, only: srat_new, rel_perm, crs_index
+  use allocate_solution, only: crs_index
 #ifdef MPI_MSG
   use utility_module, only: st_mpi
   use mpi_solve, only: senrec_rvectv
@@ -29,6 +29,8 @@ module calc_function
   real(DP), allocatable :: conn_flow(:)
   real(DP), allocatable :: delh_s(:), elev_rati(:)
   real(DP), allocatable :: delh_r(:), delh_l(:), seal_flow(:)
+  real(DP), allocatable :: alp_ss_new(:), alp_ss_old(:)
+  real(DP), allocatable :: jcvec(:), tempf1(:), tempf2(:)
 
   contains
 
@@ -37,6 +39,7 @@ module calc_function
   ! allocate_calfun -- Allocate for calculate function value
   !*********************************************************************************************
     ! -- modules
+    use allocate_solution, only: nreg_num
 
     ! -- inout
 
@@ -50,17 +53,19 @@ module calc_function
     allocate(conn_flow(ncalc))
     allocate(delh_s(ncals), elev_rati(ncals))
     allocate(delh_r(st_bcnd%rive_num), delh_l(st_bcnd%lake_num), seal_flow(st_bcnd%seal_num))
+    allocate(alp_ss_new(ncalc), alp_ss_old(ncalc))
+    allocate(jcvec(nreg_num), tempf1(ncalc), tempf2(ncalc))
 
   end subroutine allocate_calfun
 
-  subroutine calc_func(infx, funcv)
+  subroutine calc_func(hold, sold, surfh, infx, snew, rperm, surfr, funcv)
   !*********************************************************************************************
   ! calc_func -- Calculate function value
   !*********************************************************************************************
     ! -- modules
-    use allocate_solution, only: surf_head
     ! -- inout
-    real(DP), intent(inout) :: infx(:)
+    real(DP), intent(in) :: hold(:), sold(:), surfh(:)
+    real(DP), intent(inout) :: infx(:), snew(:), rperm(:), surfr(:)
     real(DP), intent(out) :: funcv(:)
     ! -- local
     integer(I4) :: i, s
@@ -80,23 +85,23 @@ module calc_function
     !$omp end parallel
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, DZERO, infx, srat_new, rel_perm, alp_ss)
+      call calc_srat_rperm(ncalc, DZERO, infx, snew, rperm, alp_ss)
 
     if (st_sim%sim_type >= 0) then
       ! -- Function storage change (stochn)
-        call func_stochn(infx, alp_ss, alp_ss, stof)
+        call func_stochn(infx, alp_ss, alp_ss, hold, sold, snew, stof)
     end if
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
       ! -- Send and Receive real vector value (rvectv)
         call senrec_rvectv(infx)
-        call senrec_rvectv(rel_perm)
+        call senrec_rvectv(rperm)
     end if
 #endif
 
     ! -- Function connect flow from adjacent cells (connflow)
-      call func_connflow(infx, conf)
+      call func_connflow(infx, rperm, conf)
 
     ! -- Function recharge term (rechterm)
       call func_rechterm(recf)
@@ -105,16 +110,16 @@ module calc_function
       call func_wellterm(welf)
 
     ! -- Function surface term (surfterm)
-      call func_surfterm(infx, surf_head, surf)
+      call func_surfterm(infx, surfh, rperm, surf, surfr)
 
     ! -- Function river term (riveterm)
-      call func_riveterm(infx, rivf)
+      call func_riveterm(infx, rperm, rivf)
 
     ! -- Function lake term (laketerm)
-      call func_laketerm(infx, lakf)
+      call func_laketerm(infx, rperm, lakf)
 
     ! -- Function sea level term (sealterm)
-      call func_sealterm(infx, seaf)
+      call func_sealterm(infx, rperm, seaf)
 
     !$omp parallel do private(s)
     do s = 1, ncals
@@ -130,23 +135,22 @@ module calc_function
 
   end subroutine calc_func
 
-  subroutine calc_mass(sfla, inmxn, inmxo, stom, conm, seam, welm, recm, surm, rivm, lakm)
+  subroutine calc_mass(sfla, hold, sold, surf_old, hnew, stom, conm, seam, welm, recm,&
+                       surm, rivm, lakm, snew, rperm, surfr)
   !*********************************************************************************************
   ! calc_mass -- Calculate function value for massbalance
   !*********************************************************************************************
     ! -- modules
-    use allocate_solution, only: surf_old
     ! -- inout
     integer(I4), intent(in) :: sfla
-    real(DP), intent(in) :: inmxo(:)
-    real(DP), intent(inout) :: inmxn(:)
+    real(DP), intent(in) :: hold(:), sold(:), surf_old(:)
+    real(DP), intent(inout) :: hnew(:)
     real(DP), intent(inout) :: stom(:), conm(:), seam(:), welm(:)
     real(DP), intent(inout) :: recm(:), surm(:), rivm(:), lakm(:)
+    real(DP), intent(inout) :: snew(:), rperm(:), surfr(:)
     ! -- local
     integer(I4) :: i
-    real(DP), allocatable :: alp_ss_new(:), alp_ss_old(:)
     !-------------------------------------------------------------------------------------------
-    allocate(alp_ss_new(ncalc), alp_ss_old(ncalc))
     !$omp parallel do private(i)
     do i = 1, ncalc
       alp_ss_new(i) = DZERO ; alp_ss_old(i) = DZERO
@@ -154,24 +158,24 @@ module calc_function
     !$omp end parallel do
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, DZERO, inmxo, srat_new, rel_perm, alp_ss_old)
+      call calc_srat_rperm(ncalc, DZERO, hold, snew, rperm, alp_ss_old)
     ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, DZERO, inmxn, srat_new, rel_perm, alp_ss_new)
+      call calc_srat_rperm(ncalc, DZERO, hnew, snew, rperm, alp_ss_new)
 
     if (st_sim%sim_type >= 0) then
       ! -- Function storage change (stochn)
-        call func_stochn(inmxn, alp_ss_new, alp_ss_old, stom)
+        call func_stochn(hnew, alp_ss_new, alp_ss_old, stom, hold, sold, snew)
     end if
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
       ! -- Send and Receive real vector value (rvectv)
-        call senrec_rvectv(inmxn)
-        call senrec_rvectv(rel_perm)
+        call senrec_rvectv(hnew)
+        call senrec_rvectv(rperm)
     end if
 #endif
 
     ! -- Function connect flow from adjacent cells (connflow)
-      call func_connflow(inmxn, conm)
+      call func_connflow(hnew, rperm, conm)
 
     ! -- Function recharge term (rechterm)
       call func_rechterm(recm)
@@ -181,17 +185,17 @@ module calc_function
 
     if (sfla == 0) then
       ! -- Function surface term (surfterm)
-        call func_surfterm(inmxn, surf_old, surm)
+        call func_surfterm(hnew, surf_old, rperm, surm, surfr)
     end if
 
     ! -- Function river term (riveterm)
-      call func_riveterm(inmxn, rivm)
+      call func_riveterm(hnew, rperm, rivm)
 
     ! -- Function lake term (laketerm)
-      call func_laketerm(inmxn, lakm)
+      call func_laketerm(hnew, rperm, lakm)
 
     ! -- Function sea level term (sealterm)
-      call func_sealterm(inmxn, seam)
+      call func_sealterm(hnew, rperm, seam)
 
     if (st_sim%sim_type >= 0) then
       !$omp parallel
@@ -210,19 +214,18 @@ module calc_function
       !$omp end parallel
     end if
 
-    deallocate(alp_ss_new, alp_ss_old)
 
   end subroutine calc_mass
 
-  subroutine func_stochn(infstoc, alp_new, alp_old, stofunc)
+  subroutine func_stochn(infstoc, alp_new, alp_old, hold, sold, snew, stofunc)
   !*********************************************************************************************
   ! func_stochn -- Function storage change
   !*********************************************************************************************
     ! -- modules
     use make_cell, only: st_geom
-    use allocate_solution, only: head_old, srat_old
     ! -- inout
     real(DP), intent(in) :: infstoc(:), alp_new(:), alp_old(:)
+    real(DP), intent(in) :: hold(:), sold(:), snew(:)
     real(DP), intent(out) :: stofunc(:)
     ! -- local
     integer(I4) :: i
@@ -236,9 +239,9 @@ module calc_function
 
     !$omp do private(i)
     do i = 1, ncalc
-      ch_stor1(i) = alp_old(i)*srat_old(i)*head_old(i)
-      ch_stor2(i) = alp_new(i)*srat_new(i)*infstoc(i)
-      ch_stor(i) = (ch_stor2(i)-ch_stor1(i)) + st_hydr%read_pors(i)*(srat_new(i)-srat_old(i))
+      ch_stor1(i) = alp_old(i)*sold(i)*hold(i)
+      ch_stor2(i) = alp_new(i)*snew(i)*infstoc(i)
+      ch_stor(i) = (ch_stor2(i)-ch_stor1(i)) + st_hydr%read_pors(i)*(snew(i)-sold(i))
       stofunc(i) = -ch_stor(i)*st_time%delt_inv*st_geom%cell_vol(i)
     end do
     !$omp end do
@@ -246,14 +249,14 @@ module calc_function
 
   end subroutine func_stochn
 
-  subroutine func_connflow(infconn, confunc)
+  subroutine func_connflow(infconn, rperm, confunc)
   !*********************************************************************************************
   ! func_connflow -- Function connect flow from adjacent cells
   !*********************************************************************************************
     ! -- modules
     use calc_parameter, only: calc_hyd_upwind
     ! -- inout
-    real(DP), intent(in) :: infconn(:)
+    real(DP), intent(in) :: infconn(:), rperm(:)
     real(DP), intent(out) :: confunc(:)
     ! -- local
     integer(I4) :: i, j, k
@@ -273,7 +276,7 @@ module calc_function
       do k = 1, end_ind-sta_ind
         ind = sta_ind + k ; j = crs_index(1)%offrow(ind)
         delhead = infconn(j) - infconn(i)
-        relp1 = rel_perm(i) ; relp2 = rel_perm(j)
+        relp1 = rperm(i) ; relp2 = rperm(j)
 
         ! -- Calculate hydradulic conductivity by upwind (hyd_upwind)
           call calc_hyd_upwind(-delhead, relp1, relp2, relat)
@@ -331,16 +334,15 @@ module calc_function
 
   end subroutine func_wellterm
 
-  subroutine func_surfterm(infsurf, inshead, surfunc)
+  subroutine func_surfterm(infsurf, inshead, rperm, surfunc, surfr)
   !*********************************************************************************************
   ! func_surfterm -- Function surface term
   !*********************************************************************************************
     ! -- modules
 !    use make_cell, only: surf_elev
-    use allocate_solution, only: surf_rati
     ! -- inout
-    real(DP), intent(in) :: infsurf(:), inshead(:)
-    real(DP), intent(inout) :: surfunc(:)
+    real(DP), intent(in) :: infsurf(:), inshead(:), rperm(:)
+    real(DP), intent(inout) :: surfunc(:), surfr(:)
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
@@ -359,17 +361,17 @@ module calc_function
 !        else
 !          delh_s(i) = surf_bott(i) - infsurf(i)
 !        end if
-!        surf_rati(i) = DONE
+!        surfr(i) = DONE
 !      else if (inshead(i) >= surf_elev(i)) then
 !        delh_s(i) = inshead(i) - surf_elev(i)
-!        surf_rati(i) = DONE
+!        surfr(i) = DONE
 !      else
 !!        delh_s(i) = inshead(i) - infsurf(i)
 !        delh_s(i) = DZERO
-!        surf_rati(i) = DONE
+!        surfr(i) = DONE
 !      end if
 !      if (surf_reli(i) == DZERO) then
-!        surf_rati(i) = DONE ; delh_s(i) = DZERO
+!        surfr(i) = DONE ; delh_s(i) = DZERO
 !      else if (infsurf(i) >= surf_top(i)) then
       if (infsurf(i) >= st_hydr%surf_top(i)) then
         if (inshead(i) > st_hydr%surf_top(i)) then
@@ -377,7 +379,7 @@ module calc_function
         else
           delh_s(i) = st_hydr%surf_top(i) - infsurf(i)
         end if
-        surf_rati(i) = DONE
+        surfr(i) = DONE
       else if (infsurf(i) >= st_hydr%surf_bott(i)) then
         if (inshead(i) > st_hydr%surf_bott(i)) then
           delh_s(i) = inshead(i) - infsurf(i)
@@ -389,9 +391,9 @@ module calc_function
           if (elev_rati(i) > DONE) then
             elev_rati(i) = DONE
           end if
-          surf_rati(i) = elev_rati(i)**st_hydr%surf_parm(i)
+          surfr(i) = elev_rati(i)**st_hydr%surf_parm(i)
         else
-          surf_rati(i) = DONE
+          surfr(i) = DONE
         end if
       else if (inshead(i) > st_hydr%surf_bott(i)) then
         delh_s(i) = inshead(i) - st_hydr%surf_bott(i)
@@ -400,28 +402,28 @@ module calc_function
           if (elev_rati(i) > DONE) then
             elev_rati(i) = DONE
           end if
-          surf_rati(i) = elev_rati(i)**st_hydr%surf_parm(i)
+          surfr(i) = elev_rati(i)**st_hydr%surf_parm(i)
         else
-          surf_rati(i) = DONE
+          surfr(i) = DONE
         end if
       else
         delh_s(i) = DZERO
       end if
 
-      surfunc(i) = st_hydr%hydf_surf(i)*st_hydr%abyd_surf(i)*delh_s(i)*rel_perm(i)*surf_rati(i)
+      surfunc(i) = st_hydr%hydf_surf(i)*st_hydr%abyd_surf(i)*delh_s(i)*rperm(i)*surfr(i)
     end do
     !$omp end do
     !$omp end parallel
 
   end subroutine func_surfterm
 
-  subroutine func_riveterm(infrive, rivfunc)
+  subroutine func_riveterm(infrive, rperm, rivfunc)
   !*********************************************************************************************
   ! func_riveterm -- Function river term
   !*********************************************************************************************
     ! -- modules
     ! -- inout
-    real(DP), intent(in) :: infrive(:)
+    real(DP), intent(in) :: infrive(:), rperm(:)
     real(DP), intent(inout) :: rivfunc(:)
     ! -- local
     integer(I4) :: i, s
@@ -444,20 +446,20 @@ module calc_function
         delh_r(i) = DZERO
       end if
 
-      rivfunc(s) = st_hydr%hydf_surf(s)*st_forc%abyd_rive(i)*delh_r(i)*rel_perm(s)
+      rivfunc(s) = st_hydr%hydf_surf(s)*st_forc%abyd_rive(i)*delh_r(i)*rperm(s)
     end do
     !$omp end do
     !$omp end parallel
 
   end subroutine func_riveterm
 
-  subroutine func_laketerm(inflake, lakfunc)
+  subroutine func_laketerm(inflake, rperm, lakfunc)
   !*********************************************************************************************
   ! func_laketerm -- Function lake term
   !*********************************************************************************************
     ! -- modules
     ! -- inout
-    real(DP), intent(in) :: inflake(:)
+    real(DP), intent(in) :: inflake(:), rperm(:)
     real(DP), intent(inout) :: lakfunc(:)
     ! -- local
     integer(I4) :: i, s
@@ -480,20 +482,20 @@ module calc_function
         delh_l(i) = DZERO
       end if
 
-      lakfunc(s) = st_hydr%hydf_surf(s)*st_forc%abyd_lake(i)*delh_l(i)*rel_perm(s)
+      lakfunc(s) = st_hydr%hydf_surf(s)*st_forc%abyd_lake(i)*delh_l(i)*rperm(s)
     end do
     !$omp end do
     !$omp end parallel
 
   end subroutine func_laketerm
 
-  subroutine func_sealterm(infseal, seafunc)
+  subroutine func_sealterm(infseal, rperm, seafunc)
   !*********************************************************************************************
   ! func_sealterm -- Function sea level term
   !*********************************************************************************************
     ! -- modules
     ! -- inout
-    real(DP), intent(in) :: infseal(:)
+    real(DP), intent(in) :: infseal(:), rperm(:)
     real(DP), intent(inout) :: seafunc(:)
     ! -- local
     integer(I4) :: i, c, s
@@ -510,7 +512,7 @@ module calc_function
     do i = 1, st_bcnd%seal_num
       c = st_bcnd%seal2calc(i) ; s = st_bcnd%seal2seal(i)
       delhead = st_forc%read_seal(s) - infseal(c)
-      seal_flow(i) = st_hydr%hydf_seal(i)*rel_perm(c)*st_hydr%abyd_seal(i)*delhead
+      seal_flow(i) = st_hydr%hydf_seal(i)*rperm(c)*st_hydr%abyd_seal(i)*delhead
     end do
     !$omp end do
 
@@ -525,7 +527,7 @@ module calc_function
 
   end subroutine func_sealterm
 
-  subroutine calc_vecjacf(vjlevel, injx, injvec, outjvec)
+  subroutine calc_vecjacf(vjlevel, injvec, hold, sold, surfh, injx, snew, rperm, surfr, outjvec)
   !*********************************************************************************************
   ! calc_vecjacf -- Calculate vector by jacobi-free
   !*********************************************************************************************
@@ -536,14 +538,13 @@ module calc_function
 #endif
     ! -- inout
     integer(I4), intent(in) :: vjlevel
-    real(DP), intent(in) :: injvec(:)
-    real(DP), intent(inout) :: injx(:)
+    real(DP), intent(in) :: injvec(:), hold(:), sold(:), surfh(:)
+    real(DP), intent(inout) :: injx(:), snew(:), rperm(:), surfr(:)
     real(DP), intent(out) :: outjvec(:)
     ! -- local
     integer(I4) :: i
     integer(I4) :: vj_num, vj_regnum
     real(DP) :: eps, eps_inv, l2_x, l2_v, l1_v, sign
-    real(DP), allocatable :: jcvec(:), tempf1(:), tempf2(:)
 #ifdef MPI_MSG
     real(DP) :: sum_l2
 #endif
@@ -551,7 +552,6 @@ module calc_function
     vj_num = crs_index(vjlevel)%unknow
     vj_regnum = size(injx)
 
-    allocate(jcvec(vj_regnum), tempf1(vj_num), tempf2(vj_num))
     !$omp parallel
     !$omp do private(i)
     do i = 1, vj_regnum
@@ -566,7 +566,7 @@ module calc_function
     !$omp end parallel
 
     ! -- Calculate function value (func)
-      call calc_func(injx, tempf1)
+      call calc_func(hold, sold, surfh, injx, snew, rperm, surfr, tempf1)
 
     ! Brown and Saad version
     l2_v = DZERO ; l2_x = DZERO ; l1_v = DZERO
@@ -614,7 +614,7 @@ module calc_function
     !$omp end parallel do
 
     ! -- Calculate function value (func)
-      call calc_func(jcvec, tempf2)
+      call calc_func(hold, sold, surfh, jcvec, snew, rperm, surfr, tempf2)
 
     !$omp parallel do private(i)
     do i = 1, vj_num
@@ -622,7 +622,6 @@ module calc_function
     end do
     !$omp end parallel do
 
-    deallocate(jcvec, tempf1, tempf2)
 
   end subroutine calc_vecjacf
 

@@ -141,9 +141,12 @@ module mpi_write
     ! -- local
     integer(I4) :: i, ierr
     integer(I4), allocatable :: istat(:)
+    real(SP) :: sync_time
     real(DP), allocatable :: out_rest(:)
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------------
+    sync_time = out_time
+    call MPI_BCAST(sync_time, 1, MPI_REAL4, 0, st_mpi%comm, ierr)
     allocate(istat(MPI_STATUS_SIZE), out_rest(ncalc+1))
     !$omp parallel
     !$omp do private(i)
@@ -157,7 +160,7 @@ module mpi_write
     end do
     !$omp end do
     !$omp end parallel
-    out_rest(1) = real(out_time, kind=DP)
+    out_rest(1) = real(sync_time, kind=DP)
 
     ierr = 0 ; head_dis = 0
     call MPI_FILE_WRITE_AT_ALL(out_fh, head_dis, out_rest, ncalc+1, MPI_REAL8, istat, ierr)

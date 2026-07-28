@@ -18,7 +18,8 @@ module set_condition
 
   implicit none
   private
-  public :: set_clas2calc, set_point2seal, set_point2surf, set_bound2calc, set_mass2calc
+  public :: set_clas2calc, set_clas2seal, set_point2seal, set_point2surf, set_bound2calc
+  public :: set_mass2calc
   public :: set_2dfile2seal, set_3dfile2seal
   public :: set_2dfile2cals, set_2dfile2calc, set_3dfile2calc
   public :: set_point2well, set_2dwell, set_3dfile2well
@@ -114,6 +115,50 @@ module set_condition
     deallocate(temp_flag)
 
   end subroutine set_clas2calc
+
+  subroutine set_clas2seal(tgn, tg_name, tg_val, cell_val, tg_flag, tg_num)
+  !*********************************************************************************************
+  ! set_clas2seal -- Set seal value from classification
+  !*********************************************************************************************
+    ! -- modules
+    use initial_module, only: st_clas
+    ! -- inout
+    integer(I4), intent(in) :: tgn
+    character(*), intent(in) :: tg_name(:)
+    real(SP), intent(in) :: tg_val(:)
+    real(SP), intent(out) :: cell_val(:)
+    integer(I4), intent(out) :: tg_flag(:)
+    integer(I4), intent(out) :: tg_num
+    ! -- local
+    integer(I4) :: i, j, k, mpi_ncalc, out_num
+    !-------------------------------------------------------------------------------------------
+    mpi_ncalc = ncalc + neib_ncalc ; out_num = size(cell_val(:))
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      tg_flag(i) = 0
+    end do
+    !$omp end parallel do
+
+    do i = 1, tgn
+      if (tg_val(i) /= SNOVAL) then
+        do k = 1, st_clas%totn
+          if (tg_name(i) == st_clas%name(k)) then
+            !$omp parallel do private(j)
+            do j = 1, out_num
+              if (st_conn%clas_flag(j,k) == 1 .and. j > mpi_ncalc) then
+                cell_val(j-mpi_ncalc) = tg_val(i)
+                tg_flag(j-mpi_ncalc) = 1
+              end if
+            end do
+            !$omp end parallel do
+          end if
+        end do
+      end if
+    end do
+
+    call count_flag(tg_flag, tg_num)
+
+  end subroutine set_clas2seal
 
   subroutine set_point2seal(tgn, p_i, p_j, p_k, tg_val, cell_val, tg_flag, tg_num)
   !*********************************************************************************************

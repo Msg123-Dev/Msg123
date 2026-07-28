@@ -4,7 +4,7 @@ program msg123
 !***********************************************************************************************
   ! -- modules
   use kind_module, only: I4, DP
-  use types_module, only: amgt_set, coef_set
+  use types_module, only: kryl_set, amgt_set, coef_set, sol_set
   use utility_module, only: log_fnum, st_mpi
   use initial_module, only: init_msg, st_ctrl
   use read_input, only: read_main_file
@@ -15,15 +15,16 @@ program msg123
   use calc_function, only: allocate_calfun
   use make_linearsystem, only: allocate_matvec
   use check_simulation, only: check_lastts, lasttime_flag
-  use linear_solution, only: allocate_amgalg
+  use linear_solution, only: allocate_amgalg, allocate_krylov
   use time_module, only: update_tstep
-  use nonlinear_solution, only: calc_numsol
+  use nonlinear_solution, only: allocate_nonlin, calc_numsol
   use write_output, only: write_outf
 #ifdef ICI
   use ici_module, only: set_mapt, put_initv, get_var, alloc_outvar, put_var, fin_ici
 #endif
 #ifdef MPI_MSG
   use mpi_initfin, only: fin_mpi
+  use mpi_solve, only: allocate_mpisolve
 #endif
 
   implicit none
@@ -32,6 +33,8 @@ program msg123
   integer(I4) :: i
   integer(I4) :: sta_value(8), end_value(8)
   real(DP) :: tot_stime, tot_etime, loop_stime, loop_etime
+  type(sol_set) :: st_sol
+  type(kryl_set) :: st_kryl
   type(amgt_set) :: st_amgt
   type(coef_set) :: st_coef
   ! -- format
@@ -79,11 +82,21 @@ program msg123
 #endif
 
   ! -- Allocate solution variable for time step (solvar)
-    call allocate_solvar()
+    call allocate_solvar(st_sol)
   ! -- Allocate for calculate function value (calfun)
     call allocate_calfun()
   ! -- Allocate for matrix and vector (matvec)
     call allocate_matvec(st_coef)
+  ! -- Allocate for nonlinear solution work arrays (nonlin)
+    call allocate_nonlin()
+  ! -- Allocate for krylov work vectors (krylov)
+    call allocate_krylov(st_kryl)
+#ifdef MPI_MSG
+  if (st_mpi%totn /= 1) then
+    ! -- Allocate for mpi solve work buffers (mpisolve)
+      call allocate_mpisolve()
+  end if
+#endif
   if (st_ctrl%precon_type == 1) then
     ! -- Allocate for amg algebra (amgalg)
       call allocate_amgalg(st_amgt)
@@ -97,19 +110,19 @@ program msg123
   ! start time step loop
   tstep_loop: do
     ! -- Update time step (tstep)
-      call update_tstep()
+      call update_tstep(st_sol)
 
     ! -- Calculate numerical solution (numsol)
-      call calc_numsol(st_amgt, st_coef)
+      call calc_numsol(st_kryl, st_amgt, st_coef, st_sol)
 
     if (st_time%conv_flag) then
       ! -- Check last time step conditions (lastts)
         call check_lastts()
       ! -- Write output file (outf)
-        call write_outf(st_time%now_time)
+        call write_outf(st_time%now_time, st_sol)
 #ifdef ICI
       ! -- Put variables (var)
-        call put_var()
+        call put_var(st_sol)
 #endif
       if(lasttime_flag == 1) then
         exit tstep_loop

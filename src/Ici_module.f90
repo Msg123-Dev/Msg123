@@ -1,6 +1,7 @@
 module ici_module
   ! -- modules
   use kind_module, only: I4, SP, DP
+  use types_module, only: sol_set
   use constval_module, only: DZERO
   use utility_module, only: st_mpi
   use initial_module, only: out_type, st_grid, st_out_type
@@ -232,17 +233,17 @@ module ici_module
 
   end subroutine alloc_outvar
 
-  subroutine put_var()
+  subroutine put_var(st_sol)
   !*********************************************************************************************
   ! put_var -- Put variables
   !*********************************************************************************************
     ! -- module
     use initial_module, only: st_in_type
-    use allocate_solution, only: head_new, srat_new
     use allocate_output, only: roff_rive, roff_lake, roff_surf
     use calc_output, only: calc_wtable, calc_rivr_off, calc_lakr_off, calc_sufr_off
     ! -- inout
 
+    type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i, s, nz
     real(DP), allocatable :: head_ici(:), wtab_dep(:)
@@ -255,13 +256,13 @@ module ici_module
     end do
     !$omp end parallel do
 
-    call change_ici_put(head_new, head_ici)
+    call change_ici_put(st_sol%head_new, head_ici)
     call ici_put_data("hyd_head", reshape([head_ici(:)*len_scal], [ncals,st_grid%nz]))
 
     if (coupled_matsiro .and. mat_put) then
       if (st_out_type%wtab /= out_type(2)) then
         ! -- Calculate water table (wtable)
-          call calc_wtable(head_new, srat_new)
+          call calc_wtable(st_sol%head_new, st_sol%srat_new)
       end if
       allocate(wtab_dep(ncals))
       ! -- Calculate water table depth (wtab_depth)
@@ -282,19 +283,19 @@ module ici_module
       !$omp end parallel do
       if (st_out_type%rivr /= out_type(2) .and. st_in_type%rive >= 0) then
         ! -- Calculate river runoff (rive_roff)
-          call calc_rivr_off()
+          call calc_rivr_off(st_sol)
         ! -- Calculate river flux (rive_flux)
           call calc_rive_flux(roff_rive, rive_flux)
       end if
       if (st_out_type%lakr /= out_type(2) .and. st_in_type%lake >= 0) then
         ! -- Calculate lake runoff (lake_roff)
-          call calc_lakr_off()
+          call calc_lakr_off(st_sol)
         ! -- Calculate lake flux (lake_flux)
           call calc_lake_flux(roff_lake, lake_flux)
       end if
       if (st_out_type%sufr /= out_type(2)) then
         ! -- Calculate surface runoff (surf_roff)
-          call calc_sufr_off()
+          call calc_sufr_off(st_sol)
         ! -- Calculate surface flux (surf_flux)
           call calc_surf_flux(roff_surf, surf_flux)
       end if

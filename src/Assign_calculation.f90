@@ -2,7 +2,7 @@ module assign_calc
   ! -- modules
   use kind_module, only: I4, SP
   use constval_module, only: VARLEN, SZERO, SNOVAL, DNOVAL
-  use utility_module, only: st_mpi, close_file, write_err_stop
+  use utility_module, only: st_mpi, close_file, write_err_stop, gmap_get
   use initial_module, only: in_type, st_grid, st_init
   use read_input, only: len_scal, len_scal_inv
   use set_cell, only: ncalc, ncals, st_conn
@@ -565,7 +565,7 @@ module assign_calc
             call get_calc_grid(i, xn, yn, zn)
             do k = zn+1, st_grid%nz
               xyzn = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(yn-1) + xn
-              j = 0 ; j = st_conn%glo2loc_ijk(xyzn)
+              j = 0 ; j = gmap_get(st_conn%glo2loc_map, xyzn)
               if (j /= 0 .and. j <= ncalc) then
                 st_hydr%read_init(j) = st_hydr%read_init(i)
               end if
@@ -745,7 +745,7 @@ module assign_calc
       call get_cals_grid(i, xn, yn)
       do k = 1, st_grid%nz
         xyzn = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(yn-1) + xn
-        j = 0 ; j = st_conn%glo2loc_ijk(xyzn)
+        j = 0 ; j = gmap_get(st_conn%glo2loc_map, xyzn)
         if (j /= 0 .and. j <= ncalc) then
           st_hydr%read_init(j) = st_geom%surf_elev(i) - st_init%depth
         end if

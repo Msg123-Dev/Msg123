@@ -299,15 +299,16 @@ module types_module
     real(DP), allocatable :: per_sea(:), rel_sea(:), tran_sea(:)
   end type coef_set
 
-  type :: conn_set
-    integer(I4), allocatable :: clas_flag(:,:)
-    integer(I4), allocatable :: calc2reg(:)
-    integer(I4), allocatable :: glo2loc_ijk(:), loc2glo_ijk(:), loc2glo_ij(:)
-  end type conn_set
-
   type :: gmap_set
     integer(I4) :: table_num = 0
     integer(I4), allocatable :: table_key(:), table_val(:)
   end type gmap_set
+
+  type :: conn_set
+    integer(I4), allocatable :: clas_flag(:,:)
+    integer(I4), allocatable :: calc2reg(:)
+    integer(I4), allocatable :: loc2glo_ijk(:), loc2glo_ij(:)
+    type(gmap_set) :: glo2loc_map
+  end type conn_set
 
 end module types_module

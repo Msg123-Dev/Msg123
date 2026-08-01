@@ -10,7 +10,7 @@ module mpi_utility
   public :: barrier_proc
   public :: mpisum_val, mpimax_val, mpiexscan_val
   public :: bcast_val, bcast_char, bcast_file, bcast_extr_set
-  public :: gather_val
+  public :: gather_val, scatterv_val
   public :: alltoall_val, alltoallv_val
 
   interface mpisum_val
@@ -41,7 +41,9 @@ module mpi_utility
     module procedure bcast_i4_scalar
     module procedure bcast_i4_array
     module procedure bcast_r4_scalar
+    module procedure bcast_r4_array
     module procedure bcast_r8_scalar
+    module procedure bcast_r8_array
   end interface
 
   interface bcast_file
@@ -55,6 +57,11 @@ module mpi_utility
     module procedure gather_i4_array
     module procedure gather_r4_array
     module procedure gather_r8_array
+  end interface
+
+  interface scatterv_val
+    module procedure scatterv_i4_array
+    module procedure scatterv_r4_array
   end interface
 
   interface alltoall_val
@@ -542,6 +549,29 @@ module mpi_utility
 
   end subroutine bcast_r4_scalar
 
+  subroutine bcast_r4_array(rarray, err_mes)
+  !*********************************************************************************************
+  ! bcast_r4_array -- Bcast real4 array value
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    real(SP), intent(inout) :: rarray(:)
+    character(*), intent(in) :: err_mes
+    ! -- local
+    integer(I4) :: ierr, a_len
+    !-------------------------------------------------------------------------------------------
+    ierr = 0 ; a_len = size(rarray(:))
+    call MPI_BCAST(rarray, a_len, MPI_REAL4, 0, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+  end subroutine bcast_r4_array
+
   subroutine bcast_r8_scalar(rscalar, err_mes)
   !*********************************************************************************************
   ! bcast_r8_scalar -- Bcast real8 scalar value
@@ -564,6 +594,29 @@ module mpi_utility
     end if
 
   end subroutine bcast_r8_scalar
+
+  subroutine bcast_r8_array(rarray, err_mes)
+  !*********************************************************************************************
+  ! bcast_r8_array -- Bcast real8 array value
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    real(DP), intent(inout) :: rarray(:)
+    character(*), intent(in) :: err_mes
+    ! -- local
+    integer(I4) :: ierr, a_len
+    !-------------------------------------------------------------------------------------------
+    ierr = 0 ; a_len = size(rarray(:))
+    call MPI_BCAST(rarray, a_len, MPI_REAL8, 0, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+  end subroutine bcast_r8_array
 
   subroutine bcast_char(err_mes)
   !*********************************************************************************************
@@ -897,6 +950,110 @@ module mpi_utility
     deallocate(rec_num, rec_count, rec_dis)
 
   end subroutine gather_i4_array
+
+  subroutine scatterv_i4_array(num_prot, out_num, glo_array, loc_array, err_mes)
+  !*********************************************************************************************
+  ! scatterv_i4_array -- Scatter an integer array held on rank 0 to each rank's contiguous
+  !   range (the inverse of gather_i4_array). Only rank 0 needs glo_array to be valid.
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    integer(I4), intent(in) :: num_prot, out_num
+    integer(I4), intent(in) :: glo_array(:)
+    integer(I4), intent(out) :: loc_array(:)
+    character(*), intent(in) :: err_mes
+    ! -- local
+    integer(I4) :: i, sum_num, ierr
+    integer(I4), allocatable :: sen_num(:), sen_count(:), sen_dis(:)
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    allocate(sen_num(num_prot))
+    !$omp parallel do private(i)
+    do i = 1, num_prot
+      sen_num(i) = 0
+    end do
+    !$omp end parallel do
+    call MPI_ALLGATHER(out_num, 1, MPI_INTEGER, sen_num, 1, MPI_INTEGER, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Allgather "//err_mes//" size in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+    allocate(sen_count(0:num_prot-1), sen_dis(0:num_prot-1))
+    sum_num = 0
+    do i = 1, num_prot
+      sen_dis(i-1) = sum_num
+      sum_num = sum_num + sen_num(i)
+      sen_count(i-1) = sen_num(i)
+    end do
+
+    call MPI_SCATTERV(glo_array, sen_count, sen_dis, MPI_INTEGER, loc_array, out_num,&
+                      MPI_INTEGER, 0, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Scatterv "//err_mes//" array in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+    deallocate(sen_num, sen_count, sen_dis)
+
+  end subroutine scatterv_i4_array
+
+  subroutine scatterv_r4_array(num_prot, out_num, glo_array, loc_array, err_mes)
+  !*********************************************************************************************
+  ! scatterv_r4_array -- Scatter a real4 array held on rank 0 to each rank's contiguous range
+  !   (the real4 counterpart of scatterv_i4_array). Only rank 0 needs glo_array to be valid.
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    integer(I4), intent(in) :: num_prot, out_num
+    real(SP), intent(in) :: glo_array(:)
+    real(SP), intent(out) :: loc_array(:)
+    character(*), intent(in) :: err_mes
+    ! -- local
+    integer(I4) :: i, sum_num, ierr
+    integer(I4), allocatable :: sen_num(:), sen_count(:), sen_dis(:)
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    allocate(sen_num(num_prot))
+    !$omp parallel do private(i)
+    do i = 1, num_prot
+      sen_num(i) = 0
+    end do
+    !$omp end parallel do
+    call MPI_ALLGATHER(out_num, 1, MPI_INTEGER, sen_num, 1, MPI_INTEGER, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Allgather "//err_mes//" size in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+    allocate(sen_count(0:num_prot-1), sen_dis(0:num_prot-1))
+    sum_num = 0
+    do i = 1, num_prot
+      sen_dis(i-1) = sum_num
+      sum_num = sum_num + sen_num(i)
+      sen_count(i-1) = sen_num(i)
+    end do
+
+    call MPI_SCATTERV(glo_array, sen_count, sen_dis, MPI_REAL4, loc_array, out_num,&
+                      MPI_REAL4, 0, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Scatterv "//err_mes//" array in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+    deallocate(sen_num, sen_count, sen_dis)
+
+  end subroutine scatterv_r4_array
 
   subroutine gather_r4_array(num_prot, in_num, loc_array, glo_array, err_mes)
   !*********************************************************************************************

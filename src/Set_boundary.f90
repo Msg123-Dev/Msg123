@@ -373,16 +373,13 @@ module set_boundary
         else
             bfview%seal = cell_r4hview
         end if
-      else if (st_in_type%seal == in_type(7)) then
-        if (st_intse%type == in_type(4)) then
-          bfview%seal = surf_r4view
-        else if (st_intse%type == in_type(6)) then
-          bfview%seal = cell_r4view
-        end if
       end if
 
       ! -- Open input sea level file (in_sealf)
-        call open_in_sealf(st_in_type%seal, st_in_path%seal, st_in_unit%seal, bfview%seal)
+      !    in_type 7 resolves its inner type inside, so both candidate views are handed over
+      !    and bfview%seal comes back holding the one that was used
+        call open_in_sealf(st_in_type%seal, st_in_path%seal, st_in_unit%seal, bfview%seal,&
+                           surf_r4view, cell_r4view)
 #else
       ! -- Open input sea level file (in_sealf)
         call open_in_sealf(st_in_type%seal, st_in_path%seal, st_in_unit%seal)

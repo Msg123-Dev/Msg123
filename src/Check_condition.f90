@@ -15,8 +15,8 @@ module check_condition
 
   implicit none
   private
-  public :: check_calc_region, check_calc_retn, check_calc_parm, check_calc_init
-  public :: check_outf_cond, read_sea_points
+  public :: check_calc_retn, check_calc_parm, check_calc_init, check_outf_cond
+  public :: read_seal_set, read_seal_clasf, read_seal_point, read_sea_allv
 
   type :: fnum_out
     integer(I4) :: conv, head, rest, srat, wtab, mass, velx, vely, velz
@@ -81,64 +81,129 @@ module check_condition
 
   end subroutine check_calc_region
 
-  subroutine read_sea_points(sea_mode, sea_ptn, sp_i, sp_j, sp_k)
+  subroutine read_seal_set(eff_type, eff_path)
   !*********************************************************************************************
-  ! read_sea_points -- Read sea input point file
+  ! read_seal_set -- Read sea level file set
+  !*********************************************************************************************
+    ! -- modules
+    use constval_module, only: CHALEN
+    use utility_module, only: close_file, open_new_rtxt
+    use initial_module, only: st_in_path
+    ! -- inout
+    integer(I4), intent(out) :: eff_type
+    character(*), intent(out) :: eff_path
+    ! -- local
+    integer(I4) :: list_fnum, list_type
+    real(SP) :: list_step, list_end
+    character(CHALEN) :: list_path
+    !-------------------------------------------------------------------------------------------
+    eff_path = repeat(' ', len(eff_path))
+    if (st_in_type%seal <= 0) then
+      eff_type = 0
+    else if (st_in_type%seal == in_type(7)) then
+      ! -- interval list: the header names the inner type, the next line the first data file
+      list_path = repeat(' ', CHALEN)
+      call open_new_rtxt(1, 1, st_in_path%seal, "input sea level interval for check", list_fnum)
+      read(list_fnum,*) list_type, list_step, list_end
+      read(list_fnum,'(a)') list_path
+      call close_file(list_fnum)
+      eff_type = list_type ; eff_path = trim(adjustl(list_path))
+    else
+      eff_type = st_in_type%seal ; eff_path = trim(adjustl(st_in_path%seal))
+    end if
+
+  end subroutine read_seal_set
+
+  subroutine read_seal_clasf(nclas, clas_name, clas_val)
+  !*********************************************************************************************
+  ! read_seal_clasf -- Read the sea level classfication file
+  !*********************************************************************************************
+    ! -- modules
+    use constval_module, only: VARLEN
+    use utility_module, only: close_file
+    use read_module, only: read_clasf
+    use initial_module, only: st_in_path, st_in_unit
+    ! -- inout
+    integer(I4), intent(out) :: nclas
+    character(VARLEN), allocatable, intent(out) :: clas_name(:)
+    real(SP), allocatable, intent(out) :: clas_val(:)
+    ! -- local
+    integer(I4) :: i
+    !-------------------------------------------------------------------------------------------
+    call open_sealf(st_in_type%seal, st_in_path%seal, st_in_unit%seal)
+    nclas = st_seal%totn
+    allocate(clas_name(max(nclas,1)), clas_val(max(nclas,1)))
+    do i = 1, max(nclas,1)
+      clas_name(i) = "" ; clas_val(i) = SNOVAL
+    end do
+    if (nclas > 0) then
+      call read_clasf(st_seal%fnum, nclas, clas_name, clas_val)
+    end if
+    call close_file(st_seal%fnum)
+
+  end subroutine read_seal_clasf
+
+  subroutine read_seal_point(sea_ptn, sp_i, sp_j, sp_k, sp_v)
+  !*********************************************************************************************
+  ! read_seal_point -- Read sea level point file
   !*********************************************************************************************
     ! -- modules
     use utility_module, only: close_file
     use read_module, only: read_3dpointf
     use initial_module, only: st_in_path, st_in_unit
     ! -- inout
-    integer(I4), intent(out) :: sea_mode
     integer(I4), intent(out) :: sea_ptn
     integer(I4), allocatable, intent(out) :: sp_i(:), sp_j(:), sp_k(:)
+    real(SP), allocatable, intent(out) :: sp_v(:)
     ! -- local
     integer(I4) :: p, npt, keep
     integer(I4), allocatable :: r_i(:), r_j(:), r_k(:)
     real(SP), allocatable :: r_v(:)
     !-------------------------------------------------------------------------------------------
-    sea_ptn = 0
-    if (st_in_type%seal <= 0) then
-      sea_mode = 0
-      allocate(sp_i(1), sp_j(1), sp_k(1))
-      return
-    else if (st_in_type%seal == in_type(2)) then
-      call open_sealf(st_in_type%seal, st_in_path%seal, st_in_unit%seal)
-      npt = st_seal%totn
-      allocate(r_i(npt), r_j(npt), r_k(npt), r_v(npt))
-      call read_3dpointf(st_seal%fnum, npt, r_i, r_j, r_k, r_v)
-      call close_file(st_seal%fnum)
+    call open_sealf(st_in_type%seal, st_in_path%seal, st_in_unit%seal)
+    npt = st_seal%totn
+    allocate(r_i(npt), r_j(npt), r_k(npt), r_v(npt))
+    call read_3dpointf(st_seal%fnum, npt, r_i, r_j, r_k, r_v)
+    call close_file(st_seal%fnum)
 
-      keep = 0
-      do p = 1, npt
-        if (r_v(p) /= SNOVAL) then
-          keep = keep + 1
-        end if
-      end do
-      sea_ptn = keep
-      allocate(sp_i(keep+1), sp_j(keep+1), sp_k(keep+1))
-      keep = 0
-      do p = 1, npt
-        if (r_v(p) /= SNOVAL) then
-          keep = keep + 1
-          sp_i(keep) = r_i(p) ; sp_j(keep) = r_j(p) ; sp_k(keep) = r_k(p)
-        end if
-      end do
-      deallocate(r_i, r_j, r_k, r_v)
-      sea_mode = 1
-    else if (st_in_type%seal == in_type(4)) then
-      sea_mode = 2
-      allocate(sp_i(1), sp_j(1), sp_k(1))
-    else if (st_in_type%seal == in_type(6)) then
-      sea_mode = 3
-      allocate(sp_i(1), sp_j(1), sp_k(1))
-    else
-      sea_mode = 9
-      allocate(sp_i(1), sp_j(1), sp_k(1))
-    end if
+    keep = 0
+    do p = 1, npt
+      if (r_v(p) /= SNOVAL) then
+        keep = keep + 1
+      end if
+    end do
+    sea_ptn = keep
+    allocate(sp_i(keep+1), sp_j(keep+1), sp_k(keep+1), sp_v(keep+1))
+    keep = 0
+    do p = 1, npt
+      if (r_v(p) /= SNOVAL) then
+        keep = keep + 1
+        sp_i(keep) = r_i(p) ; sp_j(keep) = r_j(p) ; sp_k(keep) = r_k(p)
+        sp_v(keep) = r_v(p)
+      end if
+    end do
+    deallocate(r_i, r_j, r_k, r_v)
 
-  end subroutine read_sea_points
+  end subroutine read_seal_point
+
+  subroutine read_sea_allv(allv)
+  !*********************************************************************************************
+  ! read_sea_allv -- Read sea level all value
+  !*********************************************************************************************
+    ! -- modules
+    use initial_module, only: st_in_path, st_in_unit
+    ! -- inout
+    real(SP), intent(out) :: allv(:)
+    ! -- local
+    integer(I4) :: i
+    !-------------------------------------------------------------------------------------------
+    do i = 1, size(allv(:))
+      allv(i) = SNOVAL
+    end do
+    call open_sealf(st_in_type%seal, st_in_path%seal, st_in_unit%seal)
+    call read_sealf(st_in_type%seal, st_seal%totn, allv)
+
+  end subroutine read_sea_allv
 
   subroutine check_calc_retn(calcn, calc_reta, calc_retn, calc_resi)
   !*********************************************************************************************
@@ -252,6 +317,7 @@ module check_condition
   !*********************************************************************************************
     ! -- modules
     use kind_module, only: SP
+    use constval_module, only: CHALEN
     use utility_module, only: open_new_rtxt, open_new_rbin, write_success, write_err_read
     ! -- inout
     integer(I4), intent(in) :: seal_ftype
@@ -261,13 +327,14 @@ module check_condition
     integer(I4) :: seal_fnum, intse_num
     integer(I4), allocatable :: type_txt(:), type_bin(:)
     real(SP) :: intse_step, intse_end
-    character(:), allocatable :: err_mes, intsep
+    character(:), allocatable :: err_mes
+    character(CHALEN) :: intsep
     !-------------------------------------------------------------------------------------------
     ierr = 0
     allocate(type_txt(4), type_bin(2))
-    allocate(character(len=0) :: err_mes, intsep)
+    allocate(character(len=0) :: err_mes)
     type_txt(:) = [in_type(1:3), in_type(5)] ; type_bin(:) = [in_type(4), in_type(6)]
-    err_mes = "input sea level for check" ; intsep = ""
+    err_mes = "input sea level for check" ; intsep = repeat(' ', CHALEN)
     if (any(seal_ftype == type_txt(:))) then
       ! -- Open new read text file (new_rtxt)
         call open_new_rtxt(1, 1, seal_path, err_mes, seal_fnum)
@@ -284,16 +351,15 @@ module check_condition
       err_mes = "input sea level time interval for check"
       if (intse_type == in_type(3) .or. intse_type == in_type(5)) then
         ! -- Open new read text file (new_rtxt)
-          call open_new_rtxt(1, 1, seal_path, err_mes, intse_num)
+          call open_new_rtxt(1, 1, trim(adjustl(intsep)), err_mes, intse_num)
         st_seal%fnum = intse_num
       else if (any(intse_type == type_bin(:))) then
         ! -- Open new read binary file (new_rbin)
-          call open_new_rbin(1, 1, seal_path, err_mes, intse_num)
+          call open_new_rbin(1, 1, trim(adjustl(intsep)), err_mes, intse_num)
         st_seal%fnum = intse_num
       else
         call write_err_stop("Specified wrong sea level time interval number.")
       end if
-      deallocate(intsep)
     end if
 
     deallocate(err_mes)
@@ -376,9 +442,9 @@ module check_condition
       call set_3dfile2seal(seal_fnum, seal_ftype, SNOVAL, seal_val)
       call close_file(seal_fnum)
     else if (seal_ftype == in_type(7)) then
-      if (any(seal_ftype == type_2d(:))) then
+      if (any(intse_type == type_2d(:))) then
         call set_2dfile2seal(seal_fnum, intse_type, SNOVAL, seal_val)
-      else if (any(seal_ftype == type_3d(:))) then
+      else if (any(intse_type == type_3d(:))) then
         call set_3dfile2seal(seal_fnum, intse_type, SNOVAL, seal_val)
       end if
       call close_file(seal_fnum)
@@ -467,8 +533,7 @@ module check_condition
 
   subroutine set_clas2seal(clasn, clas_name, clas_val, tg_val)
   !*********************************************************************************************
-  ! set_clas2seal -- Set sea level from classification. The cells of each named class are
-  !   expanded from its specs (i,j,k with -1 wildcards) instead of a global clas array. (段5-4b)
+  ! set_clas2seal -- Set sea level from classification file
   !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_clas

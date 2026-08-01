@@ -79,6 +79,8 @@ module open_file
       end if
     end if
 
+    temp_view = 0
+
     if (present(view_calc)) then
       temp_view = view_calc
     end if
@@ -212,6 +214,8 @@ module open_file
         end if
       end if
     end if
+
+    temp_view = 0
 
     if (present(view_calc)) then
       temp_view = view_calc
@@ -354,6 +358,8 @@ module open_file
       call close_file(geog_num)
     end if
 
+    temp_view = 0
+
     if (present(geog_view)) then
       temp_view = geog_view
     end if
@@ -465,6 +471,7 @@ module open_file
           call open_new_rtxt(1, 1, init_path, err_mes, st_init%fnum)
       end if
     else if (init_type /= in_type(7)) then
+      temp_view = 0
       if (present(view_rest)) then
         temp_view = view_rest
       end if
@@ -491,7 +498,7 @@ module open_file
 
   end subroutine open_in_initf
 
-  subroutine open_in_sealf(seal_type, seal_path, seal_unit, seal_view)
+  subroutine open_in_sealf(seal_type, seal_path, seal_unit, seal_view, view_2d, view_3d)
   !*********************************************************************************************
   ! open_in_sealf -- Open input sea level file
   !*********************************************************************************************
@@ -500,7 +507,8 @@ module open_file
     ! -- inout
     integer(I4), intent(in) :: seal_type
     character(*), intent(inout) :: seal_path, seal_unit
-    integer(I4), intent(in), optional :: seal_view
+    integer(I4), intent(inout), optional :: seal_view
+    integer(I4), intent(in), optional :: view_2d, view_3d
     ! -- local
     integer(I4) :: ierr
     integer(I4) :: temp_view
@@ -518,6 +526,7 @@ module open_file
     txt_seal_mask(:) = (seal_type == txt_seal_type(:))
     bin_seal_mask(:) = (seal_type == bin_seal_type(:))
 
+    temp_view = 0
     if (present(seal_view)) then
       temp_view = seal_view
     end if
@@ -571,6 +580,16 @@ module open_file
             call open_new_rtxt(1, 1, trim(adjustl(intsep)), "input "//err_mes, st_seal%fnum)
         end if
       else if (any(bin_seal_mask)) then
+        ! -- the inner type is known now, so pick the matching view (2d surface / 3d cell) and
+        !    hand it back so the time loop sets the same view on the next file of the list
+        if (intse_type == in_type(4) .and. present(view_2d)) then
+          temp_view = view_2d
+        else if (intse_type == in_type(6) .and. present(view_3d)) then
+          temp_view = view_3d
+        end if
+        if (present(seal_view)) then
+          seal_view = temp_view
+        end if
 #ifdef MPI_MSG
         ! -- Open mpi read file (mpi_read_file)
           call open_mpi_read_file(1, 1, trim(adjustl(intsep)), "input "//err_mes, st_seal%fnum)
@@ -694,6 +713,7 @@ module open_file
     character(CHALEN) :: intrep
     character(:), allocatable :: vname, err_mes
     !-------------------------------------------------------------------------------------------
+    temp_view = 0
     if (present(rech_view)) then
       temp_view = rech_view
     end if
@@ -877,6 +897,8 @@ module open_file
     txt_well_mask(:) = (well_type == txt_well_type(:))
     bin_well_mask(:) = (well_type == bin_well_type(:))
 
+    temp_view = 0
+
     if (present(well_view)) then
       temp_view = well_view
     end if
@@ -1052,6 +1074,7 @@ module open_file
     integer(I4) :: temp_view
     character(:), allocatable :: vname
     !-------------------------------------------------------------------------------------------
+    temp_view = 0
     if (present(wlay_view)) then
       temp_view = wlay_view
     end if
@@ -1100,6 +1123,7 @@ module open_file
       ! -- Set int4 file view (int4_fview)
         call set_int4_fview(welle_fnum, temp_view, "input "//vname//" end layer")
 #else
+      temp_view = 0
       if (present(wlay_view)) then
         temp_view = wlay_view
       end if
@@ -1130,6 +1154,7 @@ module open_file
     character(CHALEN) :: intprp
     character(:), allocatable :: vname, err_mes
     !-------------------------------------------------------------------------------------------
+    temp_view = 0
     if (present(prec_view)) then
       temp_view = prec_view
     end if
@@ -1303,6 +1328,7 @@ module open_file
     character(CHALEN) :: intevp
     character(:), allocatable :: vname, err_mes
     !-------------------------------------------------------------------------------------------
+    temp_view = 0
     if (present(evap_view)) then
       temp_view = evap_view
     end if
@@ -2139,6 +2165,8 @@ module open_file
     !-------------------------------------------------------------------------------------------
     allocate(txt_mass_type(3), txt_mass_mask(3))
     txt_mass_type(:) = [in_type(1), in_type(3), in_type(5)]
+
+    temp_view = 0
 
     if (present(view_mass)) then
       temp_view = view_mass

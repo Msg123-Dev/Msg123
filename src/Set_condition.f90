@@ -3,7 +3,7 @@ module set_condition
   use kind_module, only: I4, SP, DP
   use constval_module, only: SZERO, SNOVAL, DZERO, DONE
   use types_module, only: hydr_set, bcnd_set
-  use utility_module, only: st_mpi
+  use utility_module, only: st_mpi, gmap_get, gmap_free
   use initial_module, only: in_type, st_sim, st_grid, st_well
   use read_module, only: read_2dtxt, read_2dbin, read_3dtxt, read_3dbin, flat_2dto2d,&
                          flat_2dto3d, flat_3dto3d
@@ -2106,7 +2106,7 @@ module set_condition
       g_num = st_conn%loc2glo_ijk(i)
       ! up direction
       if (k_num /= 1) then
-        u_num = g_num-gridx*gridy ; loc_u = st_conn%glo2loc_ijk(u_num)
+        u_num = g_num-gridx*gridy ; loc_u = gmap_get(st_conn%glo2loc_map, u_num)
         if (loc_u > 0) then
           off_num = loc_u ; tks = reg_cksz(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
@@ -2163,7 +2163,7 @@ module set_condition
       end if
       ! north direction
       if (j_num /= 1) then
-        n_num = g_num-gridx ; loc_n = st_conn%glo2loc_ijk(n_num)
+        n_num = g_num-gridx ; loc_n = gmap_get(st_conn%glo2loc_map, n_num)
         if (loc_n > 0) then
           off_num = loc_n ; tks = reg_cksy(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
@@ -2216,7 +2216,7 @@ module set_condition
       end if
       ! west direction
       if (i_num /= 1) then
-        w_num = g_num-1 ; loc_w = st_conn%glo2loc_ijk(w_num)
+        w_num = g_num-1 ; loc_w = gmap_get(st_conn%glo2loc_map, w_num)
         if (loc_w > 0) then
           off_num = loc_w ; tks = reg_cksx(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
@@ -2269,7 +2269,7 @@ module set_condition
       end if
       ! east direction
       if (i_num /= gridx) then
-        e_num = g_num+1 ; loc_e = st_conn%glo2loc_ijk(e_num)
+        e_num = g_num+1 ; loc_e = gmap_get(st_conn%glo2loc_map, e_num)
         if (loc_e > 0) then
           off_num = loc_e ; tks = reg_cksx(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
@@ -2322,7 +2322,7 @@ module set_condition
       end if
       ! south direction
       if (j_num /= gridy) then
-        s_num = g_num+gridx ; loc_s = st_conn%glo2loc_ijk(s_num)
+        s_num = g_num+gridx ; loc_s = gmap_get(st_conn%glo2loc_map, s_num)
         if (loc_s > 0) then
           off_num = loc_s ; tks = reg_cksy(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
@@ -2375,7 +2375,7 @@ module set_condition
       end if
       ! down direction
       if (k_num /= gridz) then
-        d_num = g_num+gridx*gridy ; loc_d = st_conn%glo2loc_ijk(d_num)
+        d_num = g_num+gridx*gridy ; loc_d = gmap_get(st_conn%glo2loc_map, d_num)
         if (loc_d > 0) then
           off_num = loc_d ; tks = reg_cksz(i)
           if (off_num > totn_clac .and. i <= ncalc) then !sea grid
@@ -2435,7 +2435,7 @@ module set_condition
     deallocate(reg_dis, reg_fare)
     deallocate(st_geom%area_r)
     deallocate(st_conn%calc2reg)
-    deallocate(st_conn%glo2loc_ijk)
+    call gmap_free(st_conn%glo2loc_map)
 
   end subroutine set_connect
 

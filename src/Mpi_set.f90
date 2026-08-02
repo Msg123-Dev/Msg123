@@ -316,7 +316,8 @@ module mpi_set
       call MPI_BCAST(char_leng, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
       if (ierr /= MPI_SUCCESS) then
         if (st_mpi%rank == 0) then
-          call write_err_stop("Broadcast the classification name "//trim(clas_name(i))//" length.")
+          call write_err_stop("Broadcast the classification name "//trim(clas_name(i))&
+                              //" length.")
         end if
       end if
 

@@ -2,12 +2,12 @@ module time_module
   ! -- modules
   use kind_module, only: I4, SP, DP
   use types_module, only: sol_set
-  use constval_module, only: SZERO, SNOVAL, DZERO, DONE, DHALF
+  use constval_module, only: SZERO, DZERO, DONE
   use utility_module, only: st_mpi
-  use initial_module, only: st_sim, st_ctrl, st_in_type, st_rivf_type, st_lakf_type, st_seal,&
-                            st_rech, st_prec, st_evap, st_well, st_riwl, st_riwd, st_ribl,&
-                            st_ride, st_riwi, st_rile, st_lawl, st_lawd, st_labl, st_laar,&
-                            st_step_flag
+  use initial_module, only: st_sim, st_ctrl, st_in_type, st_rivf_type, st_lakf_type, st_seal
+  use initial_module, only: st_rech, st_prec, st_evap, st_well, st_riwl, st_riwd, st_ribl
+  use initial_module, only: st_ride, st_riwi, st_rile, st_lawl, st_lawd, st_labl, st_laar
+  use initial_module, only: st_step_flag
   use open_file, only: st_intre, st_intpr, st_intev
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc, ncals
@@ -800,10 +800,11 @@ module time_module
   ! set_nextvar -- Set next variable
   !*********************************************************************************************
     ! -- modules
+    use constval_module, only: SNOVAL
     use set_condition, only: set_srabyd, set_chabyd, set_wellconn
     use assign_boundary, only: assign_sealv, assign_surfbv, assign_wellv, assign_rilav
-    use calc_boundary, only: calc_reprev, conv_rech2calc, count_rivecalc, count_lakecalc,&
-                             calc_wlbd, calc_rivea
+    use calc_boundary, only: calc_reprev, conv_rech2calc, count_rivecalc, count_lakecalc
+    use calc_boundary, only: calc_wlbd, calc_rivea
 #ifdef MPI_MSG
     use mpi_utility, only: mpisum_val
 #endif

@@ -1,7 +1,6 @@
 module mpi_initfin
   ! -- modules
   use kind_module, only: I4
-  use types_module, only: mpi_set
   use mpi
 
   implicit none
@@ -17,6 +16,7 @@ module mpi_initfin
   ! init_mpi -- Initialize mpi
   !*********************************************************************************************
     ! -- module
+    use types_module, only: mpi_set
 
     ! -- inout
     integer(I4), intent(in) :: num_log

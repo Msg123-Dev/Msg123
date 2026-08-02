@@ -1,7 +1,6 @@
 module calc_simulation
   ! -- modules
   use kind_module, only: I4, DP
-  use constval_module, only: DZERO
   use allocate_solution, only: crs_index
 
   implicit none
@@ -17,6 +16,7 @@ module calc_simulation
   ! calc_l2norm2 -- Calculate l2 norm square
   !*********************************************************************************************
     ! -- modules
+    use constval_module, only: DZERO
 
     ! -- inout
     integer(I4), intent(in) :: l2level

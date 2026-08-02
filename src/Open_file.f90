@@ -1,16 +1,15 @@
 module open_file
   ! -- modules
-  use kind_module, only: I4, SP, DP
+  use kind_module, only: I4, SP
   use constval_module, only: CHALEN, TIMELEN, HOURSEC, SZERO, SINFI
-  use utility_module, only: st_mpi, open_new_rtxt, open_new_rbin, open_new_wtxt,&
-                            close_file, write_logf, write_success, write_err_stop, conv_unit
+  use utility_module, only: st_mpi, open_new_rtxt, open_new_rbin, open_new_wtxt, close_file
+  use utility_module, only: write_logf, write_err_stop, conv_unit
   use initial_module, only: in_type, st_sim, st_grid, st_step_flag
   use read_module, only: skip_file, skip_file_int
 #ifdef MPI_MSG
-  use utility_module, only: log_fnum
   use mpi_utility, only: bcast_val, bcast_file, bcast_extr_set
-  use mpi_read, only: open_mpi_read_file, set_int4_fview, set_real4_fview, skip_mpi_file,&
-                      skip_mpi_file_int
+  use mpi_read, only: open_mpi_read_file, set_int4_fview, set_real4_fview, skip_mpi_file
+  use mpi_read, only: skip_mpi_file_int
 #endif
 
   implicit none
@@ -1489,8 +1488,7 @@ module open_file
   ! open_in_rivef -- Read input river file
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_rivf_type, st_riwl, st_riwd, st_ribl, st_ride, st_riwi,&
-                              st_rile
+    use initial_module, only: st_rivf_type, st_riwl, st_riwd, st_ribl, st_ride, st_riwi, st_rile
     ! -- inout
     character(*), intent(in) :: rive_path
     integer(I4), intent(in) :: nohv, hv

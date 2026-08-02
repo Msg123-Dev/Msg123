@@ -3,10 +3,10 @@ module set_condition
   use kind_module, only: I4, SP, DP
   use constval_module, only: SZERO, SNOVAL, DZERO, DONE
   use types_module, only: hydr_set, bcnd_set
-  use utility_module, only: st_mpi, gmap_get, gmap_free
-  use initial_module, only: in_type, st_sim, st_grid, st_well
-  use read_module, only: read_2dtxt, read_2dbin, read_3dtxt, read_3dbin, flat_2dto2d,&
-                         flat_2dto3d, flat_3dto3d
+  use utility_module, only: st_mpi
+  use initial_module, only: in_type, st_grid, st_well
+  use read_module, only: read_2dtxt, read_2dbin, read_3dtxt, read_3dbin, flat_2dto2d
+  use read_module, only: flat_2dto3d, flat_3dto3d
   use set_cell, only: ncalc, ncals, neib_ncalc, st_conn
   use make_cell, only: st_geom
 #ifdef MPI_MSG
@@ -1886,12 +1886,13 @@ module set_condition
   !*********************************************************************************************
     ! -- modules
     use constval_module, only: FACE
-    use initial_module, only: st_out_type
+    use utility_module, only: gmap_get, gmap_free
+    use initial_module, only: st_sim, st_out_type
     use set_cell, only: get_calc_grid, seal_cnum
 #ifdef MPI_MSG
     use mpi_set, only: senrec_neibval, senrec_faceval
-    use set_cell, only: neib_mpi_totn, send_cind, recv_cind, send_citem, recv_citem, neib_num,&
-                        send2recv
+    use set_cell, only: neib_mpi_totn, send_cind, recv_cind, send_citem, recv_citem, neib_num
+    use set_cell, only: send2recv
 #endif
     ! -- inout
     real(SP), intent(in) :: cksx(:), cksy(:), cksz(:)

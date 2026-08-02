@@ -2,7 +2,6 @@ module calc_parameter
   ! -- modules
   use kind_module, only: DP
   use constval_module, only: DZERO, DONE
-  use set_condition, only: st_hydr
 
   implicit none
   private
@@ -21,6 +20,7 @@ module calc_parameter
     use kind_module, only: I4
     use constval_module, only: DHALF, DTWO
     use make_cell, only: st_geom
+    use set_condition, only: st_hydr
     ! -- inout
     integer(I4), intent(in) :: num
     real(DP), intent(in) :: pertur

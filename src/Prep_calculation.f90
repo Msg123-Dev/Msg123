@@ -1,6 +1,6 @@
 module prep_calculation
   ! -- modules
-  use kind_module, only: I4, SP, DP
+  use kind_module, only: I4
   use constval_module, only: DZERO
   use types_module, only: time_set
   use utility_module, only: st_mpi

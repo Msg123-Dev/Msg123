@@ -2,10 +2,10 @@ module read_input
   ! -- modules
   use kind_module, only: I4, SP, DP
   use constval_module, only: CHALEN, TIMELEN, SZERO, SONE, DNOVAL
-  use utility_module, only: get_days, open_new_rtxt, close_file, write_logf, write_success,&
-                            write_err_stop
-  use initial_module, only: in_type, unit_list, st_sim, st_ctrl, st_in_type, st_in_path,&
-                            st_in_unit
+  use utility_module, only: get_days, open_new_rtxt, close_file, write_logf, write_success
+  use utility_module, only: write_err_stop
+  use initial_module, only: in_type, unit_list, st_sim, st_ctrl, st_in_type, st_in_path
+  use initial_module, only: st_in_unit
 
   implicit none
   private

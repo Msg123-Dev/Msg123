@@ -2,14 +2,13 @@ module write_output
   ! -- modules
   use kind_module, only: I4, SP, DP
   use types_module, only: sol_set
-  use constval_module, only: SZERO, DZERO
+  use constval_module, only: DZERO
   use utility_module, only: st_mpi, close_file
   use read_input, only: len_scal
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc, ncals
   use set_condition, only: st_hydr, st_bcnd
   use assign_calc, only: msout_tnum
-  use prep_calculation, only: st_time
   use check_simulation, only: lasttime_flag
   use write_module, only: write_2dbin, write_3dbin, write_header_bin
 #ifdef MPI_MSG
@@ -31,11 +30,13 @@ module write_output
   ! write_outf -- write output file
   !*********************************************************************************************
     ! -- modules
+    use constval_module, only: SZERO
     use initial_module, only: out_type, st_out_type, st_out_step
+    use prep_calculation, only: st_time
     use check_simulation, only: check_outtiming, write_flag
     use allocate_output, only: allocate_outvar
-    use calc_output, only: calc_cell_mas, calc_rivr_off, calc_lakr_off, calc_sufr_off,&
-                           calc_dunr_off, calc_seal_res, calc_rech_res, calc_well_res
+    use calc_output, only: calc_cell_mas, calc_rivr_off, calc_lakr_off, calc_sufr_off
+    use calc_output, only: calc_dunr_off, calc_seal_res, calc_rech_res, calc_well_res
 #ifdef MPI_MSG
     use mpi_write, only: write_mpi_rest, set_senrec_wtab
 #endif

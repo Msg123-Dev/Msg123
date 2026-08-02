@@ -1,13 +1,13 @@
 module set_boundary
   ! -- modules
-  use kind_module, only: I4, SP, DP
-  use constval_module, only: SNOVAL, DNOVAL
+  use kind_module, only: I4
+  use constval_module, only: SNOVAL
   use types_module, only: rlbc_set, bfview_set, bound_fview
   use utility_module, only: st_mpi, write_logf, write_err_stop, get_ilen, conv_i2s
-  use initial_module, only: in_type, st_in_type, st_rivf_type, st_lakf_type, st_in_path,&
-                            st_in_unit
+  use initial_module, only: in_type, st_in_type, st_rivf_type, st_lakf_type, st_in_path
+  use initial_module, only: st_in_unit
   use set_cell, only: ncals
-  use set_condition, only: st_hydr, st_bcnd
+  use set_condition, only: st_bcnd
   use assign_boundary, only: assign_surfbv, assign_rilav, st_forc
   use calc_boundary, only: conv_rech2calc, calc_wlbd, calc_blld, calc_lsurf
 #ifdef MPI_MSG
@@ -39,7 +39,7 @@ module set_boundary
     use constval_module, only: DZERO
     use open_file, only: open_in_rivef, open_in_lakef
     use set_cell, only: ncalc
-    use set_condition, only: set_connect, set_srabyd, set_chabyd, set_wellconn
+    use set_condition, only: st_hydr, set_connect, set_srabyd, set_chabyd, set_wellconn
     use calc_boundary, only: calc_reprev, count_rivecalc, count_lakecalc, calc_rivea
 #ifdef MPI_MSG
    use mpi_set, only: bcast_bound_ftype, bcast_solval
@@ -206,8 +206,7 @@ module set_boundary
     if (sum_riwln /= 0 .and. sum_ribln /= 0 .and. sum_riarn /= 0) then
       ! -- Count river calculation (rivecalc)
         call count_rivecalc(st_rive%cflag%wl, st_rive%cflag%bl, st_rive%cflag%ar,&
-                            st_rive%calc%wl, st_rive%calc%bl, st_rive%calc%ar,&
-                            st_bcnd%rive_num)
+                            st_rive%calc%wl, st_rive%calc%bl, st_rive%calc%ar, st_bcnd%rive_num)
     end if
 
     st_rive%num%wl = 0
@@ -265,8 +264,7 @@ module set_boundary
     if (sum_lawln /= 0 .and. sum_labln /= 0 .and. sum_laarn /= 0) then
       ! -- Count lake calculation cell (lakecalc)
         call count_lakecalc(st_lake%cflag%wl, st_lake%cflag%bl, st_lake%cflag%ar,&
-                            st_lake%calc%wl, st_lake%calc%bl, st_lake%calc%ar,&
-                            st_bcnd%lake_num)
+                            st_lake%calc%wl, st_lake%calc%bl, st_lake%calc%ar, st_bcnd%lake_num)
     end if
 
     st_lake%num%wl = 0
@@ -376,8 +374,6 @@ module set_boundary
       end if
 
       ! -- Open input sea level file (in_sealf)
-      !    in_type 7 resolves its inner type inside, so both candidate views are handed over
-      !    and bfview%seal comes back holding the one that was used
         call open_in_sealf(st_in_type%seal, st_in_path%seal, st_in_unit%seal, bfview%seal,&
                            surf_r4view, cell_r4view)
 #else
@@ -436,8 +432,7 @@ module set_boundary
 
       ! -- Open input recharge file (in_rechf)
         call open_in_rechf(st_in_type%rech, st_in_path%rech, st_in_unit%rech, bfview%rech)
-      ! -- open_in_rechf resets st_intre%type=0; restore the header flag for the direct
-      !    2d_bin-with-header case (in_type(7) is set correctly inside open_in_rechf)
+
       if (st_in_type%rech == in_type(4) .and. len_trim(adjustl(st_in_unit%rech)) /= 0) then
         st_intre%type = st_in_type%rech
       end if
@@ -458,8 +453,7 @@ module set_boundary
       !$omp end parallel do
       ! -- Assign recharge value
         call assign_surfbv(st_in_type%rech, st_intre%type, st_rech, st_bcnd%rech_num,&
-                           st_bcnd%rech_cflag,&
-                           st_forc%read_rech)
+                           st_bcnd%rech_cflag, st_forc%read_rech)
 
       call conv_rech2calc(st_bcnd%rech_num)
     end if
@@ -593,8 +587,7 @@ module set_boundary
       !$omp end parallel do
       ! -- Assign precipitation value
         call assign_surfbv(st_in_type%prec, st_intpr%type, st_prec, st_bcnd%prec_num,&
-                           st_bcnd%prec_cflag,&
-                           st_forc%read_prec)
+                           st_bcnd%prec_cflag, st_forc%read_prec)
       deallocate(st_bcnd%prec_cflag)
     end if
 
@@ -656,8 +649,7 @@ module set_boundary
       !$omp end parallel do
       ! -- Assign evapotranspiration value
         call assign_surfbv(st_in_type%evap, st_intev%type, st_evap, st_bcnd%evap_num,&
-                           st_bcnd%evap_cflag,&
-                           st_forc%read_evap)
+                           st_bcnd%evap_cflag, st_forc%read_evap)
       deallocate(st_bcnd%evap_cflag)
     end if
 

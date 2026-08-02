@@ -1,6 +1,6 @@
 module assign_boundary
   ! -- modules
-  use kind_module, only: I4, SP, DP
+  use kind_module, only: I4, SP
   use constval_module, only: SNOVAL, DZERO
   use types_module, only: forc_set
   use utility_module, only: st_mpi, close_file
@@ -28,13 +28,14 @@ module assign_boundary
   ! assign_sealv -- Assign sea level value
   !*********************************************************************************************
     ! -- modules
+    use kind_module, only: DP
     use utility_module, only: write_err_stop, get_ilen, conv_i2s
     use initial_module, only: st_in_type, st_seal
     use read_module, only: read_3dpointf
     use open_file, only: st_intse
     use set_cell, only: ncell, seal_snum, seal_cnum
-    use set_condition, only: set_clas2seal, set_point2seal, set_bound2calc, set_2dfile2seal,&
-                             set_3dfile2seal
+    use set_condition, only: set_clas2seal, set_point2seal, set_bound2calc, set_2dfile2seal
+    use set_condition, only: set_3dfile2seal
 #ifdef MPI_MSG
     use mpi_utility, only: bcast_char
     use mpi_set, only: bcast_3dpoint
@@ -255,8 +256,8 @@ module assign_boundary
     use initial_module, only: st_well
     use open_file, only: st_intwe
     use set_cell, only: ncalc
-    use set_condition, only: set_point2well, set_2dwell, set_3dfile2well, set_well2index,&
-                             set_well3d2index, set_wellprop
+    use set_condition, only: set_point2well, set_2dwell, set_3dfile2well, set_well2index
+    use set_condition, only: set_well3d2index, set_wellprop
     ! -- inout
     integer(I4), intent(in) :: well_ftype, weks_ftype, weke_ftype
     integer(I4), intent(inout) :: num_well

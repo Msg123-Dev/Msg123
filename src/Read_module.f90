@@ -5,7 +5,6 @@ module read_module
   use utility_module, only: st_mpi, open_new_rtxt, open_new_rbin, write_logf, write_err_read
   use initial_module, only: in_type, st_sim, st_grid, st_init
 #ifdef MPI_MSG
-  use utility_module, only: log_fnum
   use mpi_utility, only: bcast_val
 #endif
 

@@ -3,7 +3,7 @@ module calc_output
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE
   use types_module, only: sol_set
-  use set_cell, only: ncalc, ncals, st_conn
+  use set_cell, only: ncalc, ncals
   use set_condition, only: st_hydr, st_bcnd
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
@@ -25,7 +25,7 @@ module calc_output
   !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_grid
-    use set_cell, only: get_cals_grid
+    use set_cell, only: st_conn, get_cals_grid
     use allocate_output, only: wtable
     ! -- inout
     real(DP), intent(in) :: hyd_head(:), deg_satu(:)

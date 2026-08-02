@@ -1,7 +1,7 @@
 module assign_calc
   ! -- modules
   use kind_module, only: I4, SP
-  use constval_module, only: VARLEN, SZERO, SNOVAL, DNOVAL
+  use constval_module, only: VARLEN, SZERO, SNOVAL
   use utility_module, only: st_mpi, close_file, write_err_stop, gmap_get
   use initial_module, only: in_type, st_grid, st_init
   use read_input, only: len_scal, len_scal_inv
@@ -431,13 +431,14 @@ module assign_calc
   !*********************************************************************************************
     ! -- modules
     use kind_module, only: DP
+    use constval_module, only: DNOVAL
     use set_cell, only: get_calc_grid
 #ifdef MPI_MSG
     use mpi_utility, only: mpisum_val, bcast_val
     use mpi_read, only: read_mpi_restf, read_mpi_head
     use mpi_set, only: bcast_init_dep, senrec_neibval
-    use set_cell, only: neib_mpi_totn, neib_ncalc, send_cind, recv_cind, send_citem,&
-                        recv_citem, neib_num, calc2recv
+    use set_cell, only: neib_mpi_totn, neib_ncalc, send_cind, recv_cind, send_citem, recv_citem
+    use set_cell, only: neib_num, calc2recv
 #endif
     ! -- inout
     integer(I4), intent(in) :: init_ftype

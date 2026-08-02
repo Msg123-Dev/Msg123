@@ -1,10 +1,10 @@
 module set_cell
   ! -- modules
   use kind_module, only: I4, SP
-  use constval_module, only: SNOVAL, CHALEN, VARLEN
+  use constval_module, only: SNOVAL, VARLEN
   use types_module, only: conn_set, gmap_set
-  use utility_module, only: st_mpi, iquick_sort, iquick_sort2, open_new_rtxt, write_err_stop,&
-                            gmap_init, gmap_put, gmap_get, gmap_free
+  use utility_module, only: st_mpi, iquick_sort, iquick_sort2, open_new_rtxt, write_err_stop
+  use utility_module, only: gmap_init, gmap_put, gmap_get, gmap_free
   use initial_module, only: st_sim, st_grid, st_clas, in_type, st_ctrl
   use read_module, only: read_2d_calcreg, read_3d_calcreg
 #ifdef MPI_MSG
@@ -50,15 +50,16 @@ module set_cell
   ! set_cell_info -- Set cell information
   !*********************************************************************************************
     ! -- modules
+    use constval_module, only: CHALEN
     use utility_module, only: open_new_wtxt, close_file
     use initial_module, only: out_type, st_out_type, st_out_path
     use check_condition, only: read_seal_set, read_seal_clasf, read_seal_point, read_sea_allv
 #ifdef MPI_MSG
     use mpi_utility, only: barrier_proc, bcast_file
     use mpi_read, only: read_dist_seaval
-    use mpi_set, only: bcast_sim_flag, bcast_xyz_num, bcast_clas_set, bcast_clas_val,&
-                       set_calc_view, set_seal_view, set_rest_view, set_write_fview,&
-                       senrec_reg_info, senrec_grid_num
+    use mpi_set, only: bcast_sim_flag, bcast_xyz_num, bcast_clas_set, bcast_clas_val
+    use mpi_set, only: set_calc_view, set_seal_view, set_rest_view, set_write_fview
+    use mpi_set, only: senrec_reg_info, senrec_grid_num
 #endif
     ! -- inout
 

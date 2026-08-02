@@ -1,7 +1,6 @@
 module ici_module
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use types_module, only: sol_set
   use constval_module, only: DZERO
   use utility_module, only: st_mpi
   use initial_module, only: out_type, st_grid, st_out_type
@@ -9,8 +8,6 @@ module ici_module
   use set_cell, only: get_calc_grid, ncalc, ncals
   use set_condition, only: st_hydr, st_bcnd
   use prep_calculation, only: st_time
-  use assign_boundary, only: st_forc
-  use allocate_output, only: wtable
   use palmtime, only: palm_TimeStart, palm_TimeEnd
   use ici_api, only: ici_put_data
   use mpi
@@ -36,14 +33,12 @@ module ici_module
   !*********************************************************************************************
     ! -- module
     use mpi_set, only: bcast_ici_set
-    use ici_api, only: ici_init, ici_get_comm_local, ici_get_numpe_local, ici_get_irank_local,&
-                       ici_is_coupled
+    use ici_api, only: ici_init, ici_get_comm_local, ici_get_numpe_local, ici_get_irank_local
+    use ici_api, only: ici_is_coupled
     use palmtime, only: palm_TimeInit
     ! -- inout
 
     ! -- local
-    integer(I4) :: ierr, errcode
-    logical :: mpi_init_check
     !-------------------------------------------------------------------------------------------
     if (st_mpi%rank == 0) then
       ! -- Read ici main file (ici_main)
@@ -101,6 +96,7 @@ module ici_module
     ! -- module
     use constval_module, only: SZERO
     use initial_module, only: st_rech, st_riwd, st_step_flag
+    use assign_boundary, only: st_forc
     use set_boundary, only: st_rive
     use ici_api, only: ici_set_time, ici_get_data, ici_get_get_fill_value
     ! -- inout
@@ -238,14 +234,15 @@ module ici_module
   ! put_var -- Put variables
   !*********************************************************************************************
     ! -- module
+    use types_module, only: sol_set
     use initial_module, only: st_in_type
-    use allocate_output, only: roff_rive, roff_lake, roff_surf
+    use allocate_output, only: wtable, roff_rive, roff_lake, roff_surf
     use calc_output, only: calc_wtable, calc_rivr_off, calc_lakr_off, calc_sufr_off
     ! -- inout
 
     type(sol_set), intent(inout) :: st_sol
     ! -- local
-    integer(I4) :: i, s, nz
+    integer(I4) :: i
     real(DP), allocatable :: head_ici(:), wtab_dep(:)
     real(DP), allocatable :: rive_flux(:), lake_flux(:), surf_flux(:), tot_flux(:)
     !-------------------------------------------------------------------------------------------
@@ -416,8 +413,7 @@ module ici_module
     ! -- inout
 
     ! -- local
-    integer(I4) :: i, xn, yn, zn, xy
-    integer(I4) :: coun_cals
+    integer(I4) :: i
     real(DP), allocatable :: init_val(:), dummy_var(:)
     !-------------------------------------------------------------------------------------------
     allocate(init_val(ncalc))
@@ -465,8 +461,8 @@ module ici_module
   !*********************************************************************************************
     ! -- module
     use constval_module, only: VARLEN
-    use ici_api, only: ici_get_exchange_interval_get, ici_get_num_of_configuration,&
-                       ici_get_num_of_exchange, ici_get_get_data_name
+    use ici_api, only: ici_get_exchange_interval_get, ici_get_num_of_configuration
+    use ici_api, only: ici_get_num_of_exchange, ici_get_get_data_name
     ! -- inout
 
     ! -- local

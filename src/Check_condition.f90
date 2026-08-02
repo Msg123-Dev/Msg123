@@ -3,8 +3,8 @@ module check_condition
   use kind_module, only: I4, SP
   use constval_module, only: SONE, SNOVAL
   use utility_module, only: st_mpi, write_err_stop, get_ilen, conv_i2s
-  use initial_module, only: in_type, out_type, st_grid, st_in_type, st_seal, st_out_type,&
-                            st_out_path, st_out_unit, st_out_time, st_out_step
+  use initial_module, only: in_type, out_type, st_grid, st_in_type, st_seal, st_out_type
+  use initial_module, only: st_out_path, st_out_unit, st_out_time, st_out_step
   use open_file, only: open_out_binf
   use read_input, only: len_scal, len_scal_inv
 #ifdef MPI_MSG
@@ -318,7 +318,7 @@ module check_condition
     ! -- modules
     use kind_module, only: SP
     use constval_module, only: CHALEN
-    use utility_module, only: open_new_rtxt, open_new_rbin, write_success, write_err_read
+    use utility_module, only: open_new_rtxt, open_new_rbin, write_err_read
     ! -- inout
     integer(I4), intent(in) :: seal_ftype
     character(*), intent(in) :: seal_path, seal_unit

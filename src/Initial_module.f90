@@ -1,12 +1,12 @@
 module initial_module
   ! -- modules
-  use kind_module, only: I4, SP, DP
+  use kind_module, only: I4
   use constval_module, only: TIMELEN
-  use types_module, only: sim_set, ctrl_set, grid_set, ftype_in, retn_in, parm_in, geog_in,&
-                          rive_in, lake_in, path_in, retn_path, parm_path, geog_path,&
-                          retn_fnum, parm_fnum, geog_fnum, unit_in, clas_set, retn_set,&
-                          parm_set, init_set, seal_set, surfb_set, well_set, surfw_set,&
-                          step_flag, ftype_out, path_out, unit_out, out_time, out_step
+  use types_module, only: sim_set, ctrl_set, grid_set, ftype_in, retn_in, parm_in, geog_in
+  use types_module, only: rive_in, lake_in, path_in, retn_path, parm_path, geog_path, retn_fnum
+  use types_module, only: parm_fnum, geog_fnum, unit_in, clas_set, retn_set, parm_set, init_set
+  use types_module, only: seal_set, surfb_set, well_set, surfw_set, step_flag, ftype_out
+  use types_module, only: path_out, unit_out, out_time, out_step
   use utility_module, only: log_fnum
 
   implicit none
@@ -137,9 +137,10 @@ module initial_module
   ! init_var -- Initialize variables
   !*********************************************************************************************
     ! -- module
-    use constval_module, only: CHALEN, INF_SPEC, INF_CLAS, INF_POIN, INF_2DTX, INF_2DBI,&
-                               INF_3DTX, INF_3DBI, INF_EXTR, OUTF_TABL, OUTF_2DBI, OUTF_3DBI,&
-                               SZERO, SINFI, DZERO, DONE, MACHI_EPS
+    use kind_module, only: SP, DP
+    use constval_module, only: CHALEN, INF_SPEC, INF_CLAS, INF_POIN, INF_2DTX, INF_2DBI
+    use constval_module, only: INF_3DTX, INF_3DBI, INF_EXTR, OUTF_TABL, OUTF_2DBI, OUTF_3DBI
+    use constval_module, only: SZERO, SINFI, DZERO, DONE, MACHI_EPS
     ! -- inout
 
     ! -- local
@@ -208,7 +209,8 @@ module initial_module
 
     !file type
     allocate(in_type(0:7), out_type(3))
-    in_type(:) = [INF_SPEC, INF_CLAS, INF_POIN, INF_2DTX, INF_2DBI, INF_3DTX, INF_3DBI, INF_EXTR]
+    in_type(0:3) = [INF_SPEC, INF_CLAS, INF_POIN, INF_2DTX]
+    in_type(4:7) = [INF_2DBI, INF_3DTX, INF_3DBI, INF_EXTR]
     out_type(:) = [OUTF_TABL, OUTF_2DBI, OUTF_3DBI]
 
     st_sim%sim_name = repeat(' ', CHALEN)

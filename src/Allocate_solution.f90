@@ -4,7 +4,6 @@ module allocate_solution
   use constval_module, only: DZERO
   use types_module, only: sol_set
   use set_cell, only: ncalc
-  use set_condition, only: st_hydr, st_bcnd
 
   implicit none
   private
@@ -106,8 +105,9 @@ module allocate_solution
     ! -- modules
     use initial_module, only: st_ctrl, st_out_type
     use set_cell, only: neib_ncalc
-    use set_condition, only: tconn_num, off_row, off_index, conn_dir, sea_dir, left_off,&
-                             right_off
+    use set_condition, only: tconn_num, off_row, off_index, conn_dir, sea_dir, left_off, st_hydr
+    use set_condition, only: st_bcnd
+    use set_condition, only: right_off
     ! -- inout
 
     type(sol_set), intent(inout) :: st_sol

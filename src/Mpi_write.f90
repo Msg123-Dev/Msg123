@@ -201,63 +201,72 @@ module mpi_write
     !$omp end parallel do
 
     ierr = 0
-    call MPI_REDUCE(inout_st%sto(1), mpi_sto(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%sto(1), mpi_sto(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
+                    st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum storage for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%con(1), mpi_con(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%con(1), mpi_con(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
+                    st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum connect flow for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%sea(1), mpi_sea(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%sea(1), mpi_sea(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
+                    st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum sea discharge for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%wel(1), mpi_wel(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%wel(1), mpi_wel(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
+                    st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum well pumping for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%rec(1), mpi_rec(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%rec(1), mpi_rec(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
+                    st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum recharge for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%sur(1), mpi_sur(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%sur(1), mpi_sur(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
+                    st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum surface runoff for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%riv(1), mpi_riv(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%riv(1), mpi_riv(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
+                    st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum river runoff for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%lak(1), mpi_lak(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%lak(1), mpi_lak(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
+                    st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum lake runoff for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%tot(1), mpi_tot(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%tot(1), mpi_tot(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
+                    st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum total volume for massbalance.")

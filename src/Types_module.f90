@@ -145,7 +145,7 @@ module types_module
     real(SP), allocatable :: value(:)
   end type seal_set
 
-  type, public :: surfb_set
+  type :: surfb_set
     integer(I4) :: totn, fnum
     real(SP) :: etime, uni_conv, multi
     character(VARLEN), allocatable :: name(:)
@@ -159,7 +159,7 @@ module types_module
     real(SP), allocatable :: value(:)
   end type well_set
 
-  type, public :: surfw_set
+  type :: surfw_set
     integer(I4) :: totn, fnum, inttype, intfnum
     real(SP) :: etime, multi, intstep
     character(VARLEN), allocatable :: name(:)

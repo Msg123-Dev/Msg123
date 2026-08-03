@@ -544,7 +544,7 @@ module calc_function
     ! -- local
     integer(I4) :: i
     integer(I4) :: vj_num, vj_regnum
-    real(DP) :: eps, eps_inv, l2_x, l2_v, l1_v, sign
+    real(DP) :: eps, eps_inv, l2_x, l2_v, sign
 #ifdef MPI_MSG
     real(DP) :: sum_l2
 #endif
@@ -569,17 +569,12 @@ module calc_function
       call calc_func(hold, sold, surfh, injx, snew, rperm, surfr, tempf1)
 
     ! Brown and Saad version
-    l2_v = DZERO ; l2_x = DZERO ; l1_v = DZERO
+    l2_v = DZERO ; l2_x = DZERO
     !$omp parallel
     !$omp do private(i) reduction(+:l2_v, l2_x)
     do i = 1, vj_num
       l2_v = l2_v + injvec(i)*injvec(i)
       l2_x = l2_x + injx(i)*injvec(i)
-    end do
-    !$omp end do
-    !$omp do private(i) reduction(+:l1_v)
-    do i = 1, vj_num
-      l1_v = l1_v + abs(injvec(i))
     end do
     !$omp end do
     !$omp end parallel
@@ -592,9 +587,6 @@ module calc_function
       ! -- Sum value for MPI (val)
         call mpisum_val(l2_x, "jacobian-free x l2-norm", sum_l2)
       l2_x = sum_l2
-      ! -- Sum value for MPI (val)
-        call mpisum_val(l1_v, "jacobian-free v l1-norm", sum_l2)
-      l1_v = sum_l2
     end if
 #endif
 
@@ -604,7 +596,7 @@ module calc_function
       sign = DONE
     end if
 
-    eps = sign*sqrt(MACHI_EPS)*max(abs(l2_x),l1_v)/l2_v
+    eps = sign*MACHI_EPS*max(abs(l2_x),sqrt(l2_v))/l2_v
     eps_inv = DONE/eps
 
     !$omp parallel do private(i)

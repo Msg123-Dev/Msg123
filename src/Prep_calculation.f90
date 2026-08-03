@@ -26,9 +26,10 @@ module prep_calculation
   !*********************************************************************************************
     ! -- modules
     use constval_module, only: SZERO, DONE, MACHI_EPS
-    use initial_module, only: st_sim, st_ctrl
-    use read_input, only: len_scal_inv
+    use initial_module, only: st_sim, st_ctrl, st_grid
+    use read_input, only: read_grid_file, len_scal_inv
     use check_condition, only: check_outf_cond
+    use make_cell, only: make_cell_info
 #ifdef MPI_MSG
     use mpi_set, only: bcast_calc_ftype, bcast_sim_val, bcast_out_type
 #endif
@@ -37,8 +38,13 @@ module prep_calculation
     ! -- local
 
     !-------------------------------------------------------------------------------------------
-    ! -- Set grid information (grid_info)
-      call set_grid_info()
+    if (st_mpi%rank == 0) then
+      ! -- Read grid file (grid_file)
+        call read_grid_file(st_grid%fnum, st_grid%nx, st_grid%ny, st_grid%nz, st_in_type%grid)
+    end if
+
+    ! -- Make cell information (cell_info)
+      call make_cell_info()
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
@@ -80,30 +86,6 @@ module prep_calculation
     st_time%conv_flag = .false.
 
   end subroutine prepare_calc
-
-  subroutine set_grid_info()
-  !*********************************************************************************************
-  ! set_grid_info -- Set grid information
-  !*********************************************************************************************
-    ! -- modules
-    use initial_module, only: st_grid
-    use read_input, only: read_grid_file
-    use make_cell, only: make_cell_info
-    ! -- inout
-
-    ! -- local
-    integer(I4) :: nx, ny, nz
-    !-------------------------------------------------------------------------------------------
-    if (st_mpi%rank == 0) then
-      nx = st_grid%nx ; ny = st_grid%ny ; nz = st_grid%nz
-      ! -- Read grid file (grid_file)
-        call read_grid_file(st_grid%fnum, nx, ny, nz, st_in_type%grid)
-    end if
-
-    ! -- Make cell information (cell_info)
-      call make_cell_info()
-
-  end subroutine set_grid_info
 
   subroutine set_retn_info()
   !*********************************************************************************************

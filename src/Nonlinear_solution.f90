@@ -479,6 +479,9 @@ module nonlinear_solution
                         st_sol%surf_head, st_sol%head_pre, st_sol%srat_new, st_sol%rel_perm,&
                         st_sol%surf_rati, jacvec)
 
+    ! -- [KIN Level 1 verify] Verify jacobi-free vector (vecjacf) -- remove after check
+      call verify_vecjacf(st_sol%head_change, jacvec)
+
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
       ! -- Sum value for MPI (val)
@@ -702,6 +705,96 @@ module nonlinear_solution
 #endif
 
   end subroutine calc_funcl2norm
+
+  subroutine verify_vecjacf(dvec, jvec)
+  !*********************************************************************************************
+  ! verify_vecjacf -- Verify jacobi-free vector against assembled matrix (temporary)
+  !   Level 1 check of docs/kinsol_alignment.md section 6. calc_vecjacf returns -J*dh and
+  !   calc_resi with a zero right hand side returns -M*dh, so jacvec and resv must agree
+  !   within the order of the perturbation size when M is the analytic jacobian.
+  !   Remove this routine and its call in run_backtr after the check is done.
+  !*********************************************************************************************
+    ! -- modules
+    use allocate_solution, only: crs_index
+    use calc_function, only: vj_eps, vj_dfn, vj_fn1
+    use calc_simulation, only: calc_resi
+#ifdef MPI_MSG
+    use mpi_solve, only: senrec_rvectv
+#endif
+    ! -- inout
+    real(DP), intent(in) :: dvec(:), jvec(:)
+    ! -- local
+    integer(I4) :: i
+    real(DP) :: dif_l2, ref_l2, rhs_l2, rel_err, can_rat
+    real(DP), allocatable :: work(:), zerob(:), resv(:)
+#ifdef MPI_MSG
+    real(DP) :: sum_val
+#endif
+    !-------------------------------------------------------------------------------------------
+    allocate(work(nreg_num), zerob(ncalc), resv(ncalc))
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, nreg_num
+      work(i) = dvec(i)
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncalc
+      zerob(i) = DZERO ; resv(i) = DZERO
+    end do
+    !$omp end do
+    !$omp end parallel
+
+#ifdef MPI_MSG
+    if (st_mpi%totn /= 1) then
+      ! -- Send and recieve real vector value (rvectv)
+        call senrec_rvectv(work)
+    end if
+#endif
+    ! -- Calculate residual (resi)
+      call calc_resi(1, crs_index(1)%unknow, array_var(1)%dmat, array_var(1)%lumat, work,&
+                     zerob, resv)
+
+    dif_l2 = DZERO ; ref_l2 = DZERO ; rhs_l2 = DZERO
+    !$omp parallel do private(i) reduction(+:dif_l2, ref_l2, rhs_l2)
+    do i = 1, ncalc
+      dif_l2 = dif_l2 + (jvec(i)-resv(i))*(jvec(i)-resv(i))
+      ref_l2 = ref_l2 + resv(i)*resv(i)
+      rhs_l2 = rhs_l2 + array_var(1)%rhs(i)*array_var(1)%rhs(i)
+    end do
+    !$omp end parallel do
+
+#ifdef MPI_MSG
+    if (st_mpi%totn /= 1) then
+      ! -- Sum value for MPI (val)
+        call mpisum_val(dif_l2, "verify jacobi-free difference l2-norm", sum_val)
+      dif_l2 = sum_val
+      ! -- Sum value for MPI (val)
+        call mpisum_val(ref_l2, "verify jacobi-free reference l2-norm", sum_val)
+      ref_l2 = sum_val
+      ! -- Sum value for MPI (val)
+        call mpisum_val(rhs_l2, "verify jacobi-free right hand side l2-norm", sum_val)
+      rhs_l2 = sum_val
+    end if
+#endif
+
+    rel_err = DZERO
+    if (ref_l2 > DZERO) then
+      rel_err = sqrt(dif_l2/ref_l2)
+    end if
+    can_rat = DZERO
+    if (vj_fn1 > DZERO) then
+      can_rat = vj_dfn/vj_fn1
+    end if
+    if (st_mpi%rank == 0) then
+      write(*,'(a,i6,8(1x,es11.4))') "VJDIAG outit dif ref rel rhs eps dfn fn1 can= ",&
+                                     st_time%out_iter, sqrt(dif_l2), sqrt(ref_l2), rel_err,&
+                                     sqrt(rhs_l2), vj_eps, vj_dfn, vj_fn1, can_rat
+    end if
+
+    deallocate(work, zerob, resv)
+
+  end subroutine verify_vecjacf
 
   subroutine write_rest(rest_head)
   !*********************************************************************************************

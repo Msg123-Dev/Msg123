@@ -372,7 +372,7 @@ module calc_function
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncals
-      delh_s(i) = DZERO ; elev_rati(i) = DZERO
+      delh_s(i) = DZERO ; elev_rati(i) = DZERO ; surfr(i) = DONE
     end do
     !$omp end do
 

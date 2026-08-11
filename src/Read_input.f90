@@ -82,6 +82,7 @@ module read_input
       call read_init_list()
 
     ierr = 0 ; time_input_file = ""
+    rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_time_input,iostat=ierr)
     if (ierr /= 0) then
       call write_err_stop("While reading timeseries input section in main file.")
@@ -118,6 +119,7 @@ module read_input
     namelist/set_out_vari/out_list
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; out_list = ""
+    rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_out_vari,iostat=ierr)
     if (ierr /= 0) then
       call write_err_stop("While reading output variable section in main file.")
@@ -163,6 +165,7 @@ module read_input
     namelist/set_simulation/sim_type, sim_name
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; sim_type = -2 ; sim_name = ""
+    rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_simulation,iostat=ierr)
 
     if (ierr /= 0) then
@@ -201,6 +204,7 @@ module read_input
     namelist/set_calc_time/stime_type, sdate, edate, end_time, calc_unit
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; stime_type = -1 ; end_time = SZERO ; calc_multi = SZERO ; calc_unit = ""
+    rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_calc_time,iostat=ierr)
 
     if (ierr /= 0) then
@@ -244,6 +248,7 @@ module read_input
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; calc_type = -1 ; calcreg_neib = -1
     calcreg_name = "" ; inact_name = "" ; clas_file = ""
+    rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_calc_reg,iostat=ierr)
 
     if (ierr /= 0) then
@@ -362,6 +367,7 @@ module read_input
     tstep_type = st_ctrl%tstep_type ; maxout_iter = st_ctrl%maxout_iter
     picard_iter = st_ctrl%picard_iter ; maxinn_iter = st_ctrl%maxinn_iter
     precon_type = st_ctrl%precon_type ; criteria = st_ctrl%criteria
+    rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_solution,iostat=ierr)
     st_ctrl%tstep_type = tstep_type ; st_ctrl%maxout_iter = maxout_iter
     st_ctrl%picard_iter = picard_iter ; st_ctrl%maxinn_iter = maxinn_iter
@@ -421,6 +427,7 @@ module read_input
     amg_nlevel = st_ctrl%amg_nlevel ; maxvcy_iter = st_ctrl%maxvcy_iter
     max_sweep = st_ctrl%max_sweep ; jac_omega = st_ctrl%jac_omega
     amg_theta = st_ctrl%amg_theta
+    rewind(unit=file_num)
     read(unit=file_num,nml=set_amg,iostat=ierr)
     st_ctrl%amg_nlevel = amg_nlevel ; st_ctrl%maxvcy_iter = maxvcy_iter
     st_ctrl%max_sweep = max_sweep ; st_ctrl%jac_omega = jac_omega
@@ -447,6 +454,7 @@ module read_input
     !-------------------------------------------------------------------------------------------
     ierr = 0
     gridx = 0 ; gridy = 0 ; gridz = 0 ; gridxyz = 0 ; grid_type = -1 ; grid_file = ""
+    rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_grid,iostat=ierr)
     if (ierr /= 0) then
       call write_err_stop("While reading grid section in main file.")
@@ -688,6 +696,7 @@ module read_input
     namelist/set_retn_parm/retn_type, parm_type, retn_file, parm_file
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; retn_type = -1 ; parm_type = -1 ; retn_file = "" ; parm_file = ""
+    rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_retn_parm,iostat=ierr)
 
     if (ierr /= 0) then
@@ -738,6 +747,7 @@ module read_input
     namelist/set_init/init_type, init_file, init_dept, init_unit
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; init_type = -1 ; init_dept = DNOVAL ; init_file = "" ; init_unit = ""
+    rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_init,iostat=ierr)
 
     if (ierr /= 0) then
@@ -956,6 +966,7 @@ module read_input
     namelist/set_geog/geog_type, geog_file
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; geog_type = -1 ; geog_file = ""
+    rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_geog,iostat=ierr)
 
     if (geog_type /= in_type(0)) then
@@ -984,6 +995,7 @@ module read_input
     namelist/set_wtab/wtab_type
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; wtab_type = -1
+    rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_wtab,iostat=ierr)
 
     if (wtab_type /= in_type(7)) then
@@ -1015,6 +1027,7 @@ module read_input
     all_mass_type(:) = [in_type(3:6)]
     mass_mask(:) = (mass_type == all_mass_type(:))
 
+    rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_mass,iostat=ierr)
 
     if (any(mass_mask) .and. len_trim(adjustl(mass_file)) == 0) then
@@ -1355,11 +1368,13 @@ module read_input
     head_unit = "" ; rest_unit = "" ; srat_unit = "" ; wtab_unit = "" ; mass_unit = ""
     velc_unit = "" ; rivr_unit = "" ; lakr_unit = "" ; sufr_unit = "" ; dunr_unit = ""
     seal_unit = "" ; well_unit = "" ; rech_unit = ""
+    rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_out_unit,iostat=ierr)
     if (ierr /= 0) then
       call write_err_stop("While reading output unit section in main file.")
     end if
 
+    rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_out_time,iostat=ierr)
     if (ierr /= 0) then
       call write_err_stop("While reading output interval time section in main file.")

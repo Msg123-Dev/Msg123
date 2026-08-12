@@ -246,7 +246,7 @@ module make_linearsystem
     ! -- inout
     real(DP), intent(in) :: per_relp(:)
     type(sol_set), intent(in) :: st_sol
-    real(DP), intent(out) :: dmat_con(:)
+    real(DP), intent(inout) :: dmat_con(:)
     real(DP), intent(out) :: lumat_con(:)
     real(DP), intent(out) :: deri_dcon(:), rel_hyd(:), deri_lucon(:), deri_con1(:), deri_con2(:)
     ! -- local

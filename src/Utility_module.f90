@@ -12,7 +12,7 @@ module utility_module
   public :: close_file
   public :: write_logf, write_success
   public :: write_err_read, write_err_write, write_err_close, write_err_stop
-  public :: conv_unit, get_ilen, conv_i2s
+  public :: conv_unit, get_ilen, conv_i2s, conv_lower
   public :: iquick_sort, iquick_sort2
   public :: gmap_init, gmap_put, gmap_get, gmap_free
 
@@ -419,6 +419,28 @@ module utility_module
     write(str,'(I0)') num
 
   end subroutine conv_i2s
+
+  function conv_lower(in_char) result(low_char)
+  !*********************************************************************************************
+  ! conv_lower -- Convert a character string to lower case
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    character(*), intent(in) :: in_char
+    ! -- local
+    integer(I4) :: i, char_num
+    character(len(in_char)) :: low_char
+    !-------------------------------------------------------------------------------------------
+    low_char(:) = in_char(:)
+    do i = 1, len(in_char)
+      char_num = iachar(low_char(i:i))
+      if (char_num >= iachar("A") .and. char_num <= iachar("Z")) then
+        low_char(i:i) = achar(char_num + 32)
+      end if
+    end do
+
+  end function conv_lower
 
   recursive subroutine iquick_sort(in_x, first, last)
   !*********************************************************************************************

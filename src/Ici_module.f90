@@ -347,24 +347,29 @@ module ici_module
   ! read_ici_main -- Set ici mail file
   !*********************************************************************************************
     ! -- module
-    use utility_module, only: open_new_rtxt
+    use utility_module, only: open_new_rtxt, close_file, write_logf, write_err_stop
+    use read_input, only: add_nml_name
     ! -- inout
 
     ! -- local
     integer(I4) :: ierr
     integer(I4) :: main_fnum
     character(:), allocatable :: main_file
-    namelist/set_ici/my_comp, my_grid, ici_file, mat_get, mat_put, cama_get, cama_put
+    namelist/set_ils/my_comp, my_grid, ici_file, mat_get, mat_put, cama_get, cama_put
     !-------------------------------------------------------------------------------------------
-    main_file = 'msg.main'
+    main_file = 'msg123.main'
+    ! -- Add name list group read by this module (nml_name)
+      call add_nml_name("set_ils")
+
     ! -- Open new read text file (new_rtxt)
       call open_new_rtxt(1, 1, main_file, "msg123 main", main_fnum)
 
     ierr = 0
-    read(unit=main_fnum,nml=set_ici,iostat=ierr)
+    read(unit=main_fnum,nml=set_ils,iostat=ierr)
     if (ierr /= 0) then
-      call write_err_stop("While reading Integrated Land Simulator(ILS) section in main file.")
+      call write_err_stop("&set_ils is required for ILS but not read in msg123.main.")
     end if
+    call write_logf("&set_ils in msg123.main is read for ILS.")
 
     call close_file(main_fnum)
 

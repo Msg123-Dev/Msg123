@@ -1,22 +1,34 @@
 module read_input
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: CHALEN, TIMELEN, SZERO, SONE, DNOVAL
+  use constval_module, only: VARLEN, CHALEN, TIMELEN, SZERO, SONE, DNOVAL
   use utility_module, only: get_days, open_new_rtxt, close_file, write_logf, write_success
-  use utility_module, only: write_err_stop
+  use utility_module, only: write_err_stop, conv_lower
   use initial_module, only: in_type, unit_list, st_sim, st_ctrl, st_in_type, st_in_path
   use initial_module, only: st_in_unit
 
   implicit none
   private
-  public :: read_main_file, read_grid_file
+  public :: read_main_file, read_grid_file, add_nml_name
   real(SP), public :: len_scal, len_scal_inv
   real(DP), allocatable, public :: glob_x(:,:), glob_y(:,:), glob_z(:,:,:)
 
   ! -- local
-  integer(I4) :: main_fnum
+  integer(I4) :: main_fnum, main_namen
   integer(I4) :: sdate(6), edate(6)
   integer(I4) :: grid_check, grid_xnum, grid_ynum, grid_znum
+  integer(I4) :: nml_addn = 0
+  integer(I4), parameter :: MAIN_MAXN = 32, ADD_MAXN = 1
+  integer(I4), parameter :: NML_MUSTN = 9, NML_OPTN = 6
+  character(VARLEN) :: main_name(MAIN_MAXN)
+  character(VARLEN) :: nml_add(ADD_MAXN)
+  character(VARLEN), parameter :: NML_MUST(NML_MUSTN) = [character(VARLEN) :: &
+                                  "set_simulation", "set_calc_time", "set_calc_reg", &
+                                  "set_solution", "set_grid", "set_retn_parm", &
+                                  "set_init", "set_time_input", "set_out_vari"]
+  character(VARLEN), parameter :: NML_OPT(NML_OPTN) = [character(VARLEN) :: &
+                                  "set_amg", "set_geog", "set_wtab", "set_mass", &
+                                  "set_out_unit", "set_out_time"]
 
   contains
 
@@ -36,6 +48,12 @@ module read_input
 
     ! -- Open new read text file (new_rtxt)
       call open_new_rtxt(1, 1, main_file, "msg123 main", main_fnum)
+
+    ! -- Read main name list group in main file (main_name_list)
+      call read_main_name_list()
+
+    ! -- Check main name list group in main file (main_name_list)
+      call check_main_name_list()
 
     ! -- Read simulation name list (sim_list)
       call read_sim_list()
@@ -61,6 +79,110 @@ module read_input
     deallocate(main_file)
 
   end subroutine read_main_file
+
+  subroutine read_main_name_list()
+  !*********************************************************************************************
+  ! read_main_name_list -- Read name list group in main file
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i, ierr, end_pos
+    character(CHALEN) :: read_line
+    !-------------------------------------------------------------------------------------------
+    ierr = 0 ; main_namen = 0
+    do i = 1, MAIN_MAXN
+      main_name(i) = repeat(" ", VARLEN)
+    end do
+
+    rewind(unit=main_fnum)
+    do
+      read(unit=main_fnum,fmt='(a)',iostat=ierr) read_line
+      if (ierr /= 0) then
+        exit
+      end if
+      read_line = adjustl(read_line)
+      if (read_line(1:1) /= "&") then
+        cycle
+      end if
+      end_pos = index(trim(read_line), " ")
+      if (end_pos == 0) then
+        end_pos = len_trim(read_line) + 1
+      end if
+      if (main_namen >= MAIN_MAXN) then
+        call write_err_stop("Too many name list groups in msg123.main. Increase MAIN_MAXN.")
+      end if
+
+      main_namen = main_namen + 1
+      main_name(main_namen) = conv_lower(read_line(2:end_pos-1))
+    end do
+    rewind(unit=main_fnum)
+
+  end subroutine read_main_name_list
+
+  subroutine check_main_name_list()
+  !*********************************************************************************************
+  ! check_main_name_list -- Check name list group in main file
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i, err_num
+    !-------------------------------------------------------------------------------------------
+    err_num = 0
+
+    ! -- Check required name list group (must)
+      do i = 1, NML_MUSTN
+        if (.not. find_nml_name(NML_MUST(i), main_name(1:main_namen))) then
+          call write_logf("&"//trim(NML_MUST(i))//" is required but not found in msg123.main.")
+          err_num = err_num + 1
+        end if
+      end do
+
+    ! -- Check unknown name list group (unknown)
+      do i = 1, main_namen
+        if (find_nml_name(main_name(i), NML_MUST)) then
+          cycle
+        end if
+        if (find_nml_name(main_name(i), NML_OPT)) then
+          cycle
+        end if
+        if (find_nml_name(main_name(i), nml_add(1:nml_addn))) then
+          cycle
+        end if
+        call write_logf("&"//trim(main_name(i))//" is an unknown name list group.")
+        err_num = err_num + 1
+      end do
+
+    if (err_num /= 0) then
+      call write_err_stop("Check name list group in msg123.main. See log file.")
+    end if
+
+  end subroutine check_main_name_list
+
+  subroutine add_nml_name(nml_name)
+  !*********************************************************************************************
+  ! add_nml_name -- Add name list group read by another module
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    character(*), intent(in) :: nml_name
+    ! -- local
+
+    !-------------------------------------------------------------------------------------------
+    if (nml_addn >= ADD_MAXN) then
+      call write_err_stop("Too many added name list groups. Increase ADD_MAXN.")
+    end if
+
+    nml_addn = nml_addn + 1
+    nml_add(nml_addn) = conv_lower(nml_name)
+
+  end subroutine add_nml_name
 
   subroutine read_inp_set()
   !*********************************************************************************************
@@ -969,6 +1091,10 @@ module read_input
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_geog,iostat=ierr)
 
+    if (ierr /= 0 .and. find_nml_name("set_geog", main_name(1:main_namen))) then
+      call write_err_stop("While reading geography section in main file.")
+    end if
+
     if (geog_type /= in_type(0)) then
       call write_logf("Set not to use geography function.")
     else
@@ -998,6 +1124,10 @@ module read_input
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_wtab,iostat=ierr)
 
+    if (ierr /= 0 .and. find_nml_name("set_wtab", main_name(1:main_namen))) then
+      call write_err_stop("While reading water table section in main file.")
+    end if
+
     if (wtab_type /= in_type(7)) then
       call write_logf("Set not to use water table depth output function.")
     end if
@@ -1025,11 +1155,15 @@ module read_input
     ierr = 0 ; mass_type = -1 ; mass_file = ""
     allocate(all_mass_type(4), mass_mask(4))
     all_mass_type(:) = [in_type(3:6)]
-    mass_mask(:) = (mass_type == all_mass_type(:))
 
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_mass,iostat=ierr)
 
+    if (ierr /= 0 .and. find_nml_name("set_mass", main_name(1:main_namen))) then
+      call write_err_stop("While reading massbalance section in main file.")
+    end if
+
+    mass_mask(:) = (mass_type == all_mass_type(:))
     if (any(mass_mask) .and. len_trim(adjustl(mass_file)) == 0) then
       call write_err_stop("Specify massbalance file path in main file.")
     end if
@@ -1459,5 +1593,28 @@ module read_input
     deallocate(str_sim_name)
 
   end subroutine set_output
+
+  function find_nml_name(nml_name, nml_list) result(hit_flag)
+  !*********************************************************************************************
+  ! find_nml_name -- Find name list group name in name list group array
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    character(*), intent(in) :: nml_name
+    character(*), intent(in) :: nml_list(:)
+    ! -- local
+    integer(I4) :: i
+    logical :: hit_flag
+    !-------------------------------------------------------------------------------------------
+    hit_flag = .false.
+    do i = 1, size(nml_list)
+      if (trim(nml_list(i)) == trim(nml_name)) then
+        hit_flag = .true.
+        exit
+      end if
+    end do
+
+  end function find_nml_name
 
 end module read_input

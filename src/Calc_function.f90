@@ -187,7 +187,7 @@ module calc_function
 
     if (st_sim%sim_type >= 0) then
       ! -- Function storage change (stochn)
-        call func_stochn(hnew, alp_ss_new, alp_ss_old, stom, hold, sold, snew)
+        call func_stochn(hnew, alp_ss_new, alp_ss_old, hold, sold, snew, stom)
     end if
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then

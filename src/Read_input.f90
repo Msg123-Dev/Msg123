@@ -481,19 +481,23 @@ module read_input
     integer(I4) :: ierr
     real(SP) :: init_step, incr_multi, decr_multi, max_tstep
     integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type
+    integer(I4) :: krpos_type
     real(DP) :: criteria
     namelist/set_solution/init_step, tstep_type, incr_multi, decr_multi, max_tstep,&
-                          maxout_iter, picard_iter, criteria, maxinn_iter, precon_type
+                          maxout_iter, picard_iter, criteria, maxinn_iter, precon_type,&
+                          krpos_type
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; init_step = SZERO ; incr_multi = SZERO ; decr_multi = SZERO ; max_tstep = SZERO
     tstep_type = st_ctrl%tstep_type ; maxout_iter = st_ctrl%maxout_iter
     picard_iter = st_ctrl%picard_iter ; maxinn_iter = st_ctrl%maxinn_iter
     precon_type = st_ctrl%precon_type ; criteria = st_ctrl%criteria
+    krpos_type = st_ctrl%krpos_type
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_solution,iostat=ierr)
     st_ctrl%tstep_type = tstep_type ; st_ctrl%maxout_iter = maxout_iter
     st_ctrl%picard_iter = picard_iter ; st_ctrl%maxinn_iter = maxinn_iter
     st_ctrl%precon_type = precon_type ; st_ctrl%criteria = criteria
+    st_ctrl%krpos_type = krpos_type
 
     if (ierr /= 0) then
       call write_err_stop("While reading solution section in main file.")
@@ -511,6 +515,10 @@ module read_input
       call write_err_stop("Input a non-negative value for preconditoner type.")
     else if (st_ctrl%precon_type > 1) then
       call write_err_stop("Input a valid value for preconditoner type.")
+    else if (st_ctrl%krpos_type < 0) then
+      call write_err_stop("Input a non-negative value for kr position type.")
+    else if (st_ctrl%krpos_type > 1) then
+      call write_err_stop("Input a valid value for kr position type.")
     else if (st_ctrl%maxout_iter < st_ctrl%picard_iter) then
       call write_err_stop("Picard iteration is larger than maximum number of outer iteration.")
     end if

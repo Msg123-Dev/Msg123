@@ -19,6 +19,7 @@ module calc_parameter
     ! -- modules
     use kind_module, only: I4
     use constval_module, only: DHALF, DTWO
+    use initial_module, only: st_ctrl
     use make_cell, only: st_geom
     use set_condition, only: st_hydr
     ! -- inout
@@ -31,10 +32,12 @@ module calc_parameter
     integer(I4) :: i
     real(DP) :: retm, beta, theta, kr, se, ss
     real(DP) :: per_phead, phead0
+    real(DP) :: kr_phead, kr_beta, kr_se
     !-------------------------------------------------------------------------------------------
     phead0 = DZERO
 
-    !$omp parallel do private(i, per_phead, retm, beta, theta, kr, se, ss)
+    !$omp parallel do private(i, per_phead, retm, beta, theta, kr, se, ss) &
+    !$omp             private(kr_phead, kr_beta, kr_se)
     do i = 1, num
       per_phead = pres(i) - st_geom%cell_top(i) + pertur
       if (per_phead < DZERO) then
@@ -56,6 +59,19 @@ module calc_parameter
         kr = DONE
         ss = st_hydr%read_spst(i)
       end if
+      ! -- Evaluate relative permeability at the cell centre (krpos_type = 1)
+      if (st_ctrl%krpos_type == 1) then
+        kr_phead = pres(i) - st_geom%cell_cent(i) + pertur
+        if (kr_phead < DZERO) then
+          retm = DONE - DONE/st_hydr%read_vann(i)
+          kr_beta = abs(kr_phead*st_hydr%read_vana(i))**st_hydr%read_vann(i)
+          kr_se = (DONE+kr_beta)**(-retm)
+          kr = kr_se**(DHALF)*(DONE-(DONE-kr_se**(DONE/retm))**retm)**DTWO
+        else
+          kr = DONE
+        end if
+      end if
+
       rperm(i) = kr
       if (present(sstor)) then
         sstor(i) = ss

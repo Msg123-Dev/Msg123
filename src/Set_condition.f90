@@ -1794,6 +1794,7 @@ module set_condition
     integer(I4), allocatable :: temp_wconn(:)
     !-------------------------------------------------------------------------------------------
     allocate(temp_wconn(st_grid%nz*wnum), st_bcnd%well_index(0:wnum))
+    st_bcnd%well_index(0) = 0
     !$omp parallel
     !$omp do private(i)
     do i = 1, st_grid%nz*wnum

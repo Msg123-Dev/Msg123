@@ -19,7 +19,7 @@ module calc_parameter
     ! -- modules
     use kind_module, only: I4
     use constval_module, only: DHALF, DTWO
-    use initial_module, only: st_ctrl
+    use initial_module, only: st_schm
     use make_cell, only: st_geom
     use set_condition, only: st_hydr
     ! -- inout
@@ -60,7 +60,7 @@ module calc_parameter
         ss = st_hydr%read_spst(i)
       end if
       ! -- Evaluate relative permeability at the cell centre (krpos_type = 1)
-      if (st_ctrl%krpos_type == 1) then
+      if (st_schm%krpos_type == 1) then
         kr_phead = pres(i) - st_geom%cell_cent(i) + pertur
         if (kr_phead < DZERO) then
           retm = DONE - DONE/st_hydr%read_vann(i)

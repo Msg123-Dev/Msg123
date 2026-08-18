@@ -5,7 +5,8 @@ module types_module
 
   implicit none
   private
-  public :: mpi_set, sim_set, ctrl_set, geom_set, time_set, grid_set, ftype_in, retn_in
+  public :: mpi_set, sim_set, ctrl_set, schm_set, geom_set, time_set, grid_set, ftype_in
+  public :: retn_in
   public :: parm_in, geog_in, rive_in, lake_in, path_in, retn_path, parm_path, geog_path
   public :: retn_fnum, parm_fnum, geog_fnum, unit_in, clas_set, retn_set, parm_set, init_set
   public :: seal_set, surfb_set, well_set, surfw_set, step_flag, ftype_out, path_out, unit_out
@@ -28,10 +29,13 @@ module types_module
     integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type
     integer(I4) :: nlevel, maxvcy_iter, amg_nlevel, max_sweep
     integer(I4) :: noclas_flag = 0
-    integer(I4) :: krpos_type = 0
     real(DP) :: criteria, errtol, newper, newper_inv
     real(SP) :: jac_omega, amg_theta
   end type ctrl_set
+
+  type :: schm_set
+    integer(I4) :: krpos_type = 0
+  end type schm_set
 
   type :: geom_set
     real(DP), allocatable :: cell_vol(:)

@@ -4,8 +4,8 @@ module read_input
   use constval_module, only: VARLEN, CHALEN, TIMELEN, SZERO, SONE, DNOVAL
   use utility_module, only: get_days, open_new_rtxt, close_file, write_logf, write_success
   use utility_module, only: write_err_stop, conv_lower
-  use initial_module, only: in_type, unit_list, st_sim, st_ctrl, st_in_type, st_in_path
-  use initial_module, only: st_in_unit
+  use initial_module, only: in_type, unit_list, st_sim, st_ctrl, st_schm, st_in_type
+  use initial_module, only: st_in_path, st_in_unit
 
   implicit none
   private
@@ -19,7 +19,7 @@ module read_input
   integer(I4) :: grid_check, grid_xnum, grid_ynum, grid_znum
   integer(I4) :: nml_addn = 0
   integer(I4), parameter :: MAIN_MAXN = 32, ADD_MAXN = 1
-  integer(I4), parameter :: NML_MUSTN = 9, NML_OPTN = 6
+  integer(I4), parameter :: NML_MUSTN = 9, NML_OPTN = 7
   character(VARLEN) :: main_name(MAIN_MAXN)
   character(VARLEN) :: nml_add(ADD_MAXN)
   character(VARLEN), parameter :: NML_MUST(NML_MUSTN) = [character(VARLEN) :: &
@@ -27,8 +27,8 @@ module read_input
                                   "set_solution", "set_grid", "set_retn_parm", &
                                   "set_init", "set_time_input", "set_out_vari"]
   character(VARLEN), parameter :: NML_OPT(NML_OPTN) = [character(VARLEN) :: &
-                                  "set_amg", "set_geog", "set_wtab", "set_mass", &
-                                  "set_out_unit", "set_out_time"]
+                                  "set_amg", "set_scheme", "set_geog", "set_wtab", &
+                                  "set_mass", "set_out_unit", "set_out_time"]
 
   contains
 
@@ -66,6 +66,9 @@ module read_input
 
     ! -- Read solution name list (sol_list)
       call read_sol_list()
+
+    ! -- Read scheme name list (schm_list)
+      call read_schm_list()
 
     ! -- Read grid name list (grid_list)
       call read_grid_list()
@@ -481,23 +484,19 @@ module read_input
     integer(I4) :: ierr
     real(SP) :: init_step, incr_multi, decr_multi, max_tstep
     integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type
-    integer(I4) :: krpos_type
     real(DP) :: criteria
     namelist/set_solution/init_step, tstep_type, incr_multi, decr_multi, max_tstep,&
-                          maxout_iter, picard_iter, criteria, maxinn_iter, precon_type,&
-                          krpos_type
+                          maxout_iter, picard_iter, criteria, maxinn_iter, precon_type
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; init_step = SZERO ; incr_multi = SZERO ; decr_multi = SZERO ; max_tstep = SZERO
     tstep_type = st_ctrl%tstep_type ; maxout_iter = st_ctrl%maxout_iter
     picard_iter = st_ctrl%picard_iter ; maxinn_iter = st_ctrl%maxinn_iter
     precon_type = st_ctrl%precon_type ; criteria = st_ctrl%criteria
-    krpos_type = st_ctrl%krpos_type
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_solution,iostat=ierr)
     st_ctrl%tstep_type = tstep_type ; st_ctrl%maxout_iter = maxout_iter
     st_ctrl%picard_iter = picard_iter ; st_ctrl%maxinn_iter = maxinn_iter
     st_ctrl%precon_type = precon_type ; st_ctrl%criteria = criteria
-    st_ctrl%krpos_type = krpos_type
 
     if (ierr /= 0) then
       call write_err_stop("While reading solution section in main file.")
@@ -515,10 +514,6 @@ module read_input
       call write_err_stop("Input a non-negative value for preconditoner type.")
     else if (st_ctrl%precon_type > 1) then
       call write_err_stop("Input a valid value for preconditoner type.")
-    else if (st_ctrl%krpos_type < 0) then
-      call write_err_stop("Input a non-negative value for kr position type.")
-    else if (st_ctrl%krpos_type > 1) then
-      call write_err_stop("Input a valid value for kr position type.")
     else if (st_ctrl%maxout_iter < st_ctrl%picard_iter) then
       call write_err_stop("Picard iteration is larger than maximum number of outer iteration.")
     end if
@@ -538,6 +533,35 @@ module read_input
     end if
 
   end subroutine read_sol_list
+
+  subroutine read_schm_list()
+  !*********************************************************************************************
+  ! read_schm_list -- Read scheme name list
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: ierr
+    integer(I4) :: krpos_type
+    namelist/set_scheme/krpos_type
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    krpos_type = st_schm%krpos_type
+    rewind(unit=main_fnum)
+    read(unit=main_fnum,nml=set_scheme,iostat=ierr)
+    st_schm%krpos_type = krpos_type
+
+    if (ierr /= 0 .and. find_nml_name("set_scheme", main_name(1:main_namen))) then
+      call write_err_stop("While reading scheme section in main file.")
+    else if (st_schm%krpos_type < 0) then
+      call write_err_stop("Input a non-negative value for kr position type.")
+    else if (st_schm%krpos_type > 1) then
+      call write_err_stop("Input a valid value for kr position type.")
+    end if
+
+  end subroutine read_schm_list
 
   subroutine read_amg_parm(file_num)
   !*********************************************************************************************

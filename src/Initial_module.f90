@@ -2,7 +2,8 @@ module initial_module
   ! -- modules
   use kind_module, only: I4
   use constval_module, only: TIMELEN
-  use types_module, only: sim_set, ctrl_set, grid_set, ftype_in, retn_in, parm_in, geog_in
+  use types_module, only: sim_set, ctrl_set, schm_set, grid_set, ftype_in, retn_in, parm_in
+  use types_module, only: geog_in
   use types_module, only: rive_in, lake_in, path_in, retn_path, parm_path, geog_path, retn_fnum
   use types_module, only: parm_fnum, geog_fnum, unit_in, clas_set, retn_set, parm_set, init_set
   use types_module, only: seal_set, surfb_set, well_set, surfw_set, step_flag, ftype_out
@@ -23,6 +24,9 @@ module initial_module
 
   !input solution file
   type(ctrl_set), public :: st_ctrl
+
+  !input scheme file
+  type(schm_set), public :: st_schm
 
   type(grid_set), public :: st_grid
 
@@ -200,10 +204,12 @@ module initial_module
     st_ctrl%tstep_type = 0 ; st_ctrl%maxout_iter = 20 ; st_ctrl%picard_iter = 0
     st_ctrl%maxinn_iter = 10 ; st_ctrl%precon_type = 0 ; st_ctrl%nlevel = 0
     st_ctrl%maxvcy_iter = 0 ; st_ctrl%amg_nlevel = 0 ; st_ctrl%max_sweep = 0
-    st_ctrl%krpos_type = 0
     st_ctrl%criteria = 1.00E-03_DP ; st_ctrl%errtol = DZERO
     st_ctrl%newper = MACHI_EPS ; st_ctrl%newper_inv = DONE/st_ctrl%newper
     st_ctrl%jac_omega = 0.67_SP ; st_ctrl%amg_theta = 0.05_SP
+
+    ! input scheme file
+    st_schm%krpos_type = 0
 
     ! time unit
     unit_list = ["SEC", "MIN", "HOU", "DAY", "YEA"]

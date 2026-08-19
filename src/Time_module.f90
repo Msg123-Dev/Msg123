@@ -140,12 +140,13 @@ module time_module
       end do
       !$omp end parallel do
       ! -- Calculate saturation and relative permeability (srat_rperm)
-        call calc_srat_rperm(ncalc, DZERO, st_forc%read_head, cell_srat, st_sol%rel_perm)
+        call calc_srat_rperm(ncalc, DZERO, st_forc%read_head, cell_srat, st_sol%rel_perm,&
+                             st_sol%stor_old)
       !$omp parallel
       !$omp do private(i)
       do i = 1, ncalc
         st_sol%head_old(i) = st_forc%read_head(i) ; st_sol%head_new(i) = st_forc%read_head(i)
-        st_sol%srat_old(i) = cell_srat(i) ; st_sol%srat_new(i) = cell_srat(i)
+        st_sol%srat_new(i) = cell_srat(i) ; st_sol%stor_new(i) = st_sol%stor_old(i)
         calc2calc(i) = i
       end do
       !$omp end do
@@ -227,14 +228,14 @@ module time_module
 
         ! -- Set value exchange (valexc)
           call set_valexc(ncalc, st_sol%head_new, st_sol%head_old)
-          call set_valexc(ncalc, st_sol%srat_new, st_sol%srat_old)
+          call set_valexc(ncalc, st_sol%stor_new, st_sol%stor_old)
           call set_valexc(ncals, st_sol%surf_head, st_sol%surf_old)
       else
         st_time%current_t = st_time%current_t - real(st_time%delt, kind=SP)
         st_time%delt = st_time%delt*st_sim%dec_fact
         ! -- Set value exchange (valexc)
           call set_valexc(ncalc, st_sol%head_old, st_sol%head_new)
-          call set_valexc(ncalc, st_sol%srat_old, st_sol%srat_new)
+          call set_valexc(ncalc, st_sol%stor_old, st_sol%stor_new)
           call set_valexc(ncals, st_sol%surf_old, st_sol%surf_head)
         if (st_sim%sim_type == 1) then
           ! -- Reset stepflag (stepf)
@@ -244,7 +245,7 @@ module time_module
     else if (st_sim%sim_type == -1) then
       ! -- Set value exchange (valexc)
         call set_valexc(ncalc, st_sol%head_new, st_sol%head_old)
-        call set_valexc(ncalc, st_sol%srat_new, st_sol%srat_old)
+        call set_valexc(ncalc, st_sol%stor_new, st_sol%stor_old)
     end if
 
     next_time = st_time%current_t + real(st_time%delt, kind=SP)

@@ -78,13 +78,13 @@ module allocate_solution
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(st_sol%head_old(ncalc), st_sol%srat_old(ncalc), st_sol%stor_old(ncalc))
+    allocate(st_sol%head_old(ncalc), st_sol%stor_old(ncalc))
     allocate(st_sol%surf_head(ncals), st_sol%surf_old(ncals), st_sol%surf_rati(ncals))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc
       st_sol%head_old(i) = DZERO
-      st_sol%srat_old(i) = DZERO ; st_sol%stor_old(i) = DZERO
+      st_sol%stor_old(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i)

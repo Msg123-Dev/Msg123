@@ -35,10 +35,10 @@ module make_linearsystem
     tot_ind = crs_index(1)%offind(nreg_num)
 
     allocate(st_coef%per_srat(ncalc), st_coef%per_relp(nreg_num), st_coef%temp_rhs(nreg_num))
+    allocate(st_coef%per_wstor(ncalc))
     allocate(st_coef%stod(ncalc), st_coef%cond(nreg_num), st_coef%sead(ncalc))
     allocate(st_coef%dmats(ncalc))
     allocate(st_coef%rivd(ncals), st_coef%lakd(ncals), st_coef%surd(ncals))
-    allocate(st_coef%deri_srat(ncalc), st_coef%deri_stor(ncalc))
     allocate(st_coef%deri_dcon(tot_ind), st_coef%rel_hyd(tot_ind), st_coef%deri_lucon(tot_ind))
     allocate(st_coef%deri_con1(tot_ind), st_coef%deri_con2(tot_ind))
     allocate(st_coef%over_riv(st_bcnd%rive_num), st_coef%deri_r(st_bcnd%rive_num))
@@ -78,7 +78,7 @@ module make_linearsystem
     !$omp end parallel do
 
     ! -- Calculate function value (func)
-      call calc_func(st_sol%head_old, st_sol%srat_old, st_sol%surf_head, st_sol%head_new,&
+      call calc_func(st_sol%stor_old, st_sol%stor_new, st_sol%surf_head, st_sol%head_new,&
                      st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, st_coef%temp_rhs)
 
     array_var(1)%rhs(:) = -st_coef%temp_rhs(:)
@@ -108,7 +108,6 @@ module make_linearsystem
     ! -- modules
     use initial_module, only: st_sim
     use calc_parameter, only: calc_srat_rperm
-    use calc_function, only: alp_ss
     ! -- inout
     type(sol_set), intent(in) :: st_sol
     real(DP), intent(out) :: diamat(:), lumat(:)
@@ -136,12 +135,11 @@ module make_linearsystem
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
       call calc_srat_rperm(ncalc, st_ctrl%newper, st_sol%head_new, st_coef%per_srat,&
-                           st_coef%per_relp)
+                           st_coef%per_relp, st_coef%per_wstor)
 
     if (st_sim%sim_type >= 0) then
       ! -- Form storage change (stochn)
-        call form_stochn(alp_ss, st_coef%stod, st_coef%per_srat, st_coef%deri_srat,&
-                         st_coef%deri_stor, st_sol)
+        call form_stochn(st_coef%per_wstor, st_sol%stor_new, st_coef%stod)
     end if
 
 #ifdef MPI_MSG
@@ -191,48 +189,26 @@ module make_linearsystem
 
   end subroutine make_matrix
 
-  subroutine form_stochn(alp, dmat_sto, per_srat, deri_srat, deri_stor, st_sol)
+  subroutine form_stochn(per_wstor, wstor, dmat_sto)
   !*********************************************************************************************
-  ! form_stochn -- Form storage change
+  ! form_stochn -- Form storage change. dW/dH by a single difference quotient.
+  !                The alpha / deri_srat / deri_stor triple is gone: W is a single scalar
+  !                function of psi, so there is no product to expand.
   !*********************************************************************************************
     ! -- modules
     use make_cell, only: st_geom
     ! -- inout
-    real(DP), intent(in) :: alp(:)
+    real(DP), intent(in) :: per_wstor(:), wstor(:)
     real(DP), intent(out) :: dmat_sto(:)
-    real(DP), intent(in) :: per_srat(:)
-    real(DP), intent(out) :: deri_srat(:), deri_stor(:)
-    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    !$omp parallel
-    !$omp do private(i)
+    !$omp parallel do private(i)
     do i = 1, ncalc
-      deri_srat(i) = DZERO ; deri_stor(i) = DZERO
-    end do
-    !$omp end do
-    !$omp do private(i)
-    do i = 1, ncalc
-      deri_srat(i) = (per_srat(i)-st_sol%srat_new(i))*st_ctrl%newper_inv
-    end do
-    !$omp end do
-
-    if (st_time%form_switch == 1) then
-      !$omp do private(i)
-      do i = 1, ncalc
-        deri_stor(i) = alp(i)*deri_srat(i)*st_sol%head_new(i)
-      end do
-      !$omp end do
-    end if
-
-    !$omp do private(i)
-    do i = 1, ncalc
-      dmat_sto(i) = -(st_hydr%read_pors(i)*deri_srat(i)+alp(i)*st_sol%srat_new(i)+deri_stor(i))&
+      dmat_sto(i) = -(per_wstor(i)-wstor(i))*st_ctrl%newper_inv&
                     *st_time%delt_inv*st_geom%cell_vol(i)
     end do
-    !$omp end do
-    !$omp end parallel
+    !$omp end parallel do
 
   end subroutine form_stochn
 

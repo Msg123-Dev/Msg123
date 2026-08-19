@@ -237,7 +237,7 @@ module nonlinear_solution
       end if
 
       ! -- Calculate function value (func)
-        call calc_func(st_sol%head_old, st_sol%srat_old, st_sol%surf_head, st_sol%head_new,&
+        call calc_func(st_sol%stor_old, st_sol%stor_new, st_sol%surf_head, st_sol%head_new,&
                        st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, new_func)
       ! -- Calculate l2 norm square (resl2norm2)
         call calc_l2norm2(1, new_func, l2norm_new)
@@ -470,12 +470,12 @@ module nonlinear_solution
     end do
     !$omp end parallel do
     ! -- Calculate function value (func)
-      call calc_func(st_sol%head_old, st_sol%srat_old, st_sol%surf_head, st_sol%head_new,&
+      call calc_func(st_sol%stor_old, st_sol%stor_new, st_sol%surf_head, st_sol%head_new,&
                      st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, new_f)
     ! -- Calculate l2 norm square (resl2norm2)
       call calc_l2norm2(1, st_sol%head_change, l2_pnorm)
     ! -- Calculate vector by jacobi-free (vecjocf)
-      call calc_vecjacf(1, st_sol%head_change, st_sol%head_old, st_sol%srat_old,&
+      call calc_vecjacf(1, st_sol%head_change, st_sol%stor_old, st_sol%stor_new,&
                         st_sol%surf_head, st_sol%head_pre, st_sol%srat_new, st_sol%rel_perm,&
                         st_sol%surf_rati, jacvec)
 
@@ -691,7 +691,7 @@ module nonlinear_solution
     !$omp end parallel do
 
     ! -- Calculate function value (func)
-      call calc_func(st_sol%head_old, st_sol%srat_old, st_sol%surf_head, st_sol%head_new,&
+      call calc_func(st_sol%stor_old, st_sol%stor_new, st_sol%surf_head, st_sol%head_new,&
                      st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, new_f)
     ! -- Calculate l2 norm square (resl2norm2)
       call calc_l2norm2(1, new_f, l2_new)

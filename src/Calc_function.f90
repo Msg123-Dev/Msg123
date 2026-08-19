@@ -19,9 +19,6 @@ module calc_function
   public :: allocate_calfun, calc_func, calc_mass, calc_vecjacf
   public :: func_rechterm, func_wellterm, func_surfterm, func_riveterm
   public :: func_laketerm, func_sealterm
-  real(DP), public :: vj_eps = DZERO, vj_dfn = DZERO, vj_fn1 = DZERO
-  real(DP), public :: vj_scale = DONE
-
   ! -- local
   real(DP), allocatable :: stof(:), conf(:), welf(:), seaf(:)
   real(DP), allocatable :: funcvs(:)
@@ -44,27 +41,7 @@ module calc_function
     ! -- inout
 
     ! -- local
-    ! -- [KIN Level 1 verify] remove after check
-    integer(I4) :: env_stat, env_len
-    character(32) :: env_char
     !-------------------------------------------------------------------------------------------
-    ! -- [KIN Level 1 verify] Read perturbation scale -- remove after check
-      env_char = repeat(' ', 32) ; env_stat = 0 ; env_len = 0
-      call get_environment_variable("MSG123_VJ_SCALE", env_char, env_len, env_stat)
-      if (env_stat == 0 .and. env_len > 0) then
-        read(env_char,*,iostat=env_stat) vj_scale
-        if (env_stat /= 0) then
-          vj_scale = DONE
-        end if
-      end if
-#ifdef MPI_MSG
-      if (st_mpi%rank == 0) then
-        write(*,'(a,es11.4)') "VJSCALE = ", vj_scale
-      end if
-#else
-      write(*,'(a,es11.4)') "VJSCALE = ", vj_scale
-#endif
-
     allocate(stof(ncalc), conf(ncalc), welf(ncalc), seaf(ncalc))
     allocate(funcvs(ncalc))
     allocate(recf(ncals), surf(ncals), rivf(ncals), lakf(ncals))
@@ -604,8 +581,6 @@ module calc_function
     end if
 
     eps = sign*sqrt(MACHI_EPS)*max(abs(l2_x),l1_v)/l2_v
-    ! -- [KIN Level 1 verify] Scale the perturbation size -- remove after check
-      eps = eps*vj_scale
     eps_inv = DONE/eps
 
     !$omp parallel do private(i)
@@ -622,27 +597,6 @@ module calc_function
       outjvec(i) = -(tempf2(i)-tempf1(i))*eps_inv
     end do
     !$omp end parallel do
-
-    ! -- [KIN Level 1 verify] Store diagnostics -- remove after check
-      vj_eps = eps
-      vj_dfn = DZERO ; vj_fn1 = DZERO
-      !$omp parallel do private(i) reduction(+:vj_dfn, vj_fn1)
-      do i = 1, vj_num
-        vj_dfn = vj_dfn + (tempf2(i)-tempf1(i))*(tempf2(i)-tempf1(i))
-        vj_fn1 = vj_fn1 + tempf1(i)*tempf1(i)
-      end do
-      !$omp end parallel do
-#ifdef MPI_MSG
-      if (st_mpi%totn /= 1) then
-        ! -- Sum value for MPI (val)
-          call mpisum_val(vj_dfn, "verify jacobi-free difference l2-norm", sum_l2)
-        vj_dfn = sum_l2
-        ! -- Sum value for MPI (val)
-          call mpisum_val(vj_fn1, "verify jacobi-free function l2-norm", sum_l2)
-        vj_fn1 = sum_l2
-      end if
-#endif
-      vj_dfn = sqrt(vj_dfn) ; vj_fn1 = sqrt(vj_fn1)
 
   end subroutine calc_vecjacf
 

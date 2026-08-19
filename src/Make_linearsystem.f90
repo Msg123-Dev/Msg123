@@ -478,7 +478,7 @@ module make_linearsystem
         ! [AI] deri_s must follow the branch: the residual is C*delh_s*kr*rati, so the
         ! [AI] derivative is zero wherever delh_s does not depend on head_new. Setting it
         ! [AI] outside the branch put a spurious -C*kr on the diagonal of dry cells, which
-        ! [AI] was the whole of the jacobian mismatch measured by verify_vecjacf
+        ! [AI] was the whole of the jacobian mismatch found in the level 1 check
         ! [AI] (surface_exchange.md, 2026-08-19).
         if (st_sol%head_new(i) >= st_hydr%surf_top(i)) then
           if (st_sol%surf_head(i) > st_hydr%surf_top(i)) then

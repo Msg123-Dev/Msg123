@@ -83,9 +83,9 @@ module calc_output
     !$omp end parallel
 
     ! -- Calculate massbalance (mass)
-      call calc_mass(0, st_sol%head_old, st_sol%srat_old, st_sol%surf_old, st_sol%head_new,&
-                     ms_st, ms_co, ms_se, ms_we, ms_re, ms_su, ms_ri, ms_la, st_sol%srat_new,&
-                     st_sol%rel_perm, st_sol%surf_rati)
+      call calc_mass(0, st_sol%stor_old, st_sol%surf_old, st_sol%head_new, ms_st, ms_co, ms_se,&
+                     ms_we, ms_re, ms_su, ms_ri, ms_la, st_sol%srat_new, st_sol%rel_perm,&
+                     st_sol%surf_rati)
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc

@@ -12,7 +12,7 @@ module calc_parameter
 
   contains
 
-  subroutine calc_srat_rperm(num, pertur, pres, srat, rperm, sstor)
+  subroutine calc_srat_rperm(num, pertur, pres, srat, rperm, wstor)
   !*********************************************************************************************
   ! calc_srat_rperm -- Calculate saturation and relative permeability
   !*********************************************************************************************
@@ -27,16 +27,16 @@ module calc_parameter
     real(DP), intent(in) :: pertur
     real(DP), intent(in) :: pres(:)
     real(DP), intent(out) :: srat(:), rperm(:)
-    real(DP), intent(out), optional :: sstor(:)
+    real(DP), intent(out), optional :: wstor(:)
     ! -- local
     integer(I4) :: i
-    real(DP) :: retm, beta, theta, kr, se, ss
+    real(DP) :: retm, beta, theta, kr, se, ws
     real(DP) :: per_phead, phead0
     real(DP) :: kr_phead, kr_beta, kr_se
     !-------------------------------------------------------------------------------------------
     phead0 = DZERO
 
-    !$omp parallel do private(i, per_phead, retm, beta, theta, kr, se, ss) &
+    !$omp parallel do private(i, per_phead, retm, beta, theta, kr, se, ws) &
     !$omp             private(kr_phead, kr_beta, kr_se)
     do i = 1, num
       per_phead = pres(i) - st_geom%cell_top(i) + pertur
@@ -51,15 +51,15 @@ module calc_parameter
           theta = st_hydr%read_pors(i)
         end if
         srat(i) = theta/st_hydr%read_pors(i)
+        ws = theta
         se = (DONE+beta)**(-retm)
         kr = se**(DHALF)*(DONE-(DONE-se**(DONE/retm))**retm)**DTWO
-        ss = DZERO
       else
         srat(i) = DONE
         kr = DONE
-        ss = st_hydr%read_spst(i)
+        ws = st_hydr%read_pors(i) + st_hydr%read_spst(i)*per_phead
       end if
-      ! -- Evaluate relative permeability at the cell centre (krpos_type = 1)
+
       if (st_schm%krpos_type == 1) then
         kr_phead = pres(i) - st_geom%cell_cent(i) + pertur
         if (kr_phead < DZERO) then
@@ -73,8 +73,8 @@ module calc_parameter
       end if
 
       rperm(i) = kr
-      if (present(sstor)) then
-        sstor(i) = ss
+      if (present(wstor)) then
+        wstor(i) = ws
       end if
     end do
     !$omp end parallel do

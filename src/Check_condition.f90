@@ -29,58 +29,6 @@ module check_condition
 
   contains
 
-  subroutine check_calc_region(greg_flag)
-  !*********************************************************************************************
-  ! check_calc_region -- Check calculation region
-  !*********************************************************************************************
-    ! -- modules
-    use constval_module, only: SZERO
-    use initial_module, only: st_in_path, st_in_unit
-    ! -- inout
-    integer(I4), intent(inout) :: greg_flag(:)
-    ! -- local
-    integer(I4) :: i, num_seal, num_calc
-    integer(I4), allocatable :: temp_greg(:)
-    real(SP), allocatable :: check_seal(:), temp_seal(:)
-    logical, allocatable :: mask(:)
-    !-------------------------------------------------------------------------------------------
-    if (st_in_type%seal > 0) then
-      ! -- open input sea level file for check (sealf)
-        call open_sealf(st_in_type%seal, st_in_path%seal, st_in_unit%seal)
-    end if
-
-    if (st_seal%totn > 0) then
-      allocate(check_seal(st_grid%nxyz))
-      !$omp parallel do private(i)
-      do i = 1, st_grid%nxyz
-        check_seal(i) = SNOVAL
-      end do
-      !$omp end parallel do
-      call read_sealf(st_in_type%seal, st_seal%totn, check_seal)
-
-      num_seal = count(greg_flag(:) == 0)
-      allocate(temp_seal(num_seal), mask(st_grid%nxyz))
-      temp_seal(:) = SZERO
-      mask(:) = (greg_flag(:) == 0)
-      temp_seal(:) = pack(check_seal(:), mask(:))
-      if (any((temp_seal(:) == SNOVAL))) then
-        call write_err_stop("Null value in sea region.")
-      end if
-
-      deallocate(temp_seal)
-
-      num_calc = count(greg_flag(:) > 0)
-      allocate(temp_greg(num_calc))
-      temp_greg(:) = 0
-      mask(:) = (greg_flag(:) > 0) .and. (check_seal(:) /= SNOVAL)
-      greg_flag(:) = unpack(temp_greg(:), mask(:), greg_flag(:))
-
-      deallocate(temp_greg, check_seal, mask)
-
-    end if
-
-  end subroutine check_calc_region
-
   subroutine read_seal_set(eff_type, eff_path)
   !*********************************************************************************************
   ! read_seal_set -- Read sea level file set

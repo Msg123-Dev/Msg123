@@ -18,22 +18,18 @@ module calc_function
   private
   public :: allocate_calfun, calc_func, calc_mass, calc_vecjacf
   public :: func_rechterm, func_wellterm, func_surfterm, func_riveterm
-  public :: func_laketerm, func_sealterm, alp_ss
-  ! -- [KIN Level 1 verify] Diagnostics of calc_vecjacf -- remove after check
-  !   vj_scale scales the perturbation size and is read from MSG123_VJ_SCALE (default 1.0).
+  public :: func_laketerm, func_sealterm
   real(DP), public :: vj_eps = DZERO, vj_dfn = DZERO, vj_fn1 = DZERO
   real(DP), public :: vj_scale = DONE
 
   ! -- local
   real(DP), allocatable :: stof(:), conf(:), welf(:), seaf(:)
   real(DP), allocatable :: funcvs(:)
-  real(DP), allocatable :: alp_ss(:)
   real(DP), allocatable :: recf(:), surf(:), rivf(:), lakf(:)
-  real(DP), allocatable :: ch_stor1(:), ch_stor2(:), ch_stor(:)
+  real(DP), allocatable :: wk_stor(:)
   real(DP), allocatable :: conn_flow(:)
   real(DP), allocatable :: delh_s(:), elev_rati(:)
   real(DP), allocatable :: delh_r(:), delh_l(:), seal_flow(:)
-  real(DP), allocatable :: alp_ss_new(:), alp_ss_old(:)
   real(DP), allocatable :: jcvec(:), tempf1(:), tempf2(:)
 
   contains
@@ -70,25 +66,24 @@ module calc_function
 #endif
 
     allocate(stof(ncalc), conf(ncalc), welf(ncalc), seaf(ncalc))
-    allocate(funcvs(ncalc), alp_ss(ncalc))
+    allocate(funcvs(ncalc))
     allocate(recf(ncals), surf(ncals), rivf(ncals), lakf(ncals))
-    allocate(ch_stor1(ncalc), ch_stor2(ncalc), ch_stor(ncalc))
+    allocate(wk_stor(ncalc))
     allocate(conn_flow(ncalc))
     allocate(delh_s(ncals), elev_rati(ncals))
     allocate(delh_r(st_bcnd%rive_num), delh_l(st_bcnd%lake_num), seal_flow(st_bcnd%seal_num))
-    allocate(alp_ss_new(ncalc), alp_ss_old(ncalc))
     allocate(jcvec(nreg_num), tempf1(ncalc), tempf2(ncalc))
 
   end subroutine allocate_calfun
 
-  subroutine calc_func(hold, sold, surfh, infx, snew, rperm, surfr, funcv)
+  subroutine calc_func(stold, stnew, surfh, infx, snew, rperm, surfr, funcv)
   !*********************************************************************************************
   ! calc_func -- Calculate function value
   !*********************************************************************************************
     ! -- modules
     ! -- inout
-    real(DP), intent(in) :: hold(:), sold(:), surfh(:)
-    real(DP), intent(inout) :: infx(:), snew(:), rperm(:), surfr(:)
+    real(DP), intent(in) :: stold(:), surfh(:)
+    real(DP), intent(inout) :: stnew(:), infx(:), snew(:), rperm(:), surfr(:)
     real(DP), intent(out) :: funcv(:)
     ! -- local
     integer(I4) :: i, s
@@ -97,7 +92,7 @@ module calc_function
     !$omp do private(i)
     do i = 1, ncalc
       stof(i) = DZERO ; conf(i) = DZERO ; welf(i) = DZERO ; seaf(i) = DZERO
-      funcvs(i) = DZERO ; alp_ss(i) = DZERO ; funcv(i) = DZERO
+      funcvs(i) = DZERO ; funcv(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i)
@@ -108,11 +103,11 @@ module calc_function
     !$omp end parallel
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, DZERO, infx, snew, rperm, alp_ss)
+      call calc_srat_rperm(ncalc, DZERO, infx, snew, rperm, stnew)
 
     if (st_sim%sim_type >= 0) then
       ! -- Function storage change (stochn)
-        call func_stochn(infx, alp_ss, alp_ss, hold, sold, snew, stof)
+        call func_stochn(stnew, stold, stof)
     end if
 
 #ifdef MPI_MSG
@@ -158,7 +153,7 @@ module calc_function
 
   end subroutine calc_func
 
-  subroutine calc_mass(sfla, hold, sold, surf_old, hnew, stom, conm, seam, welm, recm,&
+  subroutine calc_mass(sfla, stold, surf_old, hnew, stom, conm, seam, welm, recm,&
                        surm, rivm, lakm, snew, rperm, surfr)
   !*********************************************************************************************
   ! calc_mass -- Calculate function value for massbalance
@@ -166,7 +161,7 @@ module calc_function
     ! -- modules
     ! -- inout
     integer(I4), intent(in) :: sfla
-    real(DP), intent(in) :: hold(:), sold(:), surf_old(:)
+    real(DP), intent(in) :: stold(:), surf_old(:)
     real(DP), intent(inout) :: hnew(:)
     real(DP), intent(inout) :: stom(:), conm(:), seam(:), welm(:)
     real(DP), intent(inout) :: recm(:), surm(:), rivm(:), lakm(:)
@@ -174,20 +169,12 @@ module calc_function
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    !$omp parallel do private(i)
-    do i = 1, ncalc
-      alp_ss_new(i) = DZERO ; alp_ss_old(i) = DZERO
-    end do
-    !$omp end parallel do
-
     ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, DZERO, hold, snew, rperm, alp_ss_old)
-    ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, DZERO, hnew, snew, rperm, alp_ss_new)
+      call calc_srat_rperm(ncalc, DZERO, hnew, snew, rperm, wk_stor)
 
     if (st_sim%sim_type >= 0) then
       ! -- Function storage change (stochn)
-        call func_stochn(hnew, alp_ss_new, alp_ss_old, hold, sold, snew, stom)
+        call func_stochn(wk_stor, stold, stom)
     end if
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
@@ -240,35 +227,23 @@ module calc_function
 
   end subroutine calc_mass
 
-  subroutine func_stochn(infstoc, alp_new, alp_old, hold, sold, snew, stofunc)
+  subroutine func_stochn(stnew, stold, stofunc)
   !*********************************************************************************************
   ! func_stochn -- Function storage change
   !*********************************************************************************************
     ! -- modules
     use make_cell, only: st_geom
     ! -- inout
-    real(DP), intent(in) :: infstoc(:), alp_new(:), alp_old(:)
-    real(DP), intent(in) :: hold(:), sold(:), snew(:)
+    real(DP), intent(in) :: stnew(:), stold(:)
     real(DP), intent(out) :: stofunc(:)
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    !$omp parallel
-    !$omp do private(i)
+    !$omp parallel do private(i)
     do i = 1, ncalc
-      ch_stor1(i) = DZERO ; ch_stor2(i) = DZERO ; ch_stor(i) = DZERO
+      stofunc(i) = -(stnew(i)-stold(i))*st_time%delt_inv*st_geom%cell_vol(i)
     end do
-    !$omp end do
-
-    !$omp do private(i)
-    do i = 1, ncalc
-      ch_stor1(i) = alp_old(i)*sold(i)*hold(i)
-      ch_stor2(i) = alp_new(i)*snew(i)*infstoc(i)
-      ch_stor(i) = (ch_stor2(i)-ch_stor1(i)) + st_hydr%read_pors(i)*(snew(i)-sold(i))
-      stofunc(i) = -ch_stor(i)*st_time%delt_inv*st_geom%cell_vol(i)
-    end do
-    !$omp end do
-    !$omp end parallel
+    !$omp end parallel do
 
   end subroutine func_stochn
 
@@ -550,7 +525,8 @@ module calc_function
 
   end subroutine func_sealterm
 
-  subroutine calc_vecjacf(vjlevel, injvec, hold, sold, surfh, injx, snew, rperm, surfr, outjvec)
+  subroutine calc_vecjacf(vjlevel, injvec, stold, stnew, surfh, injx, snew, rperm, surfr,&
+                          outjvec)
   !*********************************************************************************************
   ! calc_vecjacf -- Calculate vector by jacobi-free
   !*********************************************************************************************
@@ -561,8 +537,8 @@ module calc_function
 #endif
     ! -- inout
     integer(I4), intent(in) :: vjlevel
-    real(DP), intent(in) :: injvec(:), hold(:), sold(:), surfh(:)
-    real(DP), intent(inout) :: injx(:), snew(:), rperm(:), surfr(:)
+    real(DP), intent(in) :: injvec(:), stold(:), surfh(:)
+    real(DP), intent(inout) :: stnew(:), injx(:), snew(:), rperm(:), surfr(:)
     real(DP), intent(out) :: outjvec(:)
     ! -- local
     integer(I4) :: i
@@ -589,7 +565,7 @@ module calc_function
     !$omp end parallel
 
     ! -- Calculate function value (func)
-      call calc_func(hold, sold, surfh, injx, snew, rperm, surfr, tempf1)
+      call calc_func(stold, stnew, surfh, injx, snew, rperm, surfr, tempf1)
 
     ! Brown and Saad version
     l2_v = DZERO ; l2_x = DZERO ; l1_v = DZERO
@@ -639,7 +615,7 @@ module calc_function
     !$omp end parallel do
 
     ! -- Calculate function value (func)
-      call calc_func(hold, sold, surfh, jcvec, snew, rperm, surfr, tempf2)
+      call calc_func(stold, stnew, surfh, jcvec, snew, rperm, surfr, tempf2)
 
     !$omp parallel do private(i)
     do i = 1, vj_num

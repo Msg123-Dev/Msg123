@@ -271,10 +271,11 @@ module types_module
   end type bound_fview
 
   type :: sol_set
-    real(DP), allocatable :: head_old(:), srat_old(:)
+    real(DP), allocatable :: head_old(:)
     real(DP), allocatable :: surf_head(:), surf_old(:), surf_rati(:)
     real(DP), allocatable :: head_new(:), head_pre(:), head_change(:)
     real(DP), allocatable :: srat_new(:), rel_perm(:)
+    real(DP), allocatable :: stor_old(:), stor_new(:)
   end type sol_set
 
   type :: kryl_set
@@ -289,11 +290,10 @@ module types_module
   end type amgt_set
 
   type :: coef_set
-    real(DP), allocatable :: per_srat(:), per_relp(:)
+    real(DP), allocatable :: per_srat(:), per_relp(:), per_wstor(:)
     real(DP), allocatable :: temp_rhs(:)
     real(DP), allocatable :: stod(:), cond(:), sead(:), dmats(:)
     real(DP), allocatable :: rivd(:), lakd(:), surd(:)
-    real(DP), allocatable :: deri_srat(:), deri_stor(:)
     real(DP), allocatable :: deri_dcon(:), rel_hyd(:), deri_lucon(:), deri_con1(:), deri_con2(:)
     real(DP), allocatable :: over_riv(:), deri_r(:), deri_ks_riv(:), delh_r(:)
     real(DP), allocatable :: per_riv(:), rel_riv(:), tran_riv(:)

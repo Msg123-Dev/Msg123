@@ -78,13 +78,13 @@ module allocate_solution
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(st_sol%head_old(ncalc), st_sol%srat_old(ncalc))
+    allocate(st_sol%head_old(ncalc), st_sol%srat_old(ncalc), st_sol%stor_old(ncalc))
     allocate(st_sol%surf_head(ncals), st_sol%surf_old(ncals), st_sol%surf_rati(ncals))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc
       st_sol%head_old(i) = DZERO
-      st_sol%srat_old(i) = DZERO
+      st_sol%srat_old(i) = DZERO ; st_sol%stor_old(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i)
@@ -118,6 +118,7 @@ module allocate_solution
 
     allocate(st_sol%head_new(nreg_num), st_sol%head_pre(nreg_num), st_sol%head_change(nreg_num))
     allocate(st_sol%srat_new(nreg_num), st_sol%rel_perm(nreg_num))
+    allocate(st_sol%stor_new(nreg_num))
     allocate(st_hydr%abyd_conn(tconn_num), st_hydr%hydf_conn(tconn_num))
     allocate(st_hydr%abyd_seal(st_bcnd%seal_num), st_hydr%hydf_seal(st_bcnd%seal_num))
     allocate(st_bcnd%seal2calc(st_bcnd%seal_num), st_bcnd%seal2seal(st_bcnd%seal_num))
@@ -127,6 +128,7 @@ module allocate_solution
     do i = 1, nreg_num
       st_sol%head_new(i) = DZERO ; st_sol%head_pre(i) = DZERO ; st_sol%head_change(i) = DZERO
       st_sol%srat_new(i) = DZERO ; st_sol%rel_perm(i) = DZERO ; dir_conn(i) = 0
+      st_sol%stor_new(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i)

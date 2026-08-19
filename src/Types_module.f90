@@ -275,6 +275,9 @@ module types_module
     real(DP), allocatable :: surf_head(:), surf_old(:), surf_rati(:)
     real(DP), allocatable :: head_new(:), head_pre(:), head_change(:)
     real(DP), allocatable :: srat_new(:), rel_perm(:)
+    ! -- Storage state function w(psi). Stage 3a-1: allocated and filled but not
+    !    yet used by the residual; srat_old is replaced by stor_old in stage 3a-2.
+    real(DP), allocatable :: stor_old(:), stor_new(:)
   end type sol_set
 
   type :: kryl_set

@@ -331,6 +331,11 @@ module make_linearsystem
     do i = 1, st_bcnd%rive_num
       s = st_bcnd%rive2cals(i)
       per_riv(i) = per_relp(s) ; rel_riv(i) = st_sol%rel_perm(s)
+      ! [AI] The branch-dependent derivative (as in set_surfbound) is NOT applied here.
+      ! [AI] It is mathematically correct but removes the diagonal that keeps Cvhm solvable:
+      ! [AI] with it, the time step stops growing (1e8 s, oscillating) and the run never
+      ! [AI] reaches 1e6 YEA. Deferred to SURF-0b together with a replacement stabilisation.
+      ! [AI] Patch kept at /tmp/msg123_patches/bndjac_surf_river_lake.patch (2026-08-19).
       if (st_sol%head_new(s) >= st_forc%rive_bott(i)) then
         delh_r(i) = st_forc%rive_head(i) - st_sol%head_new(s)
         over_riv(i) = DONE
@@ -392,6 +397,7 @@ module make_linearsystem
     do i = 1, st_bcnd%lake_num
       s = st_bcnd%lake2cals(i)
       per_lak(i) = per_relp(s) ; rel_lak(i) = st_sol%rel_perm(s)
+      ! [AI] Same deferral as set_rivebound. See SURF-0b.
       if (st_sol%head_new(s) >= st_forc%lake_bott(i)) then
         delh_l(i) = st_forc%lake_head(i) - st_sol%head_new(s)
         over_lak(i) = DONE
@@ -468,6 +474,12 @@ module make_linearsystem
 !      if (surf_reli(i) == DZERO) then
 !        delh_s(i) = DZERO
 !      else
+        tran_sur(i) = st_hydr%hydf_surf(i)*st_hydr%abyd_surf(i)
+        ! [AI] deri_s must follow the branch: the residual is C*delh_s*kr*rati, so the
+        ! [AI] derivative is zero wherever delh_s does not depend on head_new. Setting it
+        ! [AI] outside the branch put a spurious -C*kr on the diagonal of dry cells, which
+        ! [AI] was the whole of the jacobian mismatch measured by verify_vecjacf
+        ! [AI] (surface_exchange.md, 2026-08-19).
         if (st_sol%head_new(i) >= st_hydr%surf_top(i)) then
           if (st_sol%surf_head(i) > st_hydr%surf_top(i)) then
             delh_s(i) = st_sol%surf_head(i) - st_sol%head_new(i)
@@ -475,6 +487,7 @@ module make_linearsystem
             delh_s(i) = st_hydr%surf_top(i) - st_sol%head_new(i)
           end if
           over_sur(i) = DONE
+          deri_s(i) = -tran_sur(i)*st_sol%rel_perm(i)
         else if (st_sol%head_new(i) >= st_hydr%surf_bott(i)) then
           if (st_sol%surf_head(i) > st_hydr%surf_bott(i)) then
             delh_s(i) = st_sol%surf_head(i) - st_sol%head_new(i)
@@ -482,15 +495,19 @@ module make_linearsystem
             delh_s(i) = st_hydr%surf_bott(i) - st_sol%head_new(i)
           end if
           over_sur(i) = DONE
+          ! [AI] surf_rati is part of the residual here, so it belongs in the derivative too.
+          deri_s(i) = -tran_sur(i)*st_sol%rel_perm(i)*st_sol%surf_rati(i)
         else if(st_sol%surf_head(i) > st_hydr%surf_bott(i)) then
           delh_s(i) = st_sol%surf_head(i) - st_hydr%surf_bott(i)
           over_sur(i) = DZERO
+          ! [AI] delh_s is set from surf_head only. No head_new dependence.
+          deri_s(i) = DZERO
         else
           delh_s(i) = DZERO
           over_sur(i) = DONE
+          ! [AI] the surface term is identically zero.
+          deri_s(i) = DZERO
         end if
-        tran_sur(i) = st_hydr%hydf_surf(i)*st_hydr%abyd_surf(i)
-        deri_s(i) = -tran_sur(i)*st_sol%rel_perm(i)
 !      end if
     end do
     !$omp end do

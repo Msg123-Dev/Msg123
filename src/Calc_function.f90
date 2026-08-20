@@ -19,6 +19,10 @@ module calc_function
   public :: allocate_calfun, calc_func, calc_mass, calc_vecjacf
   public :: func_rechterm, func_wellterm, func_surfterm, func_riveterm
   public :: func_laketerm, func_sealterm
+  ! [AI] Total external source/sink flux (recharge, surface, river, lake, well, sea),
+  ! [AI] summed on this rank only. It is the natural scale for the residual: unlike the
+  ! [AI] storage change it does not vanish in a steady problem.
+  real(DP), public :: qtot_ext = DZERO
   ! -- local
   real(DP), allocatable :: stof(:), conf(:), welf(:), seaf(:)
   real(DP), allocatable :: funcvs(:)
@@ -127,6 +131,14 @@ module calc_function
       funcv(i) = funcvs(i) + stof(i) + conf(i) + welf(i) + seaf(i)
     end do
     !$omp end parallel do
+
+    ! [AI] External source/sink total, used as the flux scale of the residual.
+      qtot_ext = DZERO
+      !$omp parallel do private(i) reduction(+:qtot_ext)
+      do i = 1, ncalc
+        qtot_ext = qtot_ext + abs(funcvs(i)) + abs(welf(i)) + abs(seaf(i))
+      end do
+      !$omp end parallel do
 
   end subroutine calc_func
 

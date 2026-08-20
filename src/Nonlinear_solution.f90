@@ -10,7 +10,7 @@ module nonlinear_solution
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc
   use prep_calculation, only: st_time
-  use calc_function, only: calc_func
+  use calc_function, only: qtot_ext, calc_func
   use calc_simulation, only: calc_l2norm2
 #ifdef MPI_MSG
   use mpi_utility, only: mpisum_val
@@ -75,6 +75,8 @@ module nonlinear_solution
     real(DP) :: max_var, max_unk, check_val
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var
     real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
+    ! [AI] residual norms reported per time step (see format 16).
+    real(DP) :: res_l1, res_l2, res_l20, qtot_l1, rat_res, rat_qtt
     logical :: back_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
@@ -92,8 +94,13 @@ module nonlinear_solution
     13 format(1X,"Stop due to maximum value or change in backtracking")
     14 format(1X,"Stop due to maximum number of nonlinear iteration")
     15 format(1X,"Didn't converge in steady state calculation")
+    ! [AI] one residual summary line per time step.
+    16 format(1X,"RESDIAG  RES/RES0 = ",es11.3,3x,"RES_L1 = ",es11.3,3x,&
+              "RESL1/Q = ",es11.3)
     !-------------------------------------------------------------------------------------------
     conv_fnum = st_out_fnum%conv ; eater = DHALF
+    res_l1 = DZERO ; res_l2 = DZERO ; res_l20 = DZERO
+    qtot_l1 = DZERO ; rat_res = DZERO ; rat_qtt = DZERO
     ! -- Set for backtracking (backtr)
       call set_backtr(st_sol, max_step)
 
@@ -146,6 +153,8 @@ module nonlinear_solution
         end if
 #endif
         l2norm_pre = l2norm_new
+        ! [AI] keep the initial residual norm ||F0|| of this time step.
+        res_l20 = sqrt(l2norm_new)*len_scal**3
       end if
 
       !$omp parallel do private(i)
@@ -264,6 +273,40 @@ module nonlinear_solution
       conv_head = st_sol%head_new(max_num)*len_scal
 #endif
       conv_var = max_var*len_scal
+      ! [AI] Residual norms. The convergence test itself is the max norm of the head
+      ! [AI] change (check_abserrmax), so these are reported, not acted on. They show
+      ! [AI] whether a time step was accepted with the residual still large.
+      ! [AI]   rat_res = ||F||2 / ||F0||2   relative to the start of this time step
+      ! [AI]   rat_qtt = ||F||1 / qtot_ext  relative to the external flux of the problem
+      res_l1 = DZERO
+      !$omp parallel do private(i) reduction(+:res_l1)
+      do i = 1, ncalc
+        res_l1 = res_l1 + abs(new_func(i))
+      end do
+      !$omp end parallel do
+      qtot_l1 = qtot_ext
+#ifdef MPI_MSG
+      if (st_mpi%totn /= 1) then
+        ! -- Sum value for MPI (val)
+          call mpisum_val(res_l1, "residual l1-norm", sum_l2)
+        res_l1 = sum_l2
+        ! -- Sum value for MPI (val)
+          call mpisum_val(qtot_l1, "external flux l1-norm", sum_l2)
+        qtot_l1 = sum_l2
+      end if
+#endif
+      res_l2 = sqrt(l2norm_new)*len_scal**3
+      res_l1 = res_l1*len_scal**3 ; qtot_l1 = qtot_l1*len_scal**3
+      if (res_l20 > DZERO) then
+        rat_res = res_l2/res_l20
+      else
+        rat_res = DZERO
+      end if
+      if (qtot_l1 > DZERO) then
+        rat_qtt = res_l1/qtot_l1
+      else
+        rat_qtt = DZERO
+      end if
       if (st_mpi%rank == 0) then
         write(conv_fnum,11) st_time%out_iter, in_iter, back_iter, conv_var,&
                             trim(adjustl(cxyzn)), conv_dmat, conv_rhs, conv_head
@@ -306,6 +349,11 @@ module nonlinear_solution
       end if
 
     end do outer_loop
+
+    ! [AI] Residual norm summary. The values are those of the last outer iteration.
+      if (st_mpi%rank == 0) then
+        write(conv_fnum,16) rat_res, res_l1, rat_qtt
+      end if
 
 
   end subroutine calc_numsol

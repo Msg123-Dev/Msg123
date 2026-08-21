@@ -318,6 +318,7 @@ module make_linearsystem
     real(DP), intent(out) :: rel_riv(:), tran_riv(:)
     ! -- local
     integer(I4) :: i, s
+    real(DP) :: head_eff
     !-------------------------------------------------------------------------------------------
     !$omp parallel
     !$omp do private(i)
@@ -327,24 +328,22 @@ module make_linearsystem
       tran_riv(i) = DZERO
     end do
     !$omp end do
-    !$omp do private(i, s)
+    !$omp do private(i, s, head_eff)
     do i = 1, st_bcnd%rive_num
       s = st_bcnd%rive2cals(i)
       per_riv(i) = per_relp(s) ; rel_riv(i) = st_sol%rel_perm(s)
       ! [AI] The branch-dependent derivative (as in set_surfbound) is NOT applied here.
-      ! [AI] It is mathematically correct but removes the diagonal that keeps Cvhm solvable:
-      ! [AI] with it, the time step stops growing (1e8 s, oscillating) and the run never
-      ! [AI] reaches 1e6 YEA. Deferred to SURF-0b together with a replacement stabilisation.
-      ! [AI] Patch kept at /tmp/msg123_patches/bndjac_surf_river_lake.patch (2026-08-19).
+      ! [AI] Tried on 2026-08-21 with the corrected river data: Cvhm still ends with a
+      ! [AI] mass balance error of 163% and needs 19 times the time steps, so it fixes
+      ! [AI] nothing on its own. Deferred to SURF-0b.
+      ! [AI] Effective stage, matching func_riveterm.
+      head_eff = max(st_forc%rive_head(i), st_forc%rive_bott(i))
       if (st_sol%head_new(s) >= st_forc%rive_bott(i)) then
-        delh_r(i) = st_forc%rive_head(i) - st_sol%head_new(s)
+        delh_r(i) = head_eff - st_sol%head_new(s)
         over_riv(i) = DONE
-      else if (st_forc%rive_head(i) > st_forc%rive_bott(i)) then
-        delh_r(i) = st_forc%rive_head(i) - st_forc%rive_bott(i)
-        over_riv(i) = DZERO
       else
-        delh_r(i) = DZERO
-        over_riv(i) = DONE
+        delh_r(i) = head_eff - st_forc%rive_bott(i)
+        over_riv(i) = DZERO
       end if
       tran_riv(i) = st_hydr%hydf_surf(s)*st_forc%abyd_rive(i)
       deri_r(i) = -tran_riv(i)*rel_riv(i)
@@ -384,6 +383,7 @@ module make_linearsystem
     real(DP), intent(out) :: rel_lak(:), tran_lak(:)
     ! -- local
     integer(I4) :: i, s
+    real(DP) :: head_eff
     !-------------------------------------------------------------------------------------------
     !$omp parallel
     !$omp do private(i)
@@ -393,20 +393,19 @@ module make_linearsystem
       tran_lak(i) = DZERO
     end do
     !$omp end do
-    !$omp do private(i, s)
+    !$omp do private(i, s, head_eff)
     do i = 1, st_bcnd%lake_num
       s = st_bcnd%lake2cals(i)
       per_lak(i) = per_relp(s) ; rel_lak(i) = st_sol%rel_perm(s)
       ! [AI] Same deferral as set_rivebound. See SURF-0b.
+      ! [AI] Effective stage, matching func_laketerm.
+      head_eff = max(st_forc%lake_head(i), st_forc%lake_bott(i))
       if (st_sol%head_new(s) >= st_forc%lake_bott(i)) then
-        delh_l(i) = st_forc%lake_head(i) - st_sol%head_new(s)
+        delh_l(i) = head_eff - st_sol%head_new(s)
         over_lak(i) = DONE
-      else if (st_forc%lake_head(i) > st_forc%lake_bott(i)) then
-        delh_l(i) = st_forc%lake_head(i) - st_forc%lake_bott(i)
-        over_lak(i) = DZERO
       else
-        delh_l(i) = DZERO
-        over_lak(i) = DONE
+        delh_l(i) = head_eff - st_forc%lake_bott(i)
+        over_lak(i) = DZERO
       end if
       tran_lak(i) = st_hydr%hydf_surf(s)*st_forc%abyd_lake(i)
       deri_l(i) = -tran_lak(i)*rel_lak(i)

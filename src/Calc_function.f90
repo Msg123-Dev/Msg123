@@ -414,6 +414,7 @@ module calc_function
     real(DP), intent(inout) :: rivfunc(:)
     ! -- local
     integer(I4) :: i, s
+    real(DP) :: head_eff
     !-------------------------------------------------------------------------------------------
     !$omp parallel
     !$omp do private(i)
@@ -422,16 +423,15 @@ module calc_function
     end do
     !$omp end do
 
-    !$omp do private(i, s)
+    !$omp do private(i, s, head_eff)
     do i = 1, st_bcnd%rive_num
       s = st_bcnd%rive2cals(i)
-      if (infrive(s) >= st_forc%rive_bott(i)) then
-        delh_r(i) = st_forc%rive_head(i) - infrive(s)
-      else if (st_forc%rive_head(i) > st_forc%rive_bott(i)) then
-        delh_r(i) = st_forc%rive_head(i) - st_forc%rive_bott(i)
-      else
-        delh_r(i) = DZERO
-      end if
+      ! [AI] Effective stage. A stage below the river bottom means a dry channel; the
+      ! [AI] river then acts as a drain at the bottom elevation. Without the clamp the
+      ! [AI] flux jumps by |rive_head - rive_bott| at h = rive_bott, which no newton
+      ! [AI] iteration can cross (Cvhm had 313 such cells, 2026-08-21).
+      head_eff = max(st_forc%rive_head(i), st_forc%rive_bott(i))
+      delh_r(i) = head_eff - max(infrive(s), st_forc%rive_bott(i))
 
       rivfunc(s) = st_hydr%hydf_surf(s)*st_forc%abyd_rive(i)*delh_r(i)*rperm(s)
     end do
@@ -450,6 +450,7 @@ module calc_function
     real(DP), intent(inout) :: lakfunc(:)
     ! -- local
     integer(I4) :: i, s
+    real(DP) :: head_eff
     !-------------------------------------------------------------------------------------------
     !$omp parallel
     !$omp do private(i)
@@ -458,16 +459,12 @@ module calc_function
     end do
     !$omp end do
 
-    !$omp do private(i, s)
+    !$omp do private(i, s, head_eff)
     do i = 1, st_bcnd%lake_num
       s = st_bcnd%lake2cals(i)
-      if (inflake(s) >= st_forc%lake_bott(i)) then
-        delh_l(i) = st_forc%lake_head(i) - inflake(s)
-      else if (st_forc%lake_head(i) > st_forc%lake_bott(i)) then
-        delh_l(i) = st_forc%lake_head(i) - st_forc%lake_bott(i)
-      else
-        delh_l(i) = DZERO
-      end if
+      ! [AI] Same effective-stage clamp as func_riveterm.
+      head_eff = max(st_forc%lake_head(i), st_forc%lake_bott(i))
+      delh_l(i) = head_eff - max(inflake(s), st_forc%lake_bott(i))
 
       lakfunc(s) = st_hydr%hydf_surf(s)*st_forc%abyd_lake(i)*delh_l(i)*rperm(s)
     end do

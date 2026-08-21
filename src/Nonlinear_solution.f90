@@ -75,7 +75,6 @@ module nonlinear_solution
     real(DP) :: max_var, max_unk, check_val
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var
     real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
-    ! [AI] residual norms reported per time step (see format 16).
     real(DP) :: res_l1, res_l2, res_l20, qtot_l1, rat_res, rat_qtt
     logical :: back_flag
 #ifdef MPI_MSG
@@ -94,7 +93,6 @@ module nonlinear_solution
     13 format(1X,"Stop due to maximum value or change in backtracking")
     14 format(1X,"Stop due to maximum number of nonlinear iteration")
     15 format(1X,"Didn't converge in steady state calculation")
-    ! [AI] one residual summary line per time step.
     16 format(1X,"RESDIAG  RES/RES0 = ",es11.3,3x,"RES_L1 = ",es11.3,3x,&
               "RESL1/Q = ",es11.3)
     !-------------------------------------------------------------------------------------------
@@ -153,7 +151,6 @@ module nonlinear_solution
         end if
 #endif
         l2norm_pre = l2norm_new
-        ! [AI] keep the initial residual norm ||F0|| of this time step.
         res_l20 = sqrt(l2norm_new)*len_scal**3
       end if
 
@@ -273,11 +270,6 @@ module nonlinear_solution
       conv_head = st_sol%head_new(max_num)*len_scal
 #endif
       conv_var = max_var*len_scal
-      ! [AI] Residual norms. The convergence test itself is the max norm of the head
-      ! [AI] change (check_abserrmax), so these are reported, not acted on. They show
-      ! [AI] whether a time step was accepted with the residual still large.
-      ! [AI]   rat_res = ||F||2 / ||F0||2   relative to the start of this time step
-      ! [AI]   rat_qtt = ||F||1 / qtot_ext  relative to the external flux of the problem
       res_l1 = DZERO
       !$omp parallel do private(i) reduction(+:res_l1)
       do i = 1, ncalc
@@ -350,10 +342,9 @@ module nonlinear_solution
 
     end do outer_loop
 
-    ! [AI] Residual norm summary. The values are those of the last outer iteration.
-      if (st_mpi%rank == 0) then
-        write(conv_fnum,16) rat_res, res_l1, rat_qtt
-      end if
+    if (st_mpi%rank == 0) then
+      write(conv_fnum,16) rat_res, res_l1, rat_qtt
+    end if
 
 
   end subroutine calc_numsol

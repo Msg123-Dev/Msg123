@@ -19,9 +19,6 @@ module calc_function
   public :: allocate_calfun, calc_func, calc_mass, calc_vecjacf
   public :: func_rechterm, func_wellterm, func_surfterm, func_riveterm
   public :: func_laketerm, func_sealterm
-  ! [AI] Total external source/sink flux (recharge, surface, river, lake, well, sea),
-  ! [AI] summed on this rank only. It is the natural scale for the residual: unlike the
-  ! [AI] storage change it does not vanish in a steady problem.
   real(DP), public :: qtot_ext = DZERO
   ! -- local
   real(DP), allocatable :: stof(:), conf(:), welf(:), seaf(:)
@@ -132,7 +129,6 @@ module calc_function
     end do
     !$omp end parallel do
 
-    ! [AI] External source/sink total, used as the flux scale of the residual.
       qtot_ext = DZERO
       !$omp parallel do private(i) reduction(+:qtot_ext)
       do i = 1, ncalc
@@ -426,10 +422,6 @@ module calc_function
     !$omp do private(i, s, head_eff)
     do i = 1, st_bcnd%rive_num
       s = st_bcnd%rive2cals(i)
-      ! [AI] Effective stage. A stage below the river bottom means a dry channel; the
-      ! [AI] river then acts as a drain at the bottom elevation. Without the clamp the
-      ! [AI] flux jumps by |rive_head - rive_bott| at h = rive_bott, which no newton
-      ! [AI] iteration can cross (Cvhm had 313 such cells, 2026-08-21).
       head_eff = max(st_forc%rive_head(i), st_forc%rive_bott(i))
       delh_r(i) = head_eff - max(infrive(s), st_forc%rive_bott(i))
 
@@ -462,10 +454,8 @@ module calc_function
     !$omp do private(i, s, head_eff)
     do i = 1, st_bcnd%lake_num
       s = st_bcnd%lake2cals(i)
-      ! [AI] Same effective-stage clamp as func_riveterm.
       head_eff = max(st_forc%lake_head(i), st_forc%lake_bott(i))
       delh_l(i) = head_eff - max(inflake(s), st_forc%lake_bott(i))
-
       lakfunc(s) = st_hydr%hydf_surf(s)*st_forc%abyd_lake(i)*delh_l(i)*rperm(s)
     end do
     !$omp end do

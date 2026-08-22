@@ -26,6 +26,10 @@ module constval_module
 
   real(DP), parameter :: MACHI_EPS = epsilon(1.00_SP)
   real(DP), parameter :: VARMAX = 1.00E+03_DP, XMAX = 1.00E+04_DP, XMAX_INV = 1.00E-04_DP
+  ! -- Scaled step length tolerance of the line search, matching the parflow default
+  ! -- Solver.Nonlinear.StepTol (kinsol scsteptol). MACHI_EPS is the single precision
+  ! -- epsilon, so the former MACHI_EPS**(2/3) was 2.4e-5, about 240 times looser.
+  real(DP), parameter :: STEP_TOL_DEF = 1.00E-07_DP
 
   character(7), parameter :: OUTFORM = "(E13.6)"
   character(53), parameter :: MASSCHARA = &

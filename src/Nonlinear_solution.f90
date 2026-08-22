@@ -3,7 +3,7 @@ module nonlinear_solution
   use kind_module, only: I4, DP
   use types_module, only: sol_set
   use allocate_solution, only: nreg_num, array_var
-  use constval_module, only: DZERO, DONE, DHALF, DTWO, VARMAX
+  use constval_module, only: DZERO, DONE, DHALF, DTWO, VARMAX, STEP_TOL_DEF
   use utility_module, only: st_mpi
   use initial_module, only: st_ctrl
   use read_input, only: len_scal
@@ -477,7 +477,6 @@ module nonlinear_solution
   ! run_backtr -- Run backtracking
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: MACHI_EPS
     use calc_function, only: calc_vecjacf
 #ifdef MPI_MSG
     use mpi_utility, only: mpimax_val
@@ -493,6 +492,7 @@ module nonlinear_solution
     ! -- local
     integer(I4) :: i
     real(DP) :: l2_new2, l2_pnorm, slope, av, bv, rhs1, rhs2, root, step_len, step_tol
+    real(DP) :: f1_pre, f1_new
     real(DP) :: lam2, temp_lam, lam_inv, lam2_inv, del_lam, lam_max, lam_min
     real(DP) :: lam_length, lam_base, lam_diff, lam_incr, sql2_pnorm, maxpnorm
     real(DP) :: alpha_cond, beta_cond
@@ -502,7 +502,7 @@ module nonlinear_solution
     real(DP) :: sum_l2, max_val
 #endif
     !-------------------------------------------------------------------------------------------
-    l2_new2 = l2_new ; lam = DONE ; lam2 = DONE ; maxpnorm = DONE ; lam_length = DONE
+    l2_new2 = l2_new ; lam = DONE ; lam2 = DZERO ; maxpnorm = DONE ; lam_length = DZERO
     !$omp parallel do private(i)
     do i = 1, ncalc
       jacvec(i) = DZERO
@@ -547,13 +547,14 @@ module nonlinear_solution
     end do
     !$omp end do
 
+    ! -- Scaled step length, KINSOL KINScSteplength. The denominator carries the 1 +
+    ! -- so that a cell with a head near zero cannot blow the length up, and the
+    ! -- reference point is the current iterate rather than the updated one.
     !$omp do private(i, temp_lam) reduction(max:lam_length)
     do i = 1, ncalc
-      if (st_sol%head_new(i) /= DZERO) then
-        temp_lam = abs(st_sol%head_change(i))/abs(st_sol%head_new(i))
-        if (temp_lam > lam_length) then
-          lam_length = temp_lam
-        end if
+      temp_lam = abs(st_sol%head_change(i))/(DONE + abs(st_sol%head_pre(i)))
+      if (temp_lam > lam_length) then
+        lam_length = temp_lam
       end if
     end do
     !$omp end do
@@ -575,22 +576,35 @@ module nonlinear_solution
       lam_length = max_val
     end if
 #endif
-    step_tol = MACHI_EPS**(2.0_DP/3.0_DP)
-    lam_min = step_tol/lam_length ; alpha_cond = DHALF*l2_pre + BACK_ALPHA*lam*slope
+    step_tol = STEP_TOL_DEF
+    if (lam_length > DZERO) then
+      lam_min = step_tol/lam_length
+    else
+      lam_min = DZERO
+    end if
+    f1_pre = DHALF*l2_pre
     grad = slope
     back_aloop: do
-      if (DHALF*l2_new <= alpha_cond) then
-        exit back_aloop
-      end if
-      backi = backi + 1
       ! -- Calculate function and l2norm2 (func2norm)
         call calc_funcl2norm(lam, l2_new, new_f, st_sol)
+      backi = backi + 1
+      f1_new = DHALF*l2_new
+      alpha_cond = f1_pre + BACK_ALPHA*lam*slope
+      if (f1_new <= alpha_cond) then
+        exit back_aloop
+      end if
+      if (lam < lam_min) then
+        ! -- Calculate function and l2norm2 (func2norm)
+          call calc_funcl2norm(DZERO, l2_new, new_f, st_sol)
+        backf = .true.
+        return
+      end if
 
       if (lam == DONE) then
-        temp_lam = -slope/(DTWO*(DHALF*l2_new-DHALF*l2_pre-slope))
+        temp_lam = -slope/(DTWO*(f1_new-f1_pre-slope))
       else
-        rhs1 = DHALF*l2_new - DHALF*l2_pre - lam*slope
-        rhs2 = l2_new2 - DHALF*l2_pre - lam2*slope
+        rhs1 = f1_new - f1_pre - lam*slope
+        rhs2 = l2_new2 - f1_pre - lam2*slope
         lam_inv = DONE/(lam**2) ; lam2_inv = DONE/(lam2**2)
         del_lam = DONE/(lam - lam2)
         av = (rhs1*lam_inv - rhs2*lam2_inv)*del_lam
@@ -612,13 +626,8 @@ module nonlinear_solution
         end if
       end if
       lam2 = lam
-      l2_new2 = DHALF*l2_new
+      l2_new2 = f1_new
       lam = max(temp_lam, 0.1_DP*lam)
-      if (lam < lam_min) then
-        backf = .true.
-        return
-      end if
-      alpha_cond = DHALF*l2_pre + BACK_ALPHA*lam*slope
     end do back_aloop
 
     alpha_cond = DHALF*l2_pre + BACK_ALPHA*lam*slope

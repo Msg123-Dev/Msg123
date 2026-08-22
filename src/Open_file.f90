@@ -686,6 +686,9 @@ module open_file
       st_seal%etime = st_sim%end_time
     end if
 
+    ! -- Check the unused time series (steady_etime)
+      call check_steady_etime(st_seal%etime, vname)
+
     st_step_flag%seal = 0
 
     deallocate(vname)
@@ -861,6 +864,9 @@ module open_file
     if (st_rech%etime > st_sim%end_time) then
       st_rech%etime = st_sim%end_time
     end if
+
+    ! -- Check the unused time series (steady_etime)
+      call check_steady_etime(st_rech%etime, vname)
 
     st_step_flag%rech = 0
 
@@ -1047,6 +1053,9 @@ module open_file
     if (st_well%etime > st_sim%end_time) then
       st_well%etime = st_sim%end_time
     end if
+
+    ! -- Check the unused time series (steady_etime)
+      call check_steady_etime(st_well%etime, vname)
 
     st_step_flag%well = 0
 
@@ -1303,6 +1312,9 @@ module open_file
       st_prec%etime = st_sim%end_time
     end if
 
+    ! -- Check the unused time series (steady_etime)
+      call check_steady_etime(st_prec%etime, vname)
+
     st_step_flag%prec = 0
 
     deallocate(vname)
@@ -1476,6 +1488,9 @@ module open_file
     if (st_evap%etime > st_sim%end_time) then
       st_evap%etime = st_sim%end_time
     end if
+
+    ! -- Check the unused time series (steady_etime)
+      call check_steady_etime(st_evap%etime, vname)
 
     st_step_flag%evap = 0
 
@@ -1740,6 +1755,9 @@ module open_file
       if (rive_etime > st_sim%end_time) then
         rive_etime = st_sim%end_time
       end if
+
+      ! -- Check the unused time series (steady_etime)
+        call check_steady_etime(rive_etime, mess_rive)
 
       rive_stepflag = 0
 
@@ -2078,6 +2096,9 @@ module open_file
         lake_etime = st_sim%end_time
       end if
 
+      ! -- Check the unused time series (steady_etime)
+        call check_steady_etime(lake_etime, mess_lake)
+
       lake_stepflag = 0
 
       select case (i)
@@ -2292,5 +2313,31 @@ module open_file
     deallocate(out_chra)
 
   end subroutine open_out_massf
+
+  subroutine check_steady_etime(fetime, fname)
+  !*********************************************************************************************
+  ! check_steady_etime -- Check the unused time series for the long-term-steady simulation
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(SP), intent(in) :: fetime
+    character(*), intent(in) :: fname
+    ! -- local
+    character(:), allocatable :: warn_mes
+    !-------------------------------------------------------------------------------------------
+    if (st_sim%sim_type /= 0 .or. fetime >= st_sim%end_time) then
+      return
+    end if
+
+    if (st_mpi%rank == 0) then
+      allocate(character(0) :: warn_mes)
+      warn_mes = "Time series in "//fname//" file is left unused after the first block "//&
+                 "because the simulation type is long-term-steady."
+      call write_logf(warn_mes)
+      deallocate(warn_mes)
+    end if
+
+  end subroutine check_steady_etime
 
 end module open_file

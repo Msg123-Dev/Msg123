@@ -62,6 +62,9 @@ module time_module
       end if
       ! -- Set next variable (nextvar)
         call set_nextvar()
+    else if (st_time%conv_flag .and. st_sim%sim_type == 0) then
+      ! -- Set delta time (delt)
+        call set_delt()
     else if (next_time > st_sim%end_time) then
       st_time%delt = real(st_sim%end_time - st_time%current_t, kind=DP)
     end if
@@ -782,7 +785,8 @@ module time_module
 
     if (min_step == st_time%current_t) then
       st_time%delt = st_time%delt
-    else if (min_step < next_time .and. next_time < st_sim%end_time) then
+    else if (min_step > st_time%current_t .and. min_step < next_time .and.&
+             next_time < st_sim%end_time) then
       st_time%delt = real(min_step - st_time%current_t, kind=DP)
     else if (next_time > st_sim%end_time) then
       st_time%delt = real(st_sim%end_time - st_time%current_t, kind=DP)

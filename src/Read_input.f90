@@ -1,7 +1,7 @@
 module read_input
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: VARLEN, CHALEN, TIMELEN, SZERO, SONE, DNOVAL
+  use constval_module, only: VARLEN, CHALEN, TIMELEN, SZERO, SONE, SINFI, DNOVAL
   use utility_module, only: get_days, open_new_rtxt, close_file, write_logf, write_success
   use utility_module, only: write_err_stop, conv_lower
   use initial_module, only: in_type, unit_list, st_sim, st_ctrl, st_schm, st_in_type
@@ -488,7 +488,7 @@ module read_input
     namelist/set_solution/init_step, tstep_type, incr_multi, decr_multi, max_tstep,&
                           maxout_iter, picard_iter, criteria, maxinn_iter, precon_type
     !-------------------------------------------------------------------------------------------
-    ierr = 0 ; init_step = SZERO ; incr_multi = SZERO ; decr_multi = SZERO ; max_tstep = SZERO
+    ierr = 0 ; init_step = SZERO ; incr_multi = SZERO ; decr_multi = SZERO ; max_tstep = SINFI
     tstep_type = st_ctrl%tstep_type ; maxout_iter = st_ctrl%maxout_iter
     picard_iter = st_ctrl%picard_iter ; maxinn_iter = st_ctrl%maxinn_iter
     precon_type = st_ctrl%precon_type ; criteria = st_ctrl%criteria
@@ -516,6 +516,8 @@ module read_input
       call write_err_stop("Input a valid value for preconditoner type.")
     else if (st_ctrl%maxout_iter < st_ctrl%picard_iter) then
       call write_err_stop("Picard iteration is larger than maximum number of outer iteration.")
+    else if (max_tstep <= SZERO) then
+      call write_err_stop("Input a positive value for maximum time step.")
     end if
 
     st_ctrl%nlevel = 1

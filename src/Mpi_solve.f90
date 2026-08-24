@@ -17,8 +17,6 @@ module mpi_solve
   public :: check_mpimaxerr, bcast_convinfo
 
   ! -- local
-  ! Persistent work buffers. Sizes are fixed once the domain decomposition and the
-  ! matrix structure are set up, so they are allocated once in allocate_mpisolve.
   integer, allocatable :: requ_send(:), requ_recv(:)
   integer, allocatable :: stat_s(:,:), stat_r(:,:)
   integer(I4), allocatable :: sbufint(:), rbufint(:)

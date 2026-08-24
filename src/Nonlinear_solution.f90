@@ -3,7 +3,7 @@ module nonlinear_solution
   use kind_module, only: I4, DP
   use types_module, only: sol_set
   use allocate_solution, only: nreg_num, array_var
-  use constval_module, only: DZERO, DONE, DHALF, DTWO, VARMAX, STEP_TOL_DEF
+  use constval_module, only: DZERO, DONE, DHALF, DTWO, VARMAX, STEP_TOL_DEF, MACHI_EPS
   use utility_module, only: st_mpi
   use initial_module, only: st_ctrl
   use read_input, only: len_scal
@@ -235,7 +235,7 @@ module nonlinear_solution
         end if
         if (.not. st_time%conv_flag .and. .not. back_flag) then
           ! -- Set Eisenstat-Walker forcing term (eise_walk)
-            call set_eise_walk(lambda, l2norm_new, l2norm_pre, l2norm_jac, gradient, eater)
+            call set_eise_walk(l2norm_new, l2norm_pre, l2norm_jac, gradient, eater)
         end if
       end if
 
@@ -434,24 +434,28 @@ module nonlinear_solution
 
   end subroutine set_backtr
 
-  subroutine set_eise_walk(lam, l2_new, l2_pre, l2_jac, grad, eta)
+  subroutine set_eise_walk(l2_new, l2_pre, l2_jac, grad, eta)
   !*********************************************************************************************
   ! set_eise_walk -- Set Eisenstat-Walker forcing term
   !*********************************************************************************************
     ! -- modules
-
+    use utility_module, only: log_fnum
     ! -- inout
-    real(DP), intent(in) :: lam, l2_new, l2_pre, l2_jac, grad
+    real(DP), intent(in) :: l2_new, l2_pre, l2_jac, grad
     real(DP), intent(inout) :: eta
     ! -- local
     real(DP), parameter :: ETA_MAX = 0.9_DP
     real(DP), parameter :: ETA_MIN = 1.0E-4_DP
     real(DP), parameter :: ETA_ALPHA = (1.0_DP+sqrt(5.0_DP))*DHALF
-    real(DP) :: eta_safe, minus1, l2_line, lin_l2norm
+    real(DP) :: eta_safe, l2_line, lin_l2norm
     !-------------------------------------------------------------------------------------------
     eta_safe = eta**ETA_ALPHA
-    minus1 = DONE - lam
-    l2_line = minus1*minus1*l2_pre + DTWO*lam*minus1*grad + lam*lam*l2_jac
+    l2_line = l2_pre + DTWO*grad + l2_jac
+    if (l2_line < -MACHI_EPS*l2_pre) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Warning!! Negative linear model norm in the forcing term."
+      end if
+    end if
     lin_l2norm = sqrt(max(DZERO, l2_line))
     eta = abs(sqrt(l2_new) - lin_l2norm)/sqrt(l2_pre)
 
@@ -532,18 +536,16 @@ module nonlinear_solution
     end if
     step_len = sql2_pnorm
 
-    l2_new = DZERO ; slope = DZERO
+    l2_new = DZERO ; slope = DZERO ; l2_jac = DZERO
     !$omp parallel
-    !$omp do private(i) reduction(+:l2_new, slope)
+    !$omp do private(i) reduction(+:l2_new, slope, l2_jac)
     do i = 1, ncalc
       l2_new = l2_new + new_f(i)*new_f(i)
       slope = slope + array_var(1)%rhs(i)*jacvec(i)*maxpnorm
+      l2_jac = l2_jac + jacvec(i)*jacvec(i)
     end do
     !$omp end do
 
-    ! -- Scaled step length, KINSOL KINScSteplength. The denominator carries the 1 +
-    ! -- so that a cell with a head near zero cannot blow the length up, and the
-    ! -- reference point is the current iterate rather than the updated one.
     !$omp do private(i, temp_lam) reduction(max:lam_length)
     do i = 1, ncalc
       temp_lam = abs(st_sol%head_change(i))/(DONE + abs(st_sol%head_pre(i)))
@@ -565,6 +567,9 @@ module nonlinear_solution
       ! -- Sum value for MPI (val)
         call mpisum_val(slope, "slope function l2-norm", sum_l2)
       slope = sum_l2
+      ! -- Sum value for MPI (val)
+        call mpisum_val(l2_jac, "jacobi vector l2-norm", sum_l2)
+      l2_jac = sum_l2
       ! -- MAX value for MPI (val)
         call mpimax_val(lam_length, "lambda length", max_val)
       lam_length = max_val
@@ -676,6 +681,9 @@ module nonlinear_solution
         end if
       end if
     end if
+
+    grad = slope*lam
+    l2_jac = l2_jac*lam*lam
 
   end subroutine run_backtr
 

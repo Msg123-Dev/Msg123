@@ -310,6 +310,7 @@ module make_linearsystem
   ! set_rivebound -- Set river boundary to dmat
   !*********************************************************************************************
     ! -- modules
+
     ! -- inout
     real(DP), intent(in) :: per_relp(:)
     type(sol_set), intent(in) :: st_sol
@@ -370,6 +371,7 @@ module make_linearsystem
   ! set_lakebound -- Set lake boundary to dmat
   !*********************************************************************************************
     ! -- modules
+
     ! -- inout
     real(DP), intent(in) :: per_relp(:)
     type(sol_set), intent(in) :: st_sol
@@ -520,6 +522,7 @@ module make_linearsystem
   ! set_seabound -- Set sea boundary to dmat
   !*********************************************************************************************
     ! -- modules
+
     ! -- inout
     real(DP), intent(in) :: per_relp(:)
     type(sol_set), intent(in) :: st_sol

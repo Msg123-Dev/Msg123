@@ -341,13 +341,13 @@ module read_input
     else
       ! -- Convert unit (unit)
         call conv_unit(st_mpi%rank, calc_unit, "main file", sdate, calc_multi)
-      if (st_sim%sim_type == 0) then
-        end_time = end_time*calc_multi
-      else if (st_sim%sim_type == 1) then
+      if (st_sim%sim_type == 1) then
         ! -- Check calculation date (date)
           call check_date(sdate, edate)
         ! -- Calculate end time (etime)
           call calc_etime(sdate, edate, end_time)
+      else
+        end_time = end_time*calc_multi
       end if
     end if
 

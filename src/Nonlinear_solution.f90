@@ -53,7 +53,7 @@ module nonlinear_solution
     use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
     use constval_module, only: VARLEN, XMAX, XMAX_INV
     use types_module, only: kryl_set, amgt_set, coef_set
-    use utility_module, only: log_fnum
+    use utility_module, only: log_fnum, write_err_stop
     use initial_module, only: st_sim, st_out_step
     use make_linearsystem, only: make_matvec
     use check_simulation, only: check_abserrmax
@@ -202,13 +202,10 @@ module nonlinear_solution
         end if
         exit outer_loop
       else if (ieee_is_nan(max_unk) .and. st_sim%sim_type == -1) then
-        st_sim%sim_type = 0
-        st_time%current_t = DZERO
         if (st_mpi%rank == 0) then
-          write(log_fnum,'(a)') "Steady state calculation changes to timestep calculation."
           write(conv_fnum,15)
         end if
-        exit outer_loop
+        call write_err_stop("Nan detected in the steady state calculation.")
       end if
 
       if (.not. st_time%conv_flag .and. st_time%form_switch == 1) then
@@ -321,13 +318,10 @@ module nonlinear_solution
         end if
         exit outer_loop
       else if (st_time%out_iter == st_ctrl%maxout_iter .and. st_sim%sim_type == -1) then
-        st_sim%sim_type = 0
-        st_time%current_t = DZERO
         if (st_mpi%rank == 0) then
-          write(log_fnum,'(a)') "Steady state calculation changes to timestep calculation."
           write(conv_fnum,15)
         end if
-        exit outer_loop
+        call write_err_stop("Steady state calculation didn't converge.")
       else if (st_time%out_iter == st_ctrl%maxout_iter) then
         if (st_mpi%rank == 0) then
           write(conv_fnum,14)

@@ -102,7 +102,7 @@ module mpi_initfin
     ! -- local
     integer(I4) :: ierr, errcode
     !-------------------------------------------------------------------------------------------
-    ierr = 0 ; errcode = 0
+    ierr = 0 ; errcode = 1
     call MPI_ABORT(my_comm, errcode, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (num_rank == 0) then

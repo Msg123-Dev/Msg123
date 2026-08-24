@@ -322,7 +322,7 @@ module utility_module
     ! -- Abort process (proc)
       call abort_proc(st_mpi%rank, log_fnum)
 #endif
-    stop
+    error stop 1
 
   end subroutine write_err_stop
 

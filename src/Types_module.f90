@@ -35,6 +35,7 @@ module types_module
 
   type :: schm_set
     integer(I4) :: krpos_type = 0
+    integer(I4) :: stor_type = 0
   end type schm_set
 
   type :: geom_set

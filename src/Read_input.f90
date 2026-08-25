@@ -546,14 +546,14 @@ module read_input
 
     ! -- local
     integer(I4) :: ierr
-    integer(I4) :: krpos_type
-    namelist/set_scheme/krpos_type
+    integer(I4) :: krpos_type, stor_type
+    namelist/set_scheme/krpos_type, stor_type
     !-------------------------------------------------------------------------------------------
     ierr = 0
-    krpos_type = st_schm%krpos_type
+    krpos_type = st_schm%krpos_type ; stor_type = st_schm%stor_type
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_scheme,iostat=ierr)
-    st_schm%krpos_type = krpos_type
+    st_schm%krpos_type = krpos_type ; st_schm%stor_type = stor_type
 
     if (ierr /= 0 .and. find_nml_name("set_scheme", main_name(1:main_namen))) then
       call write_err_stop("While reading scheme section in main file.")
@@ -561,6 +561,10 @@ module read_input
       call write_err_stop("Input a non-negative value for kr position type.")
     else if (st_schm%krpos_type > 1) then
       call write_err_stop("Input a valid value for kr position type.")
+    else if (st_schm%stor_type < 0) then
+      call write_err_stop("Input a non-negative value for storage type.")
+    else if (st_schm%stor_type > 1) then
+      call write_err_stop("Input a valid value for storage type.")
     end if
 
   end subroutine read_schm_list

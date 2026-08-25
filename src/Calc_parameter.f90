@@ -51,7 +51,11 @@ module calc_parameter
           theta = st_hydr%read_pors(i)
         end if
         srat(i) = theta/st_hydr%read_pors(i)
-        ws = theta
+        if (st_schm%stor_type == 1) then
+          ws = theta + st_hydr%read_spst(i)*per_phead*srat(i)
+        else
+          ws = theta
+        end if
         se = (DONE+beta)**(-retm)
         kr = se**(DHALF)*(DONE-(DONE-se**(DONE/retm))**retm)**DTWO
       else

@@ -3,7 +3,7 @@ module mpi_set
   use kind_module, only: I4, SP, DP
   use constval_module, only: FACE, SZERO, DZERO
   use utility_module, only: st_mpi, write_err_stop
-  use initial_module, only: st_sim, st_ctrl, st_grid, st_in_type, st_out_type
+  use initial_module, only: st_sim, st_ctrl, st_schm, st_grid, st_in_type, st_out_type
   use mpi
 
   implicit none
@@ -199,6 +199,20 @@ module mpi_set
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Broadcast the preconditoner type.")
+      end if
+    end if
+
+    call MPI_BCAST(st_schm%krpos_type, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Broadcast the kr position type.")
+      end if
+    end if
+
+    call MPI_BCAST(st_schm%stor_type, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Broadcast the storage type.")
       end if
     end if
 

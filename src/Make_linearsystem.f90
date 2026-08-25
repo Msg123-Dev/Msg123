@@ -334,15 +334,16 @@ module make_linearsystem
       s = st_bcnd%rive2cals(i)
       per_riv(i) = per_relp(s) ; rel_riv(i) = st_sol%rel_perm(s)
       head_eff = max(st_forc%rive_head(i), st_forc%rive_bott(i))
+      tran_riv(i) = st_hydr%hydf_surf(s)*st_forc%abyd_rive(i)
       if (st_sol%head_new(s) >= st_forc%rive_bott(i)) then
         delh_r(i) = head_eff - st_sol%head_new(s)
         over_riv(i) = DONE
+        deri_r(i) = -tran_riv(i)*rel_riv(i)
       else
         delh_r(i) = head_eff - st_forc%rive_bott(i)
         over_riv(i) = DZERO
+        deri_r(i) = DZERO
       end if
-      tran_riv(i) = st_hydr%hydf_surf(s)*st_forc%abyd_rive(i)
-      deri_r(i) = -tran_riv(i)*rel_riv(i)
     end do
     !$omp end do
 
@@ -395,15 +396,16 @@ module make_linearsystem
       s = st_bcnd%lake2cals(i)
       per_lak(i) = per_relp(s) ; rel_lak(i) = st_sol%rel_perm(s)
       head_eff = max(st_forc%lake_head(i), st_forc%lake_bott(i))
+      tran_lak(i) = st_hydr%hydf_surf(s)*st_forc%abyd_lake(i)
       if (st_sol%head_new(s) >= st_forc%lake_bott(i)) then
         delh_l(i) = head_eff - st_sol%head_new(s)
         over_lak(i) = DONE
+        deri_l(i) = -tran_lak(i)*rel_lak(i)
       else
         delh_l(i) = head_eff - st_forc%lake_bott(i)
         over_lak(i) = DZERO
+        deri_l(i) = DZERO
       end if
-      tran_lak(i) = st_hydr%hydf_surf(s)*st_forc%abyd_lake(i)
-      deri_l(i) = -tran_lak(i)*rel_lak(i)
     end do
     !$omp end do
 

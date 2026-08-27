@@ -56,7 +56,7 @@ module nonlinear_solution
     use utility_module, only: log_fnum, write_err_stop
     use initial_module, only: st_sim, st_out_step
     use make_linearsystem, only: make_matvec
-    use check_simulation, only: check_abserrmax
+    use check_simulation, only: check_abserrmax, check_residual
     use linear_solution, only: solve_linalg, in_iter
 #ifdef MPI_MSG
     use mpi_solve, only: check_mpimaxerr, bcast_convinfo
@@ -76,7 +76,7 @@ module nonlinear_solution
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var
     real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
     real(DP) :: res_l1, res_l2, res_l20, qtot_l1, rat_res, rat_qtt
-    logical :: back_flag
+    logical :: back_flag, res_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
     real(DP) :: var_max, unk_max, var_abs_max
@@ -300,6 +300,13 @@ module nonlinear_solution
         write(conv_fnum,11) st_time%out_iter, in_iter, back_iter, conv_var,&
                             trim(adjustl(cxyzn)), conv_dmat, conv_rhs, conv_head
       end if
+
+      if (st_time%conv_flag) then
+        ! -- Check residual convergence (residual)
+          call check_residual(new_func, st_sol%stor_new, res_flag)
+        st_time%conv_flag = res_flag
+      end if
+
       ! check outer_loop
       if (st_time%conv_flag) then
         ! -- Calculate surface water level (surfw)

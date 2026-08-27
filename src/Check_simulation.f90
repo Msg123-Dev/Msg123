@@ -6,7 +6,7 @@ module check_simulation
 
   implicit none
   private
-  public :: check_insol, check_abserrmax, check_outtiming, check_lastts
+  public :: check_insol, check_abserrmax, check_residual, check_outtiming, check_lastts
   integer(I4), public :: write_flag, lasttime_flag
 
   ! -- local
@@ -89,6 +89,70 @@ module check_simulation
     end if
 
   end subroutine check_abserrmax
+
+  subroutine check_residual(funcv, stnew, res_flag)
+  !*********************************************************************************************
+  ! check_residual -- Check residual convergence criteria
+  !*********************************************************************************************
+    ! -- modules
+    use constval_module, only: DZERO
+#ifdef MPI_MSG
+    use utility_module, only: st_mpi
+    use mpi_utility, only: mpisum_val
+#endif
+    use initial_module, only: st_ctrl
+    use read_input, only: len_scal
+    use set_cell, only: ncalc
+    use make_cell, only: st_geom
+    ! -- inout
+    real(DP), intent(in) :: funcv(:), stnew(:)
+    logical, intent(out) :: res_flag
+    ! -- local
+    integer(I4) :: i, nviol
+    real(DP), parameter :: A_ZERO = 1.00E-15_DP
+    real(DP) :: vol_scal, res_val, acc_val
+    logical :: abs_flag, rel_flag, pass_flag
+#ifdef MPI_MSG
+    integer(I4) :: sum_viol
+#endif
+    !-------------------------------------------------------------------------------------------
+    res_flag = .true.
+    abs_flag = st_ctrl%res_abs_tol > DZERO ; rel_flag = st_ctrl%res_rel_tol > DZERO
+    if (.not. abs_flag .and. .not. rel_flag) then
+      return
+    end if
+
+    nviol = 0 ; vol_scal = len_scal**3
+    !$omp parallel do private(i, res_val, acc_val, pass_flag) reduction(+:nviol)
+    do i = 1, ncalc
+      res_val = abs(funcv(i))*vol_scal
+      acc_val = abs(stnew(i))*st_time%delt_inv*st_geom%cell_vol(i)*vol_scal
+      pass_flag = .false.
+      if (abs_flag .and. res_val <= st_ctrl%res_abs_tol) then
+        pass_flag = .true.
+      else if (rel_flag .and. acc_val <= A_ZERO) then
+        pass_flag = .true.
+      else if (rel_flag .and. res_val <= st_ctrl%res_rel_tol*acc_val) then
+        pass_flag = .true.
+      end if
+      if (.not. pass_flag) then
+        nviol = nviol + 1
+      end if
+    end do
+    !$omp end parallel do
+
+#ifdef MPI_MSG
+    if (st_mpi%totn /= 1) then
+      ! -- Sum value for MPI (val)
+        call mpisum_val(nviol, "residual criteria violation", sum_viol)
+      nviol = sum_viol
+    end if
+#endif
+    if (nviol /= 0) then
+      res_flag = .false.
+    end if
+
+  end subroutine check_residual
 
   subroutine check_outtiming()
   !*********************************************************************************************

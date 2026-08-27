@@ -477,26 +477,29 @@ module read_input
   ! read_sol_list -- Read solution name list
   !*********************************************************************************************
     ! -- modules
-
+    use constval_module, only: DZERO
     ! -- inout
 
     ! -- local
     integer(I4) :: ierr
     real(SP) :: init_step, incr_multi, decr_multi, max_tstep
     integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type
-    real(DP) :: criteria
+    real(DP) :: criteria, res_abs_tol, res_rel_tol
     namelist/set_solution/init_step, tstep_type, incr_multi, decr_multi, max_tstep,&
-                          maxout_iter, picard_iter, criteria, maxinn_iter, precon_type
+                          maxout_iter, picard_iter, criteria, maxinn_iter, precon_type,&
+                          res_abs_tol, res_rel_tol
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; init_step = SZERO ; incr_multi = SZERO ; decr_multi = SZERO ; max_tstep = SINFI
     tstep_type = st_ctrl%tstep_type ; maxout_iter = st_ctrl%maxout_iter
     picard_iter = st_ctrl%picard_iter ; maxinn_iter = st_ctrl%maxinn_iter
     precon_type = st_ctrl%precon_type ; criteria = st_ctrl%criteria
+    res_abs_tol = st_ctrl%res_abs_tol ; res_rel_tol = st_ctrl%res_rel_tol
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_solution,iostat=ierr)
     st_ctrl%tstep_type = tstep_type ; st_ctrl%maxout_iter = maxout_iter
     st_ctrl%picard_iter = picard_iter ; st_ctrl%maxinn_iter = maxinn_iter
     st_ctrl%precon_type = precon_type ; st_ctrl%criteria = criteria
+    st_ctrl%res_abs_tol = res_abs_tol ; st_ctrl%res_rel_tol = res_rel_tol
 
     if (ierr /= 0) then
       call write_err_stop("While reading solution section in main file.")
@@ -518,6 +521,10 @@ module read_input
       call write_err_stop("Picard iteration is larger than maximum number of outer iteration.")
     else if (max_tstep <= SZERO) then
       call write_err_stop("Input a positive value for maximum time step.")
+    else if (res_abs_tol < DZERO) then
+      call write_err_stop("Input a non-negative value for absolute residual tolerance.")
+    else if (res_rel_tol < DZERO) then
+      call write_err_stop("Input a non-negative value for scaled residual tolerance.")
     end if
 
     st_ctrl%nlevel = 1

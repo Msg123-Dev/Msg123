@@ -29,7 +29,7 @@ module types_module
     integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type
     integer(I4) :: nlevel, maxvcy_iter, amg_nlevel, max_sweep
     integer(I4) :: noclas_flag = 0
-    real(DP) :: criteria, errtol, newper, newper_inv
+    real(DP) :: criteria, errtol, newper, newper_inv, res_abs_tol, res_rel_tol
     real(SP) :: jac_omega, amg_theta
   end type ctrl_set
 

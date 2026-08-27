@@ -205,6 +205,7 @@ module initial_module
     st_ctrl%maxinn_iter = 10 ; st_ctrl%precon_type = 0 ; st_ctrl%nlevel = 0
     st_ctrl%maxvcy_iter = 0 ; st_ctrl%amg_nlevel = 0 ; st_ctrl%max_sweep = 0
     st_ctrl%criteria = 1.00E-03_DP ; st_ctrl%errtol = DZERO
+    st_ctrl%res_abs_tol = DZERO ; st_ctrl%res_rel_tol = DZERO
     st_ctrl%newper = MACHI_EPS ; st_ctrl%newper_inv = DONE/st_ctrl%newper
     st_ctrl%jac_omega = 0.67_SP ; st_ctrl%amg_theta = 0.05_SP
 

@@ -3050,6 +3050,10 @@ module mpi_set
       call bcast_val(st_sim%dec_fact, " decrement multiplier value")
     ! -- Bcast scalar value (val)
       call bcast_val(st_ctrl%criteria, " outer criteria (max norm) value")
+    ! -- Bcast scalar value (val)
+      call bcast_val(st_ctrl%res_abs_tol, " absolute residual tolerance value")
+    ! -- Bcast scalar value (val)
+      call bcast_val(st_ctrl%res_rel_tol, " scaled residual tolerance value")
 
     if (st_ctrl%precon_type == 1) then
       ! -- Bcast scalar value (val)

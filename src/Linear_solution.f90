@@ -3,7 +3,7 @@ module linear_solution
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE, DINFI
   use types_module, only: kryl_set, amgt_set
-  use utility_module, only: st_mpi
+  use utility_module, only: st_mpi, dilu_shift_num
   use initial_module, only: st_ctrl
   use prep_calculation, only: st_time
   use allocate_solution, only: nreg_num, dir_conn, crs_index, array_var
@@ -890,7 +890,7 @@ module linear_solution
     integer(I4) :: i, j, k
     integer(I4) :: off_sta, off_end, off_sta2, off_end2
     integer(I4) :: offr, offr2
-    real(DP) :: d_invk
+    real(DP) :: d_invk, d_flor
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, npre
@@ -916,6 +916,13 @@ module linear_solution
           end do
         end if
       end do
+      if (st_ctrl%dilu_shift > DZERO) then
+        d_flor = st_ctrl%dilu_shift*abs(pre_ind(i))
+        if (abs(pre_d(i)) < d_flor) then
+          pre_d(i) = sign(d_flor, pre_ind(i))
+          dilu_shift_num = dilu_shift_num + 1
+        end if
+      end if
     end do
 
   end subroutine precon_dilu

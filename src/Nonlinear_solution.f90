@@ -4,7 +4,7 @@ module nonlinear_solution
   use types_module, only: sol_set
   use allocate_solution, only: nreg_num, array_var
   use constval_module, only: DZERO, DONE, DHALF, DTWO, VARMAX, STEP_TOL_DEF, MACHI_EPS
-  use utility_module, only: st_mpi
+  use utility_module, only: st_mpi, slope_sign_num
   use initial_module, only: st_ctrl
   use read_input, only: len_scal
   use check_condition, only: st_out_fnum
@@ -587,6 +587,12 @@ module nonlinear_solution
       lam_min = step_tol/lam_length
     else
       lam_min = DZERO
+    end if
+    if (slope >= DZERO) then
+      slope_sign_num = slope_sign_num + 1
+      if (slope > DZERO) then
+        slope = -slope
+      end if
     end if
     f1_pre = DHALF*l2_pre
     grad = slope

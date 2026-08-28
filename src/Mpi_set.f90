@@ -3068,6 +3068,8 @@ module mpi_set
       call bcast_val(st_ctrl%res_abs_tol, " absolute residual tolerance value")
     ! -- Bcast scalar value (val)
       call bcast_val(st_ctrl%res_rel_tol, " scaled residual tolerance value")
+    ! -- Bcast scalar value (val)
+      call bcast_val(st_ctrl%dilu_shift, " dilu pivot shift value")
 
     if (st_ctrl%precon_type == 1) then
       ! -- Bcast scalar value (val)

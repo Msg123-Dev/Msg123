@@ -2,7 +2,8 @@ module mpi_solve
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO
-  use utility_module, only: st_mpi, write_err_stop
+  use utility_module, only: st_mpi, write_err_stop, dilu_shift_num
+  use initial_module, only: st_ctrl
   use mpi_utility, only: mpisum_val
   use set_cell, only: ncalc, neib_mpi_totn, send_cind, recv_cind, send_citem, recv_citem
   use set_cell, only: neib_num
@@ -233,7 +234,7 @@ module mpi_solve
     integer(I4) :: off_sta, off_end, off_sta2, off_end2
     integer(I4) :: offr, offr2, off_left, off_row_num
     integer(I4) :: rank_flag, allp_flag
-    real(DP) :: d_invk
+    real(DP) :: d_invk, d_flor
     !-------------------------------------------------------------------------------------------
     off_row_num = crs_index(1)%offind(nreg_num)
     !$omp parallel
@@ -282,6 +283,13 @@ module mpi_solve
           end do
           if (sum(offr_flag(off_sta:off_end)) == off_end-off_sta+1) then
             fix_flag(i) = 1 ; pre_d(i) = temp_pred(i)
+            if (st_ctrl%dilu_shift > DZERO) then
+              d_flor = st_ctrl%dilu_shift*abs(pre_ind(i))
+              if (abs(pre_d(i)) < d_flor) then
+                pre_d(i) = sign(d_flor, pre_ind(i))
+                dilu_shift_num = dilu_shift_num + 1
+              end if
+            end if
           end if
         end if
       end do

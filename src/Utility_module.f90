@@ -6,6 +6,8 @@ module utility_module
   implicit none
   private
   integer(I4), public :: log_fnum = 0
+  integer(I4), public :: dilu_shift_num = 0
+  integer(I4), public :: slope_sign_num = 0
   type(mpi_set), public :: st_mpi
   public :: get_file_stat, get_days
   public :: open_new_rtxt, open_new_rbin, open_new_wtxt, open_new_wbin

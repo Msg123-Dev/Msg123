@@ -5,7 +5,7 @@ program msg123
   ! -- modules
   use kind_module, only: I4, DP
   use types_module, only: kryl_set, amgt_set, coef_set, sol_set
-  use utility_module, only: log_fnum, st_mpi
+  use utility_module, only: log_fnum, st_mpi, dilu_shift_num, slope_sign_num
   use initial_module, only: init_msg, st_ctrl
   use read_input, only: read_main_file
   use set_cell, only: set_cell_info
@@ -24,6 +24,7 @@ program msg123
 #endif
 #ifdef MPI_MSG
   use mpi_initfin, only: fin_mpi
+  use mpi_utility, only: mpisum_val
   use mpi_solve, only: allocate_mpisolve
 #endif
 
@@ -37,11 +38,15 @@ program msg123
   type(kryl_set) :: st_kryl
   type(amgt_set) :: st_amgt
   type(coef_set) :: st_coef
+#ifdef MPI_MSG
+  integer(I4) :: sum_shift, sum_slope
+#endif
   ! -- format
   11 format(/"Run end date and time(yyyy/mm/dd hh:mm:ss) : ",i4,"/",i2.2,"/",i2.2,1x,i2,":",&
             i2.2,":",i2.2,/)
   12 format(/"Total cpu time : ", es15.6, " (sec)")
   13 format(/"Time loop cpu time : ", es15.6, " (sec)")
+  14 format(/a," : ", i12, " times")
   !--------------------------------------------------------------------------------------------
   if (st_mpi%rank == 0) then
     ! -- Start time
@@ -137,11 +142,24 @@ program msg123
 #endif
 
 #ifdef MPI_MSG
+  if (st_mpi%totn /= 1) then
+    ! -- Sum value for MPI (val)
+      call mpisum_val(dilu_shift_num, "dilu pivot shift count", sum_shift)
+      call mpisum_val(slope_sign_num, "non-negative slope count", sum_slope)
+    dilu_shift_num = sum_shift ; slope_sign_num = sum_slope
+  end if
   ! -- Finalize mpi (mpi)
     call fin_mpi(st_mpi%rank, log_fnum)
 #endif
 
   if (st_mpi%rank == 0) then
+    if (dilu_shift_num /= 0) then
+      write(log_fnum,14) "Dilu pivot shifted", dilu_shift_num
+    end if
+    if (slope_sign_num /= 0) then
+      write(log_fnum,14) "Non-negative slope", slope_sign_num
+    end if
+
     ! -- Time loop end time
       call CPU_TIME(loop_etime)
     ! -- Calculation end time

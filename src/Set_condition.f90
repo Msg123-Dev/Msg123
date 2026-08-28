@@ -4,7 +4,7 @@ module set_condition
   use constval_module, only: SZERO, SNOVAL, DZERO, DONE
   use types_module, only: hydr_set, bcnd_set
   use utility_module, only: st_mpi
-  use initial_module, only: in_type, st_grid, st_well
+  use initial_module, only: in_type, st_grid, st_well, st_schm
   use read_module, only: read_2dtxt, read_2dbin, read_3dtxt, read_3dbin, flat_2dto2d
   use read_module, only: flat_2dto3d, flat_3dto3d
   use set_cell, only: ncalc, ncals, neib_ncalc, st_conn
@@ -2487,12 +2487,20 @@ module set_condition
     real(DP), intent(out) :: abyd_surftemp(:)
     ! -- local
     integer(I4) :: i, s
-    real(DP) :: dis_s
+    real(DP) :: dis_s, dis_h
     !-------------------------------------------------------------------------------------------
-    !$omp parallel do private(i, s, dis_s)
+    !$omp parallel do private(i, s, dis_s, dis_h)
     do i = 1, surfn
       s = surf2surf(i)
-      dis_s = abs(bott_s(i) - st_geom%cell_cent(s))
+      dis_h = st_geom%cell_top(s) - st_geom%cell_cent(s)
+      select case (st_schm%abyd_type)
+      case (1)
+        dis_s = max(abs(bott_s(i) - st_geom%cell_cent(s)), st_schm%abyd_ratio*dis_h)
+      case (2)
+        dis_s = dis_h
+      case default
+        dis_s = abs(bott_s(i) - st_geom%cell_cent(s))
+      end select
       abyd_surftemp(i) = abs(area_s(i))/dis_s
       st_hydr%surf_area(s) = st_hydr%surf_area(s) - area_s(i)
       st_hydr%rech_area(s) = st_hydr%rech_area(s) - area_s(i)

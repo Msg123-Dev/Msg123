@@ -216,6 +216,20 @@ module mpi_set
       end if
     end if
 
+    call MPI_BCAST(st_schm%abyd_type, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Broadcast the area by distance type.")
+      end if
+    end if
+
+    call MPI_BCAST(st_schm%abyd_ratio, 1, MPI_REAL8, 0, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Broadcast the area by distance ratio.")
+      end if
+    end if
+
   end subroutine bcast_sim_flag
 
   subroutine bcast_xyz_num()

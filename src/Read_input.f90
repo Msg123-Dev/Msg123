@@ -548,19 +548,22 @@ module read_input
   ! read_schm_list -- Read scheme name list
   !*********************************************************************************************
     ! -- modules
-
+    use constval_module, only: DZERO
     ! -- inout
 
     ! -- local
     integer(I4) :: ierr
-    integer(I4) :: krpos_type, stor_type
-    namelist/set_scheme/krpos_type, stor_type
+    integer(I4) :: krpos_type, stor_type, abyd_type
+    real(DP) :: abyd_ratio
+    namelist/set_scheme/krpos_type, stor_type, abyd_type, abyd_ratio
     !-------------------------------------------------------------------------------------------
     ierr = 0
     krpos_type = st_schm%krpos_type ; stor_type = st_schm%stor_type
+    abyd_type = st_schm%abyd_type ; abyd_ratio = st_schm%abyd_ratio
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_scheme,iostat=ierr)
     st_schm%krpos_type = krpos_type ; st_schm%stor_type = stor_type
+    st_schm%abyd_type = abyd_type ; st_schm%abyd_ratio = abyd_ratio
 
     if (ierr /= 0 .and. find_nml_name("set_scheme", main_name(1:main_namen))) then
       call write_err_stop("While reading scheme section in main file.")
@@ -572,6 +575,12 @@ module read_input
       call write_err_stop("Input a non-negative value for storage type.")
     else if (st_schm%stor_type > 1) then
       call write_err_stop("Input a valid value for storage type.")
+    else if (st_schm%abyd_type < 0) then
+      call write_err_stop("Input a non-negative value for area by distance type.")
+    else if (st_schm%abyd_type > 2) then
+      call write_err_stop("Input a valid value for area by distance type.")
+    else if (st_schm%abyd_ratio < DZERO) then
+      call write_err_stop("Input a non-negative value for area by distance ratio.")
     end if
 
   end subroutine read_schm_list

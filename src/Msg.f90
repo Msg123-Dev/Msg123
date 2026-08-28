@@ -6,6 +6,7 @@ program msg123
   use kind_module, only: I4, DP
   use types_module, only: kryl_set, amgt_set, coef_set, sol_set
   use utility_module, only: log_fnum, st_mpi, dilu_shift_num, slope_sign_num
+  use utility_module, only: nan_recv_num, maxstep_num
   use initial_module, only: init_msg, st_ctrl
   use read_input, only: read_main_file
   use set_cell, only: set_cell_info
@@ -39,7 +40,7 @@ program msg123
   type(amgt_set) :: st_amgt
   type(coef_set) :: st_coef
 #ifdef MPI_MSG
-  integer(I4) :: sum_shift, sum_slope
+  integer(I4) :: sum_shift, sum_slope, sum_nanr, sum_maxs
 #endif
   ! -- format
   11 format(/"Run end date and time(yyyy/mm/dd hh:mm:ss) : ",i4,"/",i2.2,"/",i2.2,1x,i2,":",&
@@ -146,7 +147,10 @@ program msg123
     ! -- Sum value for MPI (val)
       call mpisum_val(dilu_shift_num, "dilu pivot shift count", sum_shift)
       call mpisum_val(slope_sign_num, "non-negative slope count", sum_slope)
+      call mpisum_val(nan_recv_num, "nan step recover count", sum_nanr)
+      call mpisum_val(maxstep_num, "maximum step taken count", sum_maxs)
     dilu_shift_num = sum_shift ; slope_sign_num = sum_slope
+    nan_recv_num = sum_nanr ; maxstep_num = sum_maxs
   end if
   ! -- Finalize mpi (mpi)
     call fin_mpi(st_mpi%rank, log_fnum)
@@ -158,6 +162,12 @@ program msg123
     end if
     if (slope_sign_num /= 0) then
       write(log_fnum,14) "Non-negative slope", slope_sign_num
+    end if
+    if (nan_recv_num /= 0) then
+      write(log_fnum,14) "Nan step recovered", nan_recv_num
+    end if
+    if (maxstep_num /= 0) then
+      write(log_fnum,14) "Maximum step taken", maxstep_num
     end if
 
     ! -- Time loop end time

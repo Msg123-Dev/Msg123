@@ -4,7 +4,7 @@ module nonlinear_solution
   use types_module, only: sol_set
   use allocate_solution, only: nreg_num, array_var
   use constval_module, only: DZERO, DONE, DHALF, DTWO, VARMAX, STEP_TOL_DEF, MACHI_EPS
-  use utility_module, only: st_mpi, slope_sign_num
+  use utility_module, only: st_mpi, slope_sign_num, nan_recv_num, maxstep_num
   use initial_module, only: st_ctrl
   use read_input, only: len_scal
   use check_condition, only: st_out_fnum
@@ -21,6 +21,7 @@ module nonlinear_solution
   public :: allocate_nonlin, calc_numsol
 
   ! -- local
+  integer(I4), parameter :: MAXS_CONS = 5
   real(DP), allocatable :: new_func(:), jacvec(:)
 
   contains
@@ -70,13 +71,13 @@ module nonlinear_solution
     integer(I4) :: i
     integer(I4) :: out_iter
     integer(I4) :: max_num, conv_fnum
-    integer(I4) :: back_iter, beta_iter
+    integer(I4) :: back_iter, beta_iter, ncsc_num
     character(VARLEN) :: cxyzn
     real(DP) :: max_var, max_unk, check_val
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var
     real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
     real(DP) :: res_l1, res_l2, res_l20, qtot_l1, rat_res, rat_qtt
-    logical :: back_flag, res_flag
+    logical :: back_flag, res_flag, maxs_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
     real(DP) :: var_max, unk_max, var_abs_max
@@ -96,7 +97,7 @@ module nonlinear_solution
     16 format(1X,"RESDIAG  RES/RES0 = ",es11.3,3x,"RES_L1 = ",es11.3,3x,&
               "RESL1/Q = ",es11.3)
     !-------------------------------------------------------------------------------------------
-    conv_fnum = st_out_fnum%conv ; eater = DHALF
+    conv_fnum = st_out_fnum%conv ; eater = DHALF ; ncsc_num = 0
     res_l1 = DZERO ; res_l2 = DZERO ; res_l20 = DZERO
     qtot_l1 = DZERO ; rat_res = DZERO ; rat_qtt = DZERO
     ! -- Set for backtracking (backtr)
@@ -210,8 +211,16 @@ module nonlinear_solution
 
       if (.not. st_time%conv_flag .and. st_time%form_switch == 1) then
         ! -- Run backtracking (backtr)
-          call run_backtr(back_iter, back_flag, beta_iter, l2norm_new, l2norm_pre, l2norm_jac,&
-                          lambda, gradient, max_step, new_func, st_sol)
+          call run_backtr(back_iter, back_flag, beta_iter, maxs_flag, l2norm_new, l2norm_pre,&
+                          l2norm_jac, lambda, gradient, max_step, new_func, st_sol)
+        if (maxs_flag) then
+          ncsc_num = ncsc_num + 1
+        else
+          ncsc_num = 0
+        end if
+        if (ncsc_num == MAXS_CONS) then
+          back_flag = .true.
+        end if
         ! -- Check absolute error max norm
           call check_abserrmax(st_sol%head_new, st_sol%head_pre, max_var, max_unk, max_num)
 #ifdef MPI_MSG
@@ -476,12 +485,13 @@ module nonlinear_solution
 
   end subroutine set_eise_walk
 
-  subroutine run_backtr(backi, backf, betai, l2_new, l2_pre, l2_jac, lam, grad, maxstep, new_f,&
-                        st_sol)
+  subroutine run_backtr(backi, backf, betai, maxsf, l2_new, l2_pre, l2_jac, lam, grad, maxstep,&
+                        new_f, st_sol)
   !*********************************************************************************************
   ! run_backtr -- Run backtracking
   !*********************************************************************************************
     ! -- modules
+    use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
     use calc_function, only: calc_vecjacf
 #ifdef MPI_MSG
     use mpi_utility, only: mpimax_val
@@ -489,6 +499,7 @@ module nonlinear_solution
     ! -- inout
     integer(I4), intent(inout) :: backi, betai
     logical, intent(inout) :: backf
+    logical, intent(out) :: maxsf
     real(DP), intent(inout) :: l2_new, l2_jac, lam
     real(DP), intent(in) :: l2_pre, maxstep
     real(DP), intent(out) :: grad
@@ -501,13 +512,14 @@ module nonlinear_solution
     real(DP) :: lam2, temp_lam, lam_inv, lam2_inv, del_lam, lam_max, lam_min
     real(DP) :: lam_length, lam_base, lam_diff, lam_incr, sql2_pnorm, maxpnorm
     real(DP) :: alpha_cond, beta_cond
-    real(DP), parameter :: BACK_ALPHA = 1.00E-4_DP
-    real(DP), parameter :: BACK_BETA = 0.9_DP
+    real(DP), parameter :: BACK_ALPHA = 1.00E-4_DP, BACK_BETA = 0.9_DP, MAXS_RATIO = 0.99_DP
+    real(DP), parameter :: FINI_GUARD = huge(1.00_DP)*0.1_DP
 #ifdef MPI_MSG
     real(DP) :: sum_l2, max_val
 #endif
     !-------------------------------------------------------------------------------------------
     l2_new2 = l2_new ; lam = DONE ; lam2 = DZERO ; maxpnorm = DONE ; lam_length = DZERO
+    maxsf = .false.
     !$omp parallel do private(i)
     do i = 1, ncalc
       jacvec(i) = DZERO
@@ -600,6 +612,17 @@ module nonlinear_solution
       ! -- Calculate function and l2norm2 (func2norm)
         call calc_funcl2norm(lam, l2_new, new_f, st_sol)
       backi = backi + 1
+      if (.not. ieee_is_finite(l2_new) .or. l2_new > FINI_GUARD) then
+        nan_recv_num = nan_recv_num + 1
+        if (lam < lam_min) then
+          ! -- Calculate function and l2norm2 (func2norm)
+            call calc_funcl2norm(DZERO, l2_new, new_f, st_sol)
+          backf = .true.
+          return
+        end if
+        lam = DHALF*lam
+        cycle back_aloop
+      end if
       f1_new = DHALF*l2_new
       alpha_cond = f1_pre + BACK_ALPHA*lam*slope
       if (f1_new <= alpha_cond) then
@@ -683,7 +706,8 @@ module nonlinear_solution
           end if
         end do b2_loop
 
-        if (DHALF*l2_new < beta_cond) then
+        if (DHALF*l2_new < beta_cond .or.&
+            (lam_diff < lam_min .and. DHALF*l2_new > alpha_cond)) then
           ! -- Calculate function and l2norm2 (func2norm)
             call calc_funcl2norm(lam_base, l2_new, new_f, st_sol)
           betai = betai + 1
@@ -693,6 +717,11 @@ module nonlinear_solution
           return
         end if
       end if
+    end if
+
+    if (lam*sql2_pnorm > MAXS_RATIO*maxstep) then
+      maxsf = .true.
+      maxstep_num = maxstep_num + 1
     end if
 
     grad = slope*lam

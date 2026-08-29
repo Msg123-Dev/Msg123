@@ -4,7 +4,7 @@ module nonlinear_solution
   use types_module, only: sol_set
   use allocate_solution, only: nreg_num, array_var
   use constval_module, only: DZERO, DONE, DHALF, DTWO, VARMAX, STEP_TOL_DEF, MACHI_EPS
-  use utility_module, only: st_mpi, slope_sign_num, nan_recv_num, maxstep_num
+  use utility_module, only: st_mpi, slope_sign_num, nan_recv_num, maxstep_num, satlim_num
   use initial_module, only: st_ctrl
   use read_input, only: len_scal
   use check_condition, only: st_out_fnum
@@ -84,12 +84,12 @@ module nonlinear_solution
 #endif
     ! -- format
     10 format(//1x,"CURRENT TIME : ",es12.5,1x,"(",a,")",20x,"TIME STEP : ",&
-              es12.5,1x,"(SEC)",/,1x,84("-"),/,1x,&
-              " OUTER INNER  BACK     MAXIMUM           MAXIMUM    DIAGONAL  RIGHT HAND     &
-              &UNKNOWN",/,1x,&
-              "                        CHANGE              CELL      MATRIX      VECTOR&
-              &       VALUE",/,1x,84("-"))
-    11 format(1X,3(i6),es12.3,a18,4(es12.3))
+              es12.5,1x,"(SEC)",/,1x,90("-"),/,1x,&
+              " OUTER INNER  BACK  BETA     MAXIMUM           MAXIMUM    DIAGONAL  RIGHT &
+              &HAND     UNKNOWN",/,1x,&
+              "                              CHANGE              CELL      MATRIX      &
+              &VECTOR       VALUE",/,1x,90("-"))
+    11 format(1X,4(i6),es12.3,a18,4(es12.3))
     12 format(1X,"Didn't converge due to maximum value or change")
     13 format(1X,"Stop due to maximum value or change in backtracking")
     14 format(1X,"Stop due to maximum number of nonlinear iteration")
@@ -212,7 +212,8 @@ module nonlinear_solution
       if (.not. st_time%conv_flag .and. st_time%form_switch == 1) then
         ! -- Run backtracking (backtr)
           call run_backtr(back_iter, back_flag, beta_iter, maxs_flag, l2norm_new, l2norm_pre,&
-                          l2norm_jac, lambda, gradient, max_step, new_func, st_sol)
+                          l2norm_jac, lambda, gradient, max_step, st_coef%stod, new_func,&
+                          st_sol)
         if (maxs_flag) then
           ncsc_num = ncsc_num + 1
         else
@@ -306,7 +307,7 @@ module nonlinear_solution
         rat_qtt = DZERO
       end if
       if (st_mpi%rank == 0) then
-        write(conv_fnum,11) st_time%out_iter, in_iter, back_iter, conv_var,&
+        write(conv_fnum,11) st_time%out_iter, in_iter, back_iter, beta_iter, conv_var,&
                             trim(adjustl(cxyzn)), conv_dmat, conv_rhs, conv_head
       end if
 
@@ -486,22 +487,23 @@ module nonlinear_solution
   end subroutine set_eise_walk
 
   subroutine run_backtr(backi, backf, betai, maxsf, l2_new, l2_pre, l2_jac, lam, grad, maxstep,&
-                        new_f, st_sol)
+                        stod, new_f, st_sol)
   !*********************************************************************************************
   ! run_backtr -- Run backtracking
   !*********************************************************************************************
     ! -- modules
     use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
+    use make_cell, only: st_geom
     use calc_function, only: calc_vecjacf
 #ifdef MPI_MSG
-    use mpi_utility, only: mpimax_val
+    use mpi_utility, only: mpimax_val, mpimin_val
 #endif
     ! -- inout
     integer(I4), intent(inout) :: backi, betai
     logical, intent(inout) :: backf
     logical, intent(out) :: maxsf
     real(DP), intent(inout) :: l2_new, l2_jac, lam
-    real(DP), intent(in) :: l2_pre, maxstep
+    real(DP), intent(in) :: l2_pre, maxstep, stod(:)
     real(DP), intent(out) :: grad
     real(DP), intent(inout) :: new_f(:)
     type(sol_set), intent(inout) :: st_sol
@@ -511,11 +513,13 @@ module nonlinear_solution
     real(DP) :: f1_pre, f1_new
     real(DP) :: lam2, temp_lam, lam_inv, lam2_inv, del_lam, lam_max, lam_min
     real(DP) :: lam_length, lam_base, lam_diff, lam_incr, sql2_pnorm, maxpnorm
+    real(DP) :: lam_maxi, satpnorm, dsat
     real(DP) :: alpha_cond, beta_cond
     real(DP), parameter :: BACK_ALPHA = 1.00E-4_DP, BACK_BETA = 0.9_DP, MAXS_RATIO = 0.99_DP
+    real(DP), parameter :: FTB_FRAC = 0.9_DP
     real(DP), parameter :: FINI_GUARD = huge(1.00_DP)*0.1_DP
 #ifdef MPI_MSG
-    real(DP) :: sum_l2, max_val
+    real(DP) :: sum_l2, max_val, min_val
 #endif
     !-------------------------------------------------------------------------------------------
     l2_new2 = l2_new ; lam = DONE ; lam2 = DZERO ; maxpnorm = DONE ; lam_length = DZERO
@@ -544,14 +548,47 @@ module nonlinear_solution
 #endif
 
     sql2_pnorm = sqrt(l2_pnorm)
+
+    lam_maxi = DONE
+    if (st_ctrl%expd_type == 1 .and. sql2_pnorm > DZERO) then
+      lam_maxi = maxstep/sql2_pnorm
+    end if
+
     if (sql2_pnorm > maxstep) then
       maxpnorm = maxstep/sql2_pnorm
+    end if
+
+    if (st_ctrl%dsat_max > DZERO) then
+      satpnorm = DONE
+      !$omp parallel do private(i, dsat) reduction(min:satpnorm)
+      do i = 1, ncalc
+        dsat = abs(stod(i))*st_time%delt/st_geom%cell_vol(i)*abs(st_sol%head_change(i))
+        if (dsat > st_ctrl%dsat_max) then
+          satpnorm = min(satpnorm, FTB_FRAC*st_ctrl%dsat_max/dsat)
+        end if
+      end do
+      !$omp end parallel do
+#ifdef MPI_MSG
+      if (st_mpi%totn /= 1) then
+        ! -- MIN value for MPI (val)
+          call mpimin_val(satpnorm, "saturation limit ratio", min_val)
+        satpnorm = min_val
+      end if
+#endif
+      if (satpnorm < DONE) then
+        satlim_num = satlim_num + 1
+        maxpnorm = min(maxpnorm, satpnorm)
+      end if
+    end if
+
+    if (maxpnorm < DONE) then
       !$omp parallel do private(i)
       do i = 1, ncalc
         st_sol%head_change(i) = st_sol%head_change(i)*maxpnorm
       end do
       !$omp end parallel do
-      sql2_pnorm = maxstep
+      sql2_pnorm = sql2_pnorm*maxpnorm
+      lam_maxi = DONE
     end if
     step_len = sql2_pnorm
 
@@ -668,8 +705,8 @@ module nonlinear_solution
     alpha_cond = DHALF*l2_pre + BACK_ALPHA*lam*slope
     beta_cond = DHALF*l2_pre + BACK_BETA*lam*slope
     if (DHALF*l2_new < beta_cond) then
-      if (lam == DONE .and. sql2_pnorm < step_len) then
-        lam_max = step_len/sql2_pnorm
+      if (lam == DONE .and. lam_maxi > DONE) then
+        lam_max = lam_maxi
         b1_loop: do
           if (DHALF*l2_new > alpha_cond .or. DHALF*l2_new >= beta_cond .or. &
               lam >= lam_max) then

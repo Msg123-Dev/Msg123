@@ -483,25 +483,27 @@ module read_input
     ! -- local
     integer(I4) :: ierr
     real(SP) :: init_step, incr_multi, decr_multi, max_tstep
-    integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type
-    real(DP) :: criteria, res_abs_tol, res_rel_tol, dilu_shift
+    integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type, expd_type
+    real(DP) :: criteria, res_abs_tol, res_rel_tol, dilu_shift, dsat_max
     namelist/set_solution/init_step, tstep_type, incr_multi, decr_multi, max_tstep,&
                           maxout_iter, picard_iter, criteria, maxinn_iter, precon_type,&
-                          res_abs_tol, res_rel_tol, dilu_shift
+                          res_abs_tol, res_rel_tol, dilu_shift, expd_type, dsat_max
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; init_step = SZERO ; incr_multi = SZERO ; decr_multi = SZERO ; max_tstep = SINFI
     tstep_type = st_ctrl%tstep_type ; maxout_iter = st_ctrl%maxout_iter
     picard_iter = st_ctrl%picard_iter ; maxinn_iter = st_ctrl%maxinn_iter
     precon_type = st_ctrl%precon_type ; criteria = st_ctrl%criteria
     res_abs_tol = st_ctrl%res_abs_tol ; res_rel_tol = st_ctrl%res_rel_tol
-    dilu_shift = st_ctrl%dilu_shift
+    dilu_shift = st_ctrl%dilu_shift ; dsat_max = st_ctrl%dsat_max
+    expd_type = st_ctrl%expd_type
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_solution,iostat=ierr)
     st_ctrl%tstep_type = tstep_type ; st_ctrl%maxout_iter = maxout_iter
     st_ctrl%picard_iter = picard_iter ; st_ctrl%maxinn_iter = maxinn_iter
     st_ctrl%precon_type = precon_type ; st_ctrl%criteria = criteria
     st_ctrl%res_abs_tol = res_abs_tol ; st_ctrl%res_rel_tol = res_rel_tol
-    st_ctrl%dilu_shift = dilu_shift
+    st_ctrl%dilu_shift = dilu_shift ; st_ctrl%dsat_max = dsat_max
+    st_ctrl%expd_type = expd_type
 
     if (ierr /= 0) then
       call write_err_stop("While reading solution section in main file.")
@@ -529,6 +531,12 @@ module read_input
       call write_err_stop("Input a non-negative value for scaled residual tolerance.")
     else if (dilu_shift < DZERO) then
       call write_err_stop("Input a non-negative value for dilu pivot shift.")
+    else if (dsat_max < DZERO) then
+      call write_err_stop("Input a non-negative value for saturation change limit.")
+    else if (expd_type < 0) then
+      call write_err_stop("Input a non-negative value for step expansion type.")
+    else if (expd_type > 1) then
+      call write_err_stop("Input a valid value for step expansion type.")
     end if
 
     st_ctrl%nlevel = 1

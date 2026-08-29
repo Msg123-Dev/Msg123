@@ -26,11 +26,11 @@ module types_module
   end type sim_set
 
   type :: ctrl_set
-    integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type
+    integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type, expd_type
     integer(I4) :: nlevel, maxvcy_iter, amg_nlevel, max_sweep
     integer(I4) :: noclas_flag = 0
     real(DP) :: criteria, errtol, newper, newper_inv, res_abs_tol, res_rel_tol
-    real(DP) :: dilu_shift
+    real(DP) :: dilu_shift, dsat_max
     real(SP) :: jac_omega, amg_theta
   end type ctrl_set
 

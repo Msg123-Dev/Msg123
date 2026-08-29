@@ -8,7 +8,7 @@ module mpi_utility
   implicit none
   private
   public :: barrier_proc
-  public :: mpisum_val, mpimax_val, mpiexscan_val
+  public :: mpisum_val, mpimax_val, mpimin_val, mpiexscan_val
   public :: bcast_val, bcast_char, bcast_file, bcast_extr_set
   public :: gather_val, scatterv_val
   public :: alltoall_val, alltoallv_val
@@ -29,6 +29,15 @@ module mpi_utility
     module procedure mpimax_i4_array
     module procedure mpimax_r4_array
     module procedure mpimax_r8_array
+  end interface
+
+  interface mpimin_val
+    module procedure mpimin_i4_scalar
+    module procedure mpimin_r4_scalar
+    module procedure mpimin_r8_scalar
+    module procedure mpimin_i4_array
+    module procedure mpimin_r4_array
+    module procedure mpimin_r8_array
   end interface
 
   interface mpiexscan_val
@@ -395,6 +404,153 @@ module mpi_utility
     end if
 
   end subroutine mpimax_r8_array
+
+  subroutine mpimin_i4_scalar(loc_num, err_mes, min_num)
+  !*********************************************************************************************
+  ! mpimin_i4_scalar -- Min integer value for MPI
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    integer(I4), intent(in) :: loc_num
+    character(*), intent(in) :: err_mes
+    integer(I4), intent(out) :: min_num
+    ! -- local
+    integer(I4) :: ierr
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    call MPI_ALLREDUCE(loc_num, min_num, 1, MPI_INTEGER, MPI_MIN, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" value in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+  end subroutine mpimin_i4_scalar
+
+  subroutine mpimin_r4_scalar(loc_val, err_mes, min_val)
+  !*********************************************************************************************
+  ! mpimin_r4_scalar -- Min real4 value for MPI
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    real(SP), intent(in) :: loc_val
+    character(*), intent(in) :: err_mes
+    real(SP), intent(out) :: min_val
+    ! -- local
+    integer(I4) :: ierr
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    call MPI_ALLREDUCE(loc_val, min_val, 1, MPI_REAL4, MPI_MIN, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" value in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+  end subroutine mpimin_r4_scalar
+
+  subroutine mpimin_r8_scalar(loc_val, err_mes, min_val)
+  !*********************************************************************************************
+  ! mpimin_r8_scalar -- Min real value for MPI
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    real(DP), intent(in) :: loc_val
+    character(*), intent(in) :: err_mes
+    real(DP), intent(out) :: min_val
+    ! -- local
+    integer(I4) :: ierr
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    call MPI_ALLREDUCE(loc_val, min_val, 1, MPI_REAL8, MPI_MIN, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" value in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+  end subroutine mpimin_r8_scalar
+
+  subroutine mpimin_i4_array(loc_array, err_mes, min_array)
+  !*********************************************************************************************
+  ! mpimin_i4_array -- Min integer array for MPI
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    integer(I4), intent(in) :: loc_array(:)
+    character(*), intent(in) :: err_mes
+    integer(I4), intent(out) :: min_array(:)
+    ! -- local
+    integer(I4) :: a_len
+    integer(I4) :: ierr
+    !-------------------------------------------------------------------------------------------
+    ierr = 0 ; a_len = size(loc_array(:))
+    call MPI_ALLREDUCE(loc_array, min_array, a_len, MPI_INTEGER, MPI_MIN, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" array in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+  end subroutine mpimin_i4_array
+
+  subroutine mpimin_r4_array(loc_array, err_mes, min_array)
+  !*********************************************************************************************
+  ! mpimin_r4_array -- Min real4 array for MPI
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    real(SP), intent(in) :: loc_array(:)
+    character(*), intent(in) :: err_mes
+    real(SP), intent(out) :: min_array(:)
+    ! -- local
+    integer(I4) :: a_len
+    integer(I4) :: ierr
+    !-------------------------------------------------------------------------------------------
+    ierr = 0 ; a_len = size(loc_array(:))
+    call MPI_ALLREDUCE(loc_array, min_array, a_len, MPI_REAL4, MPI_MIN, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" array in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+  end subroutine mpimin_r4_array
+
+  subroutine mpimin_r8_array(loc_array, err_mes, min_array)
+  !*********************************************************************************************
+  ! mpimin_r8_array -- Min real8 array for MPI
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    real(DP), intent(in) :: loc_array(:)
+    character(*), intent(in) :: err_mes
+    real(DP), intent(out) :: min_array(:)
+    ! -- local
+    integer(I4) :: a_len
+    integer(I4) :: ierr
+    !-------------------------------------------------------------------------------------------
+    ierr = 0 ; a_len = size(loc_array(:))
+    call MPI_ALLREDUCE(loc_array, min_array, a_len, MPI_REAL8, MPI_MIN, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Allreduce "//err_mes//" array in MPI program."
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    end if
+
+  end subroutine mpimin_r8_array
 
   subroutine mpiexscan_i4_array(loc_array, err_mes, scan_array)
   !*********************************************************************************************

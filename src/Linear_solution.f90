@@ -65,6 +65,7 @@ module linear_solution
     allocate(st_amgt%tb(nreg_num), st_amgt%tr(nreg_num))
     allocate(st_amgt%trhs(nreg_num), st_amgt%tfx(nreg_num), st_amgt%tlu(tconn_num))
     allocate(st_amgt%save_rhs(nreg_num), st_amgt%dilu_d(nreg_num))
+    allocate(st_amgt%tsr(nreg_num), st_amgt%tsx(nreg_num))
 
     !$omp parallel
     !$omp do private(i)
@@ -72,6 +73,7 @@ module linear_solution
       st_amgt%td(i) = DZERO ; st_amgt%tx(i) = DZERO
       st_amgt%tb(i) = DZERO ; st_amgt%tr(i) = DZERO
       st_amgt%trhs(i) = DZERO ; st_amgt%tfx(i) = DZERO
+      st_amgt%tsr(i) = DZERO ; st_amgt%tsx(i) = DZERO
       st_amgt%save_rhs(i) = DZERO ; st_amgt%dilu_d(i) = DZERO
     end do
     !$omp end do
@@ -641,13 +643,6 @@ module linear_solution
           st_amgt%tlu(i) = array_var(vlevel)%lumat(i)
         end do
         !$omp end do
-        if (vlevel == alevel) then
-          !$omp do private(i)
-          do i = 1, d_size
-            st_amgt%td(i) = st_amgt%dilu_d(i)
-          end do
-          !$omp end do
-        end if
         !$omp end parallel
 
 #ifdef MPI_MSG
@@ -656,28 +651,11 @@ module linear_solution
             call senrec_rvectv(st_amgt%tx(1:reg_size))
             call senrec_rvectv(st_amgt%tb(1:reg_size))
         end if
-        if (st_mpi%totn /= 1 .and. vlevel == alevel) then
-          ! -- Solve mpi ilu factorization (ilu)
-            call solve_mpi_ilu(st_amgt%tb(1:reg_size), st_amgt%td(1:reg_size),&
-                               st_amgt%tlu(1:lu_size),&
-                               st_amgt%tx(1:reg_size))
-        else
-          ! -- Solve ilu factorization (ilu)
-            call solve_ilu(vlevel, d_size, st_amgt%tb(1:reg_size), st_amgt%td(1:reg_size),&
-                           st_amgt%tlu(1:lu_size), st_amgt%tx(1:reg_size))
-        end if
-#else
-        ! -- Solve ilu factorization (ilu)
-          call solve_ilu(vlevel, d_size, st_amgt%tb(1:reg_size), st_amgt%td(1:reg_size),&
-                         st_amgt%tlu(1:lu_size), st_amgt%tx(1:reg_size))
 #endif
+        ! -- Smooth by dilu (smooth)
+          call smooth_amg(vlevel, d_size, lu_size, reg_size, alevel, st_amgt)
 
-#ifdef MPI_MSG
-        if (st_mpi%totn /= 1 .and. vlevel == alevel) then
-          ! -- Send and Receive real vector value (rvectv)
-            call senrec_rvectv(st_amgt%tx(1:reg_size))
-        end if
-#endif
+        array_var(vlevel)%x(:) = st_amgt%tx(1:reg_size)
 
         ! -- Calculate residual
           call calc_resi(vlevel, d_size, st_amgt%td(1:reg_size), st_amgt%tlu(1:lu_size),&
@@ -756,8 +734,7 @@ module linear_solution
       if (st_mpi%totn /= 1 .and. st_ctrl%nlevel == alevel) then
         ! -- Solve mpi ilu factorization (ilu)
           call solve_mpi_ilu(st_amgt%tb(1:reg_size), st_amgt%td(1:d_size),&
-                             st_amgt%tlu(1:lu_size),&
-                             st_amgt%tx(1:reg_size))
+                             st_amgt%tlu(1:lu_size), st_amgt%tx(1:reg_size))
       else
         ! -- Solve ilu factorization (ilu)
           call solve_ilu(st_ctrl%nlevel, d_size, st_amgt%tb(1:reg_size), st_amgt%td(1:d_size),&
@@ -778,7 +755,7 @@ module linear_solution
       array_var(st_ctrl%nlevel)%x(:) = st_amgt%tx(1:reg_size)
 
       do vlevel = st_ctrl%nlevel-1, alevel, -1
-        nfin = crs_index(vlevel+1)%unknow
+        nfin = crs_index(vlevel)%unknow
         !$omp parallel
         !$omp do private(i)
         do i = 1, nfin
@@ -815,13 +792,6 @@ module linear_solution
           st_amgt%tlu(i) = array_var(vlevel)%lumat(i)
         end do
         !$omp end do
-        if (vlevel == alevel) then
-          !$omp do private(i)
-          do i = 1, d_size
-            st_amgt%td(i) = st_amgt%dilu_d(i)
-          end do
-          !$omp end do
-        end if
         !$omp end parallel
 
 #ifdef MPI_MSG
@@ -830,21 +800,9 @@ module linear_solution
             call senrec_rvectv(st_amgt%tx(1:reg_size))
             call senrec_rvectv(st_amgt%tb(1:reg_size))
         end if
-        if (st_mpi%totn /= 1 .and. vlevel == alevel) then
-          ! -- Solve mpi ilu factorization (ilu)
-            call solve_mpi_ilu(st_amgt%tb(1:reg_size), st_amgt%td(1:reg_size),&
-                               st_amgt%tlu(1:lu_size),&
-                               st_amgt%tx(1:reg_size))
-        else
-          ! -- Solve ilu factorization (ilu)
-            call solve_ilu(vlevel, d_size, st_amgt%tb(1:reg_size), st_amgt%td(1:reg_size),&
-                           st_amgt%tlu(1:lu_size), st_amgt%tx(1:reg_size))
-        end if
-#else
-        ! -- Solve ilu factorization (ilu)
-          call solve_ilu(vlevel, d_size, st_amgt%tb(1:reg_size), st_amgt%td(1:reg_size),&
-                         st_amgt%tlu(1:lu_size), st_amgt%tx(1:reg_size))
 #endif
+        ! -- Smooth by dilu (smooth)
+          call smooth_amg(vlevel, d_size, lu_size, reg_size, alevel, st_amgt)
 
         array_var(vlevel)%x(:) = st_amgt%tx(1:reg_size)
         array_var(vlevel)%rhs(:) = st_amgt%tb(1:reg_size)
@@ -926,6 +884,57 @@ module linear_solution
     end do
 
   end subroutine precon_dilu
+
+  subroutine smooth_amg(slevel, ns_size, nlu_size, nreg_size, alevel, st_amgt)
+  !*********************************************************************************************
+  ! smooth_amg -- Smooth for AMG
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(in) :: slevel, ns_size, nlu_size, nreg_size, alevel
+    type(amgt_set), intent(inout) :: st_amgt
+    ! -- local
+    integer(I4) :: i, sweep
+    !-------------------------------------------------------------------------------------------
+    do sweep = 1, st_ctrl%max_sweep
+      ! -- Calculate residual (resi)
+        call calc_resi(slevel, ns_size, st_amgt%td(1:nreg_size), st_amgt%tlu(1:nlu_size),&
+                       st_amgt%tx(1:nreg_size), st_amgt%tb(1:nreg_size),&
+                       st_amgt%tsr(1:nreg_size))
+#ifdef MPI_MSG
+      if (st_mpi%totn /= 1 .and. slevel == alevel) then
+        ! -- Send and Receive real vector value (rvectv)
+          call senrec_rvectv(st_amgt%tsr(1:nreg_size))
+        ! -- Solve mpi ilu factorization (ilu)
+          call solve_mpi_ilu(st_amgt%tsr(1:nreg_size), st_amgt%dilu_d(1:nreg_size),&
+                             st_amgt%tlu(1:nlu_size), st_amgt%tsx(1:nreg_size))
+      else if (slevel == alevel) then
+#else
+      if (slevel == alevel) then
+#endif
+        ! -- Solve ilu factorization (ilu)
+          call solve_ilu(slevel, ns_size, st_amgt%tsr(1:nreg_size), st_amgt%dilu_d(1:ns_size),&
+                         st_amgt%tlu(1:nlu_size), st_amgt%tsx(1:nreg_size))
+      else
+        ! -- Solve ilu factorization (ilu)
+          call solve_ilu(slevel, ns_size, st_amgt%tsr(1:nreg_size), st_amgt%td(1:ns_size),&
+                         st_amgt%tlu(1:nlu_size), st_amgt%tsx(1:nreg_size))
+      end if
+      !$omp parallel do private(i)
+      do i = 1, ns_size
+        st_amgt%tx(i) = st_amgt%tx(i) + st_amgt%tsx(i)
+      end do
+      !$omp end parallel do
+#ifdef MPI_MSG
+      if (st_mpi%totn /= 1 .and. slevel == alevel) then
+        ! -- Send and Receive real vector value (rvectv)
+          call senrec_rvectv(st_amgt%tx(1:nreg_size))
+      end if
+#endif
+    end do
+
+  end subroutine smooth_amg
 
   subroutine solve_ilu(plevel, npre, inrhs, indmat, inlumat, outx)
   !*********************************************************************************************

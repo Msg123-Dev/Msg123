@@ -203,7 +203,7 @@ module initial_module
     ! input solution file
     st_ctrl%tstep_type = 0 ; st_ctrl%maxout_iter = 20 ; st_ctrl%picard_iter = 0
     st_ctrl%maxinn_iter = 10 ; st_ctrl%precon_type = 0 ; st_ctrl%nlevel = 0
-    st_ctrl%maxvcy_iter = 0 ; st_ctrl%amg_nlevel = 0 ; st_ctrl%max_sweep = 0
+    st_ctrl%maxvcy_iter = 1 ; st_ctrl%amg_nlevel = 5 ; st_ctrl%max_sweep = 1
     st_ctrl%criteria = 1.00E-03_DP ; st_ctrl%errtol = DZERO
     st_ctrl%res_abs_tol = DZERO ; st_ctrl%res_rel_tol = DZERO
     st_ctrl%dilu_shift = DZERO ; st_ctrl%dsat_max = DZERO ; st_ctrl%expd_type = 0

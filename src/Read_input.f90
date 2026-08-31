@@ -620,8 +620,14 @@ module read_input
     st_ctrl%amg_nlevel = amg_nlevel ; st_ctrl%maxvcy_iter = maxvcy_iter
     st_ctrl%max_sweep = max_sweep ; st_ctrl%jac_omega = jac_omega
     st_ctrl%amg_theta = amg_theta
-    if (ierr /= 0) then
+    if (ierr /= 0 .and. find_nml_name("set_amg", main_name(1:main_namen))) then
       call write_err_stop("While reading amg section in main file.")
+    else if (st_ctrl%amg_nlevel < 2) then
+      call write_err_stop("Input a larger than 1 value for amg level number.")
+    else if (st_ctrl%maxvcy_iter < 1) then
+      call write_err_stop("Input a positive value for maximum v-cycle number.")
+    else if (st_ctrl%max_sweep < 1) then
+      call write_err_stop("Input a positive value for maximum sweep number.")
     end if
 
   end subroutine read_amg_parm

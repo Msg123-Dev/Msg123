@@ -290,6 +290,7 @@ module types_module
 
   type :: amgt_set
     real(DP), allocatable :: td(:), tx(:), tb(:), tr(:), trhs(:), tfx(:), tlu(:)
+    real(DP), allocatable :: tsr(:), tsx(:)
     real(DP), allocatable :: save_rhs(:), dilu_d(:)
   end type amgt_set
 

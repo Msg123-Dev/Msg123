@@ -10,6 +10,7 @@ module make_amg_matrix
   public :: make_amgmat
 
   ! -- local
+  integer(I4), parameter :: AMG_MIN_COARSE = 9
   integer(I4) :: amglev, nfine, que_size, ncoase
   real(DP), allocatable :: temp_dmat(:)
   integer(I4), allocatable :: aggr_luflag(:), nonaggr_lu(:), nonaggr_index(:)
@@ -33,7 +34,7 @@ module make_amg_matrix
 
     amg_level: do amglev = 2, st_ctrl%amg_nlevel
       nfine = crs_index(amglev-1)%unknow
-      if (nfine == 0) then
+      if (nfine <= AMG_MIN_COARSE) then
         st_ctrl%nlevel = amglev - 1
         exit amg_level
       else
@@ -200,7 +201,7 @@ module make_amg_matrix
           end if
           if (aggr_num(j) > 0) then
             aggr_num(i) = aggr_num(j)
-            exit aggre_check
+            exit
           end if
         end do
       end if

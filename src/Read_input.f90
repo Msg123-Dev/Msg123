@@ -484,10 +484,12 @@ module read_input
     integer(I4) :: ierr
     real(SP) :: init_step, incr_multi, decr_multi, max_tstep
     integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type, expd_type
+    integer(I4) :: conv_type
     real(DP) :: criteria, res_abs_tol, res_rel_tol, dilu_shift, dsat_max
     namelist/set_solution/init_step, tstep_type, incr_multi, decr_multi, max_tstep,&
                           maxout_iter, picard_iter, criteria, maxinn_iter, precon_type,&
-                          res_abs_tol, res_rel_tol, dilu_shift, expd_type, dsat_max
+                          res_abs_tol, res_rel_tol, dilu_shift, expd_type, dsat_max,&
+                          conv_type
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; init_step = SZERO ; incr_multi = SZERO ; decr_multi = SZERO ; max_tstep = SINFI
     tstep_type = st_ctrl%tstep_type ; maxout_iter = st_ctrl%maxout_iter
@@ -495,7 +497,7 @@ module read_input
     precon_type = st_ctrl%precon_type ; criteria = st_ctrl%criteria
     res_abs_tol = st_ctrl%res_abs_tol ; res_rel_tol = st_ctrl%res_rel_tol
     dilu_shift = st_ctrl%dilu_shift ; dsat_max = st_ctrl%dsat_max
-    expd_type = st_ctrl%expd_type
+    expd_type = st_ctrl%expd_type ; conv_type = st_ctrl%conv_type
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_solution,iostat=ierr)
     st_ctrl%tstep_type = tstep_type ; st_ctrl%maxout_iter = maxout_iter
@@ -503,7 +505,7 @@ module read_input
     st_ctrl%precon_type = precon_type ; st_ctrl%criteria = criteria
     st_ctrl%res_abs_tol = res_abs_tol ; st_ctrl%res_rel_tol = res_rel_tol
     st_ctrl%dilu_shift = dilu_shift ; st_ctrl%dsat_max = dsat_max
-    st_ctrl%expd_type = expd_type
+    st_ctrl%expd_type = expd_type ; st_ctrl%conv_type = conv_type
 
     if (ierr /= 0) then
       call write_err_stop("While reading solution section in main file.")
@@ -537,6 +539,12 @@ module read_input
       call write_err_stop("Input a non-negative value for step expansion type.")
     else if (expd_type > 1) then
       call write_err_stop("Input a valid value for step expansion type.")
+    else if (conv_type < 0) then
+      call write_err_stop("Input a non-negative value for convergence type.")
+    else if (conv_type > 1) then
+      call write_err_stop("Input a valid value for convergence type.")
+    else if (conv_type == 1 .and. res_abs_tol <= DZERO .and. res_rel_tol <= DZERO) then
+      call write_err_stop("Input a residual tolerance for the selected convergence type.")
     end if
 
     st_ctrl%nlevel = 1

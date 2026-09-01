@@ -6,7 +6,8 @@ module check_simulation
 
   implicit none
   private
-  public :: check_insol, check_abserrmax, check_residual, check_outtiming, check_lastts
+  public :: check_insol, check_abserrmax, check_residual, check_stepnorm
+  public :: check_outtiming, check_lastts
   integer(I4), public :: write_flag, lasttime_flag
 
   ! -- local
@@ -153,6 +154,48 @@ module check_simulation
     end if
 
   end subroutine check_residual
+
+  subroutine check_stepnorm(x_new, x_pre, stepmax)
+  !*********************************************************************************************
+  ! check_stepnorm -- Check scaled step max norm
+  !*********************************************************************************************
+    ! -- modules
+    use constval_module, only: DZERO, DONE
+#ifdef MPI_MSG
+    use utility_module, only: st_mpi
+    use mpi_utility, only: mpimax_val
+#endif
+    use read_input, only: len_scal
+    use set_cell, only: ncalc
+    ! -- inout
+    real(DP), intent(in) :: x_new(:), x_pre(:)
+    real(DP), intent(out) :: stepmax
+    ! -- local
+    integer(I4) :: i
+    real(DP) :: new_val, chg_val, stp_val
+#ifdef MPI_MSG
+    real(DP) :: max_step
+#endif
+    !-------------------------------------------------------------------------------------------
+    stepmax = DZERO
+    !$omp parallel do private(i, new_val, chg_val, stp_val) reduction(max:stepmax)
+    do i = 1, ncalc
+      new_val = abs(x_new(i))*len_scal
+      chg_val = abs(x_new(i) - x_pre(i))*len_scal
+      stp_val = chg_val/(DONE + new_val)
+      stepmax = max(stepmax, stp_val)
+    end do
+    !$omp end parallel do
+
+#ifdef MPI_MSG
+    if (st_mpi%totn /= 1) then
+      ! -- Max value for MPI (val)
+        call mpimax_val(stepmax, "scaled step max norm", max_step)
+      stepmax = max_step
+    end if
+#endif
+
+  end subroutine check_stepnorm
 
   subroutine check_outtiming()
   !*********************************************************************************************

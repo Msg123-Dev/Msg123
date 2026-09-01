@@ -3074,6 +3074,8 @@ module mpi_set
       call bcast_val(st_ctrl%dsat_max, " saturation change limit value")
     ! -- Bcast scalar value (val)
       call bcast_val(st_ctrl%expd_type, " step expansion type")
+    ! -- Bcast scalar value (val)
+      call bcast_val(st_ctrl%conv_type, " convergence type")
 
     if (st_ctrl%precon_type == 1) then
       ! -- Bcast scalar value (val)

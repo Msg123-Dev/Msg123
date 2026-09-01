@@ -311,7 +311,7 @@ module nonlinear_solution
                             trim(adjustl(cxyzn)), conv_dmat, conv_rhs, conv_head
       end if
 
-      if (st_time%conv_flag) then
+      if (st_time%conv_flag .and. st_ctrl%conv_type == 1) then
         ! -- Check residual convergence (residual)
           call check_residual(new_func, st_sol%stor_new, res_flag)
         st_time%conv_flag = res_flag

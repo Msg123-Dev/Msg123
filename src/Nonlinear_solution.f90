@@ -72,6 +72,8 @@ module nonlinear_solution
     integer(I4) :: out_iter
     integer(I4) :: max_num, conv_fnum
     integer(I4) :: back_iter, beta_iter, ncsc_num
+    integer(I4) :: res_nviol
+    real(DP) :: res_rat, res_abs
     character(VARLEN) :: cxyzn
     real(DP) :: max_var, max_unk, check_val
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var
@@ -84,18 +86,18 @@ module nonlinear_solution
 #endif
     ! -- format
     10 format(//1x,"CURRENT TIME : ",es12.5,1x,"(",a,")",20x,"TIME STEP : ",&
-              es12.5,1x,"(SEC)",/,1x,90("-"),/,1x,&
-              " OUTER INNER  BACK  BETA     MAXIMUM           MAXIMUM    DIAGONAL  RIGHT &
-              &HAND     UNKNOWN",/,1x,&
-              "                              CHANGE              CELL      MATRIX      &
-              &VECTOR       VALUE",/,1x,90("-"))
-    11 format(1X,4(i6),es12.3,a18,4(es12.3))
+              es12.5,1x,"(SEC)",/,1x,95("-"),/,1x,&
+              " OUTER INNER BACK       NVIOL     MAXIMUM           MAXIMUM    DIAGONAL  &
+              &  RESIDUAL     UNKNOWN",/,1x,&
+              "                 BETA              CHANGE              CELL      MATRIX  &
+              &     RATIO       VALUE",/,1x,95("-"))
+    11 format(1X,i6,i6,i5,i4,i8,es12.3,a18,3(es12.3))
     12 format(1X,"Didn't converge due to maximum value or change")
     13 format(1X,"Stop due to maximum value or change in backtracking")
     14 format(1X,"Stop due to maximum number of nonlinear iteration")
     15 format(1X,"Didn't converge in steady state calculation")
-    16 format(1X,"RESDIAG  RES/RES0 = ",es11.3,3x,"RES_L1 = ",es11.3,3x,&
-              "RESL1/Q = ",es11.3)
+    16 format(1X,"RESDIAG  RES/RES0 = ",es11.3,2x,"RES_L1 = ",es11.3,2x,&
+              "RESL1/Q = ",es11.3,2x,"RESABS=",es10.3)
     !-------------------------------------------------------------------------------------------
     conv_fnum = st_out_fnum%conv ; eater = DHALF ; ncsc_num = 0
     res_l1 = DZERO ; res_l2 = DZERO ; res_l20 = DZERO
@@ -128,6 +130,7 @@ module nonlinear_solution
       end if
 
       back_iter = 0 ; beta_iter = 0
+      res_nviol = 0 ; res_rat = DZERO ; res_abs = DZERO
       back_flag = .false.
 
       ! -- Reset coefficients matrix and constant vector (matvec)
@@ -306,15 +309,17 @@ module nonlinear_solution
       else
         rat_qtt = DZERO
       end if
-      if (st_mpi%rank == 0) then
-        write(conv_fnum,11) st_time%out_iter, in_iter, back_iter, beta_iter, conv_var,&
-                            trim(adjustl(cxyzn)), conv_dmat, conv_rhs, conv_head
-      end if
-
-      if (st_time%conv_flag .and. st_ctrl%conv_type == 1) then
+      if (st_ctrl%res_abs_tol > DZERO .or. st_ctrl%res_rel_tol > DZERO) then
         ! -- Check residual convergence (residual)
-          call check_residual(new_func, st_sol%stor_new, res_flag)
-        st_time%conv_flag = res_flag
+          call check_residual(new_func, st_sol%stor_new, res_flag, res_nviol, res_rat,&
+                              res_abs)
+        if (st_time%conv_flag .and. st_ctrl%conv_type == 1) then
+          st_time%conv_flag = res_flag
+        end if
+      end if
+      if (st_mpi%rank == 0) then
+        write(conv_fnum,11) st_time%out_iter, in_iter, back_iter, beta_iter, res_nviol,&
+                            conv_var, trim(adjustl(cxyzn)), conv_dmat, res_rat, conv_head
       end if
 
       ! check outer_loop
@@ -354,7 +359,7 @@ module nonlinear_solution
     end do outer_loop
 
     if (st_mpi%rank == 0) then
-      write(conv_fnum,16) rat_res, res_l1, rat_qtt
+      write(conv_fnum,16) rat_res, res_l1, rat_qtt, res_abs
     end if
 
 

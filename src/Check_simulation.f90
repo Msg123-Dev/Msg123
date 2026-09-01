@@ -91,7 +91,7 @@ module check_simulation
 
   end subroutine check_abserrmax
 
-  subroutine check_residual(funcv, stnew, res_flag)
+  subroutine check_residual(funcv, stnew, res_flag, nviol, resrat, resabs)
   !*********************************************************************************************
   ! check_residual -- Check residual convergence criteria
   !*********************************************************************************************
@@ -99,7 +99,7 @@ module check_simulation
     use constval_module, only: DZERO
 #ifdef MPI_MSG
     use utility_module, only: st_mpi
-    use mpi_utility, only: mpisum_val
+    use mpi_utility, only: mpisum_val, mpimax_val
 #endif
     use initial_module, only: st_ctrl
     use read_input, only: len_scal
@@ -108,27 +108,34 @@ module check_simulation
     ! -- inout
     real(DP), intent(in) :: funcv(:), stnew(:)
     logical, intent(out) :: res_flag
+    integer(I4), intent(out) :: nviol
+    real(DP), intent(out) :: resrat, resabs
     ! -- local
-    integer(I4) :: i, nviol
+    integer(I4) :: i
     real(DP), parameter :: A_ZERO = 1.00E-15_DP
     real(DP) :: vol_scal, res_val, acc_val
     logical :: abs_flag, rel_flag, pass_flag
 #ifdef MPI_MSG
     integer(I4) :: sum_viol
+    real(DP) :: max_rat, max_abs
 #endif
     !-------------------------------------------------------------------------------------------
-    res_flag = .true.
+    res_flag = .true. ; nviol = 0 ; resrat = DZERO ; resabs = DZERO
     abs_flag = st_ctrl%res_abs_tol > DZERO ; rel_flag = st_ctrl%res_rel_tol > DZERO
     if (.not. abs_flag .and. .not. rel_flag) then
       return
     end if
 
-    nviol = 0 ; vol_scal = len_scal**3
-    !$omp parallel do private(i, res_val, acc_val, pass_flag) reduction(+:nviol)
+    vol_scal = len_scal**3
+    !$omp parallel do private(i, res_val, acc_val, pass_flag) reduction(+:nviol)&
+    !$omp             reduction(max:resrat, resabs)
     do i = 1, ncalc
       res_val = abs(funcv(i))*vol_scal
       acc_val = abs(stnew(i))*st_time%delt_inv*st_geom%cell_vol(i)*vol_scal
       pass_flag = .false.
+      if (acc_val > A_ZERO) then
+        resrat = max(resrat, res_val/acc_val)
+      end if
       if (abs_flag .and. res_val <= st_ctrl%res_abs_tol) then
         pass_flag = .true.
       else if (rel_flag .and. acc_val <= A_ZERO) then
@@ -138,6 +145,7 @@ module check_simulation
       end if
       if (.not. pass_flag) then
         nviol = nviol + 1
+        resabs = max(resabs, res_val)
       end if
     end do
     !$omp end parallel do
@@ -147,6 +155,12 @@ module check_simulation
       ! -- Sum value for MPI (val)
         call mpisum_val(nviol, "residual criteria violation", sum_viol)
       nviol = sum_viol
+      ! -- Max value for MPI (val)
+        call mpimax_val(resrat, "residual scaled ratio", max_rat)
+      resrat = max_rat
+      ! -- Max value for MPI (val)
+        call mpimax_val(resabs, "residual absolute value", max_abs)
+      resabs = max_abs
     end if
 #endif
     if (nviol /= 0) then

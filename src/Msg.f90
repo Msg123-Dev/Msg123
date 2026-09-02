@@ -6,7 +6,7 @@ program msg123
   use kind_module, only: I4, DP
   use types_module, only: kryl_set, amgt_set, coef_set, sol_set
   use utility_module, only: log_fnum, st_mpi, dilu_shift_num, slope_sign_num
-  use utility_module, only: nan_recv_num, maxstep_num, satlim_num
+  use utility_module, only: nan_recv_num, maxstep_num, satlim_num, lin_guard_num
   use initial_module, only: init_msg, st_ctrl
   use read_input, only: read_main_file
   use set_cell, only: set_cell_info
@@ -172,6 +172,9 @@ program msg123
     end if
     if (satlim_num /= 0) then
       write(log_fnum,14) "Sat limit applied ", satlim_num
+    end if
+    if (lin_guard_num /= 0) then
+      write(log_fnum,14) "Linear guard fired", lin_guard_num
     end if
 
     ! -- Time loop end time

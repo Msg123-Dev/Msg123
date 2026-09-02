@@ -1,9 +1,9 @@
 module linear_solution
   ! -- modules
   use kind_module, only: I4, DP
-  use constval_module, only: DZERO, DONE, DINFI
+  use constval_module, only: DZERO, DONE, DINFI, UROUND
   use types_module, only: kryl_set, amgt_set
-  use utility_module, only: st_mpi, dilu_shift_num
+  use utility_module, only: st_mpi, dilu_shift_num, lin_guard_num
   use initial_module, only: st_ctrl
   use prep_calculation, only: st_time
   use allocate_solution, only: nreg_num, dir_conn, crs_index, array_var
@@ -135,8 +135,10 @@ module linear_solution
     ! -- local
     integer(I4) :: n, d_size, lu_size, reg_size
     real(DP) :: sk, sk0, sk2, alpha, beta
+    real(DP) :: gnrm(2), gscal
 #ifdef MPI_MSG
     real(DP) :: sum_sk, sum_rnorm
+    real(DP) :: gsum(3), gred(3)
 #endif
     !-------------------------------------------------------------------------------------------
     d_size = crs_index(level)%unknow
@@ -231,6 +233,10 @@ module linear_solution
         end do
         !$omp end parallel do
       else
+        if (abs(sk0) < UROUND*abs(sk)) then
+          lin_guard_num = lin_guard_num + 1
+          sk0 = sign(max(abs(sk0), UROUND*abs(sk)), sk0)
+        end if
         beta = sk/sk0
         !$omp parallel do private(n)
         do n = 1, d_size
@@ -248,21 +254,29 @@ module linear_solution
       ! -- Calculate matrix-vector multiplication (matvec)
         call calc_matvec(level, d_size, st_kryl%p, array_var(level)%dmat, array_var(level)%lumat, st_kryl%q)
 
-      sk2 = DZERO
-      !$omp parallel do private(n) reduction(+:sk2)
+      sk2 = DZERO ; gnrm(1) = DZERO ; gnrm(2) = DZERO
+      !$omp parallel do private(n) reduction(+:sk2, gnrm)
       do n = 1, d_size
         sk2 = sk2 + st_kryl%p(n)*st_kryl%q(n)
+        gnrm(1) = gnrm(1) + st_kryl%p(n)*st_kryl%p(n)
+        gnrm(2) = gnrm(2) + st_kryl%q(n)*st_kryl%q(n)
       end do
       !$omp end parallel do
 
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
+        gsum(1) = sk2 ; gsum(2) = gnrm(1) ; gsum(3) = gnrm(2)
         ! -- Sum value for MPI (val)
-          call mpisum_val(sk2, "sk2 l2-norm", sum_sk)
-        sk2 = sum_sk
+          call mpisum_val(gsum, "cg inner products", gred)
+        sk2 = gred(1) ; gnrm(1) = gred(2) ; gnrm(2) = gred(3)
       end if
 #endif
 
+      gscal = sqrt(gnrm(1)*gnrm(2))
+      if (abs(sk2) < UROUND*gscal) then
+        lin_guard_num = lin_guard_num + 1
+        sk2 = sign(max(abs(sk2), UROUND*gscal), sk2)
+      end if
       alpha = sk/sk2
       !$omp parallel do private(n)
       do n = 1, d_size
@@ -316,6 +330,10 @@ module linear_solution
     ! -- local
     integer(I4) :: n, d_size, lu_size, reg_size
     real(DP) :: sk, sk0, sk2, alpha, beta, bicgs_omega, ts, tt
+    real(DP) :: gnrm(2), gscal
+#ifdef MPI_MSG
+    real(DP) :: gsum(3), gred(3)
+#endif
 #ifdef MPI_MSG
     real(DP) :: sum_sk, sum_rnorm
 #endif
@@ -394,6 +412,14 @@ module linear_solution
         end do
         !$omp end parallel do
       else
+        if (abs(sk0) < UROUND*abs(sk)) then
+          lin_guard_num = lin_guard_num + 1
+          sk0 = sign(max(abs(sk0), UROUND*abs(sk)), sk0)
+        end if
+        if (abs(bicgs_omega) < UROUND) then
+          lin_guard_num = lin_guard_num + 1
+          bicgs_omega = sign(UROUND, bicgs_omega)
+        end if
         beta = (sk/sk0)*(alpha/bicgs_omega)
         !$omp parallel do private(n)
         do n = 1, d_size
@@ -436,19 +462,27 @@ module linear_solution
       ! -- Calculate matrix-vector multiplication (matvec)
         call calc_matvec(level, d_size, st_kryl%z, array_var(level)%dmat, array_var(level)%lumat, st_kryl%v)
 
-      sk2 = DZERO
-      !$omp parallel do private(n) reduction(+:sk2)
+      sk2 = DZERO ; gnrm(1) = DZERO ; gnrm(2) = DZERO
+      !$omp parallel do private(n) reduction(+:sk2, gnrm)
       do n = 1, d_size
         sk2 = sk2 + st_kryl%v(n)*st_kryl%rs(n)
+        gnrm(1) = gnrm(1) + st_kryl%v(n)*st_kryl%v(n)
+        gnrm(2) = gnrm(2) + st_kryl%rs(n)*st_kryl%rs(n)
       end do
       !$omp end parallel do
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
+        gsum(1) = sk2 ; gsum(2) = gnrm(1) ; gsum(3) = gnrm(2)
         ! -- Sum value for MPI (val)
-          call mpisum_val(sk2, "sk2 l2-norm", sum_sk)
-        sk2 = sum_sk
+          call mpisum_val(gsum, "bicgs inner products", gred)
+        sk2 = gred(1) ; gnrm(1) = gred(2) ; gnrm(2) = gred(3)
       end if
 #endif
+      gscal = sqrt(gnrm(1)*gnrm(2))
+      if (abs(sk2) < UROUND*gscal) then
+        lin_guard_num = lin_guard_num + 1
+        sk2 = sign(max(abs(sk2), UROUND*gscal), sk2)
+      end if
       alpha = sk/sk2
 
       !$omp parallel do private(n)
@@ -509,31 +543,29 @@ module linear_solution
         ! -- Calculate matrix-vector multiplication (matvec)
           call calc_matvec(level, d_size, st_kryl%z, array_var(level)%dmat, array_var(level)%lumat, st_kryl%t)
 
-        ts = DZERO ; tt = DZERO
-        !$omp parallel
-        !$omp do private(n) reduction(+:ts)
+        ts = DZERO ; tt = DZERO ; gnrm(1) = DZERO
+        !$omp parallel do private(n) reduction(+:ts, tt, gnrm)
         do n = 1, d_size
           ts = ts + st_kryl%t(n)*st_kryl%resi(n)
-        end do
-        !$omp end do
-        !$omp do private(n) reduction(+:tt)
-        do n = 1, d_size
           tt = tt + st_kryl%t(n)*st_kryl%t(n)
+          gnrm(1) = gnrm(1) + st_kryl%resi(n)*st_kryl%resi(n)
         end do
-        !$omp end do
-        !$omp end parallel
+        !$omp end parallel do
 
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1) then
+          gsum(1) = ts ; gsum(2) = tt ; gsum(3) = gnrm(1)
           ! -- Sum value for MPI (val)
-            call mpisum_val(ts, "ts l2-norm", sum_sk)
-          ts = sum_sk
-          ! -- Sum value for MPI (val)
-            call mpisum_val(tt, "tt l2-norm", sum_sk)
-          tt = sum_sk
+            call mpisum_val(gsum, "bicgs omega products", gred)
+          ts = gred(1) ; tt = gred(2) ; gnrm(1) = gred(3)
         end if
 #endif
 
+        gscal = sqrt(tt*gnrm(1))
+        if (abs(tt) < UROUND*gscal) then
+          lin_guard_num = lin_guard_num + 1
+          tt = sign(max(abs(tt), UROUND*gscal), tt)
+        end if
         bicgs_omega = ts/tt
 
         !$omp parallel do private(n)

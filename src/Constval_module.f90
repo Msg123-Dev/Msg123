@@ -25,6 +25,7 @@ module constval_module
   real(DP), parameter :: DSMAL = 1.00E-10_DP, DNOVAL = -9999_DP
 
   real(DP), parameter :: MACHI_EPS = epsilon(1.00_SP)
+  real(DP), parameter :: UROUND = epsilon(1.00_DP)
   real(DP), parameter :: VARMAX = 1.00E+03_DP, XMAX = 1.00E+04_DP, XMAX_INV = 1.00E-04_DP
   real(DP), parameter :: STEP_TOL_DEF = 1.00E-07_DP
 

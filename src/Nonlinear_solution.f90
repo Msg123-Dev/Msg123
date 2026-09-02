@@ -5,6 +5,7 @@ module nonlinear_solution
   use allocate_solution, only: nreg_num, array_var
   use constval_module, only: DZERO, DONE, DHALF, DTWO, VARMAX, STEP_TOL_DEF, MACHI_EPS
   use utility_module, only: st_mpi, slope_sign_num, nan_recv_num, maxstep_num, satlim_num
+  use utility_module, only: jacchk_num, jacchk_rat, jacchk_scl
   use initial_module, only: st_ctrl
   use read_input, only: len_scal
   use check_condition, only: st_out_fnum
@@ -23,6 +24,8 @@ module nonlinear_solution
   ! -- local
   integer(I4), parameter :: MAXS_CONS = 5
   real(DP), allocatable :: new_func(:), jacvec(:)
+  real(DP), allocatable :: chk_vec(:), chk_jac(:), chk_mat(:)
+  real(DP), allocatable :: sav_stor(:), sav_srat(:), sav_rper(:), sav_surr(:)
 
   contains
 
@@ -38,6 +41,9 @@ module nonlinear_solution
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
     allocate(new_func(ncalc), jacvec(ncalc))
+    allocate(chk_vec(nreg_num), chk_jac(ncalc), chk_mat(nreg_num))
+    allocate(sav_stor(nreg_num), sav_srat(nreg_num), sav_rper(nreg_num))
+    allocate(sav_surr(nreg_num))
     !$omp parallel do private(i)
     do i = 1, ncalc
       new_func(i) = DZERO ; jacvec(i) = DZERO
@@ -161,6 +167,12 @@ module nonlinear_solution
         st_sol%head_change(i) = DZERO
       end do
       !$omp end parallel do
+
+      if (st_time%form_switch == 1 .and.&
+          st_time%out_iter == st_ctrl%picard_iter + 1) then
+        ! -- Check jacobian consistency (jacchk)
+          call check_jacobian(st_sol)
+      end if
 
       st_time%conv_flag = .false.
       if (st_sim%sim_type /= -1) then
@@ -360,6 +372,66 @@ module nonlinear_solution
 
 
   end subroutine calc_numsol
+
+  subroutine check_jacobian(st_sol)
+  !*********************************************************************************************
+  ! check_jacobian -- Check consistency between the assembled matrix and the residual
+  !*********************************************************************************************
+    ! -- modules
+    use calc_function, only: calc_vecjacf
+    use linear_solution, only: calc_matvec
+    ! -- inout
+    type(sol_set), intent(inout) :: st_sol
+    ! -- local
+    integer(I4) :: i, k
+    real(DP) :: chk_scal, chk_dev, chk_fac, eps_base
+    !-------------------------------------------------------------------------------------------
+    eps_base = sqrt(MACHI_EPS)
+    !$omp parallel do private(i)
+    do i = 1, nreg_num
+      chk_vec(i) = real(1 - 2*mod(i,2), DP)
+      sav_stor(i) = st_sol%stor_new(i) ; sav_srat(i) = st_sol%srat_new(i)
+      sav_rper(i) = st_sol%rel_perm(i) ; sav_surr(i) = st_sol%surf_rati(i)
+    end do
+    !$omp end parallel do
+
+    ! -- Calculate matrix-vector multiplication (matvec)
+      call calc_matvec(1, ncalc, chk_vec, array_var(1)%dmat, array_var(1)%lumat, chk_mat)
+    chk_scal = DZERO
+    do i = 1, ncalc
+      chk_scal = max(chk_scal, abs(chk_mat(i)))
+    end do
+
+    do k = 1, 3
+      chk_fac = eps_base/(10.00_DP**(k-1))
+      ! -- Calculate vector by jacobi-free (vecjocf)
+        call calc_vecjacf(1, chk_vec, st_sol%stor_old, st_sol%stor_new, st_sol%surf_head,&
+                          st_sol%head_pre, st_sol%srat_new, st_sol%rel_perm,&
+                          st_sol%surf_rati, chk_jac, chk_fac)
+      chk_dev = DZERO
+      do i = 1, ncalc
+        chk_dev = max(chk_dev, abs(chk_mat(i) + chk_jac(i)))
+      end do
+      if (chk_scal > DZERO) then
+        if (chk_dev/chk_scal > jacchk_rat(k)) then
+          jacchk_rat(k) = chk_dev/chk_scal
+        end if
+      end if
+    end do
+
+    !$omp parallel do private(i)
+    do i = 1, nreg_num
+      st_sol%stor_new(i) = sav_stor(i) ; st_sol%srat_new(i) = sav_srat(i)
+      st_sol%rel_perm(i) = sav_rper(i) ; st_sol%surf_rati(i) = sav_surr(i)
+    end do
+    !$omp end parallel do
+
+    if (chk_scal > DZERO) then
+      jacchk_num = jacchk_num + 1
+      jacchk_scl = max(jacchk_scl, chk_scal)
+    end if
+
+  end subroutine check_jacobian
 
   subroutine reset_matvec
   !*********************************************************************************************

@@ -3076,6 +3076,8 @@ module mpi_set
       call bcast_val(st_ctrl%expd_type, " step expansion type")
     ! -- Bcast scalar value (val)
       call bcast_val(st_ctrl%conv_type, " convergence type")
+    ! -- Bcast scalar value (val)
+      call bcast_val(st_ctrl%newper_fac, " newton perturbation factor")
 
     if (st_ctrl%precon_type == 1) then
       ! -- Bcast scalar value (val)

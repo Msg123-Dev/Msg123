@@ -502,7 +502,7 @@ module calc_function
   end subroutine func_sealterm
 
   subroutine calc_vecjacf(vjlevel, injvec, stold, stnew, surfh, injx, snew, rperm, surfr,&
-                          outjvec)
+                          outjvec, epsfac)
   !*********************************************************************************************
   ! calc_vecjacf -- Calculate vector by jacobi-free
   !*********************************************************************************************
@@ -516,6 +516,7 @@ module calc_function
     real(DP), intent(in) :: injvec(:), stold(:), surfh(:)
     real(DP), intent(inout) :: stnew(:), injx(:), snew(:), rperm(:), surfr(:)
     real(DP), intent(out) :: outjvec(:)
+    real(DP), intent(in), optional :: epsfac
     ! -- local
     integer(I4) :: i
     integer(I4) :: vj_num, vj_regnum
@@ -579,7 +580,11 @@ module calc_function
       sign = DONE
     end if
 
-    eps = sign*sqrt(MACHI_EPS)*max(abs(l2_x),l1_v)/l2_v
+    if (present(epsfac)) then
+      eps = sign*epsfac*max(abs(l2_x),l1_v)/l2_v
+    else
+      eps = sign*sqrt(MACHI_EPS)*max(abs(l2_x),l1_v)/l2_v
+    end if
     eps_inv = DONE/eps
 
     !$omp parallel do private(i)

@@ -1,12 +1,14 @@
 module utility_module
   ! -- modules
-  use kind_module, only: I4
+  use kind_module, only: I4, DP
   use types_module, only: mpi_set, gmap_set
 
   implicit none
   private
   integer(I4), public :: log_fnum = 0, dilu_shift_num = 0, slope_sign_num = 0
   integer(I4), public :: nan_recv_num = 0, maxstep_num = 0, satlim_num = 0
+  integer(I4), public :: jacchk_num = 0
+  real(DP), public :: jacchk_rat(3) = 0.00_DP, jacchk_scl = 0.00_DP
   type(mpi_set), public :: st_mpi
   public :: get_file_stat, get_days
   public :: open_new_rtxt, open_new_rbin, open_new_wtxt, open_new_wbin

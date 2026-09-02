@@ -16,7 +16,7 @@ module linear_solution
 
   implicit none
   private
-  public :: allocate_krylov, allocate_amgalg, solve_linalg
+  public :: allocate_krylov, allocate_amgalg, solve_linalg, calc_matvec
   integer(I4), public :: in_iter
 
   ! -- local

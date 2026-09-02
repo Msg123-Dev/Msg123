@@ -26,11 +26,7 @@ module constval_module
 
   real(DP), parameter :: MACHI_EPS = epsilon(1.00_SP)
   real(DP), parameter :: UROUND = epsilon(1.00_DP)
-  real(DP), parameter :: VARMAX = 1.00E+03_DP, XMAX = 1.00E+04_DP, XMAX_INV = 1.00E-04_DP
-  real(DP), parameter :: STEP_TOL_DEF = 1.00E-07_DP
 
   character(7), parameter :: OUTFORM = "(E13.6)"
-  character(53), parameter :: MASSCHARA = &
-                              "FLOW,STORAGE,RECHARGE,WELL,SURFACE,RIVER,LAKE,SEA,ALL"
 
 end module constval_module

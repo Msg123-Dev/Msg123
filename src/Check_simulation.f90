@@ -109,8 +109,8 @@ module check_simulation
     real(DP), intent(in) :: funcv(:), stnew(:)
     logical, intent(out) :: res_flag
     ! -- local
-    integer(I4) :: i, nviol
-    real(DP), parameter :: A_ZERO = 1.00E-15_DP
+    integer(I4) :: i, viol_num
+    real(DP), parameter :: ACC_FLOOR = 1.00E-15_DP
     real(DP) :: vol_scal, res_val, acc_val
     logical :: abs_flag, rel_flag, pass_flag
 #ifdef MPI_MSG
@@ -123,21 +123,21 @@ module check_simulation
       return
     end if
 
-    nviol = 0 ; vol_scal = len_scal**3
-    !$omp parallel do private(i, res_val, acc_val, pass_flag) reduction(+:nviol)
+    viol_num = 0 ; vol_scal = len_scal**3
+    !$omp parallel do private(i, res_val, acc_val, pass_flag) reduction(+:viol_num)
     do i = 1, ncalc
       res_val = abs(funcv(i))*vol_scal
       acc_val = abs(stnew(i))*st_time%delt_inv*st_geom%cell_vol(i)*vol_scal
       pass_flag = .false.
       if (abs_flag .and. res_val <= st_ctrl%res_abs_tol) then
         pass_flag = .true.
-      else if (rel_flag .and. acc_val <= A_ZERO) then
+      else if (rel_flag .and. acc_val <= ACC_FLOOR) then
         pass_flag = .true.
       else if (rel_flag .and. res_val <= st_ctrl%res_rel_tol*acc_val) then
         pass_flag = .true.
       end if
       if (.not. pass_flag) then
-        nviol = nviol + 1
+        viol_num = viol_num + 1
       end if
     end do
     !$omp end parallel do
@@ -145,11 +145,11 @@ module check_simulation
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
       ! -- Sum value for MPI (val)
-        call mpisum_val(nviol, "residual criteria violation", sum_viol)
-      nviol = sum_viol
+        call mpisum_val(viol_num, "residual criteria violation", sum_viol)
+      viol_num = sum_viol
     end if
 #endif
-    if (nviol /= 0) then
+    if (viol_num /= 0) then
       res_flag = .false.
     end if
 

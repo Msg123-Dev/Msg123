@@ -238,7 +238,8 @@ module nonlinear_solution
 #endif
         if ((check_val >= VARMAX .or. max_unk >= XMAX) .and. st_sim%sim_type /= -1) then
           back_flag = .true.
-        else if (check_val <= st_ctrl%criteria .and. max_unk < XMAX) then
+        else if (check_val <= st_ctrl%criteria .and. max_unk < XMAX .and.&
+                 .not. (back_flag .and. st_sim%sim_type /= -1)) then
           st_time%conv_flag = .true.
         else if (st_sim%sim_type == -1) then
           back_flag = .false.

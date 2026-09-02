@@ -76,7 +76,7 @@ module nonlinear_solution
     real(DP) :: max_var, max_unk, check_val
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var
     real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
-    real(DP) :: res_l1, res_l2, res_l20, qtot_l1, rat_res, rat_qtt
+    real(DP) :: res_l1, qtot_l1, rat_qtt
     logical :: back_flag, res_flag, maxs_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
@@ -84,22 +84,20 @@ module nonlinear_solution
 #endif
     ! -- format
     10 format(//1x,"CURRENT TIME : ",es12.5,1x,"(",a,")",20x,"TIME STEP : ",&
-              es12.5,1x,"(SEC)",/,1x,90("-"),/,1x,&
-              " OUTER INNER  BACK  BETA     MAXIMUM           MAXIMUM    DIAGONAL  RIGHT &
-              &HAND     UNKNOWN",/,1x,&
-              "                              CHANGE              CELL      MATRIX      &
-              &VECTOR       VALUE",/,1x,90("-"))
-    11 format(1X,4(i6),es12.3,a18,4(es12.3))
+              es12.5,1x,"(SEC)",/,1x,95("-"),/,1x,&
+              " OUTER INNER BACK BETA    MAXIMUM           MAXIMUM   DIAGONAL RIGHT HAND    &
+              &UNKNOWN       MASS",/,1x,&
+              "                           CHANGE              CELL     MATRIX     VECTOR      &
+              &VALUE      ERROR",/,1x,95("-"))
+    11 format(1X,2(i6),2(i5),es11.3,a18,4(es11.3))
     12 format(1X,"Didn't converge due to maximum value or change")
     13 format(1X,"Stop due to maximum value or change in backtracking")
     14 format(1X,"Stop due to maximum number of nonlinear iteration")
     15 format(1X,"Didn't converge in steady state calculation")
-    16 format(1X,"RESDIAG  RES/RES0 = ",es11.3,3x,"RES_L1 = ",es11.3,3x,&
-              "RESL1/Q = ",es11.3)
+    16 format(1X,"RESIDUAL  SUM OF |F| = ",es11.3)
     !-------------------------------------------------------------------------------------------
     conv_fnum = st_out_fnum%conv ; eater = DHALF ; ncsc_num = 0
-    res_l1 = DZERO ; res_l2 = DZERO ; res_l20 = DZERO
-    qtot_l1 = DZERO ; rat_res = DZERO ; rat_qtt = DZERO
+    res_l1 = DZERO ; qtot_l1 = DZERO ; rat_qtt = DZERO
     ! -- Set for backtracking (backtr)
       call set_backtr(st_sol, max_step)
 
@@ -152,7 +150,6 @@ module nonlinear_solution
         end if
 #endif
         l2norm_pre = l2norm_new
-        res_l20 = sqrt(l2norm_new)*len_scal**3
       end if
 
       !$omp parallel do private(i)
@@ -295,13 +292,7 @@ module nonlinear_solution
         qtot_l1 = sum_l2
       end if
 #endif
-      res_l2 = sqrt(l2norm_new)*len_scal**3
       res_l1 = res_l1*len_scal**3 ; qtot_l1 = qtot_l1*len_scal**3
-      if (res_l20 > DZERO) then
-        rat_res = res_l2/res_l20
-      else
-        rat_res = DZERO
-      end if
       if (qtot_l1 > DZERO) then
         rat_qtt = res_l1/qtot_l1
       else
@@ -309,7 +300,7 @@ module nonlinear_solution
       end if
       if (st_mpi%rank == 0) then
         write(conv_fnum,11) st_time%out_iter, in_iter, back_iter, beta_iter, conv_var,&
-                            trim(adjustl(cxyzn)), conv_dmat, conv_rhs, conv_head
+                            trim(adjustl(cxyzn)), conv_dmat, conv_rhs, conv_head, rat_qtt
       end if
 
       if (st_time%conv_flag .and. st_ctrl%conv_type == 1) then
@@ -355,7 +346,7 @@ module nonlinear_solution
     end do outer_loop
 
     if (st_mpi%rank == 0) then
-      write(conv_fnum,16) rat_res, res_l1, rat_qtt
+      write(conv_fnum,16) res_l1
     end if
 
 

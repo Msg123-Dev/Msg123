@@ -507,7 +507,7 @@ module calc_function
   ! calc_vecjacf -- Calculate vector by jacobi-free
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: MACHI_EPS
+    use kind_module, only: SP
 #ifdef MPI_MSG
     use mpi_utility, only: mpisum_val
 #endif
@@ -519,6 +519,7 @@ module calc_function
     ! -- local
     integer(I4) :: i
     integer(I4) :: vj_num, vj_regnum
+    real(DP), parameter :: JFREE_EPS = epsilon(1.00_SP)
     real(DP) :: eps, eps_inv, l2_x, l2_v, l1_v, sign
 #ifdef MPI_MSG
     real(DP) :: sum_l2
@@ -579,7 +580,7 @@ module calc_function
       sign = DONE
     end if
 
-    eps = sign*sqrt(MACHI_EPS)*max(abs(l2_x),l1_v)/l2_v
+    eps = sign*sqrt(JFREE_EPS)*max(abs(l2_x),l1_v)/l2_v
     eps_inv = DONE/eps
 
     !$omp parallel do private(i)

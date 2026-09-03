@@ -287,16 +287,17 @@ module write_output
   ! write_mass_header -- Write massbalance file header
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: OUTFORM, MASSCHARA
+    use constval_module, only: OUTFORM
     use utility_module, only: get_ilen, conv_i2s
     use initial_module, only: st_sim
     use allocate_output, only: ms_head
     ! -- inout
 
     ! -- local
-    integer(I4) :: i, mass_fnum
+    integer(I4) :: i, mass_fnum, msout_tnum_format
+    character(53), parameter :: MASSCHARA = &
+                                "FLOW,STORAGE,RECHARGE,WELL,SURFACE,RIVER,LAKE,SEA,ALL"
     character(:), allocatable :: str_mstnum
-    integer(I4) :: msout_tnum_format
     !-------------------------------------------------------------------------------------------
     mass_fnum = st_out_fnum%mass
     write(mass_fnum,'(3a)') trim(adjustl(st_sim%cal_unit)), ",", trim(adjustl(ms_head))

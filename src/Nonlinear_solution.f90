@@ -1,16 +1,16 @@
 module nonlinear_solution
   ! -- modules
   use kind_module, only: I4, DP
+  use constval_module, only: DZERO, DONE, DHALF, DTWO, MACHI_EPS
   use types_module, only: sol_set
-  use allocate_solution, only: nreg_num, array_var
-  use constval_module, only: DZERO, DONE, DHALF, DTWO, VARMAX, STEP_TOL_DEF, MACHI_EPS
   use utility_module, only: st_mpi, slope_sign_num, nan_recv_num, maxstep_num, satlim_num
   use initial_module, only: st_ctrl
   use read_input, only: len_scal
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc
   use prep_calculation, only: st_time
-  use calc_function, only: qtot_ext, calc_func
+  use allocate_solution, only: nreg_num, array_var
+  use calc_function, only: qext_sum, calc_func
   use calc_simulation, only: calc_l2norm2
 #ifdef MPI_MSG
   use mpi_utility, only: mpisum_val
@@ -21,7 +21,9 @@ module nonlinear_solution
   public :: allocate_nonlin, calc_numsol
 
   ! -- local
-  integer(I4), parameter :: MAXS_CONS = 5
+  integer(I4), parameter :: MAXSTEP_RUN_MAX = 5
+  real(DP), parameter :: VARMAX = 1.00E+03_DP, XMAX = 1.00E+04_DP
+  real(DP), parameter :: XMAX_INV = 1.00E-04_DP
   real(DP), allocatable :: new_func(:), jacvec(:)
 
   contains
@@ -52,7 +54,7 @@ module nonlinear_solution
   !*********************************************************************************************
     ! -- modules
     use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
-    use constval_module, only: VARLEN, XMAX, XMAX_INV
+    use constval_module, only: VARLEN
     use types_module, only: kryl_set, amgt_set, coef_set
     use utility_module, only: log_fnum, write_err_stop
     use initial_module, only: st_sim, st_out_step
@@ -71,12 +73,12 @@ module nonlinear_solution
     integer(I4) :: i
     integer(I4) :: out_iter
     integer(I4) :: max_num, conv_fnum
-    integer(I4) :: back_iter, beta_iter, ncsc_num
+    integer(I4) :: back_iter, beta_iter, maxstep_run
     character(VARLEN) :: cxyzn
     real(DP) :: max_var, max_unk, check_val
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var
     real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
-    real(DP) :: res_l1, qtot_l1, rat_qtt
+    real(DP) :: res_l1, qext_l1, mass_error
     logical :: back_flag, res_flag, maxs_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
@@ -96,8 +98,8 @@ module nonlinear_solution
     15 format(1X,"Didn't converge in steady state calculation")
     16 format(1X,"RESIDUAL  SUM OF |F| = ",es11.3)
     !-------------------------------------------------------------------------------------------
-    conv_fnum = st_out_fnum%conv ; eater = DHALF ; ncsc_num = 0
-    res_l1 = DZERO ; qtot_l1 = DZERO ; rat_qtt = DZERO
+    conv_fnum = st_out_fnum%conv ; eater = DHALF ; maxstep_run = 0
+    res_l1 = DZERO ; qext_l1 = DZERO ; mass_error = DZERO
     ! -- Set for backtracking (backtr)
       call set_backtr(st_sol, max_step)
 
@@ -212,11 +214,11 @@ module nonlinear_solution
                           l2norm_jac, lambda, gradient, max_step, st_coef%stod, new_func,&
                           st_sol)
         if (maxs_flag) then
-          ncsc_num = ncsc_num + 1
+          maxstep_run = maxstep_run + 1
         else
-          ncsc_num = 0
+          maxstep_run = 0
         end if
-        if (ncsc_num == MAXS_CONS) then
+        if (maxstep_run == MAXSTEP_RUN_MAX) then
           back_flag = .true.
         end if
         ! -- Check absolute error max norm
@@ -281,26 +283,26 @@ module nonlinear_solution
         res_l1 = res_l1 + abs(new_func(i))
       end do
       !$omp end parallel do
-      qtot_l1 = qtot_ext
+      qext_l1 = qext_sum
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
         ! -- Sum value for MPI (val)
           call mpisum_val(res_l1, "residual l1-norm", sum_l2)
         res_l1 = sum_l2
         ! -- Sum value for MPI (val)
-          call mpisum_val(qtot_l1, "external flux l1-norm", sum_l2)
-        qtot_l1 = sum_l2
+          call mpisum_val(qext_l1, "external flux l1-norm", sum_l2)
+        qext_l1 = sum_l2
       end if
 #endif
-      res_l1 = res_l1*len_scal**3 ; qtot_l1 = qtot_l1*len_scal**3
-      if (qtot_l1 > DZERO) then
-        rat_qtt = res_l1/qtot_l1
+      res_l1 = res_l1*len_scal**3 ; qext_l1 = qext_l1*len_scal**3
+      if (qext_l1 > DZERO) then
+        mass_error = res_l1/qext_l1
       else
-        rat_qtt = DZERO
+        mass_error = DZERO
       end if
       if (st_mpi%rank == 0) then
         write(conv_fnum,11) st_time%out_iter, in_iter, back_iter, beta_iter, conv_var,&
-                            trim(adjustl(cxyzn)), conv_dmat, conv_rhs, conv_head, rat_qtt
+                            trim(adjustl(cxyzn)), conv_dmat, conv_rhs, conv_head, mass_error
       end if
 
       if (st_time%conv_flag .and. st_ctrl%conv_type == 1) then
@@ -501,15 +503,16 @@ module nonlinear_solution
     type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i
-    real(DP) :: l2_new2, l2_pnorm, slope, av, bv, rhs1, rhs2, root, step_len, step_tol
+    real(DP) :: l2_new2, l2_pnorm, slope, av, bv, rhs1, rhs2, root, step_len
     real(DP) :: f1_pre, f1_new
     real(DP) :: lam2, temp_lam, lam_inv, lam2_inv, del_lam, lam_max, lam_min
     real(DP) :: lam_length, lam_base, lam_diff, lam_incr, sql2_pnorm, maxpnorm
-    real(DP) :: lam_maxi, satpnorm, dsat
+    real(DP) :: lam_maxi, dsat_scale, dsat_cell
     real(DP) :: alpha_cond, beta_cond
-    real(DP), parameter :: BACK_ALPHA = 1.00E-4_DP, BACK_BETA = 0.9_DP, MAXS_RATIO = 0.99_DP
-    real(DP), parameter :: FTB_FRAC = 0.9_DP
-    real(DP), parameter :: FINI_GUARD = huge(1.00_DP)*0.1_DP
+    real(DP), parameter :: BACK_ALPHA = 1.00E-4_DP, BACK_BETA = 0.9_DP, MAXSTEP_RATIO = 0.99_DP
+    real(DP), parameter :: DSAT_STEP_FRAC = 0.9_DP
+    real(DP), parameter :: DIVERGE_LIMIT = huge(1.00_DP)*0.1_DP
+    real(DP), parameter :: STEP_TOL = 1.00E-07_DP
 #ifdef MPI_MSG
     real(DP) :: sum_l2, max_val, min_val
 #endif
@@ -551,25 +554,25 @@ module nonlinear_solution
     end if
 
     if (st_ctrl%dsat_max > DZERO) then
-      satpnorm = DONE
-      !$omp parallel do private(i, dsat) reduction(min:satpnorm)
+      dsat_scale = DONE
+      !$omp parallel do private(i, dsat_cell) reduction(min:dsat_scale)
       do i = 1, ncalc
-        dsat = abs(stod(i))*st_time%delt/st_geom%cell_vol(i)*abs(st_sol%head_change(i))
-        if (dsat > st_ctrl%dsat_max) then
-          satpnorm = min(satpnorm, FTB_FRAC*st_ctrl%dsat_max/dsat)
+        dsat_cell = abs(stod(i))*st_time%delt/st_geom%cell_vol(i)*abs(st_sol%head_change(i))
+        if (dsat_cell > st_ctrl%dsat_max) then
+          dsat_scale = min(dsat_scale, DSAT_STEP_FRAC*st_ctrl%dsat_max/dsat_cell)
         end if
       end do
       !$omp end parallel do
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
         ! -- MIN value for MPI (val)
-          call mpimin_val(satpnorm, "saturation limit ratio", min_val)
-        satpnorm = min_val
+          call mpimin_val(dsat_scale, "saturation limit ratio", min_val)
+        dsat_scale = min_val
       end if
 #endif
-      if (satpnorm < DONE) then
+      if (dsat_scale < DONE) then
         satlim_num = satlim_num + 1
-        maxpnorm = min(maxpnorm, satpnorm)
+        maxpnorm = min(maxpnorm, dsat_scale)
       end if
     end if
 
@@ -623,9 +626,8 @@ module nonlinear_solution
       lam_length = max_val
     end if
 #endif
-    step_tol = STEP_TOL_DEF
     if (lam_length > DZERO) then
-      lam_min = step_tol/lam_length
+      lam_min = STEP_TOL/lam_length
     else
       lam_min = DZERO
     end if
@@ -641,7 +643,7 @@ module nonlinear_solution
       ! -- Calculate function and l2norm2 (func2norm)
         call calc_funcl2norm(lam, l2_new, new_f, st_sol)
       backi = backi + 1
-      if (.not. ieee_is_finite(l2_new) .or. l2_new > FINI_GUARD) then
+      if (.not. ieee_is_finite(l2_new) .or. l2_new > DIVERGE_LIMIT) then
         nan_recv_num = nan_recv_num + 1
         if (lam < lam_min) then
           ! -- Calculate function and l2norm2 (func2norm)
@@ -748,7 +750,7 @@ module nonlinear_solution
       end if
     end if
 
-    if (lam*sql2_pnorm > MAXS_RATIO*maxstep) then
+    if (lam*sql2_pnorm > MAXSTEP_RATIO*maxstep) then
       maxsf = .true.
       maxstep_num = maxstep_num + 1
     end if

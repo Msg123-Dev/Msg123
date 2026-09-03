@@ -290,13 +290,14 @@ module types_module
   end type kryl_set
 
   type :: amgt_set
-    real(DP), allocatable :: td(:), tx(:), tb(:), tr(:), trhs(:), tfx(:), tlu(:)
-    real(DP), allocatable :: tsr(:), tsx(:)
+    real(DP), allocatable :: tmp_diag(:), tmp_x(:), tmp_rhs(:), tmp_resi(:)
+    real(DP), allocatable :: tmp_rhs_coa(:), tmp_corr(:), tmp_lumat(:)
+    real(DP), allocatable :: smth_resi(:), smth_corr(:)
     real(DP), allocatable :: save_rhs(:), dilu_d(:)
   end type amgt_set
 
   type :: coef_set
-    real(DP), allocatable :: per_srat(:), per_relp(:), per_wstor(:)
+    real(DP), allocatable :: per_srat(:), per_relp(:), stor_per(:)
     real(DP), allocatable :: temp_rhs(:)
     real(DP), allocatable :: stod(:), cond(:), sead(:), dmats(:)
     real(DP), allocatable :: rivd(:), lakd(:), surd(:)

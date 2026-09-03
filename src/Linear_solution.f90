@@ -61,26 +61,27 @@ module linear_solution
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(st_amgt%td(nreg_num), st_amgt%tx(nreg_num))
-    allocate(st_amgt%tb(nreg_num), st_amgt%tr(nreg_num))
-    allocate(st_amgt%trhs(nreg_num), st_amgt%tfx(nreg_num), st_amgt%tlu(tconn_num))
+    allocate(st_amgt%tmp_diag(nreg_num), st_amgt%tmp_x(nreg_num))
+    allocate(st_amgt%tmp_rhs(nreg_num), st_amgt%tmp_resi(nreg_num))
+    allocate(st_amgt%tmp_rhs_coa(nreg_num), st_amgt%tmp_corr(nreg_num))
+    allocate(st_amgt%tmp_lumat(tconn_num))
     allocate(st_amgt%save_rhs(nreg_num), st_amgt%dilu_d(nreg_num))
-    allocate(st_amgt%tsr(nreg_num), st_amgt%tsx(nreg_num))
+    allocate(st_amgt%smth_resi(nreg_num), st_amgt%smth_corr(nreg_num))
 
     !$omp parallel
     !$omp do private(i)
     do i = 1, nreg_num
-      st_amgt%td(i) = DZERO ; st_amgt%tx(i) = DZERO
-      st_amgt%tb(i) = DZERO ; st_amgt%tr(i) = DZERO
-      st_amgt%trhs(i) = DZERO ; st_amgt%tfx(i) = DZERO
-      st_amgt%tsr(i) = DZERO ; st_amgt%tsx(i) = DZERO
+      st_amgt%tmp_diag(i) = DZERO ; st_amgt%tmp_x(i) = DZERO
+      st_amgt%tmp_rhs(i) = DZERO ; st_amgt%tmp_resi(i) = DZERO
+      st_amgt%tmp_rhs_coa(i) = DZERO ; st_amgt%tmp_corr(i) = DZERO
+      st_amgt%smth_resi(i) = DZERO ; st_amgt%smth_corr(i) = DZERO
       st_amgt%save_rhs(i) = DZERO ; st_amgt%dilu_d(i) = DZERO
     end do
     !$omp end do
 
     !$omp do private(i)
     do i = 1, tconn_num
-      st_amgt%tlu(i) = DZERO
+      st_amgt%tmp_lumat(i) = DZERO
     end do
     !$omp end do
     !$omp end parallel
@@ -135,10 +136,10 @@ module linear_solution
     ! -- local
     integer(I4) :: n, d_size, lu_size, reg_size
     real(DP) :: sk, sk0, sk2, alpha, beta
-    real(DP) :: gnrm(2), gscal
+    real(DP) :: guard_nrm(2), guard_scal
 #ifdef MPI_MSG
     real(DP) :: sum_sk, sum_rnorm
-    real(DP) :: gsum(3), gred(3)
+    real(DP) :: send_val(3), recv_val(3)
 #endif
     !-------------------------------------------------------------------------------------------
     d_size = crs_index(level)%unknow
@@ -254,28 +255,28 @@ module linear_solution
       ! -- Calculate matrix-vector multiplication (matvec)
         call calc_matvec(level, d_size, st_kryl%p, array_var(level)%dmat, array_var(level)%lumat, st_kryl%q)
 
-      sk2 = DZERO ; gnrm(1) = DZERO ; gnrm(2) = DZERO
-      !$omp parallel do private(n) reduction(+:sk2, gnrm)
+      sk2 = DZERO ; guard_nrm(1) = DZERO ; guard_nrm(2) = DZERO
+      !$omp parallel do private(n) reduction(+:sk2, guard_nrm)
       do n = 1, d_size
         sk2 = sk2 + st_kryl%p(n)*st_kryl%q(n)
-        gnrm(1) = gnrm(1) + st_kryl%p(n)*st_kryl%p(n)
-        gnrm(2) = gnrm(2) + st_kryl%q(n)*st_kryl%q(n)
+        guard_nrm(1) = guard_nrm(1) + st_kryl%p(n)*st_kryl%p(n)
+        guard_nrm(2) = guard_nrm(2) + st_kryl%q(n)*st_kryl%q(n)
       end do
       !$omp end parallel do
 
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
-        gsum(1) = sk2 ; gsum(2) = gnrm(1) ; gsum(3) = gnrm(2)
+        send_val(1) = sk2 ; send_val(2) = guard_nrm(1) ; send_val(3) = guard_nrm(2)
         ! -- Sum value for MPI (val)
-          call mpisum_val(gsum, "cg inner products", gred)
-        sk2 = gred(1) ; gnrm(1) = gred(2) ; gnrm(2) = gred(3)
+          call mpisum_val(send_val, "cg inner products", recv_val)
+        sk2 = recv_val(1) ; guard_nrm(1) = recv_val(2) ; guard_nrm(2) = recv_val(3)
       end if
 #endif
 
-      gscal = sqrt(gnrm(1)*gnrm(2))
-      if (abs(sk2) < UROUND*gscal) then
+      guard_scal = sqrt(guard_nrm(1)*guard_nrm(2))
+      if (abs(sk2) < UROUND*guard_scal) then
         lin_guard_num = lin_guard_num + 1
-        sk2 = sign(max(abs(sk2), UROUND*gscal), sk2)
+        sk2 = sign(max(abs(sk2), UROUND*guard_scal), sk2)
       end if
       alpha = sk/sk2
       !$omp parallel do private(n)
@@ -330,9 +331,9 @@ module linear_solution
     ! -- local
     integer(I4) :: n, d_size, lu_size, reg_size
     real(DP) :: sk, sk0, sk2, alpha, beta, bicgs_omega, ts, tt
-    real(DP) :: gnrm(2), gscal
+    real(DP) :: guard_nrm(2), guard_scal
 #ifdef MPI_MSG
-    real(DP) :: gsum(3), gred(3)
+    real(DP) :: send_val(3), recv_val(3)
 #endif
 #ifdef MPI_MSG
     real(DP) :: sum_sk, sum_rnorm
@@ -462,26 +463,26 @@ module linear_solution
       ! -- Calculate matrix-vector multiplication (matvec)
         call calc_matvec(level, d_size, st_kryl%z, array_var(level)%dmat, array_var(level)%lumat, st_kryl%v)
 
-      sk2 = DZERO ; gnrm(1) = DZERO ; gnrm(2) = DZERO
-      !$omp parallel do private(n) reduction(+:sk2, gnrm)
+      sk2 = DZERO ; guard_nrm(1) = DZERO ; guard_nrm(2) = DZERO
+      !$omp parallel do private(n) reduction(+:sk2, guard_nrm)
       do n = 1, d_size
         sk2 = sk2 + st_kryl%v(n)*st_kryl%rs(n)
-        gnrm(1) = gnrm(1) + st_kryl%v(n)*st_kryl%v(n)
-        gnrm(2) = gnrm(2) + st_kryl%rs(n)*st_kryl%rs(n)
+        guard_nrm(1) = guard_nrm(1) + st_kryl%v(n)*st_kryl%v(n)
+        guard_nrm(2) = guard_nrm(2) + st_kryl%rs(n)*st_kryl%rs(n)
       end do
       !$omp end parallel do
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
-        gsum(1) = sk2 ; gsum(2) = gnrm(1) ; gsum(3) = gnrm(2)
+        send_val(1) = sk2 ; send_val(2) = guard_nrm(1) ; send_val(3) = guard_nrm(2)
         ! -- Sum value for MPI (val)
-          call mpisum_val(gsum, "bicgs inner products", gred)
-        sk2 = gred(1) ; gnrm(1) = gred(2) ; gnrm(2) = gred(3)
+          call mpisum_val(send_val, "bicgs inner products", recv_val)
+        sk2 = recv_val(1) ; guard_nrm(1) = recv_val(2) ; guard_nrm(2) = recv_val(3)
       end if
 #endif
-      gscal = sqrt(gnrm(1)*gnrm(2))
-      if (abs(sk2) < UROUND*gscal) then
+      guard_scal = sqrt(guard_nrm(1)*guard_nrm(2))
+      if (abs(sk2) < UROUND*guard_scal) then
         lin_guard_num = lin_guard_num + 1
-        sk2 = sign(max(abs(sk2), UROUND*gscal), sk2)
+        sk2 = sign(max(abs(sk2), UROUND*guard_scal), sk2)
       end if
       alpha = sk/sk2
 
@@ -543,28 +544,28 @@ module linear_solution
         ! -- Calculate matrix-vector multiplication (matvec)
           call calc_matvec(level, d_size, st_kryl%z, array_var(level)%dmat, array_var(level)%lumat, st_kryl%t)
 
-        ts = DZERO ; tt = DZERO ; gnrm(1) = DZERO
-        !$omp parallel do private(n) reduction(+:ts, tt, gnrm)
+        ts = DZERO ; tt = DZERO ; guard_nrm(1) = DZERO
+        !$omp parallel do private(n) reduction(+:ts, tt, guard_nrm)
         do n = 1, d_size
           ts = ts + st_kryl%t(n)*st_kryl%resi(n)
           tt = tt + st_kryl%t(n)*st_kryl%t(n)
-          gnrm(1) = gnrm(1) + st_kryl%resi(n)*st_kryl%resi(n)
+          guard_nrm(1) = guard_nrm(1) + st_kryl%resi(n)*st_kryl%resi(n)
         end do
         !$omp end parallel do
 
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1) then
-          gsum(1) = ts ; gsum(2) = tt ; gsum(3) = gnrm(1)
+          send_val(1) = ts ; send_val(2) = tt ; send_val(3) = guard_nrm(1)
           ! -- Sum value for MPI (val)
-            call mpisum_val(gsum, "bicgs omega products", gred)
-          ts = gred(1) ; tt = gred(2) ; gnrm(1) = gred(3)
+            call mpisum_val(send_val, "bicgs omega products", recv_val)
+          ts = recv_val(1) ; tt = recv_val(2) ; guard_nrm(1) = recv_val(3)
         end if
 #endif
 
-        gscal = sqrt(tt*gnrm(1))
-        if (abs(tt) < UROUND*gscal) then
+        guard_scal = sqrt(tt*guard_nrm(1))
+        if (abs(tt) < UROUND*guard_scal) then
           lin_guard_num = lin_guard_num + 1
-          tt = sign(max(abs(tt), UROUND*gscal), tt)
+          tt = sign(max(abs(tt), UROUND*guard_scal), tt)
         end if
         bicgs_omega = ts/tt
 
@@ -664,15 +665,15 @@ module linear_solution
         !$omp parallel
         !$omp do private(i)
         do i = 1, reg_size
-          st_amgt%td(i) = array_var(vlevel)%dmat(i)
-          st_amgt%tx(i) = array_var(vlevel)%x(i)
-          st_amgt%tb(i) = array_var(vlevel)%rhs(i)
-          st_amgt%tr(i) = DZERO
+          st_amgt%tmp_diag(i) = array_var(vlevel)%dmat(i)
+          st_amgt%tmp_x(i) = array_var(vlevel)%x(i)
+          st_amgt%tmp_rhs(i) = array_var(vlevel)%rhs(i)
+          st_amgt%tmp_resi(i) = DZERO
         end do
         !$omp end do
         !$omp do private(i)
         do i = 1, lu_size
-          st_amgt%tlu(i) = array_var(vlevel)%lumat(i)
+          st_amgt%tmp_lumat(i) = array_var(vlevel)%lumat(i)
         end do
         !$omp end do
         !$omp end parallel
@@ -680,23 +681,24 @@ module linear_solution
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1 .and. vlevel == alevel) then
           ! -- Send and Receive real vector value (rvectv)
-            call senrec_rvectv(st_amgt%tx(1:reg_size))
-            call senrec_rvectv(st_amgt%tb(1:reg_size))
+            call senrec_rvectv(st_amgt%tmp_x(1:reg_size))
+            call senrec_rvectv(st_amgt%tmp_rhs(1:reg_size))
         end if
 #endif
         ! -- Smooth by dilu (smooth)
           call smooth_amg(vlevel, d_size, lu_size, reg_size, alevel, st_amgt)
 
-        array_var(vlevel)%x(:) = st_amgt%tx(1:reg_size)
+        array_var(vlevel)%x(:) = st_amgt%tmp_x(1:reg_size)
 
         ! -- Calculate residual
-          call calc_resi(vlevel, d_size, st_amgt%td(1:reg_size), st_amgt%tlu(1:lu_size),&
-                         st_amgt%tx(1:reg_size), st_amgt%tb(1:reg_size), st_amgt%tr(1:reg_size))
+          call calc_resi(vlevel, d_size, st_amgt%tmp_diag(1:reg_size),&
+                         st_amgt%tmp_lumat(1:lu_size), st_amgt%tmp_x(1:reg_size),&
+                         st_amgt%tmp_rhs(1:reg_size), st_amgt%tmp_resi(1:reg_size))
 
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1 .and. vlevel == alevel) then
           ! -- Send and Receive real vector value (rvectv)
-            call senrec_rvectv(st_amgt%tr(1:reg_size))
+            call senrec_rvectv(st_amgt%tmp_resi(1:reg_size))
         end if
 #endif
 
@@ -704,7 +706,7 @@ module linear_solution
         !$omp parallel
         !$omp do private(i)
         do i = 1, ncoa
-          st_amgt%trhs(i) = DZERO
+          st_amgt%tmp_rhs_coa(i) = DZERO
         end do
         !$omp end do
         !$omp do private(i, j, k, rst, ren)
@@ -713,9 +715,10 @@ module linear_solution
           ren = res_var(vlevel+1)%rindex(i)
           do k = rst, ren
             j = res_var(vlevel+1)%roffrow(k)
-            st_amgt%trhs(i) = st_amgt%trhs(i) + res_var(vlevel+1)%rval(k)*st_amgt%tr(j)
+            st_amgt%tmp_rhs_coa(i) = st_amgt%tmp_rhs_coa(i)&
+                                     + res_var(vlevel+1)%rval(k)*st_amgt%tmp_resi(j)
           end do
-          array_var(vlevel+1)%rhs(i) = st_amgt%trhs(i)
+          array_var(vlevel+1)%rhs(i) = st_amgt%tmp_rhs_coa(i)
         end do
         !$omp end do
 
@@ -734,24 +737,24 @@ module linear_solution
       !$omp parallel
       !$omp do private(i)
       do i = 1, d_size
-        st_amgt%td(i) = array_var(st_ctrl%nlevel)%dmat(i)
+        st_amgt%tmp_diag(i) = array_var(st_ctrl%nlevel)%dmat(i)
       end do
       !$omp end do
       !$omp do private(i)
       do i = 1, lu_size
-        st_amgt%tlu(i) = array_var(st_ctrl%nlevel)%lumat(i)
+        st_amgt%tmp_lumat(i) = array_var(st_ctrl%nlevel)%lumat(i)
       end do
       !$omp end do
       !$omp do private(i)
       do i = 1, reg_size
-        st_amgt%tx(i) = array_var(st_ctrl%nlevel)%x(i)
-        st_amgt%tb(i) = array_var(st_ctrl%nlevel)%rhs(i)
+        st_amgt%tmp_x(i) = array_var(st_ctrl%nlevel)%x(i)
+        st_amgt%tmp_rhs(i) = array_var(st_ctrl%nlevel)%rhs(i)
       end do
       !$omp end do
       if (st_ctrl%nlevel == alevel) then
         !$omp do private(i)
         do i = 1, d_size
-          st_amgt%td(i) = st_amgt%dilu_d(i)
+          st_amgt%tmp_diag(i) = st_amgt%dilu_d(i)
         end do
         !$omp end do
       end if
@@ -760,38 +763,40 @@ module linear_solution
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1 .and. st_ctrl%nlevel == alevel) then
         ! -- Send and Receive real vector value (rvectv)
-          call senrec_rvectv(st_amgt%tx(1:reg_size))
-          call senrec_rvectv(st_amgt%tb(1:reg_size))
+          call senrec_rvectv(st_amgt%tmp_x(1:reg_size))
+          call senrec_rvectv(st_amgt%tmp_rhs(1:reg_size))
       end if
       if (st_mpi%totn /= 1 .and. st_ctrl%nlevel == alevel) then
         ! -- Solve mpi ilu factorization (ilu)
-          call solve_mpi_ilu(st_amgt%tb(1:reg_size), st_amgt%td(1:d_size),&
-                             st_amgt%tlu(1:lu_size), st_amgt%tx(1:reg_size))
+          call solve_mpi_ilu(st_amgt%tmp_rhs(1:reg_size), st_amgt%tmp_diag(1:d_size),&
+                             st_amgt%tmp_lumat(1:lu_size), st_amgt%tmp_x(1:reg_size))
       else
         ! -- Solve ilu factorization (ilu)
-          call solve_ilu(st_ctrl%nlevel, d_size, st_amgt%tb(1:reg_size), st_amgt%td(1:d_size),&
-                         st_amgt%tlu(1:lu_size), st_amgt%tx(1:reg_size))
+          call solve_ilu(st_ctrl%nlevel, d_size, st_amgt%tmp_rhs(1:reg_size),&
+                         st_amgt%tmp_diag(1:d_size), st_amgt%tmp_lumat(1:lu_size),&
+                         st_amgt%tmp_x(1:reg_size))
       end if
 #else
         ! -- Solve ilu factorization (ilu)
-        call solve_ilu(st_ctrl%nlevel, d_size, st_amgt%tb(1:reg_size), st_amgt%td(1:d_size),&
-                       st_amgt%tlu(1:lu_size), st_amgt%tx(1:reg_size))
+        call solve_ilu(st_ctrl%nlevel, d_size, st_amgt%tmp_rhs(1:reg_size),&
+                       st_amgt%tmp_diag(1:d_size), st_amgt%tmp_lumat(1:lu_size),&
+                       st_amgt%tmp_x(1:reg_size))
 #endif
 
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1 .and. st_ctrl%nlevel == alevel) then
         ! -- Send and Receive real vector value (rvectv)
-          call senrec_rvectv(st_amgt%tx(1:reg_size))
+          call senrec_rvectv(st_amgt%tmp_x(1:reg_size))
       end if
 #endif
-      array_var(st_ctrl%nlevel)%x(:) = st_amgt%tx(1:reg_size)
+      array_var(st_ctrl%nlevel)%x(:) = st_amgt%tmp_x(1:reg_size)
 
       do vlevel = st_ctrl%nlevel-1, alevel, -1
         nfin = crs_index(vlevel)%unknow
         !$omp parallel
         !$omp do private(i)
         do i = 1, nfin
-          st_amgt%tfx(i) = DZERO
+          st_amgt%tmp_corr(i) = DZERO
         end do
         !$omp end do
         !$omp do private(i, j, k, pst, pen)
@@ -800,9 +805,10 @@ module linear_solution
           pen = pro_var(vlevel+1)%pindex(i)
           do k = pst, pen
             j = pro_var(vlevel+1)%poffrow(k)
-            st_amgt%tfx(i) = st_amgt%tfx(i) + pro_var(vlevel+1)%pval(k)*array_var(vlevel+1)%x(j)
+            st_amgt%tmp_corr(i) = st_amgt%tmp_corr(i)&
+                                  + pro_var(vlevel+1)%pval(k)*array_var(vlevel+1)%x(j)
           end do
-          array_var(vlevel)%x(i) = array_var(vlevel)%x(i) + st_amgt%tfx(i)
+          array_var(vlevel)%x(i) = array_var(vlevel)%x(i) + st_amgt%tmp_corr(i)
         end do
         !$omp end do
         !$omp end parallel
@@ -814,14 +820,14 @@ module linear_solution
         !$omp parallel
         !$omp do private(i)
         do i = 1, reg_size
-          st_amgt%td(i) = array_var(vlevel)%dmat(i)
-          st_amgt%tx(i) = array_var(vlevel)%x(i)
-          st_amgt%tb(i) = array_var(vlevel)%rhs(i)
+          st_amgt%tmp_diag(i) = array_var(vlevel)%dmat(i)
+          st_amgt%tmp_x(i) = array_var(vlevel)%x(i)
+          st_amgt%tmp_rhs(i) = array_var(vlevel)%rhs(i)
         end do
         !$omp end do
         !$omp do private(i)
         do i = 1, lu_size
-          st_amgt%tlu(i) = array_var(vlevel)%lumat(i)
+          st_amgt%tmp_lumat(i) = array_var(vlevel)%lumat(i)
         end do
         !$omp end do
         !$omp end parallel
@@ -829,15 +835,15 @@ module linear_solution
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1 .and. vlevel == alevel) then
           ! -- Send and Receive real vector value (rvectv)
-            call senrec_rvectv(st_amgt%tx(1:reg_size))
-            call senrec_rvectv(st_amgt%tb(1:reg_size))
+            call senrec_rvectv(st_amgt%tmp_x(1:reg_size))
+            call senrec_rvectv(st_amgt%tmp_rhs(1:reg_size))
         end if
 #endif
         ! -- Smooth by dilu (smooth)
           call smooth_amg(vlevel, d_size, lu_size, reg_size, alevel, st_amgt)
 
-        array_var(vlevel)%x(:) = st_amgt%tx(1:reg_size)
-        array_var(vlevel)%rhs(:) = st_amgt%tb(1:reg_size)
+        array_var(vlevel)%x(:) = st_amgt%tmp_x(1:reg_size)
+        array_var(vlevel)%rhs(:) = st_amgt%tmp_rhs(1:reg_size)
 
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1 .and. vlevel == alevel) then
@@ -880,7 +886,7 @@ module linear_solution
     integer(I4) :: i, j, k
     integer(I4) :: off_sta, off_end, off_sta2, off_end2
     integer(I4) :: offr, offr2
-    real(DP) :: d_invk, d_flor
+    real(DP) :: d_invk, d_floor
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, npre
@@ -907,9 +913,9 @@ module linear_solution
         end if
       end do
       if (st_ctrl%dilu_shift > DZERO) then
-        d_flor = st_ctrl%dilu_shift*abs(pre_ind(i))
-        if (abs(pre_d(i)) < d_flor) then
-          pre_d(i) = sign(d_flor, pre_ind(i))
+        d_floor = st_ctrl%dilu_shift*abs(pre_ind(i))
+        if (abs(pre_d(i)) < d_floor) then
+          pre_d(i) = sign(d_floor, pre_ind(i))
           dilu_shift_num = dilu_shift_num + 1
         end if
       end if
@@ -917,51 +923,54 @@ module linear_solution
 
   end subroutine precon_dilu
 
-  subroutine smooth_amg(slevel, ns_size, nlu_size, nreg_size, alevel, st_amgt)
+  subroutine smooth_amg(smth_level, ns_size, nlu_size, nreg_size, alevel, st_amgt)
   !*********************************************************************************************
   ! smooth_amg -- Smooth for AMG
   !*********************************************************************************************
     ! -- modules
 
     ! -- inout
-    integer(I4), intent(in) :: slevel, ns_size, nlu_size, nreg_size, alevel
+    integer(I4), intent(in) :: smth_level, ns_size, nlu_size, nreg_size, alevel
     type(amgt_set), intent(inout) :: st_amgt
     ! -- local
     integer(I4) :: i, sweep
     !-------------------------------------------------------------------------------------------
     do sweep = 1, st_ctrl%max_sweep
       ! -- Calculate residual (resi)
-        call calc_resi(slevel, ns_size, st_amgt%td(1:nreg_size), st_amgt%tlu(1:nlu_size),&
-                       st_amgt%tx(1:nreg_size), st_amgt%tb(1:nreg_size),&
-                       st_amgt%tsr(1:nreg_size))
+        call calc_resi(smth_level, ns_size, st_amgt%tmp_diag(1:nreg_size),&
+                       st_amgt%tmp_lumat(1:nlu_size),&
+                       st_amgt%tmp_x(1:nreg_size), st_amgt%tmp_rhs(1:nreg_size),&
+                       st_amgt%smth_resi(1:nreg_size))
 #ifdef MPI_MSG
-      if (st_mpi%totn /= 1 .and. slevel == alevel) then
+      if (st_mpi%totn /= 1 .and. smth_level == alevel) then
         ! -- Send and Receive real vector value (rvectv)
-          call senrec_rvectv(st_amgt%tsr(1:nreg_size))
+          call senrec_rvectv(st_amgt%smth_resi(1:nreg_size))
         ! -- Solve mpi ilu factorization (ilu)
-          call solve_mpi_ilu(st_amgt%tsr(1:nreg_size), st_amgt%dilu_d(1:nreg_size),&
-                             st_amgt%tlu(1:nlu_size), st_amgt%tsx(1:nreg_size))
-      else if (slevel == alevel) then
+          call solve_mpi_ilu(st_amgt%smth_resi(1:nreg_size), st_amgt%dilu_d(1:nreg_size),&
+                             st_amgt%tmp_lumat(1:nlu_size), st_amgt%smth_corr(1:nreg_size))
+      else if (smth_level == alevel) then
 #else
-      if (slevel == alevel) then
+      if (smth_level == alevel) then
 #endif
         ! -- Solve ilu factorization (ilu)
-          call solve_ilu(slevel, ns_size, st_amgt%tsr(1:nreg_size), st_amgt%dilu_d(1:ns_size),&
-                         st_amgt%tlu(1:nlu_size), st_amgt%tsx(1:nreg_size))
+          call solve_ilu(smth_level, ns_size, st_amgt%smth_resi(1:nreg_size),&
+                         st_amgt%dilu_d(1:ns_size), st_amgt%tmp_lumat(1:nlu_size),&
+                         st_amgt%smth_corr(1:nreg_size))
       else
         ! -- Solve ilu factorization (ilu)
-          call solve_ilu(slevel, ns_size, st_amgt%tsr(1:nreg_size), st_amgt%td(1:ns_size),&
-                         st_amgt%tlu(1:nlu_size), st_amgt%tsx(1:nreg_size))
+          call solve_ilu(smth_level, ns_size, st_amgt%smth_resi(1:nreg_size),&
+                         st_amgt%tmp_diag(1:ns_size), st_amgt%tmp_lumat(1:nlu_size),&
+                         st_amgt%smth_corr(1:nreg_size))
       end if
       !$omp parallel do private(i)
       do i = 1, ns_size
-        st_amgt%tx(i) = st_amgt%tx(i) + st_amgt%tsx(i)
+        st_amgt%tmp_x(i) = st_amgt%tmp_x(i) + st_amgt%smth_corr(i)
       end do
       !$omp end parallel do
 #ifdef MPI_MSG
-      if (st_mpi%totn /= 1 .and. slevel == alevel) then
+      if (st_mpi%totn /= 1 .and. smth_level == alevel) then
         ! -- Send and Receive real vector value (rvectv)
-          call senrec_rvectv(st_amgt%tx(1:nreg_size))
+          call senrec_rvectv(st_amgt%tmp_x(1:nreg_size))
       end if
 #endif
     end do

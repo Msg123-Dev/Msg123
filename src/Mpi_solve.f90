@@ -234,7 +234,7 @@ module mpi_solve
     integer(I4) :: off_sta, off_end, off_sta2, off_end2
     integer(I4) :: offr, offr2, off_left, off_row_num
     integer(I4) :: rank_flag, allp_flag
-    real(DP) :: d_invk, d_flor
+    real(DP) :: d_invk, d_floor
     !-------------------------------------------------------------------------------------------
     off_row_num = crs_index(1)%offind(nreg_num)
     !$omp parallel
@@ -284,9 +284,9 @@ module mpi_solve
           if (sum(offr_flag(off_sta:off_end)) == off_end-off_sta+1) then
             fix_flag(i) = 1 ; pre_d(i) = temp_pred(i)
             if (st_ctrl%dilu_shift > DZERO) then
-              d_flor = st_ctrl%dilu_shift*abs(pre_ind(i))
-              if (abs(pre_d(i)) < d_flor) then
-                pre_d(i) = sign(d_flor, pre_ind(i))
+              d_floor = st_ctrl%dilu_shift*abs(pre_ind(i))
+              if (abs(pre_d(i)) < d_floor) then
+                pre_d(i) = sign(d_floor, pre_ind(i))
                 dilu_shift_num = dilu_shift_num + 1
               end if
             end if

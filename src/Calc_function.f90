@@ -19,12 +19,12 @@ module calc_function
   public :: allocate_calfun, calc_func, calc_mass, calc_vecjacf
   public :: func_rechterm, func_wellterm, func_surfterm, func_riveterm
   public :: func_laketerm, func_sealterm
-  real(DP), public :: qtot_ext = DZERO
+  real(DP), public :: qext_sum = DZERO
   ! -- local
   real(DP), allocatable :: stof(:), conf(:), welf(:), seaf(:)
   real(DP), allocatable :: funcvs(:)
   real(DP), allocatable :: recf(:), surf(:), rivf(:), lakf(:)
-  real(DP), allocatable :: wk_stor(:)
+  real(DP), allocatable :: stor_work(:)
   real(DP), allocatable :: conn_flow(:)
   real(DP), allocatable :: delh_s(:), elev_rati(:)
   real(DP), allocatable :: delh_r(:), delh_l(:), seal_flow(:)
@@ -46,7 +46,7 @@ module calc_function
     allocate(stof(ncalc), conf(ncalc), welf(ncalc), seaf(ncalc))
     allocate(funcvs(ncalc))
     allocate(recf(ncals), surf(ncals), rivf(ncals), lakf(ncals))
-    allocate(wk_stor(ncalc))
+    allocate(stor_work(ncalc))
     allocate(conn_flow(ncalc))
     allocate(delh_s(ncals), elev_rati(ncals))
     allocate(delh_r(st_bcnd%rive_num), delh_l(st_bcnd%lake_num), seal_flow(st_bcnd%seal_num))
@@ -129,10 +129,10 @@ module calc_function
     end do
     !$omp end parallel do
 
-      qtot_ext = DZERO
-      !$omp parallel do private(i) reduction(+:qtot_ext)
+      qext_sum = DZERO
+      !$omp parallel do private(i) reduction(+:qext_sum)
       do i = 1, ncalc
-        qtot_ext = qtot_ext + abs(funcvs(i)) + abs(welf(i)) + abs(seaf(i))
+        qext_sum = qext_sum + abs(funcvs(i)) + abs(welf(i)) + abs(seaf(i))
       end do
       !$omp end parallel do
 
@@ -155,11 +155,11 @@ module calc_function
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
     ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, DZERO, hnew, snew, rperm, wk_stor)
+      call calc_srat_rperm(ncalc, DZERO, hnew, snew, rperm, stor_work)
 
     if (st_sim%sim_type >= 0) then
       ! -- Function storage change (stochn)
-        call func_stochn(wk_stor, stold, stom)
+        call func_stochn(stor_work, stold, stom)
     end if
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then

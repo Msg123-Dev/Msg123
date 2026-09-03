@@ -12,7 +12,7 @@ module calc_parameter
 
   contains
 
-  subroutine calc_srat_rperm(num, pertur, pres, srat, rperm, wstor)
+  subroutine calc_srat_rperm(num, pertur, pres, srat, rperm, stor_out)
   !*********************************************************************************************
   ! calc_srat_rperm -- Calculate saturation and relative permeability
   !*********************************************************************************************
@@ -27,16 +27,16 @@ module calc_parameter
     real(DP), intent(in) :: pertur
     real(DP), intent(in) :: pres(:)
     real(DP), intent(out) :: srat(:), rperm(:)
-    real(DP), intent(out), optional :: wstor(:)
+    real(DP), intent(out), optional :: stor_out(:)
     ! -- local
     integer(I4) :: i
-    real(DP) :: retm, beta, theta, kr, se, ws
+    real(DP) :: retm, beta, theta, kr, se, stor_val
     real(DP) :: per_phead, phead0
     real(DP) :: kr_phead, kr_beta, kr_se
     !-------------------------------------------------------------------------------------------
     phead0 = DZERO
 
-    !$omp parallel do private(i, per_phead, retm, beta, theta, kr, se, ws) &
+    !$omp parallel do private(i, per_phead, retm, beta, theta, kr, se, stor_val) &
     !$omp             private(kr_phead, kr_beta, kr_se)
     do i = 1, num
       per_phead = pres(i) - st_geom%cell_top(i) + pertur
@@ -52,16 +52,16 @@ module calc_parameter
         end if
         srat(i) = theta/st_hydr%read_pors(i)
         if (st_schm%stor_type == 1) then
-          ws = theta + st_hydr%read_spst(i)*per_phead*srat(i)
+          stor_val = theta + st_hydr%read_spst(i)*per_phead*srat(i)
         else
-          ws = theta
+          stor_val = theta
         end if
         se = (DONE+beta)**(-retm)
         kr = se**(DHALF)*(DONE-(DONE-se**(DONE/retm))**retm)**DTWO
       else
         srat(i) = DONE
         kr = DONE
-        ws = st_hydr%read_pors(i) + st_hydr%read_spst(i)*per_phead
+        stor_val = st_hydr%read_pors(i) + st_hydr%read_spst(i)*per_phead
       end if
 
       if (st_schm%krpos_type == 1) then
@@ -77,8 +77,8 @@ module calc_parameter
       end if
 
       rperm(i) = kr
-      if (present(wstor)) then
-        wstor(i) = ws
+      if (present(stor_out)) then
+        stor_out(i) = stor_val
       end if
     end do
     !$omp end parallel do

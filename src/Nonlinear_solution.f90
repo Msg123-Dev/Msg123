@@ -1,7 +1,7 @@
 module nonlinear_solution
   ! -- modules
   use kind_module, only: I4, DP
-  use constval_module, only: DZERO, DONE, DHALF, DTWO, MACHI_EPS
+  use constval_module, only: DZERO, DONE, DHALF, DTWO
   use types_module, only: sol_set
   use utility_module, only: st_mpi, slope_sign_num, nan_recv_num, maxstep_num, satlim_num
   use initial_module, only: st_ctrl
@@ -450,6 +450,7 @@ module nonlinear_solution
   ! set_eise_walk -- Set Eisenstat-Walker forcing term
   !*********************************************************************************************
     ! -- modules
+    use kind_module, only: SP
     use utility_module, only: log_fnum
     ! -- inout
     real(DP), intent(in) :: l2_new, l2_pre, l2_jac, grad
@@ -458,11 +459,12 @@ module nonlinear_solution
     real(DP), parameter :: ETA_MAX = 0.9_DP
     real(DP), parameter :: ETA_MIN = 1.0E-4_DP
     real(DP), parameter :: ETA_ALPHA = (1.0_DP+sqrt(5.0_DP))*DHALF
+    real(DP), parameter :: DESCENT_TOL = epsilon(1.00_SP)
     real(DP) :: eta_safe, l2_line, lin_l2norm
     !-------------------------------------------------------------------------------------------
     eta_safe = eta**ETA_ALPHA
     l2_line = l2_pre + DTWO*grad + l2_jac
-    if (l2_line < -MACHI_EPS*l2_pre) then
+    if (l2_line < -DESCENT_TOL*l2_pre) then
       if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Warning!! Negative linear model norm in the forcing term."
       end if

@@ -144,7 +144,7 @@ module initial_module
     use kind_module, only: SP, DP
     use constval_module, only: CHALEN, INF_SPEC, INF_CLAS, INF_POIN, INF_2DTX, INF_2DBI
     use constval_module, only: INF_3DTX, INF_3DBI, INF_EXTR, OUTF_TABL, OUTF_2DBI, OUTF_3DBI
-    use constval_module, only: SZERO, SINFI, DZERO, DONE, MACHI_EPS
+    use constval_module, only: SZERO, SINFI, DZERO, DONE, NEWPER_BASE
     ! -- inout
 
     ! -- local
@@ -208,7 +208,7 @@ module initial_module
     st_ctrl%res_abs_tol = DZERO ; st_ctrl%res_rel_tol = DZERO
     st_ctrl%dilu_shift = DZERO ; st_ctrl%dsat_max = DZERO ; st_ctrl%expd_type = 0
     st_ctrl%conv_type = 0
-    st_ctrl%newper = MACHI_EPS ; st_ctrl%newper_inv = DONE/st_ctrl%newper
+    st_ctrl%newper = NEWPER_BASE ; st_ctrl%newper_inv = DONE/st_ctrl%newper
     st_ctrl%jac_omega = 0.67_SP ; st_ctrl%amg_theta = 0.05_SP
 
     ! input scheme file

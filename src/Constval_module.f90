@@ -24,7 +24,7 @@ module constval_module
   real(DP), parameter :: DTWO = 2.00_DP, DQUA = 0.25_DP, DINFI = 1.00E+10_DP
   real(DP), parameter :: DSMAL = 1.00E-10_DP, DNOVAL = -9999_DP
 
-  real(DP), parameter :: MACHI_EPS = epsilon(1.00_SP)
+  real(DP), parameter :: NEWPER_BASE = epsilon(1.00_SP)
   real(DP), parameter :: UROUND = epsilon(1.00_DP)
 
   character(7), parameter :: OUTFORM = "(E13.6)"

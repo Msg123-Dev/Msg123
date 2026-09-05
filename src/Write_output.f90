@@ -4,7 +4,7 @@ module write_output
   use types_module, only: sol_set
   use constval_module, only: DZERO
   use utility_module, only: st_mpi, close_file
-  use read_input, only: len_scal
+  use read_input, only: len_scal, z_base
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc, ncals
   use set_condition, only: st_hydr, st_bcnd
@@ -344,7 +344,8 @@ module write_output
 
 #ifdef MPI_MSG
     ! -- Write MPI 3D binary file (mpi_3dbin)
-      call write_mpi_3dbin(head_fnum, ncalc, calc2calc, len_scal, st_sol%head_new, time_out)
+      call write_mpi_3dbin(head_fnum, ncalc, calc2calc, len_scal, st_sol%head_new, time_out, &
+                           z_base)
     if (lasttime_flag == 1) then
       call close_mpi_file(head_fnum)
     end if
@@ -352,7 +353,7 @@ module write_output
     ! -- Write header binary file (header_bin)
       call write_header_bin(head_fnum, time_out)
     ! -- Write 3D binary file (3dbin)
-      call write_3dbin(head_fnum, ncalc, calc2calc, len_scal, st_sol%head_new)
+      call write_3dbin(head_fnum, ncalc, calc2calc, len_scal, st_sol%head_new, z_base)
     if (lasttime_flag == 1) then
       call close_file(head_fnum)
     end if
@@ -419,7 +420,7 @@ module write_output
     !-------------------------------------------------------------------------------------------
     rewind(fnum_rest)
     write(fnum_rest) real(time_out, kind=DP)
-    write(fnum_rest) (st_sol%head_new(i)*len_scal, i = 1, ncalc)
+    write(fnum_rest) (st_sol%head_new(i)*len_scal + z_base, i = 1, ncalc)
     call close_file(fnum_rest)
 
   end subroutine write_out_restf
@@ -465,7 +466,7 @@ module write_output
 
 #ifdef MPI_MSG
     ! -- Write MPI 2D binary file (mpi_2dbin)
-      call write_mpi_2dbin(wtab_fnum, ncals, cals2cals, len_scal, wtable, time_out)
+      call write_mpi_2dbin(wtab_fnum, ncals, cals2cals, len_scal, wtable, time_out, z_base)
     if (lasttime_flag == 1) then
       call close_mpi_file(wtab_fnum)
     end if
@@ -473,7 +474,7 @@ module write_output
     ! -- Write header binary file (header_bin)
       call write_header_bin(wtab_fnum, time_out)
     ! -- Write 2D binary file (2dbin)
-      call write_2dbin(wtab_fnum, ncals, cals2cals, len_scal, wtable)
+      call write_2dbin(wtab_fnum, ncals, cals2cals, len_scal, wtable, z_base)
     if (lasttime_flag == 1) then
       call close_file(wtab_fnum)
     end if

@@ -1,6 +1,6 @@
 module utility_module
   ! -- modules
-  use kind_module, only: I4
+  use kind_module, only: I4, DP
   use types_module, only: mpi_set, gmap_set
 
   implicit none
@@ -8,6 +8,9 @@ module utility_module
   integer(I4), public :: log_fnum = 0, dilu_shift_num = 0, slope_sign_num = 0
   integer(I4), public :: nan_recv_num = 0, maxstep_num = 0, satlim_num = 0
   integer(I4), public :: lin_guard_num = 0
+  integer(I4), public :: unsat_num = 0, unsat_tot = 0
+  real(DP), public :: unsat_psi = 0.00_DP
+  character(18), public :: unsat_cell = ""
   type(mpi_set), public :: st_mpi
   public :: get_file_stat, get_days
   public :: open_new_rtxt, open_new_rbin, open_new_wtxt, open_new_wbin

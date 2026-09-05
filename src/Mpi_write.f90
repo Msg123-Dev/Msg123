@@ -20,7 +20,7 @@ module mpi_write
 
   contains
 
-  subroutine write_mpi_2dbin(out_fh, out_totn, calc_num, out_unit, out_val, ntime)
+  subroutine write_mpi_2dbin(out_fh, out_totn, calc_num, out_unit, out_val, ntime, out_base)
   !*********************************************************************************************
   ! write_mpi_2dbin -- Write MPI 2d binary
   !*********************************************************************************************
@@ -32,12 +32,18 @@ module mpi_write
     integer(I4), intent(in) :: calc_num(:)
     real(SP), intent(in) :: out_unit, ntime
     real(DP), intent(in) :: out_val(:)
+    real(DP), intent(in), optional :: out_base
     ! -- local
     integer(I4) :: i, s, ierr
     integer(I4) :: all_ncals
     integer(I4), allocatable :: istat(:)
     real(SP), allocatable :: vari_sp(:)
+    real(DP) :: base_val
     !-------------------------------------------------------------------------------------------
+    base_val = DZERO
+    if (present(out_base)) then
+      base_val = out_base
+    end if
     all_ncals = ncals + no_ncals + seal_snum + 1
     allocate(istat(MPI_STATUS_SIZE))
     allocate(vari_sp(all_ncals))
@@ -55,7 +61,7 @@ module mpi_write
     !$omp do private(i, s)
     do i = 1, out_totn
       s = write_2d_ind(calc_num(i)) + 1
-      vari_sp(s) = real(out_val(i)*out_unit, kind=SP)
+      vari_sp(s) = real(out_val(i)*out_unit+base_val, kind=SP)
     end do
     !$omp end do
     !$omp end parallel
@@ -74,7 +80,7 @@ module mpi_write
 
   end subroutine write_mpi_2dbin
 
-  subroutine write_mpi_3dbin(out_fh, out_totn, calc_num, out_unit, out_val, ntime)
+  subroutine write_mpi_3dbin(out_fh, out_totn, calc_num, out_unit, out_val, ntime, out_base)
   !*********************************************************************************************
   ! write_mpi_3dbin -- Write MPI 3d binary
   !*********************************************************************************************
@@ -86,12 +92,18 @@ module mpi_write
     integer(I4), intent(in) :: calc_num(:)
     real(SP), intent(in) :: out_unit, ntime
     real(DP), intent(in) :: out_val(:)
+    real(DP), intent(in), optional :: out_base
     ! -- local
     integer(I4) :: i, c, ierr
     integer(I4) :: all_ncalc
     integer(I4), allocatable :: istat(:)
     real(SP), allocatable :: vari_sp(:)
+    real(DP) :: base_val
     !-------------------------------------------------------------------------------------------
+    base_val = DZERO
+    if (present(out_base)) then
+      base_val = out_base
+    end if
     all_ncalc = ncalc + no_ncalc + seal_cnum + 1
     allocate(istat(MPI_STATUS_SIZE))
     allocate(vari_sp(all_ncalc))
@@ -109,7 +121,7 @@ module mpi_write
     !$omp do private(i, c)
     do i = 1, out_totn
       c = write_3d_ind(calc_num(i)) + 1
-      vari_sp(c) = real(out_val(i)*out_unit, kind=SP)
+      vari_sp(c) = real(out_val(i)*out_unit+base_val, kind=SP)
     end do
     !$omp end do
     !$omp end parallel
@@ -133,7 +145,7 @@ module mpi_write
   ! write_mpi_rest -- Write mpi restart value
   !*********************************************************************************************
     ! -- modules
-
+    use read_input, only: z_base
     ! -- inout
     integer(I4), intent(in) :: out_fh
     real(SP), intent(in) :: out_time, out_unit
@@ -156,7 +168,7 @@ module mpi_write
     !$omp end do
     !$omp do private(i)
     do i = 1, ncalc
-      out_rest(i+1) = out_val(i)*real(out_unit, kind=DP)
+      out_rest(i+1) = out_val(i)*real(out_unit, kind=DP) + z_base
     end do
     !$omp end do
     !$omp end parallel
@@ -201,72 +213,72 @@ module mpi_write
     !$omp end parallel do
 
     ierr = 0
-    call MPI_REDUCE(inout_st%sto(1), mpi_sto(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
-                    st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%sto(1), mpi_sto(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm,&
+                    ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum storage for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%con(1), mpi_con(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
-                    st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%con(1), mpi_con(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm,&
+                    ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum connect flow for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%sea(1), mpi_sea(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
-                    st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%sea(1), mpi_sea(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm,&
+                    ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum sea discharge for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%wel(1), mpi_wel(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
-                    st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%wel(1), mpi_wel(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm,&
+                    ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum well pumping for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%rec(1), mpi_rec(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
-                    st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%rec(1), mpi_rec(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm,&
+                    ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum recharge for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%sur(1), mpi_sur(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
-                    st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%sur(1), mpi_sur(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm,&
+                    ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum surface runoff for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%riv(1), mpi_riv(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
-                    st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%riv(1), mpi_riv(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm,&
+                    ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum river runoff for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%lak(1), mpi_lak(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
-                    st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%lak(1), mpi_lak(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm,&
+                    ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum lake runoff for massbalance.")
       end if
     end if
 
-    call MPI_REDUCE(inout_st%tot(1), mpi_tot(1), num_mass, MPI_REAL8, MPI_SUM, 0,&
-                    st_mpi%comm, ierr)
+    call MPI_REDUCE(inout_st%tot(1), mpi_tot(1), num_mass, MPI_REAL8, MPI_SUM, 0, st_mpi%comm,&
+                    ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Reduce sum total volume for massbalance.")

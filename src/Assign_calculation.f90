@@ -4,7 +4,7 @@ module assign_calc
   use constval_module, only: VARLEN, SZERO, SNOVAL
   use utility_module, only: st_mpi, close_file, write_err_stop, gmap_get
   use initial_module, only: in_type, st_grid, st_init
-  use read_input, only: len_scal, len_scal_inv
+  use read_input, only: len_scal, len_scal_inv, z_base
   use set_cell, only: ncalc, ncals, st_conn
   use set_condition, only: set_clas2calc, set_2dfile2calc, set_3dfile2calc, st_hydr
 #ifdef MPI_MSG
@@ -395,7 +395,7 @@ module assign_calc
 
     !$omp parallel do private(i)
     do i = 1, ncals
-      st_hydr%surf_bott(i) = st_hydr%surf_bott(i)*len_scal_inv
+      st_hydr%surf_bott(i) = (st_hydr%surf_bott(i)-z_base)*len_scal_inv
       st_hydr%surf_reli(i) = st_hydr%surf_reli(i)*len_scal_inv
     end do
     !$omp end parallel do
@@ -480,7 +480,9 @@ module assign_calc
     st_init%rest_time = real(temp_end, kind=SP)
     !$omp parallel do private(i)
     do i = 1, ncalc
-      st_hydr%read_init(i) = st_hydr%read_init(i)*len_scal_inv
+      if (st_hydr%read_init(i) /= DNOVAL) then
+        st_hydr%read_init(i) = (st_hydr%read_init(i)-z_base)*len_scal_inv
+      end if
     end do
     !$omp end parallel do
 
@@ -520,7 +522,9 @@ module assign_calc
       end if
       !$omp parallel do private(i)
       do i = 1, ncalc
-        st_hydr%read_init(i) = st_hydr%read_init(i)*len_scal_inv
+        if (st_hydr%read_init(i) /= DNOVAL) then
+          st_hydr%read_init(i) = (st_hydr%read_init(i)-z_base)*len_scal_inv
+        end if
       end do
       !$omp end parallel do
       if (init_ftype == in_type(3) .or. init_ftype == in_type(5)) then

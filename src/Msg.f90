@@ -7,6 +7,7 @@ program msg123
   use types_module, only: kryl_set, amgt_set, coef_set, sol_set
   use utility_module, only: log_fnum, st_mpi, dilu_shift_num, slope_sign_num
   use utility_module, only: nan_recv_num, maxstep_num, satlim_num, lin_guard_num
+  use utility_module, only: unsat_num, unsat_tot, unsat_psi, unsat_cell
   use initial_module, only: init_msg, st_ctrl
   use read_input, only: read_main_file
   use set_cell, only: set_cell_info
@@ -48,6 +49,8 @@ program msg123
   12 format(/"Total cpu time : ", es15.6, " (sec)")
   13 format(/"Time loop cpu time : ", es15.6, " (sec)")
   14 format(/a," : ", i12, " times")
+  15 format(/a," : ", i12, " cells")
+  16 format(/a," : psi",es11.3," at ",a)
   !--------------------------------------------------------------------------------------------
   if (st_mpi%rank == 0) then
     ! -- Start time
@@ -175,6 +178,10 @@ program msg123
     end if
     if (lin_guard_num /= 0) then
       write(log_fnum,14) "Linear guard fired", lin_guard_num
+    end if
+    if (unsat_tot /= 0) then
+      write(log_fnum,15) "Unsaturated cells ", unsat_num
+      write(log_fnum,16) "Driest cell       ", unsat_psi, trim(adjustl(unsat_cell))
     end if
 
     ! -- Time loop end time

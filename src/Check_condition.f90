@@ -241,7 +241,7 @@ module check_condition
     !-------------------------------------------------------------------------------------------
     check_flag = 0 ; sum_checkf = 0
     ! -- Check read value (read_val)
-      call check_read_val(calcn, real(calc_init, kind=SP), len_scal, check_flag)
+      call check_read_val(calcn, real(calc_init, kind=SP), SONE, check_flag)
 #ifdef MPI_MSG
     ! -- Sum value for MPI (val)
       call mpisum_val(check_flag, "check initial", sum_checkf)

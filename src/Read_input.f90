@@ -1,7 +1,7 @@
 module read_input
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: VARLEN, CHALEN, TIMELEN, SZERO, SONE, SINFI, DNOVAL
+  use constval_module, only: VARLEN, CHALEN, TIMELEN, SZERO, SONE, DZERO, DNOVAL
   use utility_module, only: get_days, open_new_rtxt, close_file, write_logf, write_success
   use utility_module, only: write_err_stop, conv_lower
   use initial_module, only: in_type, unit_list, st_sim, st_ctrl, st_schm, st_in_type
@@ -11,6 +11,7 @@ module read_input
   private
   public :: read_main_file, read_grid_file, add_nml_name
   real(SP), public :: len_scal, len_scal_inv
+  real(DP), public :: z_base
   real(DP), allocatable, public :: glob_x(:,:), glob_y(:,:), glob_z(:,:,:)
 
   ! -- local
@@ -477,19 +478,19 @@ module read_input
   ! read_sol_list -- Read solution name list
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: DZERO
+    use constval_module, only: SINFI
     ! -- inout
 
     ! -- local
     integer(I4) :: ierr
     real(SP) :: init_step, incr_multi, decr_multi, max_tstep
     integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type, expd_type
-    integer(I4) :: conv_type
+    integer(I4) :: conv_type, datum_type
     real(DP) :: criteria, res_abs_tol, res_rel_tol, dilu_shift, dsat_max
     namelist/set_solution/init_step, tstep_type, incr_multi, decr_multi, max_tstep,&
                           maxout_iter, picard_iter, criteria, maxinn_iter, precon_type,&
                           res_abs_tol, res_rel_tol, dilu_shift, expd_type, dsat_max,&
-                          conv_type
+                          conv_type, datum_type
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; init_step = SZERO ; incr_multi = SZERO ; decr_multi = SZERO ; max_tstep = SINFI
     tstep_type = st_ctrl%tstep_type ; maxout_iter = st_ctrl%maxout_iter
@@ -498,6 +499,7 @@ module read_input
     res_abs_tol = st_ctrl%res_abs_tol ; res_rel_tol = st_ctrl%res_rel_tol
     dilu_shift = st_ctrl%dilu_shift ; dsat_max = st_ctrl%dsat_max
     expd_type = st_ctrl%expd_type ; conv_type = st_ctrl%conv_type
+    datum_type = st_ctrl%datum_type
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_solution,iostat=ierr)
     st_ctrl%tstep_type = tstep_type ; st_ctrl%maxout_iter = maxout_iter
@@ -506,6 +508,7 @@ module read_input
     st_ctrl%res_abs_tol = res_abs_tol ; st_ctrl%res_rel_tol = res_rel_tol
     st_ctrl%dilu_shift = dilu_shift ; st_ctrl%dsat_max = dsat_max
     st_ctrl%expd_type = expd_type ; st_ctrl%conv_type = conv_type
+    st_ctrl%datum_type = datum_type
 
     if (ierr /= 0) then
       call write_err_stop("While reading solution section in main file.")
@@ -543,6 +546,8 @@ module read_input
       call write_err_stop("Input a non-negative value for convergence type.")
     else if (conv_type > 1) then
       call write_err_stop("Input a valid value for convergence type.")
+    else if (datum_type < 0 .or. datum_type > 1) then
+      call write_err_stop("Input a valid value for datum type.")
     else if (conv_type == 1 .and. res_abs_tol <= DZERO .and. res_rel_tol <= DZERO) then
       call write_err_stop("Input a residual tolerance for the selected convergence type.")
     end if
@@ -568,7 +573,7 @@ module read_input
   ! read_schm_list -- Read scheme name list
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: DZERO
+
     ! -- inout
 
     ! -- local
@@ -682,7 +687,6 @@ module read_input
   ! read_grid_file -- Read grid file
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: DZERO
     use utility_module, only: open_new_rbin
     use read_module, only: read_2dtxt, read_2dbin, read_3dtxt, read_3dbin
     ! -- inout
@@ -1321,7 +1325,7 @@ module read_input
     ! -- local
     integer(I4) :: i, j, k
     integer(I4), allocatable :: gxnum(:,:), gynum(:,:), gznum(:,:,:)
-    real(DP) :: minz, maxz, real_scal
+    real(DP) :: minz, maxz, real_scal, z_range
     !-------------------------------------------------------------------------------------------
     grid_check = 0 ; grid_xnum = 0 ; grid_ynum = 0 ; grid_znum = 0
     allocate(gxnum(nx+1,ny+1), gynum(nx+1,ny+1))
@@ -1392,11 +1396,21 @@ module read_input
 
     grid_check = grid_xnum + grid_ynum + grid_znum
 
-    real_scal = log10(max(abs(maxz),abs(minz)))
-    if ((real_scal - int(real_scal)) > SZERO) then
-      len_scal = 10**(int(real_scal)+1)
+    if (st_ctrl%datum_type == 1) then
+      z_base = minz
+      z_range = maxz - minz
     else
-      len_scal = 10**(int(real_scal))
+      z_base = DZERO
+      z_range = max(abs(maxz),abs(minz))
+    end if
+    if (z_range <= DZERO) then
+      call write_err_stop("Input a valid grid elevation range.")
+    end if
+    real_scal = log10(z_range)
+    if ((real_scal - int(real_scal)) > SZERO) then
+      len_scal = 10.00_SP**(int(real_scal)+1)
+    else
+      len_scal = 10.00_SP**(int(real_scal))
     end if
 
     len_scal_inv = SONE/len_scal
@@ -1410,7 +1424,7 @@ module read_input
     !$omp end do
     !$omp do private(k)
     do k = 1, nz+1
-      glob_z(:,:,k) = glob_z(:,:,k)*len_scal_inv
+      glob_z(:,:,k) = (glob_z(:,:,k)-z_base)*len_scal_inv
     end do
     !$omp end do
     !$omp end parallel

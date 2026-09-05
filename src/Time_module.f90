@@ -109,7 +109,7 @@ module time_module
     use constval_module, only: DNOVAL
     use utility_module, only: conv_unit
     use initial_module, only: st_init
-    use read_input, only: len_scal
+    use read_input, only: len_scal, z_base
     use calc_parameter, only: calc_srat_rperm
 #ifdef MPI_MSG
     use mpi_utility, only: bcast_val
@@ -182,12 +182,12 @@ module time_module
 #ifdef MPI_MSG
       ! -- Write MPI 3D binary file (mpi_3dbin)
         call write_mpi_3dbin(st_out_fnum%head, ncalc, calc2calc, len_scal, st_sol%head_new,&
-                             st_time%now_time)
+                             st_time%now_time, z_base)
 #else
       ! -- Write header binary file (header_bin)
         call write_header_bin(st_out_fnum%head, st_time%now_time)
       ! -- Write 3D binary file (3dbin)
-        call write_3dbin(st_out_fnum%head, ncalc, calc2calc, len_scal, st_sol%head_new)
+        call write_3dbin(st_out_fnum%head, ncalc, calc2calc, len_scal, st_sol%head_new, z_base)
 #endif
       deallocate(calc2calc)
 
@@ -927,7 +927,7 @@ module time_module
       end do
       !$omp end parallel do
       ! -- Assign river water level value
-        call assign_rilav(st_rivf_type%wlev, 0, st_riwl, st_rive%num%wl, st_rive%cflag%wl,&
+        call assign_rilav(st_rivf_type%wlev, 2, st_riwl, st_rive%num%wl, st_rive%cflag%wl,&
                           st_rive%calc%wl)
 
       st_step_flag%riwl = 0 ; rive_stepflag = rive_stepflag + 1
@@ -944,7 +944,7 @@ module time_module
       end do
       !$omp end parallel do
       ! -- Assign river bottom level value
-        call assign_rilav(st_rivf_type%blev, 0, st_ribl, st_rive%num%bl, st_rive%cflag%bl,&
+        call assign_rilav(st_rivf_type%blev, 2, st_ribl, st_rive%num%bl, st_rive%cflag%bl,&
                           st_rive%calc%bl)
 
       st_step_flag%ribl = 0 ; rive_stepflag = rive_stepflag + 1
@@ -1075,7 +1075,7 @@ module time_module
       allocate(st_lake%cflag%wl(ncals), st_lake%calc%wl(ncals))
       st_lake%cflag%wl(:) = 0 ; st_lake%calc%wl(:) = SNOVAL
       ! -- Assign lake water level value
-        call assign_rilav(st_lakf_type%wlev, 0, st_lawl, st_lake%num%wl, st_lake%cflag%wl,&
+        call assign_rilav(st_lakf_type%wlev, 2, st_lawl, st_lake%num%wl, st_lake%cflag%wl,&
                           st_lake%calc%wl)
 
       st_step_flag%lawl = 0 ; lake_stepflag = lake_stepflag + 1
@@ -1092,7 +1092,7 @@ module time_module
       end do
       !$omp end parallel do
       ! -- Assign lake bottom level value
-        call assign_rilav(st_lakf_type%blev, 0, st_labl, st_lake%num%bl, st_lake%cflag%bl,&
+        call assign_rilav(st_lakf_type%blev, 2, st_labl, st_lake%num%bl, st_lake%cflag%bl,&
                           st_lake%calc%bl)
 
       st_step_flag%labl = 0 ; lake_stepflag = lake_stepflag + 1

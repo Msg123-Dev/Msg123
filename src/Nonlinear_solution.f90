@@ -5,7 +5,7 @@ module nonlinear_solution
   use types_module, only: sol_set
   use utility_module, only: st_mpi, slope_sign_num, nan_recv_num, maxstep_num, satlim_num
   use initial_module, only: st_ctrl
-  use read_input, only: len_scal
+  use read_input, only: len_scal, z_base
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc
   use prep_calculation, only: st_time
@@ -57,7 +57,9 @@ module nonlinear_solution
     use constval_module, only: VARLEN
     use types_module, only: kryl_set, amgt_set, coef_set
     use utility_module, only: log_fnum, write_err_stop
+    use utility_module, only: unsat_num, unsat_tot, unsat_psi, unsat_cell
     use initial_module, only: st_sim, st_out_step
+    use make_cell, only: st_geom
     use make_linearsystem, only: make_matvec
     use check_simulation, only: check_abserrmax, check_residual
     use linear_solution, only: solve_linalg, in_iter
@@ -74,11 +76,13 @@ module nonlinear_solution
     integer(I4) :: out_iter
     integer(I4) :: max_num, conv_fnum
     integer(I4) :: back_iter, beta_iter, maxstep_run
+    integer(I4) :: unsat_run, psi_num
     character(VARLEN) :: cxyzn
     real(DP) :: max_var, max_unk, check_val
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var
     real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
     real(DP) :: res_l1, qext_l1, mass_error
+    real(DP) :: cell_psi, psi_run
     logical :: back_flag, res_flag, maxs_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
@@ -115,6 +119,28 @@ module nonlinear_solution
           new_func(i) = DZERO
         end do
         !$omp end parallel do
+        unsat_run = 0 ; psi_run = DZERO ; psi_num = 0
+        !$omp parallel do private(i, cell_psi) reduction(+:unsat_run) reduction(min:psi_run)
+        do i = 1, ncalc
+          cell_psi = st_sol%head_new(i) - st_geom%cell_top(i)
+          if (cell_psi < DZERO) then
+            unsat_run = unsat_run + 1
+          end if
+          psi_run = min(psi_run, cell_psi)
+        end do
+        !$omp end parallel do
+        if (unsat_run > unsat_num) then
+          unsat_num = unsat_run
+        end if
+        if (psi_run < unsat_psi) then
+          do i = 1, ncalc
+            if (st_sol%head_new(i) - st_geom%cell_top(i) <= psi_run) then
+              psi_num = i ; exit
+            end if
+          end do
+          unsat_psi = psi_run*len_scal ; unsat_cell = get_cnum(psi_num)
+        end if
+        unsat_tot = ncalc
       else
         l2norm_pre = l2norm_new
       end if
@@ -182,14 +208,15 @@ module nonlinear_solution
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
         ! -- Check mpi max error (mpimaxerr)
+          max_unk = max_unk*len_scal + z_base
           call check_mpimaxerr(max_var, max_unk, var_abs_max, unk_max, var_max)
-        check_val = var_abs_max*len_scal ; max_unk = unk_max*len_scal
+        check_val = var_abs_max*len_scal ; max_unk = unk_max
       else
-        check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk)*len_scal
+        check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk*len_scal + z_base)
         var_max = max_var
       end if
 #else
-      check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk)*len_scal
+      check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk*len_scal + z_base)
 #endif
       if (st_time%conv_flag .and. .not. ieee_is_nan(max_unk)) then
           st_time%conv_flag = .false.
@@ -226,14 +253,15 @@ module nonlinear_solution
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1) then
           ! -- Check mpi max error (mpimaxerr)
+            max_unk = max_unk*len_scal + z_base
             call check_mpimaxerr(max_var, max_unk, var_abs_max, unk_max, var_max)
-          check_val = var_abs_max*len_scal ; max_unk = unk_max*len_scal
+          check_val = var_abs_max*len_scal ; max_unk = unk_max
         else
-          check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk)*len_scal
+          check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk*len_scal + z_base)
           var_max = max_var
         end if
 #else
-        check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk)*len_scal
+        check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk*len_scal + z_base)
 #endif
         if ((check_val >= VARMAX .or. max_unk >= XMAX) .and. st_sim%sim_type /= -1) then
           back_flag = .true.
@@ -267,14 +295,14 @@ module nonlinear_solution
       end if
       conv_dmat = array_var(1)%dmat(max_num)*len_scal**2
       conv_rhs = array_var(1)%rhs(max_num)*len_scal**3
-      conv_head = st_sol%head_new(max_num)*len_scal
+      conv_head = st_sol%head_new(max_num)*len_scal + z_base
       ! -- Bcast converge information (convinfo)
         call bcast_convinfo(cxyzn, conv_dmat, conv_rhs, conv_head, max_var)
 #else
       cxyzn = get_cnum(max_num)
       conv_dmat = array_var(1)%dmat(max_num)*len_scal**2
       conv_rhs = array_var(1)%rhs(max_num)*len_scal**3
-      conv_head = st_sol%head_new(max_num)*len_scal
+      conv_head = st_sol%head_new(max_num)*len_scal + z_base
 #endif
       conv_var = max_var*len_scal
       res_l1 = DZERO
@@ -849,7 +877,7 @@ module nonlinear_solution
 #else
     rewind(rest_fnum)
     write(rest_fnum) real(st_time%now_time, kind=DP)
-    write(rest_fnum) (rest_head(i)*len_scal, i = 1, ncalc)
+    write(rest_fnum) (rest_head(i)*len_scal + z_base, i = 1, ncalc)
 #endif
 
   end subroutine write_rest

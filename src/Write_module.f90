@@ -1,7 +1,7 @@
 module write_module
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: SNOVAL
+  use constval_module, only: SNOVAL, DZERO
   use utility_module, only: write_err_write
   use initial_module, only: st_grid
   use set_cell, only: get_cals_grid, get_calc_grid
@@ -15,7 +15,7 @@ module write_module
 
   contains
 
-  subroutine write_2dtxt(fnum, out_format, out_totn, calc_num, out_unit, out_val)
+  subroutine write_2dtxt(fnum, out_format, out_totn, calc_num, out_unit, out_val, out_base)
   !*********************************************************************************************
   ! write_2dtxt -- Write 2D text file
   !*********************************************************************************************
@@ -27,11 +27,17 @@ module write_module
     integer(I4), intent(in) :: calc_num(:)
     real(SP), intent(in) :: out_unit
     real(DP), intent(in) :: out_val(:)
+    real(DP), intent(in), optional :: out_base
     ! -- local
     integer(I4) :: i, j, ierr
     integer(I4) :: xnum, ynum
     real(SP), allocatable :: array_out(:,:)
+    real(DP) :: base_val
     !-------------------------------------------------------------------------------------------
+    base_val = DZERO
+    if (present(out_base)) then
+      base_val = out_base
+    end if
     allocate(array_out(st_grid%nx,st_grid%ny))
     !$omp parallel
     !$omp do private(j)
@@ -42,7 +48,7 @@ module write_module
     !$omp do private(i, xnum, ynum)
     do i = 1, out_totn
       call get_cals_grid(calc_num(i), xnum, ynum)
-      array_out(xnum,ynum) = real(out_val(i)*out_unit, kind=SP)
+      array_out(xnum,ynum) = real(out_val(i)*out_unit+base_val, kind=SP)
     end do
     !$omp end do
     !$omp end parallel
@@ -59,7 +65,7 @@ module write_module
 
   end subroutine write_2dtxt
 
-  subroutine write_2dbin(fnum, out_totn, calc_num, out_unit, out_val)
+  subroutine write_2dbin(fnum, out_totn, calc_num, out_unit, out_val, out_base)
   !*********************************************************************************************
   ! write_2dbin -- Write 2D binary file
   !*********************************************************************************************
@@ -70,11 +76,17 @@ module write_module
     integer(I4), intent(in) :: calc_num(:)
     real(SP), intent(in) :: out_unit
     real(DP), intent(in) :: out_val(:)
+    real(DP), intent(in), optional :: out_base
     ! -- local
     integer(I4) :: i, j, ierr
     integer(I4) :: xnum, ynum
     real(SP), allocatable :: array_out(:,:)
+    real(DP) :: base_val
     !-------------------------------------------------------------------------------------------
+    base_val = DZERO
+    if (present(out_base)) then
+      base_val = out_base
+    end if
     allocate(array_out(st_grid%nx,st_grid%ny))
     !$omp parallel
     !$omp do private(j)
@@ -85,7 +97,7 @@ module write_module
     !$omp do private(i, xnum, ynum)
     do i = 1, out_totn
       call get_cals_grid(calc_num(i), xnum, ynum)
-      array_out(xnum,ynum) = real(out_val(i)*out_unit, kind=SP)
+      array_out(xnum,ynum) = real(out_val(i)*out_unit+base_val, kind=SP)
     end do
     !$omp end do
     !$omp end parallel
@@ -100,7 +112,7 @@ module write_module
 
   end subroutine write_2dbin
 
-  subroutine write_3dtxt(fnum, out_format, out_totn, calc_num, out_unit, out_val)
+  subroutine write_3dtxt(fnum, out_format, out_totn, calc_num, out_unit, out_val, out_base)
   !*********************************************************************************************
   ! write_3dtxt -- Write 3D text file
   !*********************************************************************************************
@@ -112,11 +124,17 @@ module write_module
     integer(I4), intent(in) :: calc_num(:)
     real(SP), intent(in) :: out_unit
     real(DP), intent(in) :: out_val(:)
+    real(DP), intent(in), optional :: out_base
     ! -- local
     integer(I4) :: i, j, k, ierr
     integer(I4) :: xnum, ynum, znum
     real(SP), allocatable :: array_out(:,:,:)
+    real(DP) :: base_val
     !-------------------------------------------------------------------------------------------
+    base_val = DZERO
+    if (present(out_base)) then
+      base_val = out_base
+    end if
     allocate(array_out(st_grid%nx,st_grid%ny,st_grid%nz))
     !$omp parallel
     !$omp do private(k)
@@ -127,7 +145,7 @@ module write_module
     !$omp do private(i, xnum, ynum, znum)
     do i = 1, out_totn
       call get_calc_grid(calc_num(i), xnum, ynum, znum)
-      array_out(xnum,ynum,znum) = real(out_val(i)*out_unit, kind=SP)
+      array_out(xnum,ynum,znum) = real(out_val(i)*out_unit+base_val, kind=SP)
     end do
     !$omp end do
     !$omp end parallel
@@ -146,7 +164,7 @@ module write_module
 
   end subroutine write_3dtxt
 
-  subroutine write_3dbin(fnum, out_totn, calc_num, out_unit, out_val)
+  subroutine write_3dbin(fnum, out_totn, calc_num, out_unit, out_val, out_base)
   !*********************************************************************************************
   ! write_3dbin -- Write 3D binary file
   !*********************************************************************************************
@@ -157,11 +175,17 @@ module write_module
     integer(I4), intent(in) :: calc_num(:)
     real(SP), intent(in) :: out_unit
     real(DP), intent(in) :: out_val(:)
+    real(DP), intent(in), optional :: out_base
     ! -- local
     integer(I4) :: i, j, k, ierr
     integer(I4) :: xnum, ynum, znum
     real(SP), allocatable :: array_out(:,:,:)
+    real(DP) :: base_val
     !-------------------------------------------------------------------------------------------
+    base_val = DZERO
+    if (present(out_base)) then
+      base_val = out_base
+    end if
     allocate(array_out(st_grid%nx,st_grid%ny,st_grid%nz))
     !$omp parallel
     !$omp do private(k)
@@ -172,7 +196,7 @@ module write_module
     !$omp do private(i, xnum, ynum, znum)
     do i = 1, out_totn
       call get_calc_grid(calc_num(i), xnum, ynum, znum)
-      array_out(xnum,ynum,znum) = real(out_val(i)*out_unit, kind=SP)
+      array_out(xnum,ynum,znum) = real(out_val(i)*out_unit+base_val, kind=SP)
     end do
     !$omp end do
     !$omp end parallel

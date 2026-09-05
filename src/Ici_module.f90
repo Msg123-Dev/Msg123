@@ -4,7 +4,7 @@ module ici_module
   use constval_module, only: DZERO
   use utility_module, only: st_mpi
   use initial_module, only: out_type, st_grid, st_out_type
-  use read_input, only: len_scal
+  use read_input, only: len_scal, z_base
   use set_cell, only: get_calc_grid, ncalc, ncals
   use set_condition, only: st_hydr, st_bcnd
   use prep_calculation, only: st_time
@@ -254,7 +254,7 @@ module ici_module
     !$omp end parallel do
 
     call change_ici_put(st_sol%head_new, head_ici)
-    call ici_put_data("hyd_head", reshape([head_ici(:)*len_scal], [ncals,st_grid%nz]))
+    call ici_put_data("hyd_head", reshape([head_ici(:)*len_scal+z_base], [ncals,st_grid%nz]))
 
     if (coupled_matsiro .and. mat_put) then
       if (st_out_type%wtab /= out_type(2)) then
@@ -430,7 +430,7 @@ module ici_module
 
     call make_ici_put()
     call change_ici_put(st_hydr%read_init, init_val)
-    call ici_put_data("hyd_head", reshape([init_val(:)*len_scal], [ncals,st_grid%nz]))
+    call ici_put_data("hyd_head", reshape([init_val(:)*len_scal+z_base], [ncals,st_grid%nz]))
 
     deallocate(init_val)
 

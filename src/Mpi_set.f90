@@ -1599,7 +1599,7 @@ module mpi_set
   ! bcast_sim_val -- Bcast simulation value
   !*********************************************************************************************
     ! -- module
-    use read_input, only: len_scal, len_scal_inv
+    use read_input, only: len_scal, len_scal_inv, z_base
     ! -- inout
 
     ! -- local
@@ -1635,17 +1635,23 @@ module mpi_set
       end if
     end if
 
-    call MPI_BCAST(len_scal, 1, MPI_REAL8, 0, st_mpi%comm, ierr)
+    call MPI_BCAST(len_scal, 1, MPI_REAL4, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Broadcast length scale.")
       end if
     end if
 
-    call MPI_BCAST(len_scal_inv, 1, MPI_REAL8, 0, st_mpi%comm, ierr)
+    call MPI_BCAST(len_scal_inv, 1, MPI_REAL4, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Broadcast inverse length scale.")
+      end if
+    end if
+    call MPI_BCAST(z_base, 1, MPI_REAL8, 0, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Broadcast datum base.")
       end if
     end if
 
@@ -3076,6 +3082,8 @@ module mpi_set
       call bcast_val(st_ctrl%expd_type, " step expansion type")
     ! -- Bcast scalar value (val)
       call bcast_val(st_ctrl%conv_type, " convergence type")
+    ! -- Bcast scalar value (val)
+      call bcast_val(st_ctrl%datum_type, " datum type")
 
     if (st_ctrl%precon_type == 1) then
       ! -- Bcast scalar value (val)

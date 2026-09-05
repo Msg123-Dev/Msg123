@@ -677,7 +677,7 @@ module set_boundary
     end do
     !$omp end parallel do
     ! -- Assign river water level value
-      call assign_rilav(st_rivf_type%wlev, 0, st_riwl, st_rive%num%wl, st_rive%cflag%wl,&
+      call assign_rilav(st_rivf_type%wlev, 2, st_riwl, st_rive%num%wl, st_rive%cflag%wl,&
                         st_rive%calc%wl)
 
   end subroutine set_riwl_info
@@ -702,7 +702,7 @@ module set_boundary
     end do
     !$omp end parallel do
     ! -- Assign river bottom level value
-      call assign_rilav(st_rivf_type%blev, 0, st_ribl, st_rive%num%bl, st_rive%cflag%bl,&
+      call assign_rilav(st_rivf_type%blev, 2, st_ribl, st_rive%num%bl, st_rive%cflag%bl,&
                         st_rive%calc%bl)
 
   end subroutine set_ribl_info
@@ -835,7 +835,7 @@ module set_boundary
     end do
     !$omp end parallel do
     ! -- Assign lake water level value
-      call assign_rilav(st_lakf_type%wlev, 0, st_lawl, st_lake%num%wl, st_lake%cflag%wl,&
+      call assign_rilav(st_lakf_type%wlev, 2, st_lawl, st_lake%num%wl, st_lake%cflag%wl,&
                         st_lake%calc%wl)
 
   end subroutine set_lawl_info
@@ -860,7 +860,7 @@ module set_boundary
     end do
     !$omp end parallel do
     ! -- Assign lake bottom level value
-      call assign_rilav(st_lakf_type%blev, 0, st_labl, st_lake%num%bl, st_lake%cflag%bl,&
+      call assign_rilav(st_lakf_type%blev, 2, st_labl, st_lake%num%bl, st_lake%cflag%bl,&
                         st_lake%calc%bl)
 
   end subroutine set_labl_info

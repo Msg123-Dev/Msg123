@@ -6,7 +6,7 @@ module assign_boundary
   use utility_module, only: st_mpi, close_file
   use initial_module, only: in_type
   use read_module, only: read_clasf
-  use read_input, only: len_scal_inv
+  use read_input, only: len_scal_inv, z_base
   use set_cell, only: ncals
   use set_condition, only: set_clas2calc, set_2dfile2cals
 #ifdef MPI_MSG
@@ -175,7 +175,7 @@ module assign_boundary
         allocate(st_forc%read_seal(sealn))
         !$omp parallel do private(i)
         do i = 1, sealn
-          st_forc%read_seal(i) = real(cell_seal(i), kind=SP)*len_scal_inv
+          st_forc%read_seal(i) = real((cell_seal(i)-z_base)*len_scal_inv, kind=SP)
         end do
         !$omp end parallel do
         deallocate(seal_cflag, seal2cell, cell_seal)
@@ -354,11 +354,12 @@ module assign_boundary
 
   end subroutine assign_wellv
 
-  subroutine assign_rilav(rl_ftype, lake_aflag, rl_st, rl_num, rl_cflag, calc_rl)
+  subroutine assign_rilav(rl_ftype, geom_type, rl_st, rl_num, rl_cflag, calc_rl)
   !*********************************************************************************************
   ! assign_rilav -- Assign river and lake value
   !*********************************************************************************************
     ! -- modules
+    use kind_module, only: DP
     use types_module, only: surfw_set
     use read_module, only: read_2dpointf
     use set_condition, only: set_point2surf
@@ -366,7 +367,7 @@ module assign_boundary
     use mpi_set, only: bcast_2dpoint
 #endif
     ! -- inout
-    integer(I4), intent(in) :: rl_ftype, lake_aflag
+    integer(I4), intent(in) :: rl_ftype, geom_type
     type(surfw_set), intent(inout) :: rl_st
     integer(I4), intent(out) :: rl_num
     integer(I4), intent(out) :: rl_cflag(:)
@@ -434,16 +435,25 @@ module assign_boundary
         end if
       end if
 
-      if (lake_aflag /= 1) then
-        nodim_unit = len_scal_inv
-      else
+      if (geom_type == 1) then
         nodim_unit = len_scal_inv*len_scal_inv
+      else
+        nodim_unit = len_scal_inv
       end if
-      !$omp parallel do private(i)
-      do i = 1, ncals
-        calc_rl(i) = calc_rl(i)*nodim_unit
-      end do
-      !$omp end parallel do
+      if (geom_type == 2) then
+        !$omp parallel do private(i)
+        do i = 1, ncals
+          calc_rl(i) = real((real(calc_rl(i), kind=DP)-z_base)*len_scal_inv,&
+                            kind=SP)
+        end do
+        !$omp end parallel do
+      else
+        !$omp parallel do private(i)
+        do i = 1, ncals
+          calc_rl(i) = calc_rl(i)*nodim_unit
+        end do
+        !$omp end parallel do
+      end if
 
     end if
 

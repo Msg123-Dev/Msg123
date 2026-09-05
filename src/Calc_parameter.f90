@@ -33,24 +33,25 @@ module calc_parameter
     real(DP) :: retm, beta, theta, kr, se, stor_val
     real(DP) :: per_phead, phead0
     real(DP) :: kr_phead, kr_beta, kr_se
+    real(DP) :: pors_val, resi_val
     !-------------------------------------------------------------------------------------------
     phead0 = DZERO
 
     !$omp parallel do private(i, per_phead, retm, beta, theta, kr, se, stor_val) &
-    !$omp             private(kr_phead, kr_beta, kr_se)
+    !$omp             private(kr_phead, kr_beta, kr_se, pors_val, resi_val)
     do i = 1, num
+      pors_val = st_hydr%read_pors(i) ; resi_val = st_hydr%read_resi(i)
       per_phead = pres(i) - st_geom%cell_top(i) + pertur
       if (per_phead < DZERO) then
         retm = DONE - DONE/st_hydr%read_vann(i)
         if (per_phead <= phead0) then
           beta = abs(per_phead*st_hydr%read_vana(i))**st_hydr%read_vann(i)
-          theta = st_hydr%read_resi(i) + (st_hydr%read_pors(i)-st_hydr%read_resi(i))*&
-                  ((DONE+beta))**(-retm)
+          theta = resi_val + (pors_val-resi_val)*((DONE+beta))**(-retm)
         else
           beta = DZERO
-          theta = st_hydr%read_pors(i)
+          theta = pors_val
         end if
-        srat(i) = theta/st_hydr%read_pors(i)
+        srat(i) = theta/pors_val
         if (st_schm%stor_type == 1) then
           stor_val = theta + st_hydr%read_spst(i)*per_phead*srat(i)
         else
@@ -61,7 +62,7 @@ module calc_parameter
       else
         srat(i) = DONE
         kr = DONE
-        stor_val = st_hydr%read_pors(i) + st_hydr%read_spst(i)*per_phead
+        stor_val = pors_val + st_hydr%read_spst(i)*per_phead
       end if
 
       if (st_schm%krpos_type == 1) then

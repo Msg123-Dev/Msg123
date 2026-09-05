@@ -443,8 +443,7 @@ module assign_boundary
       if (geom_type == 2) then
         !$omp parallel do private(i)
         do i = 1, ncals
-          calc_rl(i) = real((real(calc_rl(i), kind=DP)-z_base)*len_scal_inv,&
-                            kind=SP)
+          calc_rl(i) = real((real(calc_rl(i), kind=DP)-z_base)*len_scal_inv, kind=SP)
         end do
         !$omp end parallel do
       else

@@ -193,8 +193,12 @@ module nonlinear_solution
       else
         st_ctrl%errtol = XMAX_INV**3
       end if
+      if (l2norm_pre > DZERO) then
       ! -- Solve linear algebra (linalg)
         call solve_linalg(l2norm_pre, st_sol%head_change, st_kryl, st_amgt, l2norm_jac)
+      else
+        l2norm_jac = DZERO ; st_time%conv_flag = .true.
+      end if
 
       !$omp parallel do private(i)
       do i = 1, nreg_num
@@ -498,7 +502,9 @@ module nonlinear_solution
       end if
     end if
     lin_l2norm = sqrt(max(DZERO, l2_line))
-    eta = abs(sqrt(l2_new) - lin_l2norm)/sqrt(l2_pre)
+    if (l2_pre > DZERO) then
+      eta = abs(sqrt(l2_new) - lin_l2norm)/sqrt(l2_pre)
+    end if
 
     if (eta_safe < 0.1_DP) then
       eta_safe = DZERO

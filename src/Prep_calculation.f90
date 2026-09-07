@@ -31,7 +31,7 @@ module prep_calculation
     use check_condition, only: check_outf_cond
     use make_cell, only: make_cell_info
 #ifdef MPI_MSG
-    use mpi_set, only: bcast_calc_ftype, bcast_sim_val, bcast_out_type
+    use mpi_set, only: bcast_calc_ftype, bcast_sim_val
 #endif
     ! -- inout
 
@@ -69,13 +69,6 @@ module prep_calculation
 
     ! -- Set massbalance information (mass_info)
       call set_mass_info()
-
-#ifdef MPI_MSG
-    if (st_mpi%totn /= 1) then
-      ! -- Bcast output file type (out_type)
-        call bcast_out_type()
-    end if
-#endif
 
     ! -- Check output file condition (outf_cond)
       call check_outf_cond()

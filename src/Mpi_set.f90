@@ -3,7 +3,8 @@ module mpi_set
   use kind_module, only: I4, SP, DP
   use constval_module, only: FACE, SZERO, DZERO
   use utility_module, only: st_mpi, write_err_stop
-  use initial_module, only: st_sim, st_ctrl, st_schm, st_grid, st_in_type, st_out_type
+  use initial_module, only: st_sim, st_ctrl, st_schm, st_grid, st_in_type, st_out_type,&
+                            st_out_step, st_out_time
   use mpi
 
   implicit none
@@ -13,7 +14,7 @@ module mpi_set
   public :: senrec_reg_info, senrec_grid_num
   public :: bcast_calc_ftype, bcast_sim_val, bcast_glob_xyzv
   public :: bcast_retn_clas, bcast_parm_clas, bcast_init_dep
-  public :: bcast_bound_ftype, bcast_out_type, bcast_solval
+  public :: bcast_bound_ftype, bcast_solval
   public :: senrec_neibval, senrec_faceval
   public :: scatter_xyval, scatter_xyzval
   public :: bcast_clas_val, bcast_2dpoint, bcast_3dpoint, bcast_wellpoint
@@ -181,52 +182,41 @@ module mpi_set
       end if
     end if
 
-    call MPI_BCAST(st_ctrl%noclas_flag, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
+    ! -- The configuration structures are sent whole, so a new member needs no change
+    !    here. This relies on every rank sharing one data representation, which holds
+    !    within a cluster of like processors.
+    call MPI_BCAST(st_ctrl, storage_size(st_ctrl)/8, MPI_BYTE, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast the classification flag.")
+        call write_err_stop("Broadcast the solution control setting.")
       end if
     end if
 
-    call MPI_BCAST(st_out_type%calg, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
+    call MPI_BCAST(st_schm, storage_size(st_schm)/8, MPI_BYTE, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast the calculation grid flag for output.")
+        call write_err_stop("Broadcast the scheme setting.")
       end if
     end if
 
-    call MPI_BCAST(st_ctrl%precon_type, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
+    call MPI_BCAST(st_out_type, storage_size(st_out_type)/8, MPI_BYTE, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast the preconditoner type.")
+        call write_err_stop("Broadcast the output file type setting.")
       end if
     end if
 
-    call MPI_BCAST(st_schm%krpos_type, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
+    call MPI_BCAST(st_out_step, storage_size(st_out_step)/8, MPI_BYTE, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast the kr position type.")
+        call write_err_stop("Broadcast the output step setting.")
       end if
     end if
 
-    call MPI_BCAST(st_schm%stor_type, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
+    call MPI_BCAST(st_out_time, storage_size(st_out_time)/8, MPI_BYTE, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast the storage type.")
-      end if
-    end if
-
-    call MPI_BCAST(st_schm%abyd_type, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
-    if (ierr /= MPI_SUCCESS) then
-      if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast the area by distance type.")
-      end if
-    end if
-
-    call MPI_BCAST(st_schm%abyd_ratio, 1, MPI_REAL8, 0, st_mpi%comm, ierr)
-    if (ierr /= MPI_SUCCESS) then
-      if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast the area by distance ratio.")
+        call write_err_stop("Broadcast the output time setting.")
       end if
     end if
 
@@ -1614,13 +1604,6 @@ module mpi_set
       end if
     end if
 
-    call MPI_BCAST(st_ctrl%nlevel, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
-    if (ierr /= MPI_SUCCESS) then
-      if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast multigrid level.")
-      end if
-    end if
-
     call MPI_BCAST(st_sim%end_time, 1, MPI_REAL4, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
@@ -1771,83 +1754,6 @@ module mpi_set
     end if
 
   end subroutine bcast_bound_ftype
-
-  subroutine bcast_out_type()
-  !*********************************************************************************************
-  ! bcast_out_type -- Bcast output file number
-  !*********************************************************************************************
-    ! -- module
-
-    ! -- inout
-
-    ! -- local
-    integer(I4) :: ierr
-    !-------------------------------------------------------------------------------------------
-    ierr = 0
-    call MPI_BCAST(st_out_type%wtab, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
-    if (ierr /= MPI_SUCCESS) then
-      if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast output water table file type.")
-      end if
-    end if
-
-    call MPI_BCAST(st_out_type%mass, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
-    if (ierr /= MPI_SUCCESS) then
-      if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast output massbalance file type.")
-      end if
-    end if
-
-    call MPI_BCAST(st_out_type%velc, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
-    if (ierr /= MPI_SUCCESS) then
-      if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast output velocity file type.")
-      end if
-    end if
-
-    call MPI_BCAST(st_out_type%rivr, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
-    if (ierr /= MPI_SUCCESS) then
-      if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast output river runoff file type.")
-      end if
-    end if
-
-    call MPI_BCAST(st_out_type%lakr, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
-    if (ierr /= MPI_SUCCESS) then
-      if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast output lake runoff file type.")
-      end if
-    end if
-
-    call MPI_BCAST(st_out_type%sufr, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
-    if (ierr /= MPI_SUCCESS) then
-      if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast output surface runoff file type.")
-      end if
-    end if
-
-    call MPI_BCAST(st_out_type%dunr, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
-    if (ierr /= MPI_SUCCESS) then
-      if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast output dunne overland runoff file type.")
-      end if
-    end if
-
-    call MPI_BCAST(st_out_type%well, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
-    if (ierr /= MPI_SUCCESS) then
-      if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast output well results file type.")
-      end if
-    end if
-
-    call MPI_BCAST(st_out_type%rech, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
-    if (ierr /= MPI_SUCCESS) then
-      if (st_mpi%rank == 0) then
-        call write_err_stop("Broadcast output recharge results file type.")
-      end if
-    end if
-
-  end subroutine bcast_out_type
 
   subroutine senrec_neib_i4(nbtot, nbnum, sind, rind, sitem, ritem, inv, outv)
   !*********************************************************************************************
@@ -3053,14 +2959,6 @@ module mpi_set
 
     !-------------------------------------------------------------------------------------------
     ! -- Bcast scalar value (val)
-      call bcast_val(st_ctrl%maxout_iter, " maximum outer iteration number")
-    ! -- Bcast scalar value (val)
-      call bcast_val(st_ctrl%maxinn_iter, " maximum inner iteration number")
-
-    ! -- Bcast scalar value (val)
-      call bcast_val(st_ctrl%amg_nlevel, " multigrid level number")
-
-    ! -- Bcast scalar value (val)
       call bcast_val(st_sim%ini_step, " initial time step value")
     ! -- Bcast scalar value (val)
       call bcast_val(st_sim%max_step, " maximun time step value")
@@ -3068,35 +2966,6 @@ module mpi_set
       call bcast_val(st_sim%inc_fact, " increment multiplier value")
     ! -- Bcast scalar value (val)
       call bcast_val(st_sim%dec_fact, " decrement multiplier value")
-    ! -- Bcast scalar value (val)
-      call bcast_val(st_ctrl%criteria, " outer criteria (max norm) value")
-    ! -- Bcast scalar value (val)
-      call bcast_val(st_ctrl%res_abs_tol, " absolute residual tolerance value")
-    ! -- Bcast scalar value (val)
-      call bcast_val(st_ctrl%res_rel_tol, " scaled residual tolerance value")
-    ! -- Bcast scalar value (val)
-      call bcast_val(st_ctrl%dilu_shift, " dilu pivot shift value")
-    ! -- Bcast scalar value (val)
-      call bcast_val(st_ctrl%dsat_max, " saturation change limit value")
-    ! -- Bcast scalar value (val)
-      call bcast_val(st_ctrl%expd_type, " step expansion type")
-    ! -- Bcast scalar value (val)
-      call bcast_val(st_ctrl%conv_type, " convergence type")
-    ! -- Bcast scalar value (val)
-      call bcast_val(st_ctrl%datum_type, " datum type")
-    ! -- Bcast scalar value (val)
-      call bcast_val(st_ctrl%deri_type, " derivative type")
-
-    if (st_ctrl%precon_type == 1) then
-      ! -- Bcast scalar value (val)
-        call bcast_val(st_ctrl%maxvcy_iter, " maximum v-cycle number")
-      ! -- Bcast scalar value (val)
-        call bcast_val(st_ctrl%max_sweep, " maximum sweep number")
-      ! -- Bcast scalar value (val)
-        call bcast_val(st_ctrl%jac_omega, " jacobian omega value")
-      ! -- Bcast scalar value (val)
-        call bcast_val(st_ctrl%amg_theta, " amg theta value")
-    end if
 
   end subroutine bcast_solval
 

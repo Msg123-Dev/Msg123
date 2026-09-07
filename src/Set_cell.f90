@@ -1,7 +1,7 @@
 module set_cell
   ! -- modules
   use kind_module, only: I4, SP
-  use constval_module, only: SNOVAL, VARLEN
+  use constval_module, only: FACE, SNOVAL, VARLEN
   use types_module, only: conn_set, gmap_set
   use utility_module, only: st_mpi, iquick_sort, iquick_sort2, open_new_rtxt, write_err_stop
   use utility_module, only: gmap_init, gmap_put, gmap_get, gmap_free
@@ -1643,9 +1643,9 @@ module set_cell
     logical :: find_flag
     !-------------------------------------------------------------------------------------------
     if (st_mpi%totn /= 1) then
-      allocate(neib_glos(ncals))
+      allocate(neib_glos(FACE*ncals))
       !$omp parallel do private(i)
-      do i = 1, ncals
+      do i = 1, FACE*ncals
         neib_glos(i) = 0
       end do
       !$omp end parallel do
@@ -1699,8 +1699,8 @@ module set_cell
       end do
 
       allocate(temp_neib_num(st_mpi%totn), temp_neib_flag(st_mpi%totn))
-      allocate(temp_mpi_num(ncalc), neib_locc(ncalc))
-      allocate(neib_gloc(ncalc), temp_calc_reg(ncalc))
+      allocate(temp_mpi_num(FACE*ncalc), neib_locc(FACE*ncalc))
+      allocate(neib_gloc(FACE*ncalc), temp_calc_reg(FACE*ncalc))
       !$omp parallel
       !$omp do private(i)
       do i = 1, st_mpi%totn
@@ -1708,7 +1708,7 @@ module set_cell
       end do
       !$omp end do
       !$omp do private(i)
-      do i = 1, ncalc
+      do i = 1, FACE*ncalc
         temp_mpi_num(i) = 0 ; neib_locc(i) = 0 ; neib_gloc(i) = 0 ; temp_calc_reg(i) = 0
       end do
       !$omp end do

@@ -156,13 +156,17 @@ module make_linearsystem
     if (st_mpi%totn /= 1) then
     ! -- Send and Receive real vector value (rvectv)
       call senrec_rvectv(st_coef%per_relp)
+      if (st_ctrl%deri_type == 1) then
+      ! -- Send and Receive real vector value (rvectv)
+        call senrec_rvectv(st_coef%dkr_dpsi)
+      end if
     end if
 #endif
 
     ! -- Form connect flow from adjacent cells (connflow)
-      call form_connflow(st_coef%per_relp, st_sol, st_coef%cond, lumat, st_coef%deri_dcon,&
-                         st_coef%rel_hyd, st_coef%deri_lucon, st_coef%deri_con1,&
-                         st_coef%deri_con2)
+      call form_connflow(st_coef%per_relp, st_coef%dkr_dpsi, st_sol, st_coef%cond, lumat,&
+                         st_coef%deri_dcon, st_coef%rel_hyd, st_coef%deri_lucon,&
+                         st_coef%deri_con1, st_coef%deri_con2)
 
     ! -- Set river boundary dmat (rivebound)
       call set_rivebound(st_coef%per_relp, st_coef%dkr_dpsi, st_sol, st_coef%rivd,&
@@ -231,8 +235,8 @@ module make_linearsystem
 
   end subroutine form_stochn
 
-  subroutine form_connflow(per_relp, st_sol, dmat_con, lumat_con, deri_dcon, rel_hyd,&
-                           deri_lucon, deri_con1, deri_con2)
+  subroutine form_connflow(per_relp, dkr_dpsi, st_sol, dmat_con, lumat_con, deri_dcon,&
+                           rel_hyd, deri_lucon, deri_con1, deri_con2)
   !*********************************************************************************************
   ! form_connflow -- Form connect flow from adjacent cells
   !*********************************************************************************************
@@ -240,6 +244,7 @@ module make_linearsystem
     use calc_parameter, only: calc_hyd_upwind
     ! -- inout
     real(DP), intent(in) :: per_relp(:)
+    real(DP), intent(in) :: dkr_dpsi(:)
     type(sol_set), intent(in) :: st_sol
     real(DP), intent(inout) :: dmat_con(:)
     real(DP), intent(out) :: lumat_con(:)
@@ -285,25 +290,36 @@ module make_linearsystem
           j = crs_index(1)%offrow(ind)
 
           delhead = st_sol%head_new(j) - st_sol%head_new(i)
-          relp1 = per_relp(i) ; relp2 = st_sol%rel_perm(j)
 
-          per_head1 = -delhead + st_ctrl%newper
-          per_head2 = -delhead - st_ctrl%newper
+          if (st_ctrl%deri_type == 1) then
+            if (delhead <= DZERO) then
+              deri_con1(ind) = st_hydr%hydf_conn(ind)*dkr_dpsi(i)*delhead&
+                               *st_hydr%abyd_conn(ind)
+            else
+              deri_con2(ind) = st_hydr%hydf_conn(ind)*dkr_dpsi(j)*delhead&
+                               *st_hydr%abyd_conn(ind)
+            end if
+          else
+            relp1 = per_relp(i) ; relp2 = st_sol%rel_perm(j)
 
-          ! -- Calculate hydradulic conductivity by upwind (hyd_upwind)
-            call calc_hyd_upwind(per_head1, relp1, relp2, relat)
-          deri_hyd1 = st_hydr%hydf_conn(ind)*relat
+            per_head1 = -delhead + st_ctrl%newper
+            per_head2 = -delhead - st_ctrl%newper
 
-          relp1 = st_sol%rel_perm(i) ; relp2 = per_relp(j)
+            ! -- Calculate hydradulic conductivity by upwind (hyd_upwind)
+              call calc_hyd_upwind(per_head1, relp1, relp2, relat)
+            deri_hyd1 = st_hydr%hydf_conn(ind)*relat
 
-          ! -- Calculate hydradulic conductivity by upwind (hyd_upwind)
-            call calc_hyd_upwind(per_head2, relp1, relp2, relat)
-          deri_hyd2 = st_hydr%hydf_conn(ind)*relat
+            relp1 = st_sol%rel_perm(i) ; relp2 = per_relp(j)
 
-          deri_con1(ind) = (deri_hyd1-rel_hyd(ind))*st_ctrl%newper_inv*delhead*&
-                           st_hydr%abyd_conn(ind)
-          deri_con2(ind) = (deri_hyd2-rel_hyd(ind))*st_ctrl%newper_inv*delhead*&
-                           st_hydr%abyd_conn(ind)
+            ! -- Calculate hydradulic conductivity by upwind (hyd_upwind)
+              call calc_hyd_upwind(per_head2, relp1, relp2, relat)
+            deri_hyd2 = st_hydr%hydf_conn(ind)*relat
+
+            deri_con1(ind) = (deri_hyd1-rel_hyd(ind))*st_ctrl%newper_inv*delhead*&
+                             st_hydr%abyd_conn(ind)
+            deri_con2(ind) = (deri_hyd2-rel_hyd(ind))*st_ctrl%newper_inv*delhead*&
+                             st_hydr%abyd_conn(ind)
+          end if
         end do
       end do
       !$omp end do

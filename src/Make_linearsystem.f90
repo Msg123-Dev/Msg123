@@ -36,6 +36,7 @@ module make_linearsystem
 
     allocate(st_coef%per_srat(ncalc), st_coef%per_relp(nreg_num), st_coef%temp_rhs(nreg_num))
     allocate(st_coef%dkr_dpsi(nreg_num))
+    allocate(st_coef%dstor_dpsi(ncalc))
     allocate(st_coef%stor_per(ncalc))
     allocate(st_coef%stod(ncalc), st_coef%cond(nreg_num), st_coef%sead(ncalc))
     allocate(st_coef%dmats(ncalc))
@@ -120,13 +121,13 @@ module make_linearsystem
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, ncalc
-      st_coef%per_srat(i) = DZERO
+      st_coef%per_srat(i) = DZERO ; st_coef%dstor_dpsi(i) = DZERO
       st_coef%stod(i) = DZERO ; st_coef%sead(i) = DZERO ; st_coef%dmats(i) = DZERO
     end do
     !$omp end parallel do
     !$omp parallel do private(i)
     do i = 1, nreg_num
-      st_coef%per_relp(i) = DZERO
+      st_coef%per_relp(i) = DZERO ; st_coef%dkr_dpsi(i) = DZERO
       st_coef%cond(i) = DZERO
     end do
     !$omp end parallel do
@@ -139,14 +140,16 @@ module make_linearsystem
     ! -- Calculate saturation and relative permeability (srat_rperm)
       if (st_ctrl%deri_type == 1) then
         call calc_srat_rperm(ncalc, DZERO, st_sol%head_new, st_coef%per_srat,&
-                             st_coef%per_relp, dkr_dpsi_out=st_coef%dkr_dpsi)
+                             st_coef%per_relp, dkr_dpsi_out=st_coef%dkr_dpsi,&
+                             dstor_dpsi_out=st_coef%dstor_dpsi)
       end if
       call calc_srat_rperm(ncalc, st_ctrl%newper, st_sol%head_new, st_coef%per_srat,&
                            st_coef%per_relp, st_coef%stor_per)
 
     if (st_sim%sim_type >= 0) then
       ! -- Form storage change (stochn)
-        call form_stochn(st_coef%stor_per, st_sol%stor_new, st_coef%stod)
+        call form_stochn(st_coef%stor_per, st_sol%stor_new, st_coef%dstor_dpsi,&
+                         st_coef%stod)
     end if
 
 #ifdef MPI_MSG
@@ -199,9 +202,10 @@ module make_linearsystem
 
   end subroutine make_matrix
 
-  subroutine form_stochn(stor_per, stor_out, dmat_sto)
+  subroutine form_stochn(stor_per, stor_out, dstor_dpsi, dmat_sto)
   !*********************************************************************************************
-  ! form_stochn -- Form storage change. dW/dH by a single difference quotient.
+  ! form_stochn -- Form storage change. dW/dH is analytic when deri_type is 1, otherwise
+  !                it is a single difference quotient.
   !                The alpha / deri_srat / deri_stor triple is gone: W is a single scalar
   !                function of psi, so there is no product to expand.
   !*********************************************************************************************
@@ -209,14 +213,19 @@ module make_linearsystem
     use make_cell, only: st_geom
     ! -- inout
     real(DP), intent(in) :: stor_per(:), stor_out(:)
+    real(DP), intent(in) :: dstor_dpsi(:)
     real(DP), intent(out) :: dmat_sto(:)
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, ncalc
-      dmat_sto(i) = -(stor_per(i)-stor_out(i))*st_ctrl%newper_inv&
-                    *st_time%delt_inv*st_geom%cell_vol(i)
+      if (st_ctrl%deri_type == 1) then
+        dmat_sto(i) = -dstor_dpsi(i)*st_time%delt_inv*st_geom%cell_vol(i)
+      else
+        dmat_sto(i) = -(stor_per(i)-stor_out(i))*st_ctrl%newper_inv&
+                      *st_time%delt_inv*st_geom%cell_vol(i)
+      end if
     end do
     !$omp end parallel do
 

@@ -3084,6 +3084,8 @@ module mpi_set
       call bcast_val(st_ctrl%conv_type, " convergence type")
     ! -- Bcast scalar value (val)
       call bcast_val(st_ctrl%datum_type, " datum type")
+    ! -- Bcast scalar value (val)
+      call bcast_val(st_ctrl%deri_type, " derivative type")
 
     if (st_ctrl%precon_type == 1) then
       ! -- Bcast scalar value (val)

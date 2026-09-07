@@ -12,7 +12,7 @@ module calc_parameter
 
   contains
 
-  subroutine calc_srat_rperm(num, pertur, pres, srat, rperm, stor_out)
+  subroutine calc_srat_rperm(num, pertur, pres, srat, rperm, stor_out, dkr_dpsi_out)
   !*********************************************************************************************
   ! calc_srat_rperm -- Calculate saturation and relative permeability
   !*********************************************************************************************
@@ -28,17 +28,18 @@ module calc_parameter
     real(DP), intent(in) :: pres(:)
     real(DP), intent(out) :: srat(:), rperm(:)
     real(DP), intent(out), optional :: stor_out(:)
+    real(DP), intent(out), optional :: dkr_dpsi_out(:)
     ! -- local
     integer(I4) :: i
     real(DP) :: retm, beta, theta, kr, se, stor_val
     real(DP) :: per_phead, phead0
-    real(DP) :: kr_phead, kr_beta, kr_se
+    real(DP) :: kr_phead, kr_beta, kr_se, kr_term
     real(DP) :: pors_val, resi_val
     !-------------------------------------------------------------------------------------------
     phead0 = DZERO
 
     !$omp parallel do private(i, per_phead, retm, beta, theta, kr, se, stor_val) &
-    !$omp             private(kr_phead, kr_beta, kr_se, pors_val, resi_val)
+    !$omp             private(kr_phead, kr_beta, kr_se, kr_term, pors_val, resi_val)
     do i = 1, num
       pors_val = st_hydr%read_pors(i) ; resi_val = st_hydr%read_resi(i)
       per_phead = pres(i) - st_geom%cell_top(i) + pertur
@@ -58,11 +59,19 @@ module calc_parameter
           stor_val = theta
         end if
         se = (DONE+beta)**(-retm)
-        kr = se**(DHALF)*(DONE-(DONE-se**(DONE/retm))**retm)**DTWO
+        kr_term = DONE-(DONE-se**(DONE/retm))**retm
+        kr = se**(DHALF)*kr_term**DTWO
+        if (present(dkr_dpsi_out)) then
+          dkr_dpsi_out(i) = -(retm*st_hydr%read_vann(i)/((DONE+beta)*per_phead))&
+                            *sqrt(se)*kr_term*(DHALF*kr_term*beta + DTWO*(DONE-kr_term))
+        end if
       else
         srat(i) = DONE
         kr = DONE
         stor_val = pors_val + st_hydr%read_spst(i)*per_phead
+        if (present(dkr_dpsi_out)) then
+          dkr_dpsi_out(i) = DZERO
+        end if
       end if
 
       if (st_schm%krpos_type == 1) then
@@ -71,9 +80,18 @@ module calc_parameter
           retm = DONE - DONE/st_hydr%read_vann(i)
           kr_beta = abs(kr_phead*st_hydr%read_vana(i))**st_hydr%read_vann(i)
           kr_se = (DONE+kr_beta)**(-retm)
-          kr = kr_se**(DHALF)*(DONE-(DONE-kr_se**(DONE/retm))**retm)**DTWO
+          kr_term = DONE-(DONE-kr_se**(DONE/retm))**retm
+          kr = kr_se**(DHALF)*kr_term**DTWO
+          if (present(dkr_dpsi_out)) then
+            dkr_dpsi_out(i) = -(retm*st_hydr%read_vann(i)/((DONE+kr_beta)*kr_phead))&
+                              *sqrt(kr_se)*kr_term&
+                              *(DHALF*kr_term*kr_beta + DTWO*(DONE-kr_term))
+          end if
         else
           kr = DONE
+          if (present(dkr_dpsi_out)) then
+            dkr_dpsi_out(i) = DZERO
+          end if
         end if
       end if
 

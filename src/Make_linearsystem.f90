@@ -35,6 +35,7 @@ module make_linearsystem
     tot_ind = crs_index(1)%offind(nreg_num)
 
     allocate(st_coef%per_srat(ncalc), st_coef%per_relp(nreg_num), st_coef%temp_rhs(nreg_num))
+    allocate(st_coef%dkr_dpsi(nreg_num))
     allocate(st_coef%stor_per(ncalc))
     allocate(st_coef%stod(ncalc), st_coef%cond(nreg_num), st_coef%sead(ncalc))
     allocate(st_coef%dmats(ncalc))
@@ -44,10 +45,12 @@ module make_linearsystem
     allocate(st_coef%over_riv(st_bcnd%rive_num), st_coef%deri_r(st_bcnd%rive_num))
     allocate(st_coef%deri_ks_riv(st_bcnd%rive_num), st_coef%delh_r(st_bcnd%rive_num))
     allocate(st_coef%per_riv(st_bcnd%rive_num), st_coef%rel_riv(st_bcnd%rive_num))
+    allocate(st_coef%dkr_riv(st_bcnd%rive_num))
     allocate(st_coef%tran_riv(st_bcnd%rive_num))
     allocate(st_coef%over_lak(st_bcnd%lake_num), st_coef%deri_l(st_bcnd%lake_num))
     allocate(st_coef%deri_ks_lak(st_bcnd%lake_num), st_coef%delh_l(st_bcnd%lake_num))
     allocate(st_coef%per_lak(st_bcnd%lake_num), st_coef%rel_lak(st_bcnd%lake_num))
+    allocate(st_coef%dkr_lak(st_bcnd%lake_num))
     allocate(st_coef%tran_lak(st_bcnd%lake_num))
     allocate(st_coef%over_sur(ncals), st_coef%deri_s(ncals), st_coef%deri_ks_sur(ncals))
     allocate(st_coef%delh_s(ncals), st_coef%tran_sur(ncals))
@@ -134,6 +137,10 @@ module make_linearsystem
     !$omp end parallel do
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
+      if (st_ctrl%deri_type == 1) then
+        call calc_srat_rperm(ncalc, DZERO, st_sol%head_new, st_coef%per_srat,&
+                             st_coef%per_relp, dkr_dpsi_out=st_coef%dkr_dpsi)
+      end if
       call calc_srat_rperm(ncalc, st_ctrl%newper, st_sol%head_new, st_coef%per_srat,&
                            st_coef%per_relp, st_coef%stor_per)
 
@@ -155,23 +162,26 @@ module make_linearsystem
                          st_coef%deri_con2)
 
     ! -- Set river boundary dmat (rivebound)
-      call set_rivebound(st_coef%per_relp, st_sol, st_coef%rivd, st_coef%over_riv,&
-                         st_coef%deri_r, st_coef%deri_ks_riv, st_coef%delh_r, st_coef%per_riv,&
-                         st_coef%rel_riv, st_coef%tran_riv)
+      call set_rivebound(st_coef%per_relp, st_coef%dkr_dpsi, st_sol, st_coef%rivd,&
+                         st_coef%over_riv, st_coef%deri_r, st_coef%deri_ks_riv,&
+                         st_coef%delh_r, st_coef%per_riv, st_coef%rel_riv, st_coef%tran_riv,&
+                         st_coef%dkr_riv)
 
     ! -- Set lake boundary dmat (lakebound)
-      call set_lakebound(st_coef%per_relp, st_sol, st_coef%lakd, st_coef%over_lak,&
-                         st_coef%deri_l, st_coef%deri_ks_lak, st_coef%delh_l, st_coef%per_lak,&
-                         st_coef%rel_lak, st_coef%tran_lak)
+      call set_lakebound(st_coef%per_relp, st_coef%dkr_dpsi, st_sol, st_coef%lakd,&
+                         st_coef%over_lak, st_coef%deri_l, st_coef%deri_ks_lak,&
+                         st_coef%delh_l, st_coef%per_lak, st_coef%rel_lak, st_coef%tran_lak,&
+                         st_coef%dkr_lak)
 
     ! -- Set surface boundary dmat (surfbound)
-      call set_surfbound(st_coef%per_relp, st_sol, st_coef%surd, st_coef%over_sur,&
-                         st_coef%deri_s, st_coef%deri_ks_sur, st_coef%delh_s, st_coef%tran_sur)
+      call set_surfbound(st_coef%per_relp, st_coef%dkr_dpsi, st_sol, st_coef%surd,&
+                         st_coef%over_sur, st_coef%deri_s, st_coef%deri_ks_sur,&
+                         st_coef%delh_s, st_coef%tran_sur)
 
     ! -- Set sea boundary dmat (seabound)
-      call set_seabound(st_coef%per_relp, st_sol, st_coef%sead, st_coef%deri_sea,&
-                        st_coef%deri_ks_sea, st_coef%delh_sea, st_coef%per_sea,&
-                        st_coef%rel_sea, st_coef%tran_sea)
+      call set_seabound(st_coef%per_relp, st_coef%dkr_dpsi, st_sol, st_coef%sead,&
+                        st_coef%deri_sea, st_coef%deri_ks_sea, st_coef%delh_sea,&
+                        st_coef%per_sea, st_coef%rel_sea, st_coef%tran_sea)
 
     !$omp parallel
     !$omp do private(s)
@@ -304,8 +314,8 @@ module make_linearsystem
 
   end subroutine form_connflow
 
-  subroutine set_rivebound(per_relp, st_sol, dmat_riv, over_riv, deri_r, deri_ks_riv, delh_r,&
-                           per_riv, rel_riv, tran_riv)
+  subroutine set_rivebound(per_relp, dkr_dpsi, st_sol, dmat_riv, over_riv, deri_r,&
+                           deri_ks_riv, delh_r, per_riv, rel_riv, tran_riv, dkr_riv)
   !*********************************************************************************************
   ! set_rivebound -- Set river boundary to dmat
   !*********************************************************************************************
@@ -313,9 +323,11 @@ module make_linearsystem
 
     ! -- inout
     real(DP), intent(in) :: per_relp(:)
+    real(DP), intent(in) :: dkr_dpsi(:)
     type(sol_set), intent(in) :: st_sol
     real(DP), intent(inout) :: dmat_riv(:)
     real(DP), intent(out) :: over_riv(:), deri_r(:), deri_ks_riv(:), delh_r(:), per_riv(:)
+    real(DP), intent(out) :: dkr_riv(:)
     real(DP), intent(out) :: rel_riv(:), tran_riv(:)
     ! -- local
     integer(I4) :: i, s
@@ -333,6 +345,7 @@ module make_linearsystem
     do i = 1, st_bcnd%rive_num
       s = st_bcnd%rive2cals(i)
       per_riv(i) = per_relp(s) ; rel_riv(i) = st_sol%rel_perm(s)
+      dkr_riv(i) = dkr_dpsi(s)
       head_eff = max(st_forc%rive_head(i), st_forc%rive_bott(i))
       tran_riv(i) = st_hydr%hydf_surf(s)*st_forc%abyd_rive(i)
       if (st_sol%head_new(s) >= st_forc%rive_bott(i)) then
@@ -350,8 +363,12 @@ module make_linearsystem
     if (st_time%form_switch == 1) then
       !$omp do private(i)
       do i = 1, st_bcnd%rive_num
-        deri_ks_riv(i) = (per_riv(i)-rel_riv(i))*st_ctrl%newper_inv*delh_r(i)*tran_riv(i)&
-                         *over_riv(i)
+        if (st_ctrl%deri_type == 1) then
+          deri_ks_riv(i) = dkr_riv(i)*delh_r(i)*tran_riv(i)*over_riv(i)
+        else
+          deri_ks_riv(i) = (per_riv(i)-rel_riv(i))*st_ctrl%newper_inv*delh_r(i)*tran_riv(i)&
+                           *over_riv(i)
+        end if
       end do
       !$omp end do
     end if
@@ -366,8 +383,8 @@ module make_linearsystem
 
   end subroutine set_rivebound
 
-  subroutine set_lakebound(per_relp, st_sol, dmat_lak, over_lak, deri_l, deri_ks_lak, delh_l,&
-                           per_lak, rel_lak, tran_lak)
+  subroutine set_lakebound(per_relp, dkr_dpsi, st_sol, dmat_lak, over_lak, deri_l,&
+                           deri_ks_lak, delh_l, per_lak, rel_lak, tran_lak, dkr_lak)
   !*********************************************************************************************
   ! set_lakebound -- Set lake boundary to dmat
   !*********************************************************************************************
@@ -375,9 +392,11 @@ module make_linearsystem
 
     ! -- inout
     real(DP), intent(in) :: per_relp(:)
+    real(DP), intent(in) :: dkr_dpsi(:)
     type(sol_set), intent(in) :: st_sol
     real(DP), intent(inout) :: dmat_lak(:)
     real(DP), intent(out) :: over_lak(:), deri_l(:), deri_ks_lak(:), delh_l(:), per_lak(:)
+    real(DP), intent(out) :: dkr_lak(:)
     real(DP), intent(out) :: rel_lak(:), tran_lak(:)
     ! -- local
     integer(I4) :: i, s
@@ -395,6 +414,7 @@ module make_linearsystem
     do i = 1, st_bcnd%lake_num
       s = st_bcnd%lake2cals(i)
       per_lak(i) = per_relp(s) ; rel_lak(i) = st_sol%rel_perm(s)
+      dkr_lak(i) = dkr_dpsi(s)
       head_eff = max(st_forc%lake_head(i), st_forc%lake_bott(i))
       tran_lak(i) = st_hydr%hydf_surf(s)*st_forc%abyd_lake(i)
       if (st_sol%head_new(s) >= st_forc%lake_bott(i)) then
@@ -412,8 +432,12 @@ module make_linearsystem
     if (st_time%form_switch == 1) then
       !$omp do private(i)
       do i = 1, st_bcnd%lake_num
-        deri_ks_lak(i) = (per_lak(i)-rel_lak(i))*st_ctrl%newper_inv*delh_l(i)*tran_lak(i)&
-                         *over_lak(i)
+        if (st_ctrl%deri_type == 1) then
+          deri_ks_lak(i) = dkr_lak(i)*delh_l(i)*tran_lak(i)*over_lak(i)
+        else
+          deri_ks_lak(i) = (per_lak(i)-rel_lak(i))*st_ctrl%newper_inv*delh_l(i)*tran_lak(i)&
+                           *over_lak(i)
+        end if
       end do
       !$omp end do
     end if
@@ -428,8 +452,8 @@ module make_linearsystem
 
   end subroutine set_lakebound
 
-  subroutine set_surfbound(per_relp, st_sol, dmat_sur, over_sur, deri_s, deri_ks_sur, delh_s,&
-                           tran_sur)
+  subroutine set_surfbound(per_relp, dkr_dpsi, st_sol, dmat_sur, over_sur, deri_s,&
+                           deri_ks_sur, delh_s, tran_sur)
   !*********************************************************************************************
   ! set_surfbound -- Set surface boundary to dmat
   !*********************************************************************************************
@@ -437,6 +461,7 @@ module make_linearsystem
 !    use make_cell, only: surf_elev
     ! -- inout
     real(DP), intent(in) :: per_relp(:)
+    real(DP), intent(in) :: dkr_dpsi(:)
     type(sol_set), intent(in) :: st_sol
     real(DP), intent(out) :: dmat_sur(:)
     real(DP), intent(out) :: over_sur(:), deri_s(:), deri_ks_sur(:), delh_s(:), tran_sur(:)
@@ -503,8 +528,12 @@ module make_linearsystem
     if (st_time%form_switch == 1) then
       !$omp do private(i)
       do i = 1, ncals
-        deri_ks_sur(i) = (per_relp(i)-st_sol%rel_perm(i))*st_ctrl%newper_inv*delh_s(i)*&
-                          tran_sur(i)*over_sur(i)
+        if (st_ctrl%deri_type == 1) then
+          deri_ks_sur(i) = dkr_dpsi(i)*delh_s(i)*tran_sur(i)*over_sur(i)
+        else
+          deri_ks_sur(i) = (per_relp(i)-st_sol%rel_perm(i))*st_ctrl%newper_inv*delh_s(i)*&
+                            tran_sur(i)*over_sur(i)
+        end if
       end do
       !$omp end do
     end if
@@ -518,8 +547,8 @@ module make_linearsystem
 
   end subroutine set_surfbound
 
-  subroutine set_seabound(per_relp, st_sol, dmat_sea, deri_sea, deri_ks_sea, delh_sea, per_sea,&
-                          rel_sea, tran_sea)
+  subroutine set_seabound(per_relp, dkr_dpsi, st_sol, dmat_sea, deri_sea, deri_ks_sea,&
+                          delh_sea, per_sea, rel_sea, tran_sea)
   !*********************************************************************************************
   ! set_seabound -- Set sea boundary to dmat
   !*********************************************************************************************
@@ -527,6 +556,7 @@ module make_linearsystem
 
     ! -- inout
     real(DP), intent(in) :: per_relp(:)
+    real(DP), intent(in) :: dkr_dpsi(:)
     type(sol_set), intent(in) :: st_sol
     real(DP), intent(inout) :: dmat_sea(:)
     real(DP), intent(out) :: deri_sea(:), deri_ks_sea(:), delh_sea(:), per_sea(:), rel_sea(:)
@@ -552,10 +582,16 @@ module make_linearsystem
     !$omp end do
 
     if (st_time%form_switch == 1) then
-      !$omp do private(i)
+      !$omp do private(i, c)
       do i = 1, st_bcnd%seal_num
-        deri_ks_sea(i) = (per_sea(i)-rel_sea(i))*st_ctrl%newper_inv*delh_sea(i)&
-                         *st_hydr%abyd_seal(i)
+        c = st_bcnd%seal2calc(i)
+        if (st_ctrl%deri_type == 1) then
+          deri_ks_sea(i) = dkr_dpsi(c)*st_hydr%hydf_seal(i)*delh_sea(i)&
+                           *st_hydr%abyd_seal(i)
+        else
+          deri_ks_sea(i) = (per_sea(i)-rel_sea(i))*st_ctrl%newper_inv*delh_sea(i)&
+                           *st_hydr%abyd_seal(i)
+        end if
       end do
       !$omp end do
     end if

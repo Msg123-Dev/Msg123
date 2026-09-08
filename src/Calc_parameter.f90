@@ -12,8 +12,7 @@ module calc_parameter
 
   contains
 
-  subroutine calc_srat_rperm(num, pertur, pres, srat, rperm, stor_out, dkr_dpsi_out,&
-                             dstor_dpsi_out)
+  subroutine calc_srat_rperm(num, pertur, pres, srat, rperm, stor, dkr_dpsi, dstor_dpsi)
   !*********************************************************************************************
   ! calc_srat_rperm -- Calculate saturation and relative permeability
   !*********************************************************************************************
@@ -27,22 +26,23 @@ module calc_parameter
     integer(I4), intent(in) :: num
     real(DP), intent(in) :: pertur
     real(DP), intent(in) :: pres(:)
-    real(DP), intent(out) :: srat(:), rperm(:)
-    real(DP), intent(out), optional :: stor_out(:)
-    real(DP), intent(out), optional :: dkr_dpsi_out(:)
-    real(DP), intent(out), optional :: dstor_dpsi_out(:)
+    real(DP), intent(out) :: rperm(:)
+    real(DP), intent(out), optional :: srat(:)
+    real(DP), intent(out), optional :: stor(:)
+    real(DP), intent(out), optional :: dkr_dpsi(:)
+    real(DP), intent(out), optional :: dstor_dpsi(:)
     ! -- local
     integer(I4) :: i
-    real(DP) :: retm, beta, theta, kr, se, stor_val
+    real(DP) :: retm, beta, theta, kr, se, stor_val, srat_val
     real(DP) :: per_phead, phead0
     real(DP) :: kr_phead, kr_beta, kr_se, kr_term
     real(DP) :: pors_val, resi_val, dtheta_dpsi
     !-------------------------------------------------------------------------------------------
     phead0 = DZERO
 
-    !$omp parallel do private(i, per_phead, retm, beta, theta, kr, se, stor_val) &
-    !$omp             private(kr_phead, kr_beta, kr_se, kr_term, pors_val, resi_val) &
-    !$omp             private(dtheta_dpsi)
+    !$omp parallel do private(i, per_phead, retm, beta, theta, kr, se, stor_val, kr_phead) &
+    !$omp             private(kr_beta, kr_se, kr_term, pors_val, resi_val, dtheta_dpsi) &
+    !$omp             private(srat_val)
     do i = 1, num
       pors_val = st_hydr%read_pors(i) ; resi_val = st_hydr%read_resi(i)
       per_phead = pres(i) - st_geom%cell_top(i) + pertur
@@ -55,38 +55,38 @@ module calc_parameter
           beta = DZERO
           theta = pors_val
         end if
-        srat(i) = theta/pors_val
+        srat_val = theta/pors_val
         if (st_schm%stor_type == 1) then
-          stor_val = theta + st_hydr%read_spst(i)*per_phead*srat(i)
+          stor_val = theta + st_hydr%read_spst(i)*per_phead*srat_val
         else
           stor_val = theta
         end if
         se = (DONE+beta)**(-retm)
         kr_term = DONE-(DONE-se**(DONE/retm))**retm
         kr = se**(DHALF)*kr_term**DTWO
-        if (present(dkr_dpsi_out)) then
-          dkr_dpsi_out(i) = -(retm*st_hydr%read_vann(i)/((DONE+beta)*per_phead))&
-                            *sqrt(se)*kr_term*(DHALF*kr_term*beta + DTWO*(DONE-kr_term))
+        if (present(dkr_dpsi)) then
+          dkr_dpsi(i) = -(retm*st_hydr%read_vann(i)/((DONE+beta)*per_phead)) *sqrt(se)*kr_term&
+                        *(DHALF*kr_term*beta + DTWO*(DONE-kr_term))
         end if
-        if (present(dstor_dpsi_out)) then
+        if (present(dstor_dpsi)) then
           dtheta_dpsi = (pors_val-resi_val)*se*retm*st_hydr%read_vann(i)*beta&
                         /(abs(per_phead)*(DONE+beta))
           if (st_schm%stor_type == 1) then
-            dstor_dpsi_out(i) = dtheta_dpsi*(DONE+st_hydr%read_spst(i)*per_phead/pors_val)&
-                                + st_hydr%read_spst(i)*srat(i)
+            dstor_dpsi(i) = dtheta_dpsi*(DONE+st_hydr%read_spst(i)*per_phead/pors_val)&
+                            + st_hydr%read_spst(i)*srat_val
           else
-            dstor_dpsi_out(i) = dtheta_dpsi
+            dstor_dpsi(i) = dtheta_dpsi
           end if
         end if
       else
-        srat(i) = DONE
+        srat_val = DONE
         kr = DONE
         stor_val = pors_val + st_hydr%read_spst(i)*per_phead
-        if (present(dkr_dpsi_out)) then
-          dkr_dpsi_out(i) = DZERO
+        if (present(dkr_dpsi)) then
+          dkr_dpsi(i) = DZERO
         end if
-        if (present(dstor_dpsi_out)) then
-          dstor_dpsi_out(i) = st_hydr%read_spst(i)
+        if (present(dstor_dpsi)) then
+          dstor_dpsi(i) = st_hydr%read_spst(i)
         end if
       end if
 
@@ -98,22 +98,24 @@ module calc_parameter
           kr_se = (DONE+kr_beta)**(-retm)
           kr_term = DONE-(DONE-kr_se**(DONE/retm))**retm
           kr = kr_se**(DHALF)*kr_term**DTWO
-          if (present(dkr_dpsi_out)) then
-            dkr_dpsi_out(i) = -(retm*st_hydr%read_vann(i)/((DONE+kr_beta)*kr_phead))&
-                              *sqrt(kr_se)*kr_term&
-                              *(DHALF*kr_term*kr_beta + DTWO*(DONE-kr_term))
+          if (present(dkr_dpsi)) then
+            dkr_dpsi(i) = -(retm*st_hydr%read_vann(i)/((DONE+kr_beta)*kr_phead))*sqrt(kr_se)&
+                          *kr_term*(DHALF*kr_term*kr_beta + DTWO*(DONE-kr_term))
           end if
         else
           kr = DONE
-          if (present(dkr_dpsi_out)) then
-            dkr_dpsi_out(i) = DZERO
+          if (present(dkr_dpsi)) then
+            dkr_dpsi(i) = DZERO
           end if
         end if
       end if
 
       rperm(i) = kr
-      if (present(stor_out)) then
-        stor_out(i) = stor_val
+      if (present(srat)) then
+        srat(i) = srat_val
+      end if
+      if (present(stor)) then
+        stor(i) = stor_val
       end if
     end do
     !$omp end parallel do

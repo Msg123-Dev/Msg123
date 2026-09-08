@@ -8,6 +8,7 @@ module prep_calculation
   use set_cell, only: ncalc
   use set_condition, only: st_hydr
 #ifdef MPI_MSG
+  use mpi_utility, only: bcast_file
   use mpi_set, only: cals_r4view, calc_r4view
 #endif
 
@@ -193,7 +194,6 @@ module prep_calculation
     use assign_calc, only: assign_initv
 #ifdef MPI_MSG
 !    use mpi_utility, only: bcast_path_unit
-    use mpi_utility, only: bcast_file
     use mpi_set, only: cals_r4hview, calc_r4hview, rest_view
 #endif
     ! -- inout
@@ -254,7 +254,6 @@ module prep_calculation
     use assign_calc, only: assign_massv
 #ifdef MPI_MSG
 !    use mpi_utility, only: bcast_file_path
-    use mpi_utility, only: bcast_file
     use mpi_set, only: cals_i4view, calc_i4view
 #endif
     ! -- inout

@@ -3,7 +3,7 @@ module nonlinear_solution
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE, DHALF, DTWO
   use types_module, only: sol_set
-  use utility_module, only: st_mpi, slope_sign_num, nan_recv_num, maxstep_num, satlim_num
+  use utility_module, only: st_mpi, log_fnum
   use initial_module, only: st_ctrl
   use read_input, only: len_scal, z_base
   use check_condition, only: st_out_fnum
@@ -56,10 +56,8 @@ module nonlinear_solution
     use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
     use constval_module, only: VARLEN
     use types_module, only: kryl_set, amgt_set, coef_set
-    use utility_module, only: log_fnum, write_err_stop
-    use utility_module, only: unsat_num, unsat_tot, unsat_psi, unsat_cell
+    use utility_module, only: write_err_stop
     use initial_module, only: st_sim, st_out_step
-    use make_cell, only: st_geom
     use make_linearsystem, only: make_matvec
     use check_simulation, only: check_abserrmax, check_residual
     use linear_solution, only: solve_linalg, in_iter
@@ -76,13 +74,11 @@ module nonlinear_solution
     integer(I4) :: out_iter
     integer(I4) :: max_num, conv_fnum
     integer(I4) :: back_iter, beta_iter, maxstep_run
-    integer(I4) :: unsat_run, psi_num
     character(VARLEN) :: cxyzn
     real(DP) :: max_var, max_unk, check_val
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var
     real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
     real(DP) :: res_l1, qext_l1, mass_error
-    real(DP) :: cell_psi, psi_run
     logical :: back_flag, res_flag, maxs_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
@@ -119,28 +115,6 @@ module nonlinear_solution
           new_func(i) = DZERO
         end do
         !$omp end parallel do
-        unsat_run = 0 ; psi_run = DZERO ; psi_num = 0
-        !$omp parallel do private(i, cell_psi) reduction(+:unsat_run) reduction(min:psi_run)
-        do i = 1, ncalc
-          cell_psi = st_sol%head_new(i) - st_geom%cell_top(i)
-          if (cell_psi < DZERO) then
-            unsat_run = unsat_run + 1
-          end if
-          psi_run = min(psi_run, cell_psi)
-        end do
-        !$omp end parallel do
-        if (unsat_run > unsat_num) then
-          unsat_num = unsat_run
-        end if
-        if (psi_run < unsat_psi) then
-          do i = 1, ncalc
-            if (st_sol%head_new(i) - st_geom%cell_top(i) <= psi_run) then
-              psi_num = i ; exit
-            end if
-          end do
-          unsat_psi = psi_run*len_scal ; unsat_cell = get_cnum(psi_num)
-        end if
-        unsat_tot = ncalc
       else
         l2norm_pre = l2norm_new
       end if
@@ -483,7 +457,6 @@ module nonlinear_solution
   !*********************************************************************************************
     ! -- modules
     use kind_module, only: SP
-    use utility_module, only: log_fnum
     ! -- inout
     real(DP), intent(in) :: l2_new, l2_pre, l2_jac, grad
     real(DP), intent(inout) :: eta
@@ -565,7 +538,7 @@ module nonlinear_solution
                      st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, new_f)
     ! -- Calculate l2 norm square (resl2norm2)
       call calc_l2norm2(1, st_sol%head_change, l2_pnorm)
-    ! -- Calculate vector by jacobi-free (vecjocf)
+    ! -- Calculate vector by jacobi-free (vecjacf)
       call calc_vecjacf(1, st_sol%head_change, st_sol%stor_old, st_sol%stor_new,&
                         st_sol%surf_head, st_sol%head_pre, st_sol%srat_new, st_sol%rel_perm,&
                         st_sol%surf_rati, jacvec)
@@ -607,7 +580,6 @@ module nonlinear_solution
       end if
 #endif
       if (dsat_scale < DONE) then
-        satlim_num = satlim_num + 1
         maxpnorm = min(maxpnorm, dsat_scale)
       end if
     end if
@@ -668,7 +640,6 @@ module nonlinear_solution
       lam_min = DZERO
     end if
     if (slope >= DZERO) then
-      slope_sign_num = slope_sign_num + 1
       if (slope > DZERO) then
         slope = -slope
       end if
@@ -680,7 +651,6 @@ module nonlinear_solution
         call calc_funcl2norm(lam, l2_new, new_f, st_sol)
       backi = backi + 1
       if (.not. ieee_is_finite(l2_new) .or. l2_new > DIVERGE_LIMIT) then
-        nan_recv_num = nan_recv_num + 1
         if (lam < lam_min) then
           ! -- Calculate function and l2norm2 (func2norm)
             call calc_funcl2norm(DZERO, l2_new, new_f, st_sol)
@@ -738,8 +708,7 @@ module nonlinear_solution
       if (lam == DONE .and. lam_maxi > DONE) then
         lam_max = lam_maxi
         b1_loop: do
-          if (DHALF*l2_new > alpha_cond .or. DHALF*l2_new >= beta_cond .or. &
-              lam >= lam_max) then
+          if (DHALF*l2_new > alpha_cond .or. DHALF*l2_new >= beta_cond .or. lam >= lam_max) then
             exit b1_loop
           end if
           lam2 = lam ; l2_new2 = DHALF*l2_new ; lam = min(DTWO*lam, lam_max)
@@ -788,7 +757,6 @@ module nonlinear_solution
 
     if (lam*sql2_pnorm > MAXSTEP_RATIO*maxstep) then
       maxsf = .true.
-      maxstep_num = maxstep_num + 1
     end if
 
     grad = slope*lam

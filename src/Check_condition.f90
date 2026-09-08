@@ -1,10 +1,13 @@
 module check_condition
   ! -- modules
   use kind_module, only: I4, SP
-  use constval_module, only: SONE, SNOVAL
-  use utility_module, only: st_mpi, write_err_stop, get_ilen, conv_i2s
+  use constval_module, only: CHALEN, VARLEN, SONE, SNOVAL
+  use utility_module, only: st_mpi, write_err_stop, get_ilen, conv_i2s, close_file
+  use utility_module, only: open_new_rtxt
   use initial_module, only: in_type, out_type, st_grid, st_in_type, st_seal, st_out_type
+  use initial_module, only: st_in_path, st_in_unit
   use initial_module, only: st_out_path, st_out_unit, st_out_time, st_out_step
+  use read_module, only: read_clasf, read_3dpointf
   use open_file, only: open_out_binf
   use read_input, only: len_scal, len_scal_inv
 #ifdef MPI_MSG
@@ -34,9 +37,6 @@ module check_condition
   ! read_seal_set -- Read sea level file set
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: CHALEN
-    use utility_module, only: close_file, open_new_rtxt
-    use initial_module, only: st_in_path
     ! -- inout
     integer(I4), intent(out) :: eff_type
     character(*), intent(out) :: eff_path
@@ -67,10 +67,6 @@ module check_condition
   ! read_seal_clasf -- Read the sea level classfication file
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: VARLEN
-    use utility_module, only: close_file
-    use read_module, only: read_clasf
-    use initial_module, only: st_in_path, st_in_unit
     ! -- inout
     integer(I4), intent(out) :: nclas
     character(VARLEN), allocatable, intent(out) :: clas_name(:)
@@ -96,9 +92,6 @@ module check_condition
   ! read_seal_point -- Read sea level point file
   !*********************************************************************************************
     ! -- modules
-    use utility_module, only: close_file
-    use read_module, only: read_3dpointf
-    use initial_module, only: st_in_path, st_in_unit
     ! -- inout
     integer(I4), intent(out) :: sea_ptn
     integer(I4), allocatable, intent(out) :: sp_i(:), sp_j(:), sp_k(:)
@@ -139,7 +132,6 @@ module check_condition
   ! read_sea_allv -- Read sea level all value
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_in_path, st_in_unit
     ! -- inout
     real(SP), intent(out) :: allv(:)
     ! -- local
@@ -265,8 +257,7 @@ module check_condition
   !*********************************************************************************************
     ! -- modules
     use kind_module, only: SP
-    use constval_module, only: CHALEN
-    use utility_module, only: open_new_rtxt, open_new_rbin, write_err_read
+    use utility_module, only: open_new_rbin, write_err_read
     ! -- inout
     integer(I4), intent(in) :: seal_ftype
     character(*), intent(in) :: seal_path, seal_unit
@@ -339,9 +330,6 @@ module check_condition
   ! read_sealf -- Read sea level value for check
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: VARLEN
-    use utility_module, only: close_file
-    use read_module, only: read_clasf, read_3dpointf
     ! -- inout
     integer(I4), intent(in) :: seal_ftype, seal_num
     real(SP), intent(out) :: seal_val(:)

@@ -3,7 +3,7 @@ module linear_solution
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE, DINFI, UROUND
   use types_module, only: kryl_set, amgt_set
-  use utility_module, only: st_mpi, dilu_shift_num, lin_guard_num
+  use utility_module, only: st_mpi
   use initial_module, only: st_ctrl
   use prep_calculation, only: st_time
   use allocate_solution, only: nreg_num, dir_conn, crs_index, array_var
@@ -235,7 +235,6 @@ module linear_solution
         !$omp end parallel do
       else
         if (abs(sk0) < UROUND*abs(sk)) then
-          lin_guard_num = lin_guard_num + 1
           sk0 = sign(max(abs(sk0), UROUND*abs(sk)), sk0)
         end if
         beta = sk/sk0
@@ -275,7 +274,6 @@ module linear_solution
 
       guard_scal = sqrt(guard_nrm(1)*guard_nrm(2))
       if (abs(sk2) < UROUND*guard_scal) then
-        lin_guard_num = lin_guard_num + 1
         sk2 = sign(max(abs(sk2), UROUND*guard_scal), sk2)
       end if
       alpha = sk/sk2
@@ -414,11 +412,9 @@ module linear_solution
         !$omp end parallel do
       else
         if (abs(sk0) < UROUND*abs(sk)) then
-          lin_guard_num = lin_guard_num + 1
           sk0 = sign(max(abs(sk0), UROUND*abs(sk)), sk0)
         end if
         if (abs(bicgs_omega) < UROUND) then
-          lin_guard_num = lin_guard_num + 1
           bicgs_omega = sign(UROUND, bicgs_omega)
         end if
         beta = (sk/sk0)*(alpha/bicgs_omega)
@@ -481,7 +477,6 @@ module linear_solution
 #endif
       guard_scal = sqrt(guard_nrm(1)*guard_nrm(2))
       if (abs(sk2) < UROUND*guard_scal) then
-        lin_guard_num = lin_guard_num + 1
         sk2 = sign(max(abs(sk2), UROUND*guard_scal), sk2)
       end if
       alpha = sk/sk2
@@ -564,7 +559,6 @@ module linear_solution
 
         guard_scal = sqrt(tt*guard_nrm(1))
         if (abs(tt) < UROUND*guard_scal) then
-          lin_guard_num = lin_guard_num + 1
           tt = sign(max(abs(tt), UROUND*guard_scal), tt)
         end if
         bicgs_omega = ts/tt
@@ -916,7 +910,6 @@ module linear_solution
         d_floor = st_ctrl%dilu_shift*abs(pre_ind(i))
         if (abs(pre_d(i)) < d_floor) then
           pre_d(i) = sign(d_floor, pre_ind(i))
-          dilu_shift_num = dilu_shift_num + 1
         end if
       end if
     end do

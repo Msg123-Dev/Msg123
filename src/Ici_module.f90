@@ -4,7 +4,7 @@ module ici_module
   use constval_module, only: DZERO
   use utility_module, only: st_mpi
   use initial_module, only: out_type, st_grid, st_out_type
-  use read_input, only: len_scal, z_base
+  use read_input, only: len_scal, len_scal_inv, z_base
   use set_cell, only: get_calc_grid, ncalc, ncals
   use set_condition, only: st_hydr, st_bcnd
   use prep_calculation, only: st_time
@@ -577,7 +577,6 @@ module ici_module
   ! calc_infil -- Calculation infiltration
   !*********************************************************************************************
     ! -- module
-    use read_input, only: len_scal_inv
     ! -- inout
     real(DP), intent(in) :: winpt(:), runofa(:), runofb(:), evapso(:), evapve(:)
     real(SP), intent(out) :: infilt(:)
@@ -601,7 +600,6 @@ module ici_module
   ! conv_rive -- Convert river
   !*********************************************************************************************
     ! -- module
-    use read_input, only: len_scal_inv
     ! -- inout
     real(DP), intent(in) :: inwd(:)
     integer(I4), intent(out) :: wdflag(:)

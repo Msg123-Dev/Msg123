@@ -182,9 +182,7 @@ module mpi_set
       end if
     end if
 
-    ! -- The configuration structures are sent whole, so a new member needs no change
-    !    here. This relies on every rank sharing one data representation, which holds
-    !    within a cluster of like processors.
+    ! -- Bcast configuration structures as bytes
     call MPI_BCAST(st_ctrl, storage_size(st_ctrl)/8, MPI_BYTE, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then

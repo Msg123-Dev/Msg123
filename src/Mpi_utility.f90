@@ -1109,8 +1109,7 @@ module mpi_utility
 
   subroutine scatterv_i4_array(num_prot, out_num, glo_array, loc_array, err_mes)
   !*********************************************************************************************
-  ! scatterv_i4_array -- Scatter an integer array held on rank 0 to each rank's contiguous
-  !   range (the inverse of gather_i4_array). Only rank 0 needs glo_array to be valid.
+  ! scatterv_i4_array -- Scatter integer array
   !*********************************************************************************************
     ! -- module
 
@@ -1161,8 +1160,7 @@ module mpi_utility
 
   subroutine scatterv_r4_array(num_prot, out_num, glo_array, loc_array, err_mes)
   !*********************************************************************************************
-  ! scatterv_r4_array -- Scatter a real4 array held on rank 0 to each rank's contiguous range
-  !   (the real4 counterpart of scatterv_i4_array). Only rank 0 needs glo_array to be valid.
+  ! scatterv_r4_array -- Scatter real4 array
   !*********************************************************************************************
     ! -- module
 

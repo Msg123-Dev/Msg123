@@ -579,8 +579,7 @@ module open_file
             call open_new_rtxt(1, 1, trim(adjustl(intsep)), "input "//err_mes, st_seal%fnum)
         end if
       else if (any(bin_seal_mask)) then
-        ! -- the inner type is known now, so pick the matching view (2d surface / 3d cell) and
-        !    hand it back so the time loop sets the same view on the next file of the list
+        ! -- Pick the matching view for the inner type and hand it back
         if (intse_type == in_type(4) .and. present(view_2d)) then
           temp_view = view_2d
         else if (intse_type == in_type(6) .and. present(view_3d)) then

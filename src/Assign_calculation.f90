@@ -8,6 +8,7 @@ module assign_calc
   use set_cell, only: ncalc, ncals, st_conn
   use set_condition, only: set_clas2calc, set_2dfile2calc, set_3dfile2calc, st_hydr
 #ifdef MPI_MSG
+  use mpi_utility, only: bcast_val
   use mpi_read, only: close_mpi_file
 #endif
 
@@ -434,7 +435,7 @@ module assign_calc
     use constval_module, only: DNOVAL
     use set_cell, only: get_calc_grid
 #ifdef MPI_MSG
-    use mpi_utility, only: mpisum_val, bcast_val
+    use mpi_utility, only: mpisum_val
     use mpi_read, only: read_mpi_restf, read_mpi_head
     use mpi_set, only: bcast_init_dep, senrec_neibval
     use set_cell, only: neib_mpi_totn, neib_ncalc, send_cind, recv_cind, send_citem, recv_citem
@@ -598,7 +599,7 @@ module assign_calc
     use open_file, only: inmas_fnum
     use set_condition, only: set_mass2calc
 #ifdef MPI_MSG
-    use mpi_utility, only: mpimax_val, bcast_val
+    use mpi_utility, only: mpimax_val
     use mpi_set, only: bcast_clas_val
 #endif
     ! -- inout

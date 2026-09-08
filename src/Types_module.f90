@@ -297,7 +297,7 @@ module types_module
   end type amgt_set
 
   type :: coef_set
-    real(DP), allocatable :: per_srat(:), per_relp(:), stor_per(:), dkr_dpsi(:)
+    real(DP), allocatable :: per_relp(:), stor_per(:), dkr_dpsi(:)
     real(DP), allocatable :: dstor_dpsi(:)
     real(DP), allocatable :: temp_rhs(:)
     real(DP), allocatable :: stod(:), cond(:), sead(:), dmats(:)

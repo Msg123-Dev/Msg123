@@ -501,8 +501,7 @@ module calc_function
 
   end subroutine func_sealterm
 
-  subroutine calc_vecjacf(vjlevel, injvec, stold, stnew, surfh, injx, snew, rperm, surfr,&
-                          outjvec)
+  subroutine calc_vecjacf(vj, injvec, stold, stnew, surfh, injx, snew, rperm, surfr, outjvec)
   !*********************************************************************************************
   ! calc_vecjacf -- Calculate vector by jacobi-free
   !*********************************************************************************************
@@ -512,7 +511,7 @@ module calc_function
     use mpi_utility, only: mpisum_val
 #endif
     ! -- inout
-    integer(I4), intent(in) :: vjlevel
+    integer(I4), intent(in) :: vj
     real(DP), intent(in) :: injvec(:), stold(:), surfh(:)
     real(DP), intent(inout) :: stnew(:), injx(:), snew(:), rperm(:), surfr(:)
     real(DP), intent(out) :: outjvec(:)
@@ -525,7 +524,7 @@ module calc_function
     real(DP) :: sum_l2
 #endif
     !-------------------------------------------------------------------------------------------
-    vj_num = crs_index(vjlevel)%unknow
+    vj_num = crs_index(vj)%unknow
     vj_regnum = size(injx)
 
     !$omp parallel

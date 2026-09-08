@@ -2,7 +2,7 @@ module mpi_solve
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO
-  use utility_module, only: st_mpi, write_err_stop, dilu_shift_num
+  use utility_module, only: st_mpi, write_err_stop
   use initial_module, only: st_ctrl
   use mpi_utility, only: mpisum_val
   use set_cell, only: ncalc, neib_mpi_totn, send_cind, recv_cind, send_citem, recv_citem
@@ -287,7 +287,6 @@ module mpi_solve
               d_floor = st_ctrl%dilu_shift*abs(pre_ind(i))
               if (abs(pre_d(i)) < d_floor) then
                 pre_d(i) = sign(d_floor, pre_ind(i))
-                dilu_shift_num = dilu_shift_num + 1
               end if
             end if
           end if

@@ -114,11 +114,7 @@ module set_cell
 
     nxy = st_grid%nx*st_grid%ny
 
-    ! -- Partition dimension (2d columns / 3d cells). 3d is selected by:
-    !      div_reg_3d = st_sim%reg_neib /= 1 .and. &
-    !                   (st_sim%reg_type == in_type(5) .or. st_sim%reg_type == in_type(6) .or. &
-    !                    st_mpi%totn >= nxy)
-    !    Forced 2d until the 3d downstream (column maps, surface comm, seepage) is ready.
+    ! -- Partition by 2d columns. 3d is not ready downstream
     div_reg_3d = .false.
 
 #ifdef MPI_MSG
@@ -763,8 +759,7 @@ module set_cell
       end do
     end if
 
-    ! -- The rank ranges must not fall back and must not run past the rank count.
-    !    A region left with an empty range shares the previous rank downstream.
+    ! -- Clamp the rank ranges to the rank count without falling back
       do i = 1, totnreg
         reg_mpi_end(i) = min(reg_mpi_end(i), st_mpi%totn)
         reg_mpi_end(i) = max(reg_mpi_end(i), reg_mpi_end(i-1))

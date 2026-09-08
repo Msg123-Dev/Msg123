@@ -1,7 +1,11 @@
 module check_simulation
   ! -- modules
   use kind_module, only: I4, DP
-  use initial_module, only: st_sim
+  use constval_module, only: DZERO
+  use utility_module, only: st_mpi
+  use initial_module, only: st_sim, st_ctrl
+  use read_input, only: len_scal
+  use set_cell, only: ncalc
   use prep_calculation, only: st_time
 
   implicit none
@@ -19,7 +23,6 @@ module check_simulation
   ! check_insol -- Check inner solution
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_ctrl
     ! -- inout
     real(DP), intent(in) :: bsum, rsum
     ! -- local
@@ -40,8 +43,6 @@ module check_simulation
   ! check_abserrmax -- Check absolute error max norm
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: DZERO
-    use set_cell, only: ncalc
     ! -- inout
     real(DP), intent(in) :: x_new(:), x_pre(:)
     real(DP), intent(out) :: chmax, xmax
@@ -96,14 +97,9 @@ module check_simulation
   ! check_residual -- Check residual convergence criteria
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: DZERO
 #ifdef MPI_MSG
-    use utility_module, only: st_mpi
     use mpi_utility, only: mpisum_val
 #endif
-    use initial_module, only: st_ctrl
-    use read_input, only: len_scal
-    use set_cell, only: ncalc
     use make_cell, only: st_geom
     ! -- inout
     real(DP), intent(in) :: funcv(:), stnew(:)
@@ -160,13 +156,10 @@ module check_simulation
   ! check_stepnorm -- Check scaled step max norm
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: DZERO, DONE
+    use constval_module, only: DONE
 #ifdef MPI_MSG
-    use utility_module, only: st_mpi
     use mpi_utility, only: mpimax_val
 #endif
-    use read_input, only: len_scal
-    use set_cell, only: ncalc
     ! -- inout
     real(DP), intent(in) :: x_new(:), x_pre(:)
     real(DP), intent(out) :: stepmax

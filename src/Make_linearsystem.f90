@@ -34,7 +34,7 @@ module make_linearsystem
     !-------------------------------------------------------------------------------------------
     tot_ind = crs_index(1)%offind(nreg_num)
 
-    allocate(st_coef%per_srat(ncalc), st_coef%per_relp(nreg_num), st_coef%temp_rhs(nreg_num))
+    allocate(st_coef%per_relp(nreg_num), st_coef%temp_rhs(nreg_num))
     allocate(st_coef%dkr_dpsi(nreg_num))
     allocate(st_coef%dstor_dpsi(ncalc))
     allocate(st_coef%stor_per(ncalc))
@@ -121,7 +121,7 @@ module make_linearsystem
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, ncalc
-      st_coef%per_srat(i) = DZERO ; st_coef%dstor_dpsi(i) = DZERO
+      st_coef%dstor_dpsi(i) = DZERO
       st_coef%stod(i) = DZERO ; st_coef%sead(i) = DZERO ; st_coef%dmats(i) = DZERO
     end do
     !$omp end parallel do
@@ -139,17 +139,15 @@ module make_linearsystem
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
       if (st_ctrl%deri_type == 1) then
-        call calc_srat_rperm(ncalc, DZERO, st_sol%head_new, st_coef%per_srat,&
-                             st_coef%per_relp, dkr_dpsi_out=st_coef%dkr_dpsi,&
-                             dstor_dpsi_out=st_coef%dstor_dpsi)
+        call calc_srat_rperm(ncalc, DZERO, st_sol%head_new, rperm=st_coef%per_relp,&
+                             dkr_dpsi=st_coef%dkr_dpsi, dstor_dpsi=st_coef%dstor_dpsi)
       end if
-      call calc_srat_rperm(ncalc, st_ctrl%newper, st_sol%head_new, st_coef%per_srat,&
-                           st_coef%per_relp, st_coef%stor_per)
+      call calc_srat_rperm(ncalc, st_ctrl%newper, st_sol%head_new, rperm=st_coef%per_relp,&
+                           stor=st_coef%stor_per)
 
     if (st_sim%sim_type >= 0) then
       ! -- Form storage change (stochn)
-        call form_stochn(st_coef%stor_per, st_sol%stor_new, st_coef%dstor_dpsi,&
-                         st_coef%stod)
+        call form_stochn(st_coef%stor_per, st_sol%stor_new, st_coef%dstor_dpsi, st_coef%stod)
     end if
 
 #ifdef MPI_MSG
@@ -208,10 +206,7 @@ module make_linearsystem
 
   subroutine form_stochn(stor_per, stor_out, dstor_dpsi, dmat_sto)
   !*********************************************************************************************
-  ! form_stochn -- Form storage change. dW/dH is analytic when deri_type is 1, otherwise
-  !                it is a single difference quotient.
-  !                The alpha / deri_srat / deri_stor triple is gone: W is a single scalar
-  !                function of psi, so there is no product to expand.
+  ! form_stochn -- Form storage change
   !*********************************************************************************************
     ! -- modules
     use make_cell, only: st_geom
@@ -293,11 +288,9 @@ module make_linearsystem
 
           if (st_ctrl%deri_type == 1) then
             if (delhead <= DZERO) then
-              deri_con1(ind) = st_hydr%hydf_conn(ind)*dkr_dpsi(i)*delhead&
-                               *st_hydr%abyd_conn(ind)
+              deri_con1(ind) = st_hydr%hydf_conn(ind)*dkr_dpsi(i)*delhead*st_hydr%abyd_conn(ind)
             else
-              deri_con2(ind) = st_hydr%hydf_conn(ind)*dkr_dpsi(j)*delhead&
-                               *st_hydr%abyd_conn(ind)
+              deri_con2(ind) = st_hydr%hydf_conn(ind)*dkr_dpsi(j)*delhead*st_hydr%abyd_conn(ind)
             end if
           else
             relp1 = per_relp(i) ; relp2 = st_sol%rel_perm(j)
@@ -611,8 +604,7 @@ module make_linearsystem
       do i = 1, st_bcnd%seal_num
         c = st_bcnd%seal2calc(i)
         if (st_ctrl%deri_type == 1) then
-          deri_ks_sea(i) = dkr_dpsi(c)*st_hydr%hydf_seal(i)*delh_sea(i)&
-                           *st_hydr%abyd_seal(i)
+          deri_ks_sea(i) = dkr_dpsi(c)*st_hydr%hydf_seal(i)*delh_sea(i)*st_hydr%abyd_seal(i)
         else
           deri_ks_sea(i) = (per_sea(i)-rel_sea(i))*st_ctrl%newper_inv*delh_sea(i)&
                            *st_hydr%abyd_seal(i)

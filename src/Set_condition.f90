@@ -4,7 +4,7 @@ module set_condition
   use constval_module, only: SZERO, SNOVAL, DZERO, DONE
   use types_module, only: hydr_set, bcnd_set
   use utility_module, only: st_mpi
-  use initial_module, only: in_type, st_grid, st_well, st_schm
+  use initial_module, only: in_type, st_grid, st_well, st_schm, st_clas
   use read_module, only: read_2dtxt, read_2dbin, read_3dtxt, read_3dbin, flat_2dto2d
   use read_module, only: flat_2dto3d, flat_3dto3d
   use set_cell, only: ncalc, ncals, neib_ncalc, st_conn
@@ -62,7 +62,6 @@ module set_condition
   ! set_clas2calc -- Set calculation value from classification
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_clas
     ! -- inout
     integer(I4), intent(in) :: tgn
     character(*), intent(in) :: tg_name(:)
@@ -121,7 +120,6 @@ module set_condition
   ! set_clas2seal -- Set seal value from classification
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_clas
     ! -- inout
     integer(I4), intent(in) :: tgn
     character(*), intent(in) :: tg_name(:)
@@ -579,7 +577,6 @@ module set_condition
   !*********************************************************************************************
     ! -- modules
 #ifdef MPI_MSG
-    use mpi_set, only: scatter_xyval
 #endif
     ! -- inout
     integer(I4), intent(in) :: fnum, ftype, int_ft, no_val
@@ -674,7 +671,6 @@ module set_condition
   !*********************************************************************************************
     ! -- modules
 #ifdef MPI_MSG
-    use mpi_set, only: scatter_xyval
 #endif
     ! -- inout
     integer(I4), intent(in) :: fnum, ftype, int_ft
@@ -770,7 +766,6 @@ module set_condition
   !*********************************************************************************************
     ! -- modules
 #ifdef MPI_MSG
-    use mpi_set, only: scatter_xyval
 #endif
     ! -- inout
     integer(I4), intent(in) :: fnum, ftype, int_ft

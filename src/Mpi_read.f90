@@ -130,8 +130,7 @@ module mpi_read
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; head_dis = 0
-    call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_REAL4, file_view, "native", MPI_INFO_NULL,&
-                           ierr)
+    call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_REAL4, file_view, "native", MPI_INFO_NULL, ierr)
 
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
@@ -155,8 +154,7 @@ module mpi_read
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; head_dis = 0
-    call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_REAL8, file_view, "native", MPI_INFO_NULL,&
-                           ierr)
+    call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_REAL8, file_view, "native", MPI_INFO_NULL, ierr)
 
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
@@ -841,10 +839,7 @@ module mpi_read
 
   subroutine read_dist_seaval(seal_ftype, seal_path, read_sta, read_num, read_seaval)
   !*********************************************************************************************
-  ! read_dist_seaval -- Read this rank's read-range sea levels from a binary sea file (段5-3c).
-  !   3dfile: value(g) is at byte (g-1)*4, so the read range [read_sta..] is a contiguous slab.
-  !   2dfile: value is per surface column; each rank reads the whole nxy surface field (a 2d
-  !   field is O(nxy)) and maps each read cell by its column.
+  ! read_dist_seaval -- Read this rank's read-range sea levels
   !*********************************************************************************************
     ! -- modules
 

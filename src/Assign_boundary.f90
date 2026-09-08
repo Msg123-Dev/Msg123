@@ -1,6 +1,6 @@
 module assign_boundary
   ! -- modules
-  use kind_module, only: I4, SP
+  use kind_module, only: I4, SP, DP
   use constval_module, only: SNOVAL, DZERO
   use types_module, only: forc_set
   use utility_module, only: st_mpi, close_file
@@ -28,7 +28,6 @@ module assign_boundary
   ! assign_sealv -- Assign sea level value
   !*********************************************************************************************
     ! -- modules
-    use kind_module, only: DP
     use utility_module, only: write_err_stop, get_ilen, conv_i2s
     use initial_module, only: st_in_type, st_seal
     use read_module, only: read_3dpointf
@@ -359,7 +358,6 @@ module assign_boundary
   ! assign_rilav -- Assign river and lake value
   !*********************************************************************************************
     ! -- modules
-    use kind_module, only: DP
     use types_module, only: surfw_set
     use read_module, only: read_2dpointf
     use set_condition, only: set_point2surf

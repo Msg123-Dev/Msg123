@@ -459,6 +459,10 @@ module utility_module
     ! -- local
     integer(I4) :: i, j, k, t
     !-------------------------------------------------------------------------------------------
+    if (last <= first) then
+      return
+    end if
+
     k = in_x((first+last)/2) ; i = first ; j = last
     do
       do while(in_x(i) < k)
@@ -494,6 +498,10 @@ module utility_module
     ! -- local
     integer(I4) :: low_pos, high_pos, pivot, swap_tmp
     !-------------------------------------------------------------------------------------------
+    if (last <= first) then
+      return
+    end if
+
     pivot = key_x((first+last)/2) ; low_pos = first ; high_pos = last
     do
       do while(key_x(low_pos) < pivot)

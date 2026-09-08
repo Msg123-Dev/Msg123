@@ -763,6 +763,13 @@ module set_cell
       end do
     end if
 
+    ! -- The rank ranges must not fall back and must not run past the rank count.
+    !    A region left with an empty range shares the previous rank downstream.
+      do i = 1, totnreg
+        reg_mpi_end(i) = min(reg_mpi_end(i), st_mpi%totn)
+        reg_mpi_end(i) = max(reg_mpi_end(i), reg_mpi_end(i-1))
+      end do
+
     allocate(cals_end(totnreg))
     call mpiexscan_val(my_reg_ncals, "region column prefix", cals_end)
 

@@ -37,24 +37,30 @@ module calc_parameter
     real(DP) :: per_phead, phead0
     real(DP) :: kr_phead, kr_beta, kr_se, kr_term
     real(DP) :: pors_val, resi_val, dtheta_dpsi
+    real(DP) :: kr_lin, kr_grad
     !-------------------------------------------------------------------------------------------
-    phead0 = DZERO
+    phead0 = -st_schm%krlin_head
 
     !$omp parallel do private(i, per_phead, retm, beta, theta, kr, se, stor_val, kr_phead) &
     !$omp             private(kr_beta, kr_se, kr_term, pors_val, resi_val, dtheta_dpsi) &
-    !$omp             private(srat_val)
+    !$omp             private(srat_val, kr_lin, kr_grad)
     do i = 1, num
       pors_val = st_hydr%read_pors(i) ; resi_val = st_hydr%read_resi(i)
       per_phead = pres(i) - st_geom%cell_top(i) + pertur
+      kr_lin = DONE ; kr_grad = DZERO
+      ! -- Relative permeability and its slope at the linear bridge head
+      if (st_schm%krlin_head > DZERO) then
+        retm = DONE - DONE/st_hydr%read_vann(i)
+        beta = abs(phead0*st_hydr%read_vana(i))**st_hydr%read_vann(i)
+        se = (DONE+beta)**(-retm)
+        kr_term = DONE-(DONE-se**(DONE/retm))**retm
+        kr_lin = se**(DHALF)*kr_term**DTWO
+        kr_grad = (DONE-kr_lin)/st_schm%krlin_head
+      end if
       if (per_phead < DZERO) then
         retm = DONE - DONE/st_hydr%read_vann(i)
-        if (per_phead <= phead0) then
-          beta = abs(per_phead*st_hydr%read_vana(i))**st_hydr%read_vann(i)
-          theta = resi_val + (pors_val-resi_val)*((DONE+beta))**(-retm)
-        else
-          beta = DZERO
-          theta = pors_val
-        end if
+        beta = abs(per_phead*st_hydr%read_vana(i))**st_hydr%read_vann(i)
+        theta = resi_val + (pors_val-resi_val)*((DONE+beta))**(-retm)
         srat_val = theta/pors_val
         if (st_schm%stor_type == 1) then
           stor_val = theta + st_hydr%read_spst(i)*per_phead*srat_val
@@ -67,6 +73,12 @@ module calc_parameter
         if (present(dkr_dpsi)) then
           dkr_dpsi(i) = -(retm*st_hydr%read_vann(i)/((DONE+beta)*per_phead)) *sqrt(se)*kr_term&
                         *(DHALF*kr_term*beta + DTWO*(DONE-kr_term))
+        end if
+        if (per_phead > phead0) then
+          kr = kr_lin + (per_phead-phead0)*kr_grad
+          if (present(dkr_dpsi)) then
+            dkr_dpsi(i) = kr_grad
+          end if
         end if
         if (present(dstor_dpsi)) then
           dtheta_dpsi = (pors_val-resi_val)*se*retm*st_hydr%read_vann(i)*beta&
@@ -101,6 +113,12 @@ module calc_parameter
           if (present(dkr_dpsi)) then
             dkr_dpsi(i) = -(retm*st_hydr%read_vann(i)/((DONE+kr_beta)*kr_phead))*sqrt(kr_se)&
                           *kr_term*(DHALF*kr_term*kr_beta + DTWO*(DONE-kr_term))
+          end if
+          if (kr_phead > phead0) then
+            kr = kr_lin + (kr_phead-phead0)*kr_grad
+            if (present(dkr_dpsi)) then
+              dkr_dpsi(i) = kr_grad
+            end if
           end if
         else
           kr = DONE

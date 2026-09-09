@@ -214,6 +214,7 @@ module initial_module
     ! input scheme file
     st_schm%krpos_type = 0 ; st_schm%stor_type = 1
     st_schm%abyd_type = 0 ; st_schm%abyd_ratio = DZERO
+    st_schm%krlin_head = DZERO
 
     ! time unit
     unit_list = ["SEC", "MIN", "HOU", "DAY", "YEA"]

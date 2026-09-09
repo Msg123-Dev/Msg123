@@ -141,22 +141,28 @@ module make_linearsystem
       if (st_ctrl%deri_type == 1) then
         call calc_srat_rperm(ncalc, DZERO, st_sol%head_new, rperm=st_coef%per_relp,&
                              dkr_dpsi=st_coef%dkr_dpsi, dstor_dpsi=st_coef%dstor_dpsi)
+      else
+        call calc_srat_rperm(ncalc, st_ctrl%newper, st_sol%head_new, rperm=st_coef%per_relp,&
+                             stor=st_coef%stor_per)
       end if
-      call calc_srat_rperm(ncalc, st_ctrl%newper, st_sol%head_new, rperm=st_coef%per_relp,&
-                           stor=st_coef%stor_per)
 
     if (st_sim%sim_type >= 0) then
       ! -- Form storage change (stochn)
-        call form_stochn(st_coef%stor_per, st_sol%stor_new, st_coef%dstor_dpsi, st_coef%stod)
+        if (st_ctrl%deri_type == 1) then
+          call form_stochn(st_sol%stor_new, st_coef%dstor_dpsi, st_coef%stod)
+        else
+          call form_stochn(st_sol%stor_new, st_coef%dstor_dpsi, st_coef%stod,&
+                           stor_per=st_coef%stor_per)
+        end if
     end if
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
     ! -- Send and Receive real vector value (rvectv)
-      call senrec_rvectv(st_coef%per_relp)
       if (st_ctrl%deri_type == 1) then
-      ! -- Send and Receive real vector value (rvectv)
         call senrec_rvectv(st_coef%dkr_dpsi)
+      else
+        call senrec_rvectv(st_coef%per_relp)
       end if
     end if
 #endif
@@ -204,29 +210,34 @@ module make_linearsystem
 
   end subroutine make_matrix
 
-  subroutine form_stochn(stor_per, stor_out, dstor_dpsi, dmat_sto)
+  subroutine form_stochn(stor_out, dstor_dpsi, dmat_sto, stor_per)
   !*********************************************************************************************
   ! form_stochn -- Form storage change
   !*********************************************************************************************
     ! -- modules
     use make_cell, only: st_geom
     ! -- inout
-    real(DP), intent(in) :: stor_per(:), stor_out(:)
+    real(DP), intent(in) :: stor_out(:)
     real(DP), intent(in) :: dstor_dpsi(:)
     real(DP), intent(out) :: dmat_sto(:)
+    real(DP), intent(in), optional :: stor_per(:)
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    !$omp parallel do private(i)
-    do i = 1, ncalc
-      if (st_ctrl%deri_type == 1) then
+    if (st_ctrl%deri_type == 1) then
+      !$omp parallel do private(i)
+      do i = 1, ncalc
         dmat_sto(i) = -dstor_dpsi(i)*st_time%delt_inv*st_geom%cell_vol(i)
-      else
+      end do
+      !$omp end parallel do
+    else
+      !$omp parallel do private(i)
+      do i = 1, ncalc
         dmat_sto(i) = -(stor_per(i)-stor_out(i))*st_ctrl%newper_inv&
                       *st_time%delt_inv*st_geom%cell_vol(i)
-      end if
-    end do
-    !$omp end parallel do
+      end do
+      !$omp end parallel do
+    end if
 
   end subroutine form_stochn
 

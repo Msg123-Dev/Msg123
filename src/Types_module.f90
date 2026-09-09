@@ -40,6 +40,7 @@ module types_module
     integer(I4) :: stor_type = 1
     integer(I4) :: abyd_type = 0
     real(DP) :: abyd_ratio = 0.00_DP
+    real(DP) :: krlin_head = 0.00_DP
   end type schm_set
 
   type :: geom_set

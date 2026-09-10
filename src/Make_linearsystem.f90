@@ -530,7 +530,7 @@ module make_linearsystem
             delh_s(i) = st_hydr%surf_top(i) - st_sol%head_new(i)
           end if
           over_sur(i) = DONE
-          deri_s(i) = -tran_sur(i)*st_sol%rel_perm(i)
+          deri_s(i) = -tran_sur(i)*st_sol%rel_perm(i)*st_sol%surf_rati(i)
         else if (st_sol%head_new(i) >= st_hydr%surf_bott(i)) then
           if (st_sol%surf_head(i) > st_hydr%surf_bott(i)) then
             delh_s(i) = st_sol%surf_head(i) - st_sol%head_new(i)
@@ -556,10 +556,10 @@ module make_linearsystem
       !$omp do private(i)
       do i = 1, ncals
         if (st_ctrl%deri_type == 1) then
-          deri_ks_sur(i) = dkr_dpsi(i)*delh_s(i)*tran_sur(i)*over_sur(i)
+          deri_ks_sur(i) = dkr_dpsi(i)*delh_s(i)*tran_sur(i)*st_sol%surf_rati(i)
         else
-          deri_ks_sur(i) = (per_relp(i)-st_sol%rel_perm(i))*st_ctrl%newper_inv*delh_s(i)*&
-                            tran_sur(i)*over_sur(i)
+          deri_ks_sur(i) = (per_relp(i)-st_sol%rel_perm(i))*st_ctrl%newper_inv*delh_s(i)&
+                           *tran_sur(i)*st_sol%surf_rati(i)
         end if
       end do
       !$omp end do

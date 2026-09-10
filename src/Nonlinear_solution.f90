@@ -8,6 +8,7 @@ module nonlinear_solution
   use read_input, only: len_scal, z_base
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc
+  use make_cell, only: st_geom
   use prep_calculation, only: st_time
   use allocate_solution, only: nreg_num, array_var
   use calc_function, only: qext_sum, calc_func
@@ -392,30 +393,41 @@ module nonlinear_solution
   ! calc_surfw -- Calculate surface water level
   !*********************************************************************************************
     ! -- modules
+    use initial_module, only: st_schm
     use set_cell, only: ncals
-!    use make_cell, only: surf_elev
-!    use prep_calculation, only: surf_bott
+    use set_condition, only: st_hydr
     ! -- inout
 
     type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    !$omp parallel do private(i)
-    do i = 1, ncals
-!      if (st_sol%head_new(i) <= surf_elev(i)) then
-!        st_sol%surf_head(i) = st_sol%head_new(i)
-!      else
-!        st_sol%surf_head(i) = surf_elev(i)
-!      end if
-      ! all surface head = surf_elev
-!      st_sol%surf_head(i) = surf_elev(i)
-      ! all surface head = surf_bottom
-!      st_sol%surf_head(i) = surf_bott(i)
-      ! all surface head = st_sol%head_new
-      st_sol%surf_head(i) = st_sol%head_new(i)
-    end do
-    !$omp end parallel do
+    select case (st_schm%surfw_type)
+    case (1)
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        st_sol%surf_head(i) = min(st_sol%head_new(i), st_geom%surf_elev(i))
+      end do
+      !$omp end parallel do
+    case (2)
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        st_sol%surf_head(i) = st_geom%surf_elev(i)
+      end do
+      !$omp end parallel do
+    case (3)
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        st_sol%surf_head(i) = st_hydr%surf_bott(i)
+      end do
+      !$omp end parallel do
+    case (0)
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        st_sol%surf_head(i) = st_sol%head_new(i)
+      end do
+      !$omp end parallel do
+    end select
 
   end subroutine calc_surfw
 
@@ -496,7 +508,6 @@ module nonlinear_solution
   !*********************************************************************************************
     ! -- modules
     use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
-    use make_cell, only: st_geom
     use calc_function, only: calc_vecjacf
 #ifdef MPI_MSG
     use mpi_utility, only: mpimax_val, mpimin_val

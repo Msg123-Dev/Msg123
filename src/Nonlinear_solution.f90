@@ -648,12 +648,11 @@ module nonlinear_solution
     grad = slope
     back_aloop: do
       ! -- Calculate function and l2norm2 (func2norm)
-        call calc_funcl2norm(lam, l2_new, new_f, st_sol)
-      backi = backi + 1
+        call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol)
       if (.not. ieee_is_finite(l2_new) .or. l2_new > DIVERGE_LIMIT) then
         if (lam < lam_min) then
           ! -- Calculate function and l2norm2 (func2norm)
-            call calc_funcl2norm(DZERO, l2_new, new_f, st_sol)
+            call calc_funcl2norm(DZERO, backi, l2_new, new_f, st_sol)
           backf = .true.
           return
         end if
@@ -667,7 +666,7 @@ module nonlinear_solution
       end if
       if (lam < lam_min) then
         ! -- Calculate function and l2norm2 (func2norm)
-          call calc_funcl2norm(DZERO, l2_new, new_f, st_sol)
+          call calc_funcl2norm(DZERO, backi, l2_new, new_f, st_sol)
         backf = .true.
         return
       end if
@@ -713,7 +712,7 @@ module nonlinear_solution
           end if
           lam2 = lam ; l2_new2 = DHALF*l2_new ; lam = min(DTWO*lam, lam_max)
           ! -- Calculate function and l2norm2 (func2norm)
-            call calc_funcl2norm(lam, l2_new, new_f, st_sol)
+            call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol)
           alpha_cond = DHALF*l2_pre + BACK_ALPHA*lam*slope
           beta_cond = DHALF*l2_pre + BACK_BETA*lam*slope
         end do b1_loop
@@ -728,7 +727,7 @@ module nonlinear_solution
           end if
           lam_incr = DHALF*lam_diff ; lam = lam_base + lam_incr
           ! -- Calculate function and l2norm2 (func2norm)
-            call calc_funcl2norm(lam, l2_new, new_f, st_sol)
+            call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol)
           alpha_cond = DHALF*l2_pre + BACK_ALPHA*lam*slope
           beta_cond = DHALF*l2_pre + BACK_BETA*lam*slope
 
@@ -745,7 +744,7 @@ module nonlinear_solution
         if (DHALF*l2_new < beta_cond .or.&
             (lam_diff < lam_min .and. DHALF*l2_new > alpha_cond)) then
           ! -- Calculate function and l2norm2 (func2norm)
-            call calc_funcl2norm(lam_base, l2_new, new_f, st_sol)
+            call calc_funcl2norm(lam_base, backi, l2_new, new_f, st_sol)
           betai = betai + 1
         end if
         if (betai == 10) then
@@ -791,13 +790,14 @@ module nonlinear_solution
 
   end function get_cnum
 
-  subroutine calc_funcl2norm(in_lam, l2_new, new_f, st_sol)
+  subroutine calc_funcl2norm(in_lam, backi, l2_new, new_f, st_sol)
   !*********************************************************************************************
   ! calc_funcl2norm -- Calculate function and l2norm2
   !*********************************************************************************************
     ! -- modules
 
     ! -- inout
+    integer(I4), intent(inout) :: backi
     real(DP), intent(in) :: in_lam
     real(DP), intent(out) :: l2_new
     real(DP), intent(inout) :: new_f(:)
@@ -808,6 +808,8 @@ module nonlinear_solution
     real(DP) :: sum_l2
 #endif
     !-------------------------------------------------------------------------------------------
+    backi = backi + 1
+
     !$omp parallel do private(i)
     do i = 1, nreg_num
       st_sol%head_new(i) = st_sol%head_pre(i) + in_lam*st_sol%head_change(i)

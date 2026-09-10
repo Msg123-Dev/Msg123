@@ -393,10 +393,9 @@ module make_linearsystem
       !$omp do private(i)
       do i = 1, st_bcnd%rive_num
         if (st_ctrl%deri_type == 1) then
-          deri_ks_riv(i) = dkr_riv(i)*delh_r(i)*tran_riv(i)*over_riv(i)
+          deri_ks_riv(i) = dkr_riv(i)*delh_r(i)*tran_riv(i)
         else
-          deri_ks_riv(i) = (per_riv(i)-rel_riv(i))*st_ctrl%newper_inv*delh_r(i)*tran_riv(i)&
-                           *over_riv(i)
+          deri_ks_riv(i) = (per_riv(i)-rel_riv(i))*st_ctrl%newper_inv*delh_r(i)*tran_riv(i)
         end if
       end do
       !$omp end do
@@ -462,10 +461,9 @@ module make_linearsystem
       !$omp do private(i)
       do i = 1, st_bcnd%lake_num
         if (st_ctrl%deri_type == 1) then
-          deri_ks_lak(i) = dkr_lak(i)*delh_l(i)*tran_lak(i)*over_lak(i)
+          deri_ks_lak(i) = dkr_lak(i)*delh_l(i)*tran_lak(i)
         else
-          deri_ks_lak(i) = (per_lak(i)-rel_lak(i))*st_ctrl%newper_inv*delh_l(i)*tran_lak(i)&
-                           *over_lak(i)
+          deri_ks_lak(i) = (per_lak(i)-rel_lak(i))*st_ctrl%newper_inv*delh_l(i)*tran_lak(i)
         end if
       end do
       !$omp end do

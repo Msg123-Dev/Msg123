@@ -747,10 +747,6 @@ module nonlinear_solution
             call calc_funcl2norm(lam_base, backi, l2_new, new_f, st_sol)
           betai = betai + 1
         end if
-        if (betai == 10) then
-          backf = .true.
-          return
-        end if
       end if
     end if
 

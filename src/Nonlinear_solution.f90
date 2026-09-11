@@ -22,8 +22,9 @@ module nonlinear_solution
   public :: allocate_nonlin, calc_numsol
 
   ! -- local
-  integer(I4), parameter :: MAXSTEP_RUN_MAX = 5
+  integer(I4), parameter :: MAXSTEP_RUN_MAX = 5, STAGN_RUN_MAX = 10
   real(DP), parameter :: VARMAX = 1.00E+03_DP, XMAX = 1.00E+04_DP
+  real(DP), parameter :: STAGN_FLOOR = 1.00E-04_DP
   real(DP), parameter :: XMAX_INV = 1.00E-04_DP
   real(DP), allocatable :: new_func(:), jacvec(:)
 
@@ -74,13 +75,13 @@ module nonlinear_solution
     integer(I4) :: i
     integer(I4) :: out_iter
     integer(I4) :: max_num, conv_fnum
-    integer(I4) :: back_iter, beta_iter, maxstep_run
+    integer(I4) :: back_iter, beta_iter, maxstep_run, stagn_run
     character(VARLEN) :: cxyzn
     real(DP) :: max_var, max_unk, check_val
-    real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var
+    real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var, mass_error_pre
     real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
     real(DP) :: res_l1, qext_l1, mass_error
-    logical :: back_flag, res_flag, maxs_flag
+    logical :: back_flag, res_flag, maxs_flag, stagn_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
     real(DP) :: var_max, unk_max, var_abs_max
@@ -98,8 +99,10 @@ module nonlinear_solution
     14 format(1X,"Stop due to maximum number of nonlinear iteration")
     15 format(1X,"Didn't converge in steady state calculation")
     16 format(1X,"RESIDUAL  SUM OF |F| = ",es11.3)
+    17 format(1X,"Stop due to stagnation of mass balance error")
     !-------------------------------------------------------------------------------------------
     conv_fnum = st_out_fnum%conv ; eater = DHALF ; maxstep_run = 0
+    stagn_run = 0 ; mass_error_pre = DZERO ; stagn_flag = .false.
     res_l1 = DZERO ; qext_l1 = DZERO ; mass_error = DZERO
     ! -- Set for backtracking (backtr)
       call set_backtr(st_sol, max_step)
@@ -307,6 +310,15 @@ module nonlinear_solution
       else
         mass_error = DZERO
       end if
+      if (mass_error > STAGN_FLOOR .and. mass_error >= mass_error_pre) then
+        stagn_run = stagn_run + 1
+      else
+        stagn_run = 0
+      end if
+      mass_error_pre = mass_error
+      if (stagn_run == STAGN_RUN_MAX .and. .not. back_flag) then
+        back_flag = .true. ; stagn_flag = .true.
+      end if
       if (st_mpi%rank == 0) then
         write(conv_fnum,11) st_time%out_iter, in_iter, back_iter, beta_iter, conv_var,&
                             trim(adjustl(cxyzn)), conv_dmat, conv_rhs, conv_head, mass_error
@@ -332,7 +344,11 @@ module nonlinear_solution
         exit outer_loop
       else if (back_flag .and. st_sim%sim_type /= -1) then
         if (st_mpi%rank == 0) then
-          write(conv_fnum,13)
+          if (stagn_flag) then
+            write(conv_fnum,17)
+          else
+            write(conv_fnum,13)
+          end if
         end if
         exit outer_loop
       else if (st_time%out_iter == st_ctrl%maxout_iter .and. st_sim%sim_type == -1) then

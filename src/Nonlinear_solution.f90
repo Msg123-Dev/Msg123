@@ -5,7 +5,7 @@ module nonlinear_solution
   use types_module, only: sol_set
   use utility_module, only: st_mpi, log_fnum
   use initial_module, only: st_ctrl
-  use read_input, only: len_scal, z_base
+  use read_input, only: len_scal, len_scal_inv, z_base
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc
   use make_cell, only: st_geom
@@ -473,8 +473,8 @@ module nonlinear_solution
 #endif
 
     maxstep = sqrt(l2_xnew)*VARMAX
-    if (maxstep < DONE) then
-      maxstep = DONE
+    if (maxstep < len_scal_inv) then
+      maxstep = len_scal_inv
     end if
 
   end subroutine set_backtr
@@ -634,7 +634,7 @@ module nonlinear_solution
 
     !$omp do private(i, temp_lam) reduction(max:lam_length)
     do i = 1, ncalc
-      temp_lam = abs(st_sol%head_change(i))/(DONE + abs(st_sol%head_pre(i)))
+      temp_lam = abs(st_sol%head_change(i))/(len_scal_inv + abs(st_sol%head_pre(i)))
       if (temp_lam > lam_length) then
         lam_length = temp_lam
       end if

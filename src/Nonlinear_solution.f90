@@ -22,9 +22,9 @@ module nonlinear_solution
   public :: allocate_nonlin, calc_numsol
 
   ! -- local
-  integer(I4), parameter :: MAXSTEP_RUN_MAX = 5, STAGN_RUN_MAX = 10
+  integer(I4), parameter :: MAXSTEP_RUN_MAX = 5, STAGN_RUN_MAX = 10, CYCLE_RUN_MAX = 100
   real(DP), parameter :: VARMAX = 1.00E+03_DP, XMAX = 1.00E+04_DP
-  real(DP), parameter :: STAGN_FLOOR = 1.00E-04_DP
+  real(DP), parameter :: STAGN_FLOOR = 1.00E-04_DP, CYCLE_RTOL = 1.00E-03_DP
   real(DP), parameter :: XMAX_INV = 1.00E-04_DP
   real(DP), allocatable :: new_func(:), jacvec(:)
 
@@ -75,13 +75,13 @@ module nonlinear_solution
     integer(I4) :: i
     integer(I4) :: out_iter
     integer(I4) :: max_num, conv_fnum
-    integer(I4) :: back_iter, beta_iter, maxstep_run, stagn_run
+    integer(I4) :: back_iter, beta_iter, maxstep_run, stagn_run, cycle_run
     character(VARLEN) :: cxyzn
     real(DP) :: max_var, max_unk, check_val
-    real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var, mass_error_pre
+    real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var, mass_error_pre, mass_error_min
     real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
     real(DP) :: res_l1, qext_l1, mass_error
-    logical :: back_flag, res_flag, maxs_flag, stagn_flag
+    logical :: back_flag, res_flag, maxs_flag, stagn_flag, cycle_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
     real(DP) :: var_max, unk_max, var_abs_max
@@ -100,9 +100,11 @@ module nonlinear_solution
     15 format(1X,"Didn't converge in steady state calculation")
     16 format(1X,"RESIDUAL  SUM OF |F| = ",es11.3)
     17 format(1X,"Stop due to stagnation of mass balance error")
+    19 format(1X,"Stop due to cycling of mass balance error")
     !-------------------------------------------------------------------------------------------
     conv_fnum = st_out_fnum%conv ; eater = DHALF ; maxstep_run = 0
     stagn_run = 0 ; mass_error_pre = DZERO ; stagn_flag = .false.
+    cycle_run = 0 ; mass_error_min = DZERO ; cycle_flag = .false.
     res_l1 = DZERO ; qext_l1 = DZERO ; mass_error = DZERO
     ! -- Set for backtracking (backtr)
       call set_backtr(st_sol, max_step)
@@ -310,15 +312,6 @@ module nonlinear_solution
       else
         mass_error = DZERO
       end if
-      if (mass_error > STAGN_FLOOR .and. mass_error >= mass_error_pre) then
-        stagn_run = stagn_run + 1
-      else
-        stagn_run = 0
-      end if
-      mass_error_pre = mass_error
-      if (stagn_run == STAGN_RUN_MAX .and. .not. back_flag) then
-        back_flag = .true. ; stagn_flag = .true.
-      end if
       if (st_mpi%rank == 0) then
         write(conv_fnum,11) st_time%out_iter, in_iter, back_iter, beta_iter, conv_var,&
                             trim(adjustl(cxyzn)), conv_dmat, conv_rhs, conv_head, mass_error
@@ -328,6 +321,30 @@ module nonlinear_solution
         ! -- Check residual convergence (residual)
           call check_residual(new_func, st_sol%stor_new, res_flag)
         st_time%conv_flag = res_flag
+      end if
+      if (.not. st_time%conv_flag) then
+        if (mass_error > STAGN_FLOOR .and. mass_error >= mass_error_pre) then
+          stagn_run = stagn_run + 1
+        else
+          stagn_run = 0
+        end if
+        mass_error_pre = mass_error
+        if (st_time%form_switch == 1) then
+          if (mass_error > DZERO .and.&
+              mass_error >= mass_error_min*(DONE - CYCLE_RTOL)) then
+            cycle_run = cycle_run + 1
+          else
+            cycle_run = 0
+          end if
+          if (mass_error_min <= DZERO .or. mass_error < mass_error_min) then
+            mass_error_min = mass_error
+          end if
+        end if
+        if (stagn_run == STAGN_RUN_MAX .and. .not. back_flag) then
+          back_flag = .true. ; stagn_flag = .true.
+        else if (cycle_run == CYCLE_RUN_MAX .and. .not. back_flag) then
+          back_flag = .true. ; cycle_flag = .true.
+        end if
       end if
 
       ! check outer_loop
@@ -346,6 +363,8 @@ module nonlinear_solution
         if (st_mpi%rank == 0) then
           if (stagn_flag) then
             write(conv_fnum,17)
+          else if (cycle_flag) then
+            write(conv_fnum,19)
           else
             write(conv_fnum,13)
           end if

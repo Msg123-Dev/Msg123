@@ -26,6 +26,8 @@ module calc_function
   real(DP), allocatable :: recf(:), surf(:), rivf(:), lakf(:)
   real(DP), allocatable :: stor_work(:)
   real(DP), allocatable :: conn_flow(:)
+  real(DP), allocatable :: scal_work(:)
+  real(DP), allocatable, public :: func_scal(:)
   real(DP), allocatable :: delh_s(:), elev_rati(:)
   real(DP), allocatable :: delh_r(:), delh_l(:), seal_flow(:)
   real(DP), allocatable :: jcvec(:), tempf1(:), tempf2(:)
@@ -48,13 +50,14 @@ module calc_function
     allocate(recf(ncals), surf(ncals), rivf(ncals), lakf(ncals))
     allocate(stor_work(ncalc))
     allocate(conn_flow(ncalc))
+    allocate(scal_work(ncalc), func_scal(ncalc))
     allocate(delh_s(ncals), elev_rati(ncals))
     allocate(delh_r(st_bcnd%rive_num), delh_l(st_bcnd%lake_num), seal_flow(st_bcnd%seal_num))
     allocate(jcvec(nreg_num), tempf1(ncalc), tempf2(ncalc))
 
   end subroutine allocate_calfun
 
-  subroutine calc_func(stold, stnew, surfh, infx, snew, rperm, surfr, funcv)
+  subroutine calc_func(stold, stnew, surfh, infx, snew, rperm, surfr, funcv, fscal)
   !*********************************************************************************************
   ! calc_func -- Calculate function value
   !*********************************************************************************************
@@ -63,6 +66,7 @@ module calc_function
     real(DP), intent(in) :: stold(:), surfh(:)
     real(DP), intent(inout) :: stnew(:), infx(:), snew(:), rperm(:), surfr(:)
     real(DP), intent(out) :: funcv(:)
+    real(DP), intent(out), optional :: fscal(:)
     ! -- local
     integer(I4) :: i, s
     !-------------------------------------------------------------------------------------------
@@ -97,7 +101,7 @@ module calc_function
 #endif
 
     ! -- Function connect flow from adjacent cells (connflow)
-      call func_connflow(infx, rperm, conf)
+      call func_connflow(infx, rperm, conf, present(fscal))
 
     ! -- Function recharge term (rechterm)
       call func_rechterm(recf)
@@ -128,6 +132,25 @@ module calc_function
       funcv(i) = funcvs(i) + stof(i) + conf(i) + welf(i) + seaf(i)
     end do
     !$omp end parallel do
+
+    if (present(fscal)) then
+      !$omp parallel do private(i)
+      do i = 1, ncalc
+        scal_work(i) = scal_work(i) + abs(stof(i)) + abs(welf(i)) + abs(seaf(i))
+      end do
+      !$omp end parallel do
+      !$omp parallel do private(s)
+      do s = 1, ncals
+        scal_work(s) = scal_work(s) + abs(recf(s)) + abs(surf(s)) + abs(rivf(s))&
+                       + abs(lakf(s))
+      end do
+      !$omp end parallel do
+      !$omp parallel do private(i)
+      do i = 1, ncalc
+        fscal(i) = scal_work(i)
+      end do
+      !$omp end parallel do
+    end if
 
       qext_sum = DZERO
       !$omp parallel do private(i) reduction(+:qext_sum)
@@ -170,7 +193,7 @@ module calc_function
 #endif
 
     ! -- Function connect flow from adjacent cells (connflow)
-      call func_connflow(hnew, rperm, conm)
+      call func_connflow(hnew, rperm, conm, .false.)
 
     ! -- Function recharge term (rechterm)
       call func_rechterm(recm)
@@ -232,7 +255,7 @@ module calc_function
 
   end subroutine func_stochn
 
-  subroutine func_connflow(infconn, rperm, confunc)
+  subroutine func_connflow(infconn, rperm, confunc, wscal)
   !*********************************************************************************************
   ! func_connflow -- Function connect flow from adjacent cells
   !*********************************************************************************************
@@ -241,19 +264,23 @@ module calc_function
     ! -- inout
     real(DP), intent(in) :: infconn(:), rperm(:)
     real(DP), intent(out) :: confunc(:)
+    logical, intent(in) :: wscal
     ! -- local
     integer(I4) :: i, j, k
     integer(I4) :: sta_ind, end_ind, ind
-    real(DP) :: relat, delhead, relp1, relp2
+    real(DP) :: relat, delhead, relp1, relp2, conn_val
     !-------------------------------------------------------------------------------------------
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc
       conn_flow(i) = DZERO
+      if (wscal) then
+        scal_work(i) = DZERO
+      end if
     end do
     !$omp end do
 
-    !$omp do private(i, j, k, sta_ind, end_ind, ind, delhead, relp1, relp2, relat)
+    !$omp do private(i, j, k, sta_ind, end_ind, ind, delhead, relp1, relp2, relat, conn_val)
     do i = 1, ncalc
       sta_ind = crs_index(1)%offind(i-1) ; end_ind = crs_index(1)%offind(i)
       do k = 1, end_ind-sta_ind
@@ -264,8 +291,11 @@ module calc_function
         ! -- Calculate hydradulic conductivity by upwind (hyd_upwind)
           call calc_hyd_upwind(-delhead, relp1, relp2, relat)
 
-        conn_flow(i) = conn_flow(i) + st_hydr%hydf_conn(ind)*relat*st_hydr%abyd_conn(ind)*&
-                       delhead
+        conn_val = st_hydr%hydf_conn(ind)*relat*st_hydr%abyd_conn(ind)*delhead
+        conn_flow(i) = conn_flow(i) + conn_val
+        if (wscal) then
+          scal_work(i) = scal_work(i) + abs(conn_val)
+        end if
       end do
       confunc(i) = conn_flow(i)
     end do

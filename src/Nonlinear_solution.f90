@@ -11,7 +11,7 @@ module nonlinear_solution
   use make_cell, only: st_geom
   use prep_calculation, only: st_time
   use allocate_solution, only: nreg_num, array_var
-  use calc_function, only: qext_sum, calc_func
+  use calc_function, only: qext_sum, func_scal, calc_func
   use calc_simulation, only: calc_l2norm2
 #ifdef MPI_MSG
   use mpi_utility, only: mpisum_val
@@ -264,7 +264,7 @@ module nonlinear_solution
 
       ! -- Calculate function value (func)
         call calc_func(st_sol%stor_old, st_sol%stor_new, st_sol%surf_head, st_sol%head_new,&
-                       st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, new_func)
+                       st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, new_func, func_scal)
       ! -- Calculate l2 norm square (resl2norm2)
         call calc_l2norm2(1, new_func, l2norm_new)
 #ifdef MPI_MSG
@@ -320,7 +320,7 @@ module nonlinear_solution
 
       if (st_time%conv_flag .and. st_ctrl%conv_type == 1) then
         ! -- Check residual convergence (residual)
-          call check_residual(new_func, st_sol%stor_new, res_flag)
+          call check_residual(new_func, func_scal, res_flag)
         st_time%conv_flag = res_flag
       end if
       if (.not. st_time%conv_flag) then

@@ -1,7 +1,7 @@
 module mpi_solve
   ! -- modules
   use kind_module, only: I4, DP
-  use constval_module, only: DZERO
+  use constval_module, only: DZERO, FACE
   use utility_module, only: st_mpi, write_err_stop
   use initial_module, only: st_ctrl
   use mpi_utility, only: mpisum_val
@@ -24,6 +24,7 @@ module mpi_solve
   real(DP), allocatable :: sbufreal(:), rbufreal(:)
   integer(I4), allocatable :: fix_flag(:), offr_flag(:)
   real(DP), allocatable :: temp_pred(:), temp_outx(:)
+  real(DP), allocatable :: lumat_dir(:,:)
 
   contains
 
@@ -48,6 +49,7 @@ module mpi_solve
     allocate(sbufreal(nsenrev), rbufreal(nsenrev))
     allocate(fix_flag(nreg_num), offr_flag(off_row_num))
     allocate(temp_pred(nreg_num), temp_outx(nreg_num))
+    allocate(lumat_dir(nreg_num,FACE))
 
     !$omp parallel
     !$omp do private(i)
@@ -60,6 +62,7 @@ module mpi_solve
     do i = 1, nreg_num
       fix_flag(i) = 0
       temp_pred(i) = DZERO ; temp_outx(i) = DZERO
+      lumat_dir(i,:) = DZERO
     end do
     !$omp end do
     !$omp do private(i)
@@ -230,9 +233,9 @@ module mpi_solve
     real(DP), intent(in) :: pre_ind(:), pre_inlu(:)
     real(DP), intent(inout) :: pre_d(:)
     ! -- local
-    integer(I4) :: i, j, k
-    integer(I4) :: off_sta, off_end, off_sta2, off_end2
-    integer(I4) :: offr, offr2, off_left, off_row_num
+    integer(I4) :: i, k
+    integer(I4) :: off_sta, off_end
+    integer(I4) :: offr, off_left, off_row_num
     integer(I4) :: rank_flag, allp_flag
     real(DP) :: d_invk, d_floor
     !-------------------------------------------------------------------------------------------
@@ -256,6 +259,17 @@ module mpi_solve
     !$omp end do
     !$omp end parallel
     rank_flag = 0 ; allp_flag = 0
+    !$omp parallel do private(i, k)
+    do i = 1, ncalc
+      do k = crs_index(1)%offind(i-1)+1, crs_index(1)%offind(i)
+        lumat_dir(i,dir_conn(k)) = pre_inlu(k)
+      end do
+    end do
+    !$omp end parallel do
+    do k = 1, FACE
+      ! -- Send and Receive real vector value (rvectv)
+        call senrec_rvectv(lumat_dir(:,k))
+    end do
     prefix_loop: do while (allp_flag /= st_mpi%totn)
       do i = 1, ncalc
         if (fix_flag(i) == 0) then
@@ -267,16 +281,8 @@ module mpi_solve
             if (off_left /= 0 .and. fix_flag(offr) == 1) then
               offr_flag(k) = 1
               d_invk = DONE/pre_d(offr)
-              off_sta2 = crs_index(1)%offind(offr-1) + 1
-              off_end2 = crs_index(1)%offind(offr)
-              do j = off_sta2, off_end2
-                offr2 = crs_index(1)%offrow(j)
-                if (3 < dir_conn(j)) then
-                  if (offr2 == i) then
-                    temp_pred(i) = temp_pred(i) - pre_inlu(k)*d_invk*pre_inlu(j)
-                  end if
-                end if
-              end do
+              temp_pred(i) = temp_pred(i)&
+                             - pre_inlu(k)*d_invk*lumat_dir(offr,FACE+1-dir_conn(k))
             else if (off_left == 0 .and. offr_flag(k) == 0) then
               offr_flag(k) = 1
             end if

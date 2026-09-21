@@ -252,6 +252,28 @@ module nonlinear_solution
         call write_err_stop("Nan detected in the steady state calculation.")
       end if
 
+      if (st_time%form_switch == 0 .and. st_ctrl%picard_btr > 0 .and.&
+          .not. st_time%conv_flag) then
+        ! -- Run backtracking for the picard iteration (picbtr)
+          call run_picbtr(back_iter, check_val, l2norm_pre, new_func, st_sol)
+        ! -- Check absolute error max norm
+          call check_abserrmax(st_sol%head_new, st_sol%head_pre, max_var, max_unk,&
+                               max_num)
+#ifdef MPI_MSG
+        if (st_mpi%totn /= 1) then
+          ! -- Check mpi max error (mpimaxerr)
+            max_unk = max_unk*len_scal + z_base
+            call check_mpimaxerr(max_var, max_unk, var_abs_max, unk_max, var_max)
+          check_val = var_abs_max*len_scal ; max_unk = unk_max
+        else
+          check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk*len_scal + z_base)
+          var_max = max_var
+        end if
+#else
+        check_val = abs(max_var)*len_scal ; max_unk = abs(max_unk*len_scal + z_base)
+#endif
+      end if
+
       if (st_time%form_switch == 1 .and.&
           (.not. st_time%conv_flag .or. st_ctrl%conv_type == 1)) then
         ! -- Run backtracking (backtr)
@@ -621,6 +643,47 @@ module nonlinear_solution
     eta = min(eta, ETA_MAX)
 
   end subroutine set_eise_walk
+
+  subroutine run_picbtr(backi, maxchg, l2_pre, new_f, st_sol)
+  !*********************************************************************************************
+  ! run_picbtr -- Run backtracking for the picard iteration
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(inout) :: backi
+    real(DP), intent(in) :: maxchg, l2_pre
+    real(DP), intent(inout) :: new_f(:)
+    type(sol_set), intent(inout) :: st_sol
+    ! -- local
+    integer(I4) :: btr_iter
+    real(DP) :: lam, l2_new, l2_tol
+    !-------------------------------------------------------------------------------------------
+    lam = DONE
+    l2_tol = l2_pre*st_ctrl%picard_btol*st_ctrl%picard_btol
+    ! -- Calculate function and l2norm2 (funcl2norm)
+      call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol)
+    if (l2_new <= l2_tol) then
+      return
+    end if
+
+    btr_loop : do btr_iter = 1, st_ctrl%picard_btr
+      if (st_ctrl%picard_bfact*lam*maxchg < st_ctrl%criteria) then
+        exit btr_loop
+      end if
+      lam = lam*st_ctrl%picard_bfact
+      ! -- Calculate function and l2norm2 (funcl2norm)
+        call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol)
+      if (l2_new <= l2_tol) then
+        exit btr_loop
+      end if
+      if (st_ctrl%picard_blim > DZERO .and.&
+          sqrt(l2_new)*len_scal**3 <= st_ctrl%picard_blim) then
+        exit btr_loop
+      end if
+    end do btr_loop
+
+  end subroutine run_picbtr
 
   subroutine run_backtr(backi, backf, betai, maxsf, l2_new, l2_pre, l2_jac, lam, grad, maxstep,&
                         pnorm, lam_maxi, new_f, st_sol)

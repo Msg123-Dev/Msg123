@@ -1,7 +1,8 @@
 module read_input
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: VARLEN, CHALEN, TIMELEN, SZERO, SONE, DZERO, DNOVAL
+  use constval_module, only: VARLEN, CHALEN, TIMELEN, SZERO, SONE, DZERO, DONE,&
+                             DNOVAL
   use utility_module, only: get_days, open_new_rtxt, close_file, write_logf, write_success
   use utility_module, only: write_err_stop, conv_lower
   use initial_module, only: in_type, unit_list, st_sim, st_ctrl, st_schm, st_in_type
@@ -486,12 +487,14 @@ module read_input
     integer(I4) :: ierr
     real(SP) :: init_step, incr_multi, decr_multi, max_tstep
     integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type, expd_type
-    integer(I4) :: conv_type, datum_type, deri_type
+    integer(I4) :: conv_type, datum_type, deri_type, picard_btr
     real(DP) :: criteria, res_abs_tol, res_rel_tol, dilu_shift, dsat_max
+    real(DP) :: picard_btol, picard_bfact, picard_blim
     namelist/set_solution/init_step, tstep_type, incr_multi, decr_multi, max_tstep,&
                           maxout_iter, picard_iter, criteria, maxinn_iter, precon_type,&
                           res_abs_tol, res_rel_tol, dilu_shift, expd_type, dsat_max,&
-                          conv_type, datum_type, deri_type
+                          conv_type, datum_type, deri_type, picard_btr,&
+                          picard_btol, picard_bfact, picard_blim
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; init_step = SZERO ; incr_multi = SZERO ; decr_multi = SZERO ; max_tstep = SINFI
     tstep_type = st_ctrl%tstep_type ; maxout_iter = st_ctrl%maxout_iter
@@ -501,6 +504,8 @@ module read_input
     dilu_shift = st_ctrl%dilu_shift ; dsat_max = st_ctrl%dsat_max
     expd_type = st_ctrl%expd_type ; conv_type = st_ctrl%conv_type
     datum_type = st_ctrl%datum_type ; deri_type = st_ctrl%deri_type
+    picard_btr = st_ctrl%picard_btr ; picard_btol = st_ctrl%picard_btol
+    picard_bfact = st_ctrl%picard_bfact ; picard_blim = st_ctrl%picard_blim
     if (st_sim%sim_type == -1) then
       conv_type = 1 ; res_rel_tol = RES_STEADY
     end if
@@ -513,6 +518,8 @@ module read_input
     st_ctrl%dilu_shift = dilu_shift ; st_ctrl%dsat_max = dsat_max
     st_ctrl%expd_type = expd_type ; st_ctrl%conv_type = conv_type
     st_ctrl%datum_type = datum_type ; st_ctrl%deri_type = deri_type
+    st_ctrl%picard_btr = picard_btr ; st_ctrl%picard_btol = picard_btol
+    st_ctrl%picard_bfact = picard_bfact ; st_ctrl%picard_blim = picard_blim
 
     if (ierr /= 0) then
       call write_err_stop("While reading solution section in main file.")
@@ -556,6 +563,14 @@ module read_input
       call write_err_stop("Input a valid value for derivative type.")
     else if (conv_type == 1 .and. res_abs_tol <= DZERO .and. res_rel_tol <= DZERO) then
       call write_err_stop("Input a residual tolerance for the selected convergence type.")
+    else if (picard_btr < 0) then
+      call write_err_stop("Input a non-negative value for picard backtracking number.")
+    else if (picard_btol < DONE) then
+      call write_err_stop("Input a value of one or more for picard backtracking tolerance.")
+    else if (picard_bfact <= DZERO .or. picard_bfact >= DONE) then
+      call write_err_stop("Input a value between zero and one for picard step reduction.")
+    else if (picard_blim < DZERO) then
+      call write_err_stop("Input a non-negative value for picard backtracking limit.")
     end if
 
     st_ctrl%nlevel = 1

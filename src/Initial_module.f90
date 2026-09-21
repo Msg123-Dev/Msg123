@@ -208,6 +208,8 @@ module initial_module
     st_ctrl%res_abs_tol = DZERO ; st_ctrl%res_rel_tol = DZERO
     st_ctrl%dilu_shift = DZERO ; st_ctrl%dsat_max = DZERO ; st_ctrl%expd_type = 0
     st_ctrl%conv_type = 0 ; st_ctrl%datum_type = 0 ; st_ctrl%deri_type = 0
+    st_ctrl%picard_btr = 0 ; st_ctrl%picard_btol = 1.05_DP
+    st_ctrl%picard_bfact = 0.10_DP ; st_ctrl%picard_blim = DZERO
     st_ctrl%newper = NEWPER_BASE ; st_ctrl%newper_inv = DONE/st_ctrl%newper
     st_ctrl%jac_omega = 0.67_SP ; st_ctrl%amg_theta = 0.05_SP
 

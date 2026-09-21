@@ -460,41 +460,14 @@ module nonlinear_solution
   ! calc_surfw -- Calculate surface water level
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_schm
-    use set_cell, only: ncals
-    use set_condition, only: st_hydr
+    use calc_function, only: set_surfw_head
     ! -- inout
-
     type(sol_set), intent(inout) :: st_sol
     ! -- local
-    integer(I4) :: i
+
     !-------------------------------------------------------------------------------------------
-    select case (st_schm%surfw_type)
-    case (1)
-      !$omp parallel do private(i)
-      do i = 1, ncals
-        st_sol%surf_head(i) = min(st_sol%head_new(i), st_geom%surf_elev(i))
-      end do
-      !$omp end parallel do
-    case (2)
-      !$omp parallel do private(i)
-      do i = 1, ncals
-        st_sol%surf_head(i) = st_geom%surf_elev(i)
-      end do
-      !$omp end parallel do
-    case (3)
-      !$omp parallel do private(i)
-      do i = 1, ncals
-        st_sol%surf_head(i) = st_hydr%surf_bott(i)
-      end do
-      !$omp end parallel do
-    case (0)
-      !$omp parallel do private(i)
-      do i = 1, ncals
-        st_sol%surf_head(i) = st_sol%head_new(i)
-      end do
-      !$omp end parallel do
-    end select
+    ! -- Set surface water level from the current head (surfw_head)
+      call set_surfw_head(st_sol%head_new, st_sol%surf_head)
 
   end subroutine calc_surfw
 

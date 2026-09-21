@@ -2,7 +2,8 @@ module calc_function
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE
-  use initial_module, only: st_sim
+  use initial_module, only: st_sim, st_schm
+  use make_cell, only: st_geom
   use set_cell, only: ncalc, ncals
   use set_condition, only: st_hydr, st_bcnd
   use prep_calculation, only: st_time
@@ -16,7 +17,7 @@ module calc_function
 
   implicit none
   private
-  public :: allocate_calfun, calc_func, calc_mass, calc_vecjacf
+  public :: allocate_calfun, calc_func, calc_mass, calc_vecjacf, set_surfw_head
   public :: func_rechterm, func_wellterm, func_surfterm, func_riveterm
   public :: func_laketerm, func_sealterm
   real(DP), public :: qext_sum = DZERO
@@ -29,6 +30,7 @@ module calc_function
   real(DP), allocatable :: scal_work(:)
   real(DP), allocatable, public :: func_scal(:)
   real(DP), allocatable :: delh_s(:), elev_rati(:)
+  real(DP), allocatable :: surf_work(:)
   real(DP), allocatable :: delh_r(:), delh_l(:), seal_flow(:)
   real(DP), allocatable :: jcvec(:), tempf1(:), tempf2(:)
 
@@ -52,6 +54,7 @@ module calc_function
     allocate(conn_flow(ncalc))
     allocate(scal_work(ncalc), func_scal(ncalc))
     allocate(delh_s(ncals), elev_rati(ncals))
+    allocate(surf_work(ncals))
     allocate(delh_r(st_bcnd%rive_num), delh_l(st_bcnd%lake_num), seal_flow(st_bcnd%seal_num))
     allocate(jcvec(nreg_num), tempf1(ncalc), tempf2(ncalc))
 
@@ -109,8 +112,15 @@ module calc_function
     ! -- Function well term (wellterm)
       call func_wellterm(welf)
 
-    ! -- Function surface term (surfterm)
-      call func_surfterm(infx, surfh, rperm, surf, surfr)
+    if (st_sim%sim_type == -1) then
+      ! -- Set surface water level from the current head (surfw_head)
+        call set_surfw_head(infx, surf_work)
+      ! -- Function surface term (surfterm)
+        call func_surfterm(infx, surf_work, rperm, surf, surfr)
+    else
+      ! -- Function surface term (surfterm)
+        call func_surfterm(infx, surfh, rperm, surf, surfr)
+    end if
 
     ! -- Function river term (riveterm)
       call func_riveterm(infx, rperm, rivf)
@@ -303,6 +313,46 @@ module calc_function
     !$omp end parallel
 
   end subroutine func_connflow
+
+  subroutine set_surfw_head(inh, outs)
+  !*********************************************************************************************
+  ! set_surfw_head -- Set surface water level from the current head
+  !*********************************************************************************************
+    ! -- modules
+    ! -- inout
+    real(DP), intent(in) :: inh(:)
+    real(DP), intent(out) :: outs(:)
+    ! -- local
+    integer(I4) :: i
+    !-------------------------------------------------------------------------------------------
+    select case (st_schm%surfw_type)
+    case (1)
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        outs(i) = min(inh(i), st_geom%surf_elev(i))
+      end do
+      !$omp end parallel do
+    case (2)
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        outs(i) = st_geom%surf_elev(i)
+      end do
+      !$omp end parallel do
+    case (3)
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        outs(i) = st_hydr%surf_bott(i)
+      end do
+      !$omp end parallel do
+    case default
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        outs(i) = inh(i)
+      end do
+      !$omp end parallel do
+    end select
+
+  end subroutine set_surfw_head
 
   subroutine func_rechterm(recfunc)
   !*********************************************************************************************

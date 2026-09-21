@@ -227,6 +227,11 @@ module linear_solution
       end if
 #endif
 
+      ! -- Exit when the cg recurrence breaks down (sk = sk0 = 0)
+      if (sk == DZERO .and. sk0 == DZERO) then
+        exit pcg_inter
+      end if
+
       if (in_iter == 1) then
         !$omp parallel do private(n)
         do n = 1, d_size
@@ -403,6 +408,11 @@ module linear_solution
         sk = sum_sk
       end if
 #endif
+
+      ! -- Exit when the bicgstab recurrence breaks down (sk = sk0 = 0)
+      if (sk == DZERO .and. sk0 == DZERO) then
+        exit bicg_inter
+      end if
 
       if (in_iter == 1) then
         !$omp parallel do private(n)

@@ -219,7 +219,8 @@ module nonlinear_solution
         call write_err_stop("Nan detected in the steady state calculation.")
       end if
 
-      if (.not. st_time%conv_flag .and. st_time%form_switch == 1) then
+      if (st_time%form_switch == 1 .and.&
+          (.not. st_time%conv_flag .or. st_ctrl%conv_type == 1)) then
         ! -- Run backtracking (backtr)
           call run_backtr(back_iter, back_flag, beta_iter, maxs_flag, l2norm_new, l2norm_pre,&
                           l2norm_jac, lambda, gradient, max_step, st_coef%stod, new_func,&

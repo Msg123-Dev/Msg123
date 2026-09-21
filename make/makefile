@@ -1,6 +1,6 @@
 # Define the directories for the object and module files,
 # the executable, and the executable name and path.
-OBJDIR = ./obj_temp
+OBJDIR = ./obj_temp_$(MODE)_$(PARA)_$(CONTRACT)
 PROGRAM = ../msg123
 SOURCEDIR = ../src
 
@@ -18,6 +18,9 @@ MODE := release
 
 # Parallelism: Serial / OpenMP / MPI / Hybrid
 PARA := Serial
+
+# Floating-point contraction: fast or off
+CONTRACT := fast
 
 # ---- MPI flag ----
 ifneq ($(filter MPI Hybrid,$(PARA)),)
@@ -68,6 +71,19 @@ ifeq ($(COMPILER),nvfortran)
 	endif
 	ifneq ($(filter OpenMP Hybrid,$(PARA)),)
 		FFLAGS += -mp
+	endif
+endif
+
+# ---- Floating-point contraction ----
+ifeq ($(CONTRACT),off)
+	ifeq ($(COMPILER),gfortran)
+		FFLAGS += -ffp-contract=off
+	endif
+	ifneq ($(filter $(COMPILER),ifort ifx),)
+		FFLAGS += -no-fma
+	endif
+	ifeq ($(COMPILER),nvfortran)
+		FFLAGS += -Mnofma
 	endif
 endif
 
@@ -135,11 +151,13 @@ $(OBJDIR)/Write_output.o \
 $(OBJDIR)/Msg.o
 
 # ---- Build rules ----
-.PHONY: all clean cleanobj
+.PHONY: all clean cleanobj FORCE
 
 all: $(PROGRAM)
 
-$(PROGRAM) : $(OBJECTS)
+FORCE:
+
+$(PROGRAM) : $(OBJECTS) FORCE
 	@echo "$(FC) $(FFLAGS) -o $@ $(OBJECTS)"
 	@$(FC) $(FFLAGS) -o $@ $(OBJECTS) $(REMARK_FILTER)
 
@@ -150,8 +168,9 @@ $(OBJDIR)/%.o : %.f90
 
 # Clean the object and module files and the executable
 clean :
-	-rm -rf $(OBJDIR)
+	-rm -rf ./obj_temp*
 	-rm -rf $(PROGRAM)
+	-rm -f *.mod
 
 # Clean the object and module files
 cleanobj :

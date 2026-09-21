@@ -82,7 +82,7 @@ module nonlinear_solution
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var, mass_error_pre, mass_error_min
     real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
     real(DP) :: res_l1, qext_l1, mass_error
-    real(DP) :: res_fact
+    real(DP) :: res_fact, step_pnorm, step_lmax
     logical :: back_flag, res_flag, maxs_flag, stagn_flag, cycle_flag
     logical :: chg_flag
 #ifdef MPI_MSG
@@ -210,6 +210,9 @@ module nonlinear_solution
         l2norm_jac = DZERO ; st_time%conv_flag = .true.
       end if
 
+      ! -- Limit the step length (limit_step)
+        call limit_step(max_step, st_coef%stod, st_sol, step_pnorm, step_lmax)
+
       !$omp parallel do private(i)
       do i = 1, nreg_num
         st_sol%head_new(i) = st_sol%head_pre(i) + st_sol%head_change(i)
@@ -253,8 +256,8 @@ module nonlinear_solution
           (.not. st_time%conv_flag .or. st_ctrl%conv_type == 1)) then
         ! -- Run backtracking (backtr)
           call run_backtr(back_iter, back_flag, beta_iter, maxs_flag, l2norm_new, l2norm_pre,&
-                          l2norm_jac, lambda, gradient, max_step, st_coef%stod, new_func,&
-                          st_sol)
+                          l2norm_jac, lambda, gradient, max_step, step_pnorm,&
+                          step_lmax, new_func, st_sol)
         if (maxs_flag) then
           maxstep_run = maxstep_run + 1
         else
@@ -471,6 +474,84 @@ module nonlinear_solution
 
   end subroutine calc_surfw
 
+  subroutine limit_step(maxstep, stod, st_sol, pnorm, lam_maxi)
+  !*********************************************************************************************
+  ! limit_step -- Limit the step length by the maximum step and the saturation change
+  !*********************************************************************************************
+    ! -- modules
+#ifdef MPI_MSG
+    use mpi_utility, only: mpimin_val
+#endif
+    ! -- inout
+    real(DP), intent(in) :: maxstep, stod(:)
+    type(sol_set), intent(inout) :: st_sol
+    real(DP), intent(out) :: pnorm, lam_maxi
+    ! -- local
+    integer(I4) :: i
+    real(DP) :: l2_pnorm, l2_pnorm_s, maxpnorm, dsat_scale, dsat_cell
+    real(DP), parameter :: DSAT_STEP_FRAC = 0.9_DP
+#ifdef MPI_MSG
+    real(DP) :: sum_l2, min_val
+#endif
+    !-------------------------------------------------------------------------------------------
+    maxpnorm = DONE
+    ! -- Calculate l2 norm square (l2norm2)
+      call calc_l2norm2(1, st_sol%head_change, l2_pnorm)
+
+#ifdef MPI_MSG
+    if (st_mpi%totn /= 1) then
+      ! -- Sum value for MPI (val)
+        call mpisum_val(l2_pnorm, "change function l2-norm", sum_l2)
+      l2_pnorm = sum_l2
+    end if
+#endif
+
+    l2_pnorm_s = sqrt(l2_pnorm)
+
+    lam_maxi = DONE
+    if (st_ctrl%expd_type == 1 .and. l2_pnorm_s > DZERO) then
+      lam_maxi = maxstep/l2_pnorm_s
+    end if
+
+    if (l2_pnorm_s > maxstep) then
+      maxpnorm = maxstep/l2_pnorm_s
+    end if
+
+    if (st_ctrl%dsat_max > DZERO) then
+      dsat_scale = DONE
+      !$omp parallel do private(i, dsat_cell) reduction(min:dsat_scale)
+      do i = 1, ncalc
+        dsat_cell = abs(stod(i))*st_time%delt/st_geom%cell_vol(i)*abs(st_sol%head_change(i))
+        if (dsat_cell > st_ctrl%dsat_max) then
+          dsat_scale = min(dsat_scale, DSAT_STEP_FRAC*st_ctrl%dsat_max/dsat_cell)
+        end if
+      end do
+      !$omp end parallel do
+#ifdef MPI_MSG
+      if (st_mpi%totn /= 1) then
+        ! -- MIN value for MPI (val)
+          call mpimin_val(dsat_scale, "saturation limit ratio", min_val)
+        dsat_scale = min_val
+      end if
+#endif
+      if (dsat_scale < DONE) then
+        maxpnorm = min(maxpnorm, dsat_scale)
+      end if
+    end if
+
+    if (maxpnorm < DONE) then
+      !$omp parallel do private(i)
+      do i = 1, ncalc
+        st_sol%head_change(i) = st_sol%head_change(i)*maxpnorm
+      end do
+      !$omp end parallel do
+      l2_pnorm_s = l2_pnorm_s*maxpnorm
+      lam_maxi = DONE
+    end if
+    pnorm = l2_pnorm_s
+
+  end subroutine limit_step
+
   subroutine set_backtr(st_sol, maxstep)
   !*********************************************************************************************
   ! set_backtr -- Set for backtracking
@@ -542,7 +623,7 @@ module nonlinear_solution
   end subroutine set_eise_walk
 
   subroutine run_backtr(backi, backf, betai, maxsf, l2_new, l2_pre, l2_jac, lam, grad, maxstep,&
-                        stod, new_f, st_sol)
+                        pnorm, lam_maxi, new_f, st_sol)
   !*********************************************************************************************
   ! run_backtr -- Run backtracking
   !*********************************************************************************************
@@ -557,24 +638,23 @@ module nonlinear_solution
     logical, intent(inout) :: backf
     logical, intent(out) :: maxsf
     real(DP), intent(inout) :: l2_new, l2_jac, lam
-    real(DP), intent(in) :: l2_pre, maxstep, stod(:)
+    real(DP), intent(in) :: l2_pre, maxstep, pnorm, lam_maxi
     real(DP), intent(out) :: grad
     real(DP), intent(inout) :: new_f(:)
     type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: i
-    real(DP) :: l2_new2, l2_pnorm, slope, av, bv, rhs1, rhs2, root, step_len
+    real(DP) :: l2_new2, slope, av, bv, rhs1, rhs2, root, step_len
     real(DP) :: f1_pre, f1_new
     real(DP) :: lam2, temp_lam, lam_inv, lam2_inv, del_lam, lam_max, lam_min
-    real(DP) :: lam_length, lam_base, lam_diff, lam_incr, sql2_pnorm, maxpnorm
-    real(DP) :: lam_maxi, dsat_scale, dsat_cell
+    real(DP) :: lam_length, lam_base, lam_diff, lam_incr, maxpnorm
     real(DP) :: alpha_cond, beta_cond
     real(DP), parameter :: BACK_ALPHA = 1.00E-4_DP, BACK_BETA = 0.9_DP, MAXSTEP_RATIO = 0.99_DP
     real(DP), parameter :: DSAT_STEP_FRAC = 0.9_DP
     real(DP), parameter :: DIVERGE_LIMIT = huge(1.00_DP)*0.1_DP
     real(DP), parameter :: STEP_TOL = 1.00E-07_DP
 #ifdef MPI_MSG
-    real(DP) :: sum_l2, max_val, min_val
+    real(DP) :: sum_l2, max_val
 #endif
     !-------------------------------------------------------------------------------------------
     l2_new2 = l2_new ; lam = DONE ; lam2 = DZERO ; maxpnorm = DONE ; lam_length = DZERO
@@ -587,64 +667,12 @@ module nonlinear_solution
     ! -- Calculate function value (func)
       call calc_func(st_sol%stor_old, st_sol%stor_new, st_sol%surf_head, st_sol%head_new,&
                      st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, new_f)
-    ! -- Calculate l2 norm square (resl2norm2)
-      call calc_l2norm2(1, st_sol%head_change, l2_pnorm)
     ! -- Calculate vector by jacobi-free (vecjacf)
       call calc_vecjacf(1, st_sol%head_change, st_sol%stor_old, st_sol%stor_new,&
                         st_sol%surf_head, st_sol%head_pre, st_sol%srat_new, st_sol%rel_perm,&
                         st_sol%surf_rati, jacvec)
 
-#ifdef MPI_MSG
-    if (st_mpi%totn /= 1) then
-      ! -- Sum value for MPI (val)
-        call mpisum_val(l2_pnorm, "change function l2-norm", sum_l2)
-      l2_pnorm = sum_l2
-    end if
-#endif
-
-    sql2_pnorm = sqrt(l2_pnorm)
-
-    lam_maxi = DONE
-    if (st_ctrl%expd_type == 1 .and. sql2_pnorm > DZERO) then
-      lam_maxi = maxstep/sql2_pnorm
-    end if
-
-    if (sql2_pnorm > maxstep) then
-      maxpnorm = maxstep/sql2_pnorm
-    end if
-
-    if (st_ctrl%dsat_max > DZERO) then
-      dsat_scale = DONE
-      !$omp parallel do private(i, dsat_cell) reduction(min:dsat_scale)
-      do i = 1, ncalc
-        dsat_cell = abs(stod(i))*st_time%delt/st_geom%cell_vol(i)*abs(st_sol%head_change(i))
-        if (dsat_cell > st_ctrl%dsat_max) then
-          dsat_scale = min(dsat_scale, DSAT_STEP_FRAC*st_ctrl%dsat_max/dsat_cell)
-        end if
-      end do
-      !$omp end parallel do
-#ifdef MPI_MSG
-      if (st_mpi%totn /= 1) then
-        ! -- MIN value for MPI (val)
-          call mpimin_val(dsat_scale, "saturation limit ratio", min_val)
-        dsat_scale = min_val
-      end if
-#endif
-      if (dsat_scale < DONE) then
-        maxpnorm = min(maxpnorm, dsat_scale)
-      end if
-    end if
-
-    if (maxpnorm < DONE) then
-      !$omp parallel do private(i)
-      do i = 1, ncalc
-        st_sol%head_change(i) = st_sol%head_change(i)*maxpnorm
-      end do
-      !$omp end parallel do
-      sql2_pnorm = sql2_pnorm*maxpnorm
-      lam_maxi = DONE
-    end if
-    step_len = sql2_pnorm
+    step_len = pnorm
 
     l2_new = DZERO ; slope = DZERO ; l2_jac = DZERO
     !$omp parallel
@@ -801,7 +829,7 @@ module nonlinear_solution
       end if
     end if
 
-    if (lam*sql2_pnorm > MAXSTEP_RATIO*maxstep) then
+    if (lam*pnorm > MAXSTEP_RATIO*maxstep) then
       maxsf = .true.
     end if
 

@@ -92,7 +92,7 @@ module check_simulation
 
   end subroutine check_abserrmax
 
-  subroutine check_residual(funcv, fscal, res_flag)
+  subroutine check_residual(funcv, fscal, res_flag, res_fact)
   !*********************************************************************************************
   ! check_residual -- Check residual convergence criteria
   !*********************************************************************************************
@@ -101,12 +101,12 @@ module check_simulation
     use mpi_utility, only: mpisum_val
 #endif
     ! -- inout
-    real(DP), intent(in) :: funcv(:), fscal(:)
+    real(DP), intent(in) :: funcv(:), fscal(:), res_fact
     logical, intent(out) :: res_flag
     ! -- local
     integer(I4) :: i, viol_num
     real(DP), parameter :: ACC_FLOOR = 1.00E-15_DP
-    real(DP) :: vol_scal, res_val, scal_val
+    real(DP) :: vol_scal, res_val, scal_val, abs_tol, rel_tol
     logical :: abs_flag, rel_flag, pass_flag
 #ifdef MPI_MSG
     integer(I4) :: sum_viol
@@ -119,16 +119,17 @@ module check_simulation
     end if
 
     viol_num = 0 ; vol_scal = len_scal**3
+    abs_tol = st_ctrl%res_abs_tol*res_fact ; rel_tol = st_ctrl%res_rel_tol*res_fact
     !$omp parallel do private(i, res_val, scal_val, pass_flag) reduction(+:viol_num)
     do i = 1, ncalc
       res_val = abs(funcv(i))*vol_scal
       scal_val = fscal(i)*vol_scal
       pass_flag = .false.
-      if (abs_flag .and. res_val <= st_ctrl%res_abs_tol) then
+      if (abs_flag .and. res_val <= abs_tol) then
         pass_flag = .true.
       else if (rel_flag .and. scal_val <= ACC_FLOOR) then
         pass_flag = .true.
-      else if (rel_flag .and. res_val <= st_ctrl%res_rel_tol*scal_val) then
+      else if (rel_flag .and. res_val <= rel_tol*scal_val) then
         pass_flag = .true.
       end if
       if (.not. pass_flag) then

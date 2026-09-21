@@ -26,6 +26,7 @@ module nonlinear_solution
   real(DP), parameter :: VARMAX = 1.00E+03_DP, XMAX = 1.00E+04_DP
   real(DP), parameter :: STAGN_FLOOR = 1.00E-04_DP, CYCLE_RTOL = 1.00E-03_DP
   real(DP), parameter :: XMAX_INV = 1.00E-04_DP
+  real(DP), parameter :: RES_FIRST = 1.00E-02_DP
   real(DP), allocatable :: new_func(:), jacvec(:)
 
   contains
@@ -81,7 +82,9 @@ module nonlinear_solution
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var, mass_error_pre, mass_error_min
     real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
     real(DP) :: res_l1, qext_l1, mass_error
+    real(DP) :: res_fact
     logical :: back_flag, res_flag, maxs_flag, stagn_flag, cycle_flag
+    logical :: chg_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
     real(DP) :: var_max, unk_max, var_abs_max
@@ -103,6 +106,7 @@ module nonlinear_solution
     19 format(1X,"Stop due to cycling of mass balance error")
     !-------------------------------------------------------------------------------------------
     conv_fnum = st_out_fnum%conv ; eater = DHALF ; maxstep_run = 0
+    chg_flag = .false.
     stagn_run = 0 ; mass_error_pre = DZERO ; stagn_flag = .false.
     cycle_run = 0 ; mass_error_min = DZERO ; cycle_flag = .false.
     res_l1 = DZERO ; qext_l1 = DZERO ; mass_error = DZERO
@@ -147,6 +151,32 @@ module nonlinear_solution
       ! -- Make coefficients matrix and constant vector (matvec)
         call make_matvec(st_coef, st_sol)
 
+      if (st_sim%sim_type == -1 .and. st_ctrl%conv_type == 1) then
+        if (st_time%out_iter == 1) then
+          res_fact = RES_FIRST
+        else
+          res_fact = DONE
+        end if
+        ! -- Check residual convergence (residual)
+          call check_residual(array_var(1)%rhs, func_scal, res_flag, res_fact)
+        if (st_time%out_iter > 1) then
+          res_flag = res_flag .and. chg_flag
+        end if
+        if (res_flag) then
+          st_time%conv_flag = .true.
+          ! -- Calculate surface water level (surfw)
+            call calc_surfw(st_sol)
+          if (st_out_step%rest == DZERO) then
+            ! -- Write restart file (rest)
+              call write_rest(st_sol%head_new)
+          else if (mod(st_time%current_t,st_out_step%rest) == 0) then
+            ! -- Write restart file (rest)
+              call write_rest(st_sol%head_new)
+          end if
+          exit outer_loop
+        end if
+      end if
+
       if (st_time%out_iter == 1) then
         ! -- Calculate l2 norm square (resl2norm2)
           call calc_l2norm2(1, array_var(1)%rhs, l2norm_new)
@@ -167,7 +197,7 @@ module nonlinear_solution
       end do
       !$omp end parallel do
 
-      st_time%conv_flag = .false.
+      st_time%conv_flag = .false. ; chg_flag = .false.
       if (st_sim%sim_type /= -1) then
         st_ctrl%errtol = eater
       else
@@ -205,7 +235,7 @@ module nonlinear_solution
       if (st_time%conv_flag .and. .not. ieee_is_nan(max_unk)) then
           st_time%conv_flag = .false.
         if (check_val <= st_ctrl%criteria .and. max_unk < XMAX) then
-          st_time%conv_flag = .true.
+          st_time%conv_flag = .true. ; chg_flag = .true.
         end if
       else if (ieee_is_nan(max_unk) .and. st_sim%sim_type /= -1) then
         if (st_mpi%rank == 0) then
@@ -252,7 +282,7 @@ module nonlinear_solution
           back_flag = .true.
         else if (check_val <= st_ctrl%criteria .and. max_unk < XMAX .and.&
                  .not. (back_flag .and. st_sim%sim_type /= -1)) then
-          st_time%conv_flag = .true.
+          st_time%conv_flag = .true. ; chg_flag = .true.
         else if (st_sim%sim_type == -1) then
           back_flag = .false.
         end if
@@ -318,9 +348,10 @@ module nonlinear_solution
                             trim(adjustl(cxyzn)), conv_dmat, conv_rhs, conv_head, mass_error
       end if
 
-      if (st_time%conv_flag .and. st_ctrl%conv_type == 1) then
+      if (st_time%conv_flag .and. st_ctrl%conv_type == 1 .and.&
+          st_sim%sim_type /= -1) then
         ! -- Check residual convergence (residual)
-          call check_residual(new_func, func_scal, res_flag)
+          call check_residual(new_func, func_scal, res_flag, DONE)
         st_time%conv_flag = res_flag
       end if
       if (.not. st_time%conv_flag) then
@@ -349,7 +380,7 @@ module nonlinear_solution
       end if
 
       ! check outer_loop
-      if (st_time%conv_flag) then
+      if (st_time%conv_flag .and. st_sim%sim_type /= -1) then
         ! -- Calculate surface water level (surfw)
           call calc_surfw(st_sol)
         if (st_out_step%rest == DZERO) then

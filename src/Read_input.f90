@@ -11,6 +11,7 @@ module read_input
   private
   public :: read_main_file, read_grid_file, add_nml_name
   real(SP), public :: len_scal, len_scal_inv
+  real(DP), parameter :: RES_STEADY = 1.00E-05_DP
   real(DP), public :: z_base
   real(DP), allocatable, public :: glob_x(:,:), glob_y(:,:), glob_z(:,:,:)
 
@@ -500,6 +501,9 @@ module read_input
     dilu_shift = st_ctrl%dilu_shift ; dsat_max = st_ctrl%dsat_max
     expd_type = st_ctrl%expd_type ; conv_type = st_ctrl%conv_type
     datum_type = st_ctrl%datum_type ; deri_type = st_ctrl%deri_type
+    if (st_sim%sim_type == -1) then
+      conv_type = 1 ; res_rel_tol = RES_STEADY
+    end if
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_solution,iostat=ierr)
     st_ctrl%tstep_type = tstep_type ; st_ctrl%maxout_iter = maxout_iter

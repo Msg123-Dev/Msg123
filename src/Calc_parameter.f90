@@ -1,7 +1,7 @@
 module calc_parameter
   ! -- modules
   use kind_module, only: DP
-  use constval_module, only: DZERO, DONE
+  use constval_module, only: DZERO, DONE, DHALF
 
   implicit none
   private
@@ -116,7 +116,7 @@ module calc_parameter
   !*********************************************************************************************
     ! -- modules
     use kind_module, only: SP
-    use constval_module, only: DHALF, DTWO
+    use constval_module, only: DTWO
     ! -- inout
     real(DP), intent(in) :: phead, retm
     real(SP), intent(in) :: vana, vann
@@ -172,10 +172,12 @@ module calc_parameter
     ! -- local
 
     !-------------------------------------------------------------------------------------------
-    if (head_dif >= DZERO) then
+    if (head_dif > DZERO) then
       hyd_upwind = hyd_c1
-    else
+    else if (head_dif < DZERO) then
       hyd_upwind = hyd_c2
+    else
+      hyd_upwind = DHALF*(hyd_c1 + hyd_c2)
     end if
 
   end subroutine calc_hyd_upwind

@@ -222,8 +222,8 @@ module nonlinear_solution
       if (.not. st_time%conv_flag .and. st_time%form_switch == 1) then
         ! -- Run backtracking (backtr)
           call run_backtr(back_iter, back_flag, beta_iter, maxs_flag, l2norm_new, l2norm_pre,&
-                          l2norm_jac, lambda, gradient, max_step, st_coef%stod, new_func,&
-                          st_sol)
+                          l2norm_jac, lambda, gradient, max_step, st_coef%stod,&
+                          st_coef%temp_rhs, new_func, st_sol)
         if (maxs_flag) then
           maxstep_run = maxstep_run + 1
         else
@@ -261,17 +261,21 @@ module nonlinear_solution
         end if
       end if
 
-      ! -- Calculate function value (func)
-        call calc_func(st_sol%stor_old, st_sol%stor_new, st_sol%surf_head, st_sol%head_new,&
-                       st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, new_func)
-      ! -- Calculate l2 norm square (resl2norm2)
-        call calc_l2norm2(1, new_func, l2norm_new)
+      if (back_iter == 0) then
+        ! -- Calculate function value (func)
+          call calc_func(st_sol%stor_old, st_sol%stor_new, st_sol%surf_head, st_sol%head_new,&
+                         st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, new_func)
+        ! -- Calculate l2 norm square (resl2norm2)
+          call calc_l2norm2(1, new_func, l2norm_new)
 #ifdef MPI_MSG
-      if (st_mpi%totn /= 1) then
-        ! -- Sum value for MPI (val)
-          call mpisum_val(l2norm_new, "new function l2-norm", sum_l2)
-        l2norm_new = sum_l2
+        if (st_mpi%totn /= 1) then
+          ! -- Sum value for MPI (val)
+            call mpisum_val(l2norm_new, "new function l2-norm", sum_l2)
+          l2norm_new = sum_l2
+        end if
+#endif
       end if
+#ifdef MPI_MSG
       if (max_var == var_max) then
         cxyzn = get_cnum(max_num)
       else
@@ -537,7 +541,7 @@ module nonlinear_solution
   end subroutine set_eise_walk
 
   subroutine run_backtr(backi, backf, betai, maxsf, l2_new, l2_pre, l2_jac, lam, grad, maxstep,&
-                        stod, new_f, st_sol)
+                        stod, pre_f, new_f, st_sol)
   !*********************************************************************************************
   ! run_backtr -- Run backtracking
   !*********************************************************************************************
@@ -552,7 +556,7 @@ module nonlinear_solution
     logical, intent(inout) :: backf
     logical, intent(out) :: maxsf
     real(DP), intent(inout) :: l2_new, l2_jac, lam
-    real(DP), intent(in) :: l2_pre, maxstep, stod(:)
+    real(DP), intent(in) :: l2_pre, maxstep, stod(:), pre_f(:)
     real(DP), intent(out) :: grad
     real(DP), intent(inout) :: new_f(:)
     type(sol_set), intent(inout) :: st_sol
@@ -579,15 +583,12 @@ module nonlinear_solution
       jacvec(i) = DZERO
     end do
     !$omp end parallel do
-    ! -- Calculate function value (func)
-      call calc_func(st_sol%stor_old, st_sol%stor_new, st_sol%surf_head, st_sol%head_new,&
-                     st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, new_f)
     ! -- Calculate l2 norm square (resl2norm2)
       call calc_l2norm2(1, st_sol%head_change, l2_pnorm)
     ! -- Calculate vector by jacobi-free (vecjacf)
       call calc_vecjacf(1, st_sol%head_change, st_sol%stor_old, st_sol%stor_new,&
                         st_sol%surf_head, st_sol%head_pre, st_sol%srat_new, st_sol%rel_perm,&
-                        st_sol%surf_rati, jacvec)
+                        st_sol%surf_rati, pre_f, jacvec)
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
@@ -641,11 +642,10 @@ module nonlinear_solution
     end if
     step_len = sql2_pnorm
 
-    l2_new = DZERO ; slope = DZERO ; l2_jac = DZERO
+    slope = DZERO ; l2_jac = DZERO
     !$omp parallel
-    !$omp do private(i) reduction(+:l2_new, slope, l2_jac)
+    !$omp do private(i) reduction(+:slope, l2_jac)
     do i = 1, ncalc
-      l2_new = l2_new + new_f(i)*new_f(i)
       slope = slope + array_var(1)%rhs(i)*jacvec(i)*maxpnorm
       l2_jac = l2_jac + jacvec(i)*jacvec(i)
     end do
@@ -666,9 +666,6 @@ module nonlinear_solution
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
-      ! -- Sum value for MPI (val)
-        call mpisum_val(l2_new, "current function l2-norm", sum_l2)
-      l2_new = sum_l2
       ! -- Sum value for MPI (val)
         call mpisum_val(slope, "slope function l2-norm", sum_l2)
       slope = sum_l2

@@ -255,7 +255,7 @@ module nonlinear_solution
       if (st_time%form_switch == 0 .and. st_ctrl%picard_btr > 0 .and.&
           .not. st_time%conv_flag) then
         ! -- Run backtracking for the picard iteration (picbtr)
-          call run_picbtr(back_iter, check_val, l2norm_pre, new_func, st_sol)
+          call run_picbtr(back_iter, check_val, l2norm_new, l2norm_pre, new_func, st_sol)
         ! -- Check absolute error max norm
           call check_abserrmax(st_sol%head_new, st_sol%head_pre, max_var, max_unk,&
                                max_num)
@@ -644,7 +644,7 @@ module nonlinear_solution
 
   end subroutine set_eise_walk
 
-  subroutine run_picbtr(backi, maxchg, l2_pre, new_f, st_sol)
+  subroutine run_picbtr(backi, maxchg, l2_new, l2_pre, new_f, st_sol)
   !*********************************************************************************************
   ! run_picbtr -- Run backtracking for the picard iteration
   !*********************************************************************************************
@@ -652,12 +652,13 @@ module nonlinear_solution
 
     ! -- inout
     integer(I4), intent(inout) :: backi
+    real(DP), intent(inout) :: l2_new
     real(DP), intent(in) :: maxchg, l2_pre
     real(DP), intent(inout) :: new_f(:)
     type(sol_set), intent(inout) :: st_sol
     ! -- local
     integer(I4) :: btr_iter
-    real(DP) :: lam, l2_new, l2_tol
+    real(DP) :: lam, l2_tol
     !-------------------------------------------------------------------------------------------
     lam = DONE
     l2_tol = l2_pre*st_ctrl%picard_btol*st_ctrl%picard_btol

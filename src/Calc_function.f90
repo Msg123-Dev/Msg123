@@ -32,7 +32,7 @@ module calc_function
   real(DP), allocatable :: delh_s(:), elev_rati(:)
   real(DP), allocatable :: surf_work(:)
   real(DP), allocatable :: delh_r(:), delh_l(:), seal_flow(:)
-  real(DP), allocatable :: jcvec(:), tempf1(:), tempf2(:)
+  real(DP), allocatable :: jcvec(:), tempf2(:)
 
   contains
 
@@ -56,7 +56,7 @@ module calc_function
     allocate(delh_s(ncals), elev_rati(ncals))
     allocate(surf_work(ncals))
     allocate(delh_r(st_bcnd%rive_num), delh_l(st_bcnd%lake_num), seal_flow(st_bcnd%seal_num))
-    allocate(jcvec(nreg_num), tempf1(ncalc), tempf2(ncalc))
+    allocate(jcvec(nreg_num), tempf2(ncalc))
 
   end subroutine allocate_calfun
 
@@ -581,7 +581,7 @@ module calc_function
 
   end subroutine func_sealterm
 
-  subroutine calc_vecjacf(vj, injvec, stold, stnew, surfh, injx, snew, rperm, surfr, outjvec)
+  subroutine calc_vecjacf(vj, injv, stold, stnew, surfh, injx, snew, rperm, surfr, injf, outjv)
   !*********************************************************************************************
   ! calc_vecjacf -- Calculate vector by jacobi-free
   !*********************************************************************************************
@@ -592,9 +592,9 @@ module calc_function
 #endif
     ! -- inout
     integer(I4), intent(in) :: vj
-    real(DP), intent(in) :: injvec(:), stold(:), surfh(:)
+    real(DP), intent(in) :: injv(:), stold(:), surfh(:), injf(:)
     real(DP), intent(inout) :: stnew(:), injx(:), snew(:), rperm(:), surfr(:)
-    real(DP), intent(out) :: outjvec(:)
+    real(DP), intent(out) :: outjv(:)
     ! -- local
     integer(I4) :: i
     integer(I4) :: vj_num, vj_regnum
@@ -615,26 +615,23 @@ module calc_function
     !$omp end do
     !$omp do private(i)
     do i = 1, vj_num
-      tempf1(i) = DZERO ; tempf2(i) = DZERO
+      tempf2(i) = DZERO
     end do
     !$omp end do
     !$omp end parallel
-
-    ! -- Calculate function value (func)
-      call calc_func(stold, stnew, surfh, injx, snew, rperm, surfr, tempf1)
 
     ! Brown and Saad version
     l2_v = DZERO ; l2_x = DZERO ; l1_v = DZERO
     !$omp parallel
     !$omp do private(i) reduction(+:l2_v, l2_x)
     do i = 1, vj_num
-      l2_v = l2_v + injvec(i)*injvec(i)
-      l2_x = l2_x + injx(i)*injvec(i)
+      l2_v = l2_v + injv(i)*injv(i)
+      l2_x = l2_x + injx(i)*injv(i)
     end do
     !$omp end do
     !$omp do private(i) reduction(+:l1_v)
     do i = 1, vj_num
-      l1_v = l1_v + abs(injvec(i))
+      l1_v = l1_v + abs(injv(i))
     end do
     !$omp end do
     !$omp end parallel
@@ -664,7 +661,7 @@ module calc_function
 
     !$omp parallel do private(i)
     do i = 1, vj_num
-      jcvec(i) = injx(i) + eps*injvec(i)
+      jcvec(i) = injx(i) + eps*injv(i)
     end do
     !$omp end parallel do
 
@@ -673,7 +670,7 @@ module calc_function
 
     !$omp parallel do private(i)
     do i = 1, vj_num
-      outjvec(i) = -(tempf2(i)-tempf1(i))*eps_inv
+      outjv(i) = -(tempf2(i)-injf(i))*eps_inv
     end do
     !$omp end parallel do
 

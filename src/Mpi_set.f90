@@ -49,6 +49,11 @@ module mpi_set
     module procedure senrec_face_r8
   end interface
 
+  interface bcast_clas_val
+    module procedure bcast_clas_val_r4
+    module procedure bcast_clas_val_r8
+  end interface
+
   ! -- local
 
   contains
@@ -2579,9 +2584,9 @@ module mpi_set
 
   end subroutine bcast_init_dep
 
-  subroutine bcast_clas_val(clasn, cname, cval)
+  subroutine bcast_clas_val_r4(clasn, cname, cval)
   !*********************************************************************************************
-  ! bcast_clas_val -- Bcast classification value
+  ! bcast_clas_val_r4 -- Bcast real4 classification value
   !*********************************************************************************************
     ! -- module
 
@@ -2617,7 +2622,47 @@ module mpi_set
       end if
     end if
 
-  end subroutine bcast_clas_val
+  end subroutine bcast_clas_val_r4
+
+  subroutine bcast_clas_val_r8(clasn, cname, cval)
+  !*********************************************************************************************
+  ! bcast_clas_val_r8 -- Bcast real8 classification value
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    integer(I4), intent(in) :: clasn
+    character(*), intent(inout) :: cname(:)
+    real(DP), intent(inout) :: cval(:)
+    ! -- local
+    integer(I4) :: i, ierr, char_leng
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    do i = 1, clasn
+      char_leng = len_trim(cname(i))
+      call MPI_BCAST(char_leng, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
+      if (ierr /= MPI_SUCCESS) then
+        if (st_mpi%rank == 0) then
+          call write_err_stop("Broadcast classification name "//cname(i)//" length.")
+        end if
+      end if
+
+      call MPI_BCAST(cname(i), char_leng, MPI_CHARACTER, 0, st_mpi%comm, ierr)
+      if (ierr /= MPI_SUCCESS) then
+        if (st_mpi%rank == 0) then
+          call write_err_stop("Broadcast classification name "//cname(i)//".")
+        end if
+      end if
+    end do
+
+    call MPI_BCAST(cval, clasn, MPI_REAL8, 0, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Broadcast classification value.")
+      end if
+    end if
+
+  end subroutine bcast_clas_val_r8
 
   subroutine bcast_2dpoint(pointn, pi, pj, pval)
   !*********************************************************************************************
@@ -2628,7 +2673,7 @@ module mpi_set
     ! -- inout
     integer(I4), intent(in) :: pointn
     integer(I4), intent(inout) :: pi(:), pj(:)
-    real(SP), intent(inout) :: pval(:)
+    real(DP), intent(inout) :: pval(:)
     ! -- local
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
@@ -2647,7 +2692,7 @@ module mpi_set
       end if
     end if
 
-    call MPI_BCAST(pval, pointn, MPI_REAL4, 0, st_mpi%comm, ierr)
+    call MPI_BCAST(pval, pointn, MPI_REAL8, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Broadcast 2d point value.")
@@ -2666,7 +2711,7 @@ module mpi_set
     ! -- inout
     integer(I4), intent(in) :: pointn
     integer(I4), intent(inout) :: pi(:), pj(:), pk(:)
-    real(SP), intent(inout) :: pval(:)
+    real(DP), intent(inout) :: pval(:)
     ! -- local
     integer(I4) :: ierr
     !-------------------------------------------------------------------------------------------
@@ -2692,7 +2737,7 @@ module mpi_set
       end if
     end if
 
-    call MPI_BCAST(pval, pointn, MPI_REAL4, 0, st_mpi%comm, ierr)
+    call MPI_BCAST(pval, pointn, MPI_REAL8, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Broadcast 3d point value.")

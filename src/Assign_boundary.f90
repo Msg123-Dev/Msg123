@@ -1,7 +1,7 @@
 module assign_boundary
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: SNOVAL, DZERO
+  use constval_module, only: SNOVAL, DZERO, DNOVAL
   use types_module, only: forc_set
   use utility_module, only: st_mpi, close_file
   use initial_module, only: in_type
@@ -45,17 +45,17 @@ module assign_boundary
     integer(I4) :: i, sealn, intse_type, temp_ftype
     integer(I4), allocatable :: seal_cflag(:), seal2cell(:)
     integer(I4), allocatable :: seal_all_type(:)
-    real(DP), allocatable :: cell_seal(:)
+    real(DP), allocatable :: raw_seal(:), cell_seal(:)
     character(:), allocatable :: err_mes, rank_str
     logical, allocatable :: seal_all_mask(:)
     !-------------------------------------------------------------------------------------------
     if (st_seal%totn > 0) then
-      allocate(st_forc%read_seal(ncell), seal_cflag(ncell))
+      allocate(raw_seal(ncell), seal_cflag(ncell))
       allocate(seal_all_type(7), seal_all_mask(7))
       !$omp parallel
       !$omp do private(i)
       do i = 1, ncell
-        st_forc%read_seal(i) = SNOVAL
+        raw_seal(i) = DNOVAL
         seal_cflag(i) = 0
       end do
       !$omp end do
@@ -71,7 +71,7 @@ module assign_boundary
         allocate(st_seal%value(st_seal%totn), st_seal%name(st_seal%totn))
         !$omp parallel do private(i)
         do i = 1, st_seal%totn
-          st_seal%value(i) = SNOVAL
+          st_seal%value(i) = DNOVAL
           st_seal%name(i) = ""
         end do
         !$omp end parallel do
@@ -83,7 +83,7 @@ module assign_boundary
           call bcast_clas_val(st_seal%totn, st_seal%name, st_seal%value)
         end if
 #endif
-        call set_clas2seal(st_seal%totn, st_seal%name, st_seal%value, st_forc%read_seal,&
+        call set_clas2seal(st_seal%totn, st_seal%name, st_seal%value, raw_seal,&
                            seal_cflag, sealn)
         deallocate(st_seal%value, st_seal%name)
       else if (seal_ftype == in_type(2)) then
@@ -91,7 +91,7 @@ module assign_boundary
         allocate(st_seal%i(st_seal%totn), st_seal%j(st_seal%totn), st_seal%k(st_seal%totn))
         !$omp parallel do private(i)
         do i = 1, st_seal%totn
-          st_seal%value(i) = SNOVAL
+          st_seal%value(i) = DNOVAL
           st_seal%i(i) = 0 ; st_seal%j(i) = 0 ; st_seal%k(i) = 0
         end do
         !$omp end parallel do
@@ -105,7 +105,7 @@ module assign_boundary
         end if
 #endif
         call set_point2seal(st_seal%totn, st_seal%i, st_seal%j, st_seal%k, st_seal%value,&
-                            st_forc%read_seal, seal_cflag, sealn)
+                            raw_seal, seal_cflag, sealn)
         deallocate(st_seal%i, st_seal%j, st_seal%k, st_seal%value)
       else
         if (seal_ftype == in_type(7)) then
@@ -117,11 +117,11 @@ module assign_boundary
         end if
 
         if (temp_ftype == in_type(3) .or. temp_ftype == in_type(4)) then
-          call set_2dfile2seal(st_seal%fnum, seal_ftype, intse_type, seal_snum, SNOVAL,&
-                               st_forc%read_seal, seal_cflag, sealn)
+          call set_2dfile2seal(st_seal%fnum, seal_ftype, intse_type, seal_snum, DNOVAL,&
+                               raw_seal, seal_cflag, sealn)
         else if (temp_ftype == in_type(5) .or. temp_ftype == in_type(6)) then
-          call set_3dfile2seal(st_seal%fnum, seal_ftype, intse_type, seal_cnum, SNOVAL,&
-                               st_forc%read_seal, seal_cflag, sealn)
+          call set_3dfile2seal(st_seal%fnum, seal_ftype, intse_type, seal_cnum, DNOVAL,&
+                               raw_seal, seal_cflag, sealn)
         end if
         if (seal_ftype == in_type(7)) then
           if (intse_type == in_type(3) .or. intse_type == in_type(5)) then
@@ -169,17 +169,19 @@ module assign_boundary
           cell_seal(i) = DZERO
         end do
         !$omp end parallel do
-        call set_bound2calc(ncell, seal_cflag, st_forc%read_seal, seal2cell, cell_seal)
-        deallocate(st_forc%read_seal)
+        call set_bound2calc(ncell, seal_cflag, raw_seal, seal2cell, cell_seal)
         allocate(st_forc%read_seal(sealn))
         !$omp parallel do private(i)
         do i = 1, sealn
-          st_forc%read_seal(i) = real((cell_seal(i)-z_base)*len_scal_inv, kind=SP)
+          st_forc%read_seal(i) = (cell_seal(i)-z_base)*len_scal_inv
         end do
         !$omp end parallel do
         deallocate(seal_cflag, seal2cell, cell_seal)
+      else
+        allocate(st_forc%read_seal(ncell))
+        st_forc%read_seal(:) = raw_seal(:)
       end if
-      deallocate(seal_all_type, seal_all_mask)
+      deallocate(raw_seal, seal_all_type, seal_all_mask)
     end if
 
   end subroutine assign_sealv
@@ -369,19 +371,23 @@ module assign_boundary
     type(surfw_set), intent(inout) :: rl_st
     integer(I4), intent(out) :: rl_num
     integer(I4), intent(out) :: rl_cflag(:)
-    real(SP), intent(out) :: calc_rl(:)
+    real(DP), intent(out) :: calc_rl(:)
     ! -- local
     integer(I4) :: i
-    real(SP) :: nodim_unit
+    real(DP) :: nodim_unit
+    real(DP), allocatable :: raw_rl(:)
+    real(SP), allocatable :: bin_rl(:)
     !-------------------------------------------------------------------------------------------
     rl_num = 0
 
     if (rl_st%totn > 0) then
+      allocate(raw_rl(ncals))
+      raw_rl(:) = DNOVAL
       if (rl_ftype == in_type(1)) then
         allocate(rl_st%value(rl_st%totn), rl_st%name(rl_st%totn))
         !$omp parallel do private(i)
         do i = 1, rl_st%totn
-          rl_st%value(i) = SNOVAL
+          rl_st%value(i) = DNOVAL
           rl_st%name(i) = ""
         end do
         !$omp end parallel do
@@ -393,14 +399,14 @@ module assign_boundary
           call bcast_clas_val(rl_st%totn, rl_st%name, rl_st%value)
         end if
 #endif
-        call set_clas2calc(rl_st%totn, rl_st%name, rl_st%value, calc_rl, rl_cflag, rl_num)
+        call set_clas2calc(rl_st%totn, rl_st%name, rl_st%value, raw_rl, rl_cflag, rl_num)
         deallocate(rl_st%value, rl_st%name)
       else if (rl_ftype == in_type(2)) then
         allocate(rl_st%value(rl_st%totn))
         allocate(rl_st%i(rl_st%totn), rl_st%j(rl_st%totn))
         !$omp parallel do private(i)
         do i = 1, rl_st%totn
-          rl_st%value(i) = SNOVAL
+          rl_st%value(i) = DNOVAL
           rl_st%i(i) = 0 ; rl_st%j(i) = 0
         end do
         !$omp end parallel do
@@ -412,12 +418,20 @@ module assign_boundary
           call bcast_2dpoint(rl_st%totn, rl_st%i, rl_st%j, rl_st%value)
         end if
 #endif
-        call set_point2surf(rl_st%totn, rl_st%i, rl_st%j, rl_st%value, calc_rl, rl_cflag,&
-                            rl_num)
+        call set_point2surf(rl_st%totn, rl_st%i, rl_st%j, rl_st%value, raw_rl, rl_cflag, rl_num)
         deallocate(rl_st%i, rl_st%j, rl_st%value)
       else
-        call set_2dfile2cals(rl_st%fnum, rl_ftype, rl_st%inttype, SNOVAL, calc_rl,&
-                             rl_cflag, rl_num)
+        if (rl_ftype == in_type(3) .or. rl_st%inttype == in_type(3)) then
+          call set_2dfile2cals(rl_st%fnum, rl_ftype, rl_st%inttype, DNOVAL, raw_rl,&
+                               rl_cflag, rl_num)
+        else
+          allocate(bin_rl(ncals))
+          bin_rl(:) = SNOVAL
+          call set_2dfile2cals(rl_st%fnum, rl_ftype, rl_st%inttype, SNOVAL, bin_rl,&
+                               rl_cflag, rl_num)
+          raw_rl(:) = bin_rl(:)
+          deallocate(bin_rl)
+        end if
         if (rl_ftype == in_type(7)) then
           if (rl_st%inttype == in_type(3)) then
             if (st_mpi%rank == 0) then
@@ -434,23 +448,24 @@ module assign_boundary
       end if
 
       if (geom_type == 1) then
-        nodim_unit = len_scal_inv*len_scal_inv
+        nodim_unit = real(len_scal_inv, kind=DP)*len_scal_inv
       else
         nodim_unit = len_scal_inv
       end if
       if (geom_type == 2) then
         !$omp parallel do private(i)
         do i = 1, ncals
-          calc_rl(i) = real((real(calc_rl(i), kind=DP)-z_base)*len_scal_inv, kind=SP)
+          calc_rl(i) = (raw_rl(i)-z_base)*len_scal_inv
         end do
         !$omp end parallel do
       else
         !$omp parallel do private(i)
         do i = 1, ncals
-          calc_rl(i) = calc_rl(i)*nodim_unit
+          calc_rl(i) = raw_rl(i)*nodim_unit
         end do
         !$omp end parallel do
       end if
+      deallocate(raw_rl)
 
     end if
 

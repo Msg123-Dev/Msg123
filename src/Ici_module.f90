@@ -156,7 +156,7 @@ module ici_module
         allocate(st_rive%calc%wd(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
-          st_rive%calc%wd(i) = SZERO
+          st_rive%calc%wd(i) = DZERO
         end do
         !$omp end parallel do
       end if
@@ -603,7 +603,7 @@ module ici_module
     ! -- inout
     real(DP), intent(in) :: inwd(:)
     integer(I4), intent(out) :: wdflag(:)
-    real(SP), intent(out) :: outwd(:)
+    real(DP), intent(out) :: outwd(:)
     integer(I4), intent(out) :: wdnum
     ! -- local
     integer(I4) :: i
@@ -611,7 +611,7 @@ module ici_module
     !$omp parallel do private(i)
     do i = 1, ncals
       if (inwd(i) /= cama_noval) then
-        outwd(i) = real(inwd(i)*len_scal_inv, kind=SP)
+        outwd(i) = inwd(i)*len_scal_inv
         wdflag(i) = 1
       end if
     end do

@@ -155,7 +155,7 @@ module types_module
     real(SP) :: etime, multi
     character(VARLEN), allocatable :: name(:)
     integer(I4), allocatable :: i(:), j(:), k(:)
-    real(SP), allocatable :: value(:)
+    real(DP), allocatable :: value(:)
   end type seal_set
 
   type :: surfb_set
@@ -177,7 +177,7 @@ module types_module
     real(SP) :: etime, multi, intstep
     character(VARLEN), allocatable :: name(:)
     integer(I4), allocatable :: i(:), j(:)
-    real(SP), allocatable :: value(:)
+    real(DP), allocatable :: value(:)
     character(:), allocatable :: intpath
   end type surfw_set
 
@@ -247,7 +247,8 @@ module types_module
     real(DP), allocatable :: calc_rech(:)
     real(DP), allocatable :: rive_head(:), rive_bott(:), rive_area(:)
     real(DP), allocatable :: lake_head(:), lake_bott(:), lake_area(:)
-    real(SP), allocatable :: read_seal(:), read_rech(:), read_well(:)
+    real(DP), allocatable :: read_seal(:)
+    real(SP), allocatable :: read_rech(:), read_well(:)
     real(SP), allocatable :: read_prec(:), read_evap(:)
     real(DP), allocatable :: well_top(:), well_bott(:), calc_well(:)
   end type forc_set
@@ -257,7 +258,7 @@ module types_module
   end type bflag_set
 
   type :: bcalc_set
-    real(SP), allocatable :: wl(:), wd(:), bl(:), de(:), wi(:), le(:), ar(:)
+    real(DP), allocatable :: wl(:), wd(:), bl(:), de(:), wi(:), le(:), ar(:)
   end type bcalc_set
 
   type :: bcount_set

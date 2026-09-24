@@ -485,18 +485,19 @@ module read_input
 
     ! -- local
     integer(I4) :: ierr
-    real(SP) :: init_step, incr_multi, decr_multi, max_tstep
+    real(SP) :: init_step, incr_multi, decr_multi, min_tstep, max_tstep
     integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type, expd_type
-    integer(I4) :: conv_type, datum_type, deri_type, picard_btr
+    integer(I4) :: conv_type, noconv_type, datum_type, deri_type, picard_btr
     real(DP) :: criteria, res_abs_tol, res_rel_tol, dilu_shift, dsat_max
     real(DP) :: picard_btol, picard_bfact, picard_blim
-    namelist/set_solution/init_step, tstep_type, incr_multi, decr_multi, max_tstep,&
+    namelist/set_solution/init_step, tstep_type, incr_multi, decr_multi, min_tstep, max_tstep,&
                           maxout_iter, picard_iter, criteria, maxinn_iter, precon_type,&
                           res_abs_tol, res_rel_tol, dilu_shift, expd_type, dsat_max,&
-                          conv_type, datum_type, deri_type, picard_btr,&
+                          conv_type, noconv_type, datum_type, deri_type, picard_btr,&
                           picard_btol, picard_bfact, picard_blim
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; init_step = SZERO ; incr_multi = SZERO ; decr_multi = SZERO ; max_tstep = SINFI
+    min_tstep = SZERO ; noconv_type = st_ctrl%noconv_type
     tstep_type = st_ctrl%tstep_type ; maxout_iter = st_ctrl%maxout_iter
     picard_iter = st_ctrl%picard_iter ; maxinn_iter = st_ctrl%maxinn_iter
     precon_type = st_ctrl%precon_type ; criteria = st_ctrl%criteria
@@ -520,6 +521,7 @@ module read_input
     st_ctrl%datum_type = datum_type ; st_ctrl%deri_type = deri_type
     st_ctrl%picard_btr = picard_btr ; st_ctrl%picard_btol = picard_btol
     st_ctrl%picard_bfact = picard_bfact ; st_ctrl%picard_blim = picard_blim
+    st_ctrl%noconv_type = noconv_type
 
     if (ierr /= 0) then
       call write_err_stop("While reading solution section in main file.")
@@ -541,6 +543,10 @@ module read_input
       call write_err_stop("Picard iteration is larger than maximum number of outer iteration.")
     else if (max_tstep <= SZERO) then
       call write_err_stop("Input a positive value for maximum time step.")
+    else if (min_tstep < SZERO) then
+      call write_err_stop("Input a non-negative value for minimum time step.")
+    else if (min_tstep > max_tstep) then
+      call write_err_stop("Minimum time step is larger than maximum time step.")
     else if (res_abs_tol < DZERO) then
       call write_err_stop("Input a non-negative value for absolute residual tolerance.")
     else if (res_rel_tol < DZERO) then
@@ -557,6 +563,8 @@ module read_input
       call write_err_stop("Input a non-negative value for convergence type.")
     else if (conv_type > 1) then
       call write_err_stop("Input a valid value for convergence type.")
+    else if (noconv_type < 0 .or. noconv_type > 1) then
+      call write_err_stop("Input a valid value for non-convergence type.")
     else if (datum_type < 0 .or. datum_type > 1) then
       call write_err_stop("Input a valid value for datum type.")
     else if (deri_type < 0 .or. deri_type > 1) then
@@ -579,6 +587,7 @@ module read_input
     end if
 
     st_sim%ini_step = init_step*st_sim%cal_fact
+    st_sim%min_step = min_tstep*st_sim%cal_fact
     st_sim%max_step = max_tstep*st_sim%cal_fact
     st_sim%inc_fact = incr_multi
     st_sim%dec_fact = decr_multi

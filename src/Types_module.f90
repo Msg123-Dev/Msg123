@@ -22,12 +22,12 @@ module types_module
     integer(I4) :: sim_type, res_type, reg_type, reg_neib
     integer(I4) :: sta_date(6), end_date(6)
     character(:), allocatable :: sim_name, cal_unit, reg_name, inact_name
-    real(SP) :: end_time, ini_step, max_step, inc_fact, dec_fact, cal_fact
+    real(SP) :: end_time, ini_step, min_step, max_step, inc_fact, dec_fact, cal_fact
   end type sim_set
 
   type :: ctrl_set
     integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type, expd_type
-    integer(I4) :: conv_type, datum_type, deri_type, picard_btr
+    integer(I4) :: conv_type, noconv_type, datum_type, deri_type, picard_btr
     integer(I4) :: nlevel, maxvcy_iter, amg_nlevel, max_sweep
     integer(I4) :: noclas_flag = 0
     real(DP) :: criteria, errtol, newper, newper_inv, res_abs_tol, res_rel_tol

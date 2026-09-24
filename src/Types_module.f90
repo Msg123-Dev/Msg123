@@ -247,7 +247,8 @@ module types_module
     real(DP), allocatable :: calc_rech(:)
     real(DP), allocatable :: rive_head(:), rive_bott(:), rive_area(:)
     real(DP), allocatable :: lake_head(:), lake_bott(:), lake_area(:)
-    real(SP), allocatable :: read_seal(:), read_rech(:), read_well(:)
+    real(DP), allocatable :: read_seal(:)
+    real(SP), allocatable :: read_rech(:), read_well(:)
     real(SP), allocatable :: read_prec(:), read_evap(:)
     real(DP), allocatable :: well_top(:), well_bott(:), calc_well(:)
   end type forc_set

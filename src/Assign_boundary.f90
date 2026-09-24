@@ -45,17 +45,18 @@ module assign_boundary
     integer(I4) :: i, sealn, intse_type, temp_ftype
     integer(I4), allocatable :: seal_cflag(:), seal2cell(:)
     integer(I4), allocatable :: seal_all_type(:)
+    real(SP), allocatable :: raw_seal(:)
     real(DP), allocatable :: cell_seal(:)
     character(:), allocatable :: err_mes, rank_str
     logical, allocatable :: seal_all_mask(:)
     !-------------------------------------------------------------------------------------------
     if (st_seal%totn > 0) then
-      allocate(st_forc%read_seal(ncell), seal_cflag(ncell))
+      allocate(raw_seal(ncell), seal_cflag(ncell))
       allocate(seal_all_type(7), seal_all_mask(7))
       !$omp parallel
       !$omp do private(i)
       do i = 1, ncell
-        st_forc%read_seal(i) = SNOVAL
+        raw_seal(i) = SNOVAL
         seal_cflag(i) = 0
       end do
       !$omp end do
@@ -83,7 +84,7 @@ module assign_boundary
           call bcast_clas_val(st_seal%totn, st_seal%name, st_seal%value)
         end if
 #endif
-        call set_clas2seal(st_seal%totn, st_seal%name, st_seal%value, st_forc%read_seal,&
+        call set_clas2seal(st_seal%totn, st_seal%name, st_seal%value, raw_seal,&
                            seal_cflag, sealn)
         deallocate(st_seal%value, st_seal%name)
       else if (seal_ftype == in_type(2)) then
@@ -105,7 +106,7 @@ module assign_boundary
         end if
 #endif
         call set_point2seal(st_seal%totn, st_seal%i, st_seal%j, st_seal%k, st_seal%value,&
-                            st_forc%read_seal, seal_cflag, sealn)
+                            raw_seal, seal_cflag, sealn)
         deallocate(st_seal%i, st_seal%j, st_seal%k, st_seal%value)
       else
         if (seal_ftype == in_type(7)) then
@@ -118,10 +119,10 @@ module assign_boundary
 
         if (temp_ftype == in_type(3) .or. temp_ftype == in_type(4)) then
           call set_2dfile2seal(st_seal%fnum, seal_ftype, intse_type, seal_snum, SNOVAL,&
-                               st_forc%read_seal, seal_cflag, sealn)
+                               raw_seal, seal_cflag, sealn)
         else if (temp_ftype == in_type(5) .or. temp_ftype == in_type(6)) then
           call set_3dfile2seal(st_seal%fnum, seal_ftype, intse_type, seal_cnum, SNOVAL,&
-                               st_forc%read_seal, seal_cflag, sealn)
+                               raw_seal, seal_cflag, sealn)
         end if
         if (seal_ftype == in_type(7)) then
           if (intse_type == in_type(3) .or. intse_type == in_type(5)) then
@@ -169,17 +170,19 @@ module assign_boundary
           cell_seal(i) = DZERO
         end do
         !$omp end parallel do
-        call set_bound2calc(ncell, seal_cflag, st_forc%read_seal, seal2cell, cell_seal)
-        deallocate(st_forc%read_seal)
+        call set_bound2calc(ncell, seal_cflag, raw_seal, seal2cell, cell_seal)
         allocate(st_forc%read_seal(sealn))
         !$omp parallel do private(i)
         do i = 1, sealn
-          st_forc%read_seal(i) = real((cell_seal(i)-z_base)*len_scal_inv, kind=SP)
+          st_forc%read_seal(i) = (cell_seal(i)-z_base)*len_scal_inv
         end do
         !$omp end parallel do
         deallocate(seal_cflag, seal2cell, cell_seal)
+      else
+        allocate(st_forc%read_seal(ncell))
+        st_forc%read_seal(:) = raw_seal(:)
       end if
-      deallocate(seal_all_type, seal_all_mask)
+      deallocate(raw_seal, seal_all_type, seal_all_mask)
     end if
 
   end subroutine assign_sealv

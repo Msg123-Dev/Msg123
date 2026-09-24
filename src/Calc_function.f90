@@ -20,7 +20,6 @@ module calc_function
   public :: allocate_calfun, calc_func, calc_mass, calc_vecjacf, set_surfw_head
   public :: func_rechterm, func_wellterm, func_surfterm, func_riveterm
   public :: func_laketerm, func_sealterm
-  real(DP), public :: qext_sum = DZERO
   ! -- local
   real(DP), allocatable :: stof(:), conf(:), welf(:), seaf(:)
   real(DP), allocatable :: funcvs(:)
@@ -28,7 +27,6 @@ module calc_function
   real(DP), allocatable :: stor_work(:)
   real(DP), allocatable :: conn_flow(:)
   real(DP), allocatable :: scal_work(:)
-  real(DP), allocatable, public :: func_scal(:)
   real(DP), allocatable :: delh_s(:), elev_rati(:)
   real(DP), allocatable :: surf_work(:)
   real(DP), allocatable :: delh_r(:), delh_l(:), seal_flow(:)
@@ -52,7 +50,7 @@ module calc_function
     allocate(recf(ncals), surf(ncals), rivf(ncals), lakf(ncals))
     allocate(stor_work(ncalc))
     allocate(conn_flow(ncalc))
-    allocate(scal_work(ncalc), func_scal(ncalc))
+    allocate(scal_work(ncalc))
     allocate(delh_s(ncals), elev_rati(ncals))
     allocate(surf_work(ncals))
     allocate(delh_r(st_bcnd%rive_num), delh_l(st_bcnd%lake_num), seal_flow(st_bcnd%seal_num))
@@ -60,7 +58,7 @@ module calc_function
 
   end subroutine allocate_calfun
 
-  subroutine calc_func(stold, stnew, surfh, infx, snew, rperm, surfr, funcv, fscal)
+  subroutine calc_func(stold, stnew, surfh, infx, snew, rperm, surfr, funcv, fscal, qext)
   !*********************************************************************************************
   ! calc_func -- Calculate function value
   !*********************************************************************************************
@@ -69,9 +67,10 @@ module calc_function
     real(DP), intent(in) :: stold(:), surfh(:)
     real(DP), intent(inout) :: stnew(:), infx(:), snew(:), rperm(:), surfr(:)
     real(DP), intent(out) :: funcv(:)
-    real(DP), intent(out), optional :: fscal(:)
+    real(DP), intent(out), optional :: fscal(:), qext
     ! -- local
     integer(I4) :: i, s
+    real(DP) :: qext_sum
     !-------------------------------------------------------------------------------------------
     !$omp parallel
     !$omp do private(i)
@@ -162,12 +161,15 @@ module calc_function
       !$omp end parallel do
     end if
 
+    if (present(qext)) then
       qext_sum = DZERO
       !$omp parallel do private(i) reduction(+:qext_sum)
       do i = 1, ncalc
         qext_sum = qext_sum + abs(funcvs(i)) + abs(welf(i)) + abs(seaf(i))
       end do
       !$omp end parallel do
+      qext = qext_sum
+    end if
 
   end subroutine calc_func
 

@@ -15,6 +15,16 @@ module read_module
   public :: skip_file, skip_file_int, flat_2dto2d, flat_2dto3d, flat_3dto3d
   public :: read_next, read_intn, read_2d_calcreg, read_3d_calcreg
 
+  interface read_clasf
+    module procedure read_clasf_r4
+    module procedure read_clasf_r8
+  end interface
+
+  interface read_3dpointf
+    module procedure read_3dpointf_r4
+    module procedure read_3dpointf_r8
+  end interface
+
   interface read_2dtxt
     module procedure read_2d_i4txt
     module procedure read_2d_r4txt
@@ -61,9 +71,9 @@ module read_module
 
   contains
 
-  subroutine read_clasf(fnum, targn, targ_name, targ_val)
+  subroutine read_clasf_r4(fnum, targn, targ_name, targ_val)
   !*********************************************************************************************
-  ! read_clasf -- Read classification input file
+  ! read_clasf_r4 -- Read real4 classification input file
   !*********************************************************************************************
     ! -- modules
 
@@ -83,7 +93,31 @@ module read_module
       end if
     end do
 
-  end subroutine read_clasf
+  end subroutine read_clasf_r4
+
+  subroutine read_clasf_r8(fnum, targn, targ_name, targ_val)
+  !*********************************************************************************************
+  ! read_clasf_r8 -- Read real8 classification input file
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(in) :: fnum, targn
+    character(*), intent(out) :: targ_name(:)
+    real(DP), intent(out) :: targ_val(:)
+    ! -- local
+    integer(I4) :: i
+    integer(I4) :: ierr
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    do i = 1, targn
+      read(unit=fnum,fmt=*,iostat=ierr) targ_name(i), targ_val(i)
+      if (ierr /= 0) then
+        call write_err_read(fnum)
+      end if
+    end do
+
+  end subroutine read_clasf_r8
 
   subroutine read_2dpointf(fnum, targn, p_i, p_j, targ_val)
   !*********************************************************************************************
@@ -94,7 +128,7 @@ module read_module
     ! -- inout
     integer(I4), intent(in) :: fnum, targn
     integer(I4), intent(out) :: p_i(:), p_j(:)
-    real(SP), intent(out) :: targ_val(:)
+    real(DP), intent(out) :: targ_val(:)
     ! -- local
     integer(I4) :: i
     integer(I4) :: ierr
@@ -109,9 +143,9 @@ module read_module
 
   end subroutine read_2dpointf
 
-  subroutine read_3dpointf(fnum, targn, p_i, p_j, p_k, targ_val)
+  subroutine read_3dpointf_r4(fnum, targn, p_i, p_j, p_k, targ_val)
   !*********************************************************************************************
-  ! read_3dpointf -- Read 3d point input file
+  ! read_3dpointf_r4 -- Read real4 3d point input file
   !*********************************************************************************************
     ! -- modules
 
@@ -131,7 +165,31 @@ module read_module
       end if
     end do
 
-  end subroutine read_3dpointf
+  end subroutine read_3dpointf_r4
+
+  subroutine read_3dpointf_r8(fnum, targn, p_i, p_j, p_k, targ_val)
+  !*********************************************************************************************
+  ! read_3dpointf_r8 -- Read real8 3d point input file
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(in) :: fnum, targn
+    integer(I4), intent(out) :: p_i(:), p_j(:), p_k(:)
+    real(DP), intent(out) :: targ_val(:)
+    ! -- local
+    integer(I4) :: i
+    integer(I4) :: ierr
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    do i = 1, targn
+      read(unit=fnum,fmt=*,iostat=ierr) p_i(i), p_j(i), p_k(i), targ_val(i)
+      if (ierr /= 0) then
+        call write_err_read(fnum)
+      end if
+    end do
+
+  end subroutine read_3dpointf_r8
 
   subroutine read_wpointf(fnum, wnum, pid, pi, pj, pks, pke, pval)
   !*********************************************************************************************

@@ -26,6 +26,11 @@ module set_condition
   public :: set_well2index, set_well3d2index, set_wellprop
   public :: set_connect, set_srabyd, set_chabyd, set_wellconn
 
+  interface set_clas2calc
+    module procedure set_clas2calc_r4
+    module procedure set_clas2calc_r8
+  end interface
+
   interface set_2dfile2cals
     module procedure set_2di4_cals
     module procedure set_2dr4_cals
@@ -57,9 +62,9 @@ module set_condition
 
   contains
 
-  subroutine set_clas2calc(tgn, tg_name, tg_val, calc_val, tg_flag, tg_num)
+  subroutine set_clas2calc_r4(tgn, tg_name, tg_val, calc_val, tg_flag, tg_num)
   !*********************************************************************************************
-  ! set_clas2calc -- Set calculation value from classification
+  ! set_clas2calc_r4 -- Set real4 calculation value from classification
   !*********************************************************************************************
     ! -- modules
     ! -- inout
@@ -113,7 +118,65 @@ module set_condition
 
     deallocate(temp_flag)
 
-  end subroutine set_clas2calc
+  end subroutine set_clas2calc_r4
+
+  subroutine set_clas2calc_r8(tgn, tg_name, tg_val, calc_val, tg_flag, tg_num)
+  !*********************************************************************************************
+  ! set_clas2calc_r8 -- Set real8 calculation value from classification
+  !*********************************************************************************************
+    ! -- modules
+    ! -- inout
+    integer(I4), intent(in) :: tgn
+    character(*), intent(in) :: tg_name(:)
+    real(DP), intent(in) :: tg_val(:)
+    real(DP), intent(inout) :: calc_val(:)
+    integer(I4), intent(out), optional :: tg_flag(:)
+    integer(I4), intent(out), optional :: tg_num
+    ! -- local
+    integer(I4) :: i, j, k
+    integer(I4) :: out_num
+    integer(I4), allocatable :: temp_flag(:)
+    !-------------------------------------------------------------------------------------------
+    out_num = size(calc_val(:))
+    allocate(temp_flag(out_num))
+    !$omp parallel do private(i)
+    do i = 1, out_num
+      temp_flag(i) = 0
+    end do
+    !$omp end parallel do
+
+    do i = 1, tgn
+      if (tg_val(i) /= SNOVAL) then
+        do k = 1, st_clas%totn
+          if (tg_name(i) == st_clas%name(k)) then
+            !$omp parallel do private(j)
+            do j = 1, out_num
+              if (st_conn%clas_flag(j,k) == 1) then
+                calc_val(j) = tg_val(i)
+                temp_flag(j) = 1
+              end if
+            end do
+            !$omp end parallel do
+          end if
+        end do
+      end if
+    end do
+
+    if (present(tg_flag)) then
+      !$omp parallel do private(i)
+      do i = 1, ncalc
+        tg_flag(i) = temp_flag(i)
+      end do
+      !$omp end parallel do
+    end if
+
+    if (present(tg_num)) then
+      call count_flag(tg_flag, tg_num)
+    end if
+
+    deallocate(temp_flag)
+
+  end subroutine set_clas2calc_r8
 
   subroutine set_clas2seal(tgn, tg_name, tg_val, cell_val, tg_flag, tg_num)
   !*********************************************************************************************
@@ -123,8 +186,8 @@ module set_condition
     ! -- inout
     integer(I4), intent(in) :: tgn
     character(*), intent(in) :: tg_name(:)
-    real(SP), intent(in) :: tg_val(:)
-    real(SP), intent(out) :: cell_val(:)
+    real(DP), intent(in) :: tg_val(:)
+    real(DP), intent(out) :: cell_val(:)
     integer(I4), intent(out) :: tg_flag(:)
     integer(I4), intent(out) :: tg_num
     ! -- local
@@ -167,8 +230,8 @@ module set_condition
     ! -- inout
     integer(I4), intent(in) :: tgn
     integer(I4), intent(in) :: p_i(:), p_j(:), p_k(:)
-    real(SP), intent(in) :: tg_val(:)
-    real(SP), intent(out) :: cell_val(:)
+    real(DP), intent(in) :: tg_val(:)
+    real(DP), intent(out) :: cell_val(:)
     integer(I4), intent(out) :: tg_flag(:)
     integer(I4), intent(out) :: tg_num
     ! -- local
@@ -236,8 +299,8 @@ module set_condition
     ! -- inout
     integer(I4), intent(in) :: tgn
     integer(I4), intent(in) :: p_i(:), p_j(:)
-    real(SP), intent(in) :: tg_val(:)
-    real(SP), intent(out) :: cell_val(:)
+    real(DP), intent(in) :: tg_val(:)
+    real(DP), intent(out) :: cell_val(:)
     integer(I4), intent(out) :: tg_flag(:)
     integer(I4), intent(out) :: tg_num
     ! -- local
@@ -344,8 +407,8 @@ module set_condition
 #endif
     ! -- inout
     integer(I4), intent(in) :: fnum, ftype, int_ft, rsnum
-    real(SP), intent(in) :: no_val
-    real(SP), intent(inout) :: val_out(:)
+    real(DP), intent(in) :: no_val
+    real(DP), intent(inout) :: val_out(:)
     integer(I4), intent(out), optional :: tg_flag(:)
     integer(I4), intent(out), optional :: tg_num
     ! -- local
@@ -356,9 +419,11 @@ module set_condition
     real(SP), allocatable :: array_seas(:)
 #else
     integer(I4) :: dummy
+    real(SP), allocatable :: bin_flat(:)
+    real(SP), allocatable :: bin_read(:,:)
 #endif
-    real(SP), allocatable :: array_flat(:)
-    real(SP), allocatable :: array_read(:,:)
+    real(DP), allocatable :: array_flat(:)
+    real(DP), allocatable :: array_read(:,:)
     !-------------------------------------------------------------------------------------------
     cnum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz ; gridxyz = st_grid%nxyz
@@ -385,7 +450,7 @@ module set_condition
       ! -- Scatter xyz value (xyzval)
         call scatter_xyzval(cnum, st_conn%loc2glo_ijk, array_flat, val_out)
 #else
-      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr8(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
 
     else if (ftype == in_type(4) .or. int_ft == in_type(4)) then
@@ -394,7 +459,7 @@ module set_condition
       !$omp parallel
       !$omp do private(i)
       do i = 1, rsnum
-        array_seas(i) = no_val
+        array_seas(i) = real(no_val, kind=SP)
       end do
       !$omp end do
       !$omp do private(i)
@@ -417,26 +482,27 @@ module set_condition
       end do
       !$omp end parallel do
       deallocate(array_seas)
-      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr8(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #else
       dummy = rsnum
-      allocate(array_read(gridx,gridy), array_flat(gridxyz))
+      allocate(bin_read(gridx,gridy), bin_flat(gridxyz), array_flat(gridxyz))
       !$omp parallel
       !$omp do private(i)
       do i = 1, gridxyz
-        array_flat(i) = no_val
+        bin_flat(i) = real(no_val, kind=SP)
       end do
       !$omp end do
       !$omp do private(j)
       do j = 1, gridy
-        array_read(:,j) = no_val
+        bin_read(:,j) = real(no_val, kind=SP)
       end do
       !$omp end do
       !$omp end parallel
-      call read_2dbin(fnum, gridx, gridy, no_val, array_read)
-      call flat_2dto3d(gridx, gridy, gridz, array_read, array_flat)
-      deallocate(array_read)
-      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
+      call read_2dbin(fnum, gridx, gridy, real(no_val, kind=SP), bin_read)
+      call flat_2dto3d(gridx, gridy, gridz, bin_read, bin_flat)
+      array_flat(:) = bin_flat(:)
+      deallocate(bin_read, bin_flat)
+      call set_calcr8(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
     end if
 
@@ -445,7 +511,7 @@ module set_condition
     end if
 
     if (present(tg_flag)) then
-      call set_calc_flag_real4(cnum, no_val, val_out, tg_flag)
+      call set_calc_flag_real8(cnum, no_val, val_out, tg_flag)
     end if
 
     if (present(tg_num)) then
@@ -464,8 +530,8 @@ module set_condition
 #endif
     ! -- inout
     integer(I4), intent(in) :: fnum, ftype, int_ft, rcnum
-    real(SP), intent(in) :: no_val
-    real(SP), intent(inout) :: val_out(:)
+    real(DP), intent(in) :: no_val
+    real(DP), intent(inout) :: val_out(:)
     integer(I4), intent(out), optional :: tg_flag(:)
     integer(I4), intent(out), optional :: tg_num
     ! -- local
@@ -476,9 +542,11 @@ module set_condition
     real(SP), allocatable :: array_seac(:)
 #else
     integer(I4) :: dummy
+    real(SP), allocatable :: bin_flat(:)
+    real(SP), allocatable :: bin_read(:,:,:)
 #endif
-    real(SP), allocatable :: array_flat(:)
-    real(SP), allocatable :: array_read(:,:,:)
+    real(DP), allocatable :: array_flat(:)
+    real(DP), allocatable :: array_read(:,:,:)
     !-------------------------------------------------------------------------------------------
     cnum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz ; gridxyz = st_grid%nxyz
@@ -505,7 +573,7 @@ module set_condition
       ! -- Scatter xyz value (xyzval)
         call scatter_xyzval(cnum, st_conn%loc2glo_ijk, array_flat, val_out)
 #else
-      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr8(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
 
     else if (ftype == in_type(6) .or. int_ft == in_type(6)) then
@@ -514,7 +582,7 @@ module set_condition
       !$omp parallel
       !$omp do private(i)
       do i = 1, rcnum
-        array_seac(i) = no_val
+        array_seac(i) = real(no_val, kind=SP)
       end do
       !$omp end do
       !$omp do private(i)
@@ -534,26 +602,27 @@ module set_condition
       end do
       !$omp end parallel do
       deallocate(array_seac)
-      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
+      call set_calcr8(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #else
       dummy = rcnum
-      allocate(array_read(gridx,gridy,gridz), array_flat(gridxyz))
+      allocate(bin_read(gridx,gridy,gridz), bin_flat(gridxyz), array_flat(gridxyz))
       !$omp parallel
       !$omp do private(i)
       do i = 1, gridxyz
-        array_flat(i) = no_val
+        bin_flat(i) = real(no_val, kind=SP)
       end do
       !$omp end do
       !$omp do private(k)
       do k = 1, gridz
-        array_read(:,:,k) = no_val
+        bin_read(:,:,k) = real(no_val, kind=SP)
       end do
       !$omp end do
       !$omp end parallel
-      call read_3dbin(fnum, gridx, gridy, gridz, no_val, array_read)
-      call flat_3dto3d(gridx, gridy, gridz, array_read, array_flat)
-      deallocate(array_read)
-      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
+      call read_3dbin(fnum, gridx, gridy, gridz, real(no_val, kind=SP), bin_read)
+      call flat_3dto3d(gridx, gridy, gridz, bin_read, bin_flat)
+      array_flat(:) = bin_flat(:)
+      deallocate(bin_read, bin_flat)
+      call set_calcr8(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
 #endif
     end if
 
@@ -562,7 +631,7 @@ module set_condition
     end if
 
     if (present(tg_flag)) then
-      call set_calc_flag_real4(cnum, no_val, val_out, tg_flag)
+      call set_calc_flag_real8(cnum, no_val, val_out, tg_flag)
     end if
 
     if (present(tg_num)) then

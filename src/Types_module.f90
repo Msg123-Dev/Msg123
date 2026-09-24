@@ -155,7 +155,7 @@ module types_module
     real(SP) :: etime, multi
     character(VARLEN), allocatable :: name(:)
     integer(I4), allocatable :: i(:), j(:), k(:)
-    real(SP), allocatable :: value(:)
+    real(DP), allocatable :: value(:)
   end type seal_set
 
   type :: surfb_set
@@ -177,7 +177,7 @@ module types_module
     real(SP) :: etime, multi, intstep
     character(VARLEN), allocatable :: name(:)
     integer(I4), allocatable :: i(:), j(:)
-    real(SP), allocatable :: value(:)
+    real(DP), allocatable :: value(:)
     character(:), allocatable :: intpath
   end type surfw_set
 

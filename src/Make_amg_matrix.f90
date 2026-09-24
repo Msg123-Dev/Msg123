@@ -161,33 +161,35 @@ module make_amg_matrix
 
     ncoase = 0
 
-    que_loop: do
-      if (que_flag(1) == 0) then
-        exit que_loop
-      end if
-      i = que2glob(1)
-      ncoase = ncoase + 1
-      aggr_num(i) = ncoase
-      do k = nonaggr_index(i-1)+1, nonaggr_index(i)
-        j = crs_index(amglev-1)%offrow(nonaggr_lu(k))
-        if (j > nfine) then
-          cycle
+    if (nfine > 0) then
+      que_loop: do
+        if (que_flag(1) == 0) then
+          exit que_loop
         end if
-        aggr_num(j) = ncoase
-        if (aggr_luflag(j) > 0) then
-          ! -- Remove queue (que)
-            call remove_que(j)
-        end if
-        aggr_luflag(j) = 0
-        glob_num(j) = i
-      end do
-      ! -- Remove queue (que)
-        call remove_que(i)
-      aggr_luflag(i) = 0
-      glob_num(i) = i
-      ! -- Remove and Enter queue deep layer (quedeep)
-        call remove_enter_quedeep(i)
-    end do que_loop
+        i = que2glob(1)
+        ncoase = ncoase + 1
+        aggr_num(i) = ncoase
+        do k = nonaggr_index(i-1)+1, nonaggr_index(i)
+          j = crs_index(amglev-1)%offrow(nonaggr_lu(k))
+          if (j > nfine) then
+            cycle
+          end if
+          aggr_num(j) = ncoase
+          if (aggr_luflag(j) > 0) then
+            ! -- Remove queue (que)
+              call remove_que(j)
+          end if
+          aggr_luflag(j) = 0
+          glob_num(j) = i
+        end do
+        ! -- Remove queue (que)
+          call remove_que(i)
+        aggr_luflag(i) = 0
+        glob_num(i) = i
+        ! -- Remove and Enter queue deep layer (quedeep)
+          call remove_enter_quedeep(i)
+      end do que_loop
+    end if
 
     deallocate(que_flag, que2glob, glob_num, lay2_num)
 

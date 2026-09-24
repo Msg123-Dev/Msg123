@@ -13,7 +13,7 @@ program msg123
   use set_boundary, only: set_bound
   use allocate_solution, only: allocate_solvar
   use calc_function, only: allocate_calfun
-  use make_linearsystem, only: allocate_matvec
+  use make_linearsystem, only: allocate_matvec, write_symm_check
   use check_simulation, only: check_lastts, lasttime_flag
   use linear_solution, only: allocate_amgalg, allocate_krylov
   use time_module, only: update_tstep
@@ -157,5 +157,7 @@ program msg123
 
     write(log_fnum,11) (end_value(i), i = 1, 3), (end_value(i), i = 5, 7)
   end if
+
+  call write_symm_check()
 
 end program msg123

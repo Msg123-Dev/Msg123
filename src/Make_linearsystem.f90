@@ -1,6 +1,6 @@
 module make_linearsystem
   ! -- modules
-  use kind_module, only: I4, DP
+  use kind_module, only: I4, I8, DP
   use constval_module, only: DZERO, DONE
   use types_module, only: coef_set, sol_set
   use initial_module, only: st_ctrl
@@ -17,6 +17,14 @@ module make_linearsystem
   implicit none
   private
   public :: allocate_matvec, make_matvec
+
+  public :: write_symm_check
+  integer(I4), allocatable :: sym_tr(:)
+  integer(I8) :: sym_ncall(0:1) = 0_I8, sym_nconn(0:1) = 0_I8, sym_nviol(0:1) = 0_I8
+  integer(I8) :: sym_nface(0:1) = 0_I8, sym_maxcall(0:1) = 0_I8
+  integer(I4) :: sym_nmiss = 0
+  real(DP) :: sym_relmax(0:1) = DZERO
+  logical :: sym_ready = .false.
 
   ! -- local
 
@@ -172,6 +180,8 @@ module make_linearsystem
       call form_connflow(st_coef%per_relp, st_coef%dkr_dpsi, st_sol, st_coef%cond, lumat,&
                          st_coef%deri_dcon, st_coef%rel_hyd, st_coef%deri_lucon,&
                          st_coef%deri_con1, st_coef%deri_con2)
+
+    call check_symm(st_coef%deri_lucon)
 
     ! -- Set river boundary dmat (rivebound)
       call set_rivebound(st_coef%per_relp, st_coef%dkr_dpsi, st_sol, st_coef%rivd,&
@@ -343,6 +353,88 @@ module make_linearsystem
     !$omp end parallel
 
   end subroutine form_connflow
+
+  subroutine check_symm(dlu)
+  !*********************************************************************************************
+  ! check_symm -- Check symmetry of deri_lucon
+  !*********************************************************************************************
+    ! -- modules
+    ! -- inout
+    real(DP), intent(in) :: dlu(:)
+    ! -- local
+    integer(I4) :: i, j, k, m, ind, sta_ind, end_ind, ph
+    integer(I8) :: nv
+    real(DP) :: a, b, big
+    !-------------------------------------------------------------------------------------------
+#ifdef MPI_MSG
+    if (st_mpi%totn /= 1) return
+#endif
+    if (.not. sym_ready) then
+      allocate(sym_tr(crs_index(1)%offind(nreg_num)))
+      sym_tr = 0
+      do i = 1, nreg_num
+        sta_ind = crs_index(1)%offind(i-1) ; end_ind = crs_index(1)%offind(i)
+        do k = 1, end_ind-sta_ind
+          ind = sta_ind + k ; j = crs_index(1)%offrow(ind)
+          if (j < 1 .or. j > nreg_num) cycle
+          do m = crs_index(1)%offind(j-1)+1, crs_index(1)%offind(j)
+            if (crs_index(1)%offrow(m) == i) then
+              sym_tr(ind) = m ; exit
+            end if
+          end do
+        end do
+      end do
+      sym_nmiss = count(sym_tr == 0)
+      sym_ready = .true.
+    end if
+
+    ph = st_time%form_switch ; nv = 0_I8
+    sym_ncall(ph) = sym_ncall(ph) + 1_I8
+    do i = 1, nreg_num
+      sta_ind = crs_index(1)%offind(i-1) ; end_ind = crs_index(1)%offind(i)
+      do k = 1, end_ind-sta_ind
+        ind = sta_ind + k ; m = sym_tr(ind)
+        if (m == 0) cycle
+        sym_nconn(ph) = sym_nconn(ph) + 1_I8
+        a = dlu(ind) ; b = dlu(m)
+        if (a /= b) then
+          nv = nv + 1_I8
+          if (ind < m) sym_nface(ph) = sym_nface(ph) + 1_I8
+          big = max(abs(a), abs(b))
+          if (big > DZERO) sym_relmax(ph) = max(sym_relmax(ph), abs(a-b)/big)
+        end if
+      end do
+    end do
+    sym_nviol(ph) = sym_nviol(ph) + nv ; sym_maxcall(ph) = max(sym_maxcall(ph), nv)
+
+    if (sum(sym_ncall) <= 200_I8 .or. mod(sum(sym_ncall), 1000_I8) == 0_I8) then
+      call write_symm_check()
+    end if
+
+  end subroutine check_symm
+
+  subroutine write_symm_check()
+  !*********************************************************************************************
+  ! write_symm_check -- Write the symmetry check
+  !*********************************************************************************************
+    ! -- modules
+    ! -- inout
+    ! -- local
+    integer(I4) :: fnum, ph
+    !-------------------------------------------------------------------------------------------
+    if (.not. sym_ready) return
+    open(newunit=fnum, file="symm_check.txt", status="replace", action="write")
+    write(fnum,'(a)') "# deri_lucon(ind) vs deri_lucon(transpose). serial only. bitwise"
+    write(fnum,'(a,2(1x,i0))') "# entries no_transpose", size(sym_tr), sym_nmiss
+    write(fnum,'(a)') "# phase ncall nconn nviol_entry nviol_face maxviol_per_call relmax"
+    do ph = 0, 1
+      write(fnum,'(a,5(1x,i0),1x,es12.5)') trim(merge("picard","newton",ph == 0)),&
+            sym_ncall(ph), sym_nconn(ph), sym_nviol(ph), sym_nface(ph), sym_maxcall(ph),&
+            sym_relmax(ph)
+    end do
+    close(fnum)
+
+  end subroutine write_symm_check
 
   subroutine set_rivebound(per_relp, dkr_dpsi, st_sol, dmat_riv, over_riv, deri_r,&
                            deri_ks_riv, delh_r, per_riv, rel_riv, tran_riv, dkr_riv)

@@ -170,7 +170,7 @@ module assign_boundary
           cell_seal(i) = DZERO
         end do
         !$omp end parallel do
-        call set_bound2calc(ncell, seal_cflag, raw_seal, seal2cell, cell_seal)
+        call set_bound2calc(ncell, seal_cflag, real(raw_seal, kind=DP), seal2cell, cell_seal)
         allocate(st_forc%read_seal(sealn))
         !$omp parallel do private(i)
         do i = 1, sealn
@@ -372,14 +372,17 @@ module assign_boundary
     type(surfw_set), intent(inout) :: rl_st
     integer(I4), intent(out) :: rl_num
     integer(I4), intent(out) :: rl_cflag(:)
-    real(SP), intent(out) :: calc_rl(:)
+    real(DP), intent(out) :: calc_rl(:)
     ! -- local
     integer(I4) :: i
-    real(SP) :: nodim_unit
+    real(DP) :: nodim_unit
+    real(SP), allocatable :: raw_rl(:)
     !-------------------------------------------------------------------------------------------
     rl_num = 0
 
     if (rl_st%totn > 0) then
+      allocate(raw_rl(ncals))
+      raw_rl(:) = SNOVAL
       if (rl_ftype == in_type(1)) then
         allocate(rl_st%value(rl_st%totn), rl_st%name(rl_st%totn))
         !$omp parallel do private(i)
@@ -396,7 +399,7 @@ module assign_boundary
           call bcast_clas_val(rl_st%totn, rl_st%name, rl_st%value)
         end if
 #endif
-        call set_clas2calc(rl_st%totn, rl_st%name, rl_st%value, calc_rl, rl_cflag, rl_num)
+        call set_clas2calc(rl_st%totn, rl_st%name, rl_st%value, raw_rl, rl_cflag, rl_num)
         deallocate(rl_st%value, rl_st%name)
       else if (rl_ftype == in_type(2)) then
         allocate(rl_st%value(rl_st%totn))
@@ -415,11 +418,10 @@ module assign_boundary
           call bcast_2dpoint(rl_st%totn, rl_st%i, rl_st%j, rl_st%value)
         end if
 #endif
-        call set_point2surf(rl_st%totn, rl_st%i, rl_st%j, rl_st%value, calc_rl, rl_cflag,&
-                            rl_num)
+        call set_point2surf(rl_st%totn, rl_st%i, rl_st%j, rl_st%value, raw_rl, rl_cflag, rl_num)
         deallocate(rl_st%i, rl_st%j, rl_st%value)
       else
-        call set_2dfile2cals(rl_st%fnum, rl_ftype, rl_st%inttype, SNOVAL, calc_rl,&
+        call set_2dfile2cals(rl_st%fnum, rl_ftype, rl_st%inttype, SNOVAL, raw_rl,&
                              rl_cflag, rl_num)
         if (rl_ftype == in_type(7)) then
           if (rl_st%inttype == in_type(3)) then
@@ -437,23 +439,24 @@ module assign_boundary
       end if
 
       if (geom_type == 1) then
-        nodim_unit = len_scal_inv*len_scal_inv
+        nodim_unit = real(len_scal_inv, kind=DP)*len_scal_inv
       else
         nodim_unit = len_scal_inv
       end if
       if (geom_type == 2) then
         !$omp parallel do private(i)
         do i = 1, ncals
-          calc_rl(i) = real((real(calc_rl(i), kind=DP)-z_base)*len_scal_inv, kind=SP)
+          calc_rl(i) = (real(raw_rl(i), kind=DP)-z_base)*len_scal_inv
         end do
         !$omp end parallel do
       else
         !$omp parallel do private(i)
         do i = 1, ncals
-          calc_rl(i) = calc_rl(i)*nodim_unit
+          calc_rl(i) = raw_rl(i)*nodim_unit
         end do
         !$omp end parallel do
       end if
+      deallocate(raw_rl)
 
     end if
 

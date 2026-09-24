@@ -293,7 +293,7 @@ module set_condition
     ! -- inout
     integer(I4), intent(in) :: bound_num
     integer(I4), intent(in) :: c_flag(:)
-    real(SP), intent(in) :: cell_val(:)
+    real(DP), intent(in) :: cell_val(:)
     integer(I4), intent(out) :: bound2calc(:)
     real(DP), intent(out) :: b_val(:)
     ! -- local

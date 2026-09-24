@@ -258,7 +258,7 @@ module types_module
   end type bflag_set
 
   type :: bcalc_set
-    real(SP), allocatable :: wl(:), wd(:), bl(:), de(:), wi(:), le(:), ar(:)
+    real(DP), allocatable :: wl(:), wd(:), bl(:), de(:), wi(:), le(:), ar(:)
   end type bcalc_set
 
   type :: bcount_set

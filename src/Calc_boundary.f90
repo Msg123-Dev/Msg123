@@ -1,6 +1,6 @@
 module calc_boundary
   ! -- modules
-  use kind_module, only: I4, SP
+  use kind_module, only: I4, SP, DP
   use constval_module, only: SZERO, DZERO
   use set_cell, only: ncals
   use make_cell, only: st_geom
@@ -70,8 +70,8 @@ module calc_boundary
       st_forc%calc_rech(i) = DZERO
     end do
     !$omp end parallel do
-    call set_bound2calc(ncals, st_bcnd%rech_cflag, st_forc%read_rech, st_bcnd%rech2cals,&
-                        st_forc%calc_rech)
+    call set_bound2calc(ncals, st_bcnd%rech_cflag, real(st_forc%read_rech, kind=DP),&
+                        st_bcnd%rech2cals, st_forc%calc_rech)
     deallocate(st_forc%read_rech, st_bcnd%rech_cflag)
     allocate(st_forc%read_rech(rec_cnum))
     !$omp parallel do private(i)
@@ -90,9 +90,9 @@ module calc_boundary
 
     ! -- inout
     integer(I4), intent(in) :: bl_flag(:), de_flag(:)
-    real(SP), intent(in) :: bl_calc(:), de_calc(:)
+    real(DP), intent(in) :: bl_calc(:), de_calc(:)
     integer(I4), intent(out) :: wl_flag(:)
-    real(SP), intent(out) :: wl_calc(:)
+    real(DP), intent(out) :: wl_calc(:)
     integer(I4), intent(out) :: wl_num
     ! -- local
     integer(I4) :: i
@@ -102,7 +102,7 @@ module calc_boundary
     !$omp do private(i)
     do i = 1, ncals
       wl_flag(i) = 0
-      wl_calc(i) = SZERO
+      wl_calc(i) = DZERO
     end do
     !$omp end do
 
@@ -132,9 +132,9 @@ module calc_boundary
 
     ! -- inout
     integer(I4), intent(in) :: wl_flag(:), de_flag(:)
-    real(SP), intent(in) :: wl_calc(:), de_calc(:)
+    real(DP), intent(in) :: wl_calc(:), de_calc(:)
     integer(I4), intent(out) :: bl_flag(:)
-    real(SP), intent(out) :: bl_calc(:)
+    real(DP), intent(out) :: bl_calc(:)
     integer(I4), intent(out) :: wb_num
     ! -- local
     integer(I4) :: i
@@ -144,7 +144,7 @@ module calc_boundary
     !$omp do private(i)
     do i = 1, ncals
       bl_flag(i) = 0
-      bl_calc(i) = SZERO
+      bl_calc(i) = DZERO
     end do
     !$omp end do
 
@@ -174,9 +174,9 @@ module calc_boundary
 
     ! -- inout
     integer(I4), intent(in) :: wd_flag(:)
-    real(SP), intent(in) :: wd_calc(:)
+    real(DP), intent(in) :: wd_calc(:)
     integer(I4), intent(out) :: wl_flag(:)
-    real(SP), intent(out) :: wl_calc(:)
+    real(DP), intent(out) :: wl_calc(:)
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
@@ -184,14 +184,14 @@ module calc_boundary
     !$omp do private(i)
     do i = 1, ncals
       wl_flag(i) = 0
-      wl_calc(i) = SZERO
+      wl_calc(i) = DZERO
     end do
     !$omp end do
 
     !$omp do private(i)
     do i = 1, ncals
       if (wd_flag(i) == 1) then
-        wl_calc(i) = real(st_geom%surf_elev(i) + wd_calc(i), kind=SP)
+        wl_calc(i) = st_geom%surf_elev(i) + wd_calc(i)
         wl_flag(i) = 1
       end if
     end do
@@ -208,9 +208,9 @@ module calc_boundary
 
     ! -- inout
     integer(I4), intent(in) :: de_flag(:)
-    real(SP), intent(in) :: de_calc(:)
+    real(DP), intent(in) :: de_calc(:)
     integer(I4), intent(out) :: bl_flag(:)
-    real(SP), intent(out) :: bl_calc(:)
+    real(DP), intent(out) :: bl_calc(:)
     integer(I4), intent(out) :: bl_num
     ! -- local
     integer(I4) :: i
@@ -220,14 +220,14 @@ module calc_boundary
     !$omp do private(i)
     do i = 1, ncals
       bl_flag(i) = 0
-      bl_calc(i) = SZERO
+      bl_calc(i) = DZERO
     end do
     !$omp end do
 
     !$omp do private(i)
     do i = 1, ncals
       if (de_flag(i) == 1) then
-        bl_calc(i) = real(st_geom%surf_elev(i) - de_calc(i), kind=SP)
+        bl_calc(i) = st_geom%surf_elev(i) - de_calc(i)
         bl_flag(i) = 1
       end if
     end do
@@ -251,7 +251,7 @@ module calc_boundary
     ! -- inout
     integer(I4), intent(in) :: in_flag(:)
     integer(I4), intent(out) :: out_flag(:)
-    real(SP), intent(out) :: surf_out(:)
+    real(DP), intent(out) :: surf_out(:)
     integer(I4), intent(out) :: out_num
     ! -- local
     integer(I4) :: i
@@ -261,14 +261,14 @@ module calc_boundary
     !$omp do private(i)
     do i = 1, ncals
       out_flag(i) = 0
-      surf_out(i) = SZERO
+      surf_out(i) = DZERO
     end do
     !$omp end do
 
     !$omp do private(i)
     do i = 1, ncals
       if (in_flag(i) == 1) then
-        surf_out(i) = real(st_geom%surf_elev(i), kind=SP)
+        surf_out(i) = st_geom%surf_elev(i)
         out_flag(i) = 1
       end if
     end do
@@ -291,9 +291,9 @@ module calc_boundary
 
     ! -- inout
     integer(I4), intent(in) :: wi_flag(:), le_flag(:)
-    real(SP), intent(in) :: riv_wi(:), riv_le(:)
+    real(DP), intent(in) :: riv_wi(:), riv_le(:)
     integer(I4), intent(out) :: ar_flag(:)
-    real(SP), intent(out) :: riv_ar(:)
+    real(DP), intent(out) :: riv_ar(:)
     integer(I4), intent(out) :: riar_num
     ! -- local
     integer(I4) :: i
@@ -326,7 +326,7 @@ module calc_boundary
 
     ! -- inout
     integer(I4), intent(in) :: wl_flag(:), bl_flag(:), ar_flag(:)
-    real(SP), intent(in) :: riv_wi(:), riv_bl(:), riv_ar(:)
+    real(DP), intent(in) :: riv_wi(:), riv_bl(:), riv_ar(:)
     integer(I4), intent(inout) :: riv_cnum
     ! -- local
     integer(I4) :: i
@@ -390,7 +390,7 @@ module calc_boundary
 
     ! -- inout
     integer(I4), intent(in) :: wl_flag(:), bl_flag(:), ar_flag(:)
-    real(SP), intent(in) :: lak_wi(:), lak_bl(:), lak_ar(:)
+    real(DP), intent(in) :: lak_wi(:), lak_bl(:), lak_ar(:)
     integer(I4), intent(inout) :: lak_cnum
     ! -- local
     integer(I4) :: i

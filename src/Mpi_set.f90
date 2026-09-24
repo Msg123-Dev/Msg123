@@ -2959,6 +2959,8 @@ module mpi_set
     ! -- Bcast scalar value (val)
       call bcast_val(st_sim%ini_step, " initial time step value")
     ! -- Bcast scalar value (val)
+      call bcast_val(st_sim%min_step, " minimum time step value")
+    ! -- Bcast scalar value (val)
       call bcast_val(st_sim%max_step, " maximun time step value")
     ! -- Bcast scalar value (val)
       call bcast_val(st_sim%inc_fact, " increment multiplier value")

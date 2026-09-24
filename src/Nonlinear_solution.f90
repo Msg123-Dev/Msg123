@@ -1,7 +1,7 @@
 module nonlinear_solution
   ! -- modules
   use kind_module, only: I4, DP
-  use constval_module, only: DZERO, DONE, DHALF, DTWO
+  use constval_module, only: DZERO, DONE, DHALF, DTWO, DSMAL
   use types_module, only: sol_set
   use utility_module, only: st_mpi, log_fnum
   use initial_module, only: st_ctrl
@@ -20,6 +20,7 @@ module nonlinear_solution
   implicit none
   private
   public :: allocate_nonlin, calc_numsol
+  integer(I4), public :: noconv_num = 0
 
   ! -- local
   integer(I4), parameter :: MAXSTEP_RUN_MAX = 5, STAGN_RUN_MAX = 10, CYCLE_RUN_MAX = 100
@@ -103,13 +104,14 @@ module nonlinear_solution
     15 format(1X,"Didn't converge in steady state calculation")
     16 format(1X,"RESIDUAL  SUM OF |F| = ",es11.3)
     17 format(1X,"Stop due to stagnation of mass balance error")
+    18 format(1X,"Accept the non-converged step (noconv_type = 1)")
     19 format(1X,"Stop due to cycling of mass balance error")
     !-------------------------------------------------------------------------------------------
     conv_fnum = st_out_fnum%conv ; eater = DHALF ; maxstep_run = 0
     chg_flag = .false.
     stagn_run = 0 ; mass_error_pre = DZERO ; stagn_flag = .false.
     cycle_run = 0 ; mass_error_min = DZERO ; cycle_flag = .false.
-    res_l1 = DZERO ; qext_l1 = DZERO ; mass_error = DZERO
+    res_l1 = DZERO ; qext_l1 = DZERO ; mass_error = DZERO ; check_val = huge(1.00_DP)
     ! -- Set for backtracking (backtr)
       call set_backtr(st_sol, max_step)
 
@@ -436,7 +438,7 @@ module nonlinear_solution
         if (st_mpi%rank == 0) then
           write(conv_fnum,15)
         end if
-        call write_err_stop("Steady state calculation didn't converge.")
+        exit outer_loop
       else if (st_time%out_iter == st_ctrl%maxout_iter) then
         if (st_mpi%rank == 0) then
           write(conv_fnum,14)
@@ -451,8 +453,37 @@ module nonlinear_solution
 
     end do outer_loop
 
+    if (.not. st_time%conv_flag .and. (st_sim%sim_type == -1 .or.&
+        st_time%delt*st_sim%dec_fact < max(real(st_sim%min_step, kind=DP), DSMAL))) then
+      if (st_ctrl%noconv_type == 1 .and. .not. ieee_is_nan(max_unk) .and.&
+          check_val < VARMAX .and. max_unk < XMAX) then
+        st_time%conv_flag = .true. ; noconv_num = noconv_num + 1
+        if (st_mpi%rank == 0) then
+          write(conv_fnum,18)
+          write(log_fnum,'(a,es12.5)') "Warning!! Non-converged step accepted at time ",&
+                                       st_time%now_time
+        end if
+        ! -- Calculate surface water level (surfw)
+          call calc_surfw(st_sol)
+        if (st_out_step%rest == DZERO) then
+          ! -- Write restart file (rest)
+            call write_rest(st_sol%head_new)
+        else if (mod(st_time%current_t,st_out_step%rest) == 0) then
+          ! -- Write restart file (rest)
+            call write_rest(st_sol%head_new)
+        end if
+      else if (st_sim%sim_type == -1) then
+        call write_err_stop("Steady state calculation didn't converge.")
+      end if
+    end if
+
     if (st_mpi%rank == 0) then
       write(conv_fnum,16) res_l1
+    end if
+
+    if (.not. st_time%conv_flag .and. st_sim%sim_type /= -1 .and.&
+        st_time%delt*st_sim%dec_fact < st_sim%min_step) then
+      call write_err_stop("Time Step is too small.")
     end if
 
 

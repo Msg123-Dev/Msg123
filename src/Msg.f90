@@ -17,7 +17,7 @@ program msg123
   use check_simulation, only: check_lastts, lasttime_flag
   use linear_solution, only: allocate_amgalg, allocate_krylov
   use time_module, only: update_tstep
-  use nonlinear_solution, only: allocate_nonlin, calc_numsol
+  use nonlinear_solution, only: allocate_nonlin, calc_numsol, noconv_num
   use write_output, only: write_outf
 #ifdef ICI
   use ici_module, only: set_mapt, put_initv, get_var, alloc_outvar, put_var, fin_ici
@@ -144,6 +144,10 @@ program msg123
 #endif
 
   if (st_mpi%rank == 0) then
+    if (noconv_num > 0) then
+      write(log_fnum,'(a,i0,a)') "Warning!! Simulation convergence failure occurred ",&
+                                 noconv_num, " time(s)."
+    end if
     ! -- Time loop end time
       call CPU_TIME(loop_etime)
     ! -- Calculation end time

@@ -61,15 +61,16 @@ module make_linearsystem
 
   end subroutine allocate_matvec
 
-  subroutine make_matvec(st_coef, st_sol)
+  subroutine make_matvec(st_coef, st_sol, fscal, qext)
   !*********************************************************************************************
   ! make_matvec -- Make matrix and vector
   !*********************************************************************************************
     ! -- modules
     use allocate_solution, only: array_var
-    use calc_function, only: calc_func, func_scal
+    use calc_function, only: calc_func
     use make_amg_matrix, only: make_amgmat
     ! -- inout
+    real(DP), intent(out) :: fscal(:), qext
     type(coef_set), intent(inout) :: st_coef
     type(sol_set), intent(inout) :: st_sol
     ! -- local
@@ -84,7 +85,7 @@ module make_linearsystem
     ! -- Calculate function value (func)
       call calc_func(st_sol%stor_old, st_sol%stor_new, st_sol%surf_head, st_sol%head_new,&
                      st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, st_coef%temp_rhs,&
-                     func_scal)
+                     fscal, qext)
 
     array_var(1)%rhs(:) = -st_coef%temp_rhs(:)
 

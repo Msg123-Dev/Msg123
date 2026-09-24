@@ -11,7 +11,7 @@ module nonlinear_solution
   use make_cell, only: st_geom
   use prep_calculation, only: st_time
   use allocate_solution, only: nreg_num, array_var
-  use calc_function, only: qext_sum, func_scal, calc_func
+  use calc_function, only: calc_func
   use calc_simulation, only: calc_l2norm2
 #ifdef MPI_MSG
   use mpi_utility, only: mpisum_val
@@ -28,7 +28,8 @@ module nonlinear_solution
   real(DP), parameter :: STAGN_FLOOR = 1.00E-04_DP, CYCLE_RTOL = 1.00E-03_DP
   real(DP), parameter :: XMAX_INV = 1.00E-04_DP
   real(DP), parameter :: RES_FIRST = 1.00E-02_DP
-  real(DP), allocatable :: new_func(:), jacvec(:)
+  real(DP), allocatable :: new_func(:), jacvec(:), func_scal(:)
+  real(DP) :: qext_sum = DZERO
 
   contains
 
@@ -43,10 +44,10 @@ module nonlinear_solution
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(new_func(ncalc), jacvec(ncalc))
+    allocate(new_func(ncalc), jacvec(ncalc), func_scal(ncalc))
     !$omp parallel do private(i)
     do i = 1, ncalc
-      new_func(i) = DZERO ; jacvec(i) = DZERO
+      new_func(i) = DZERO ; jacvec(i) = DZERO ; func_scal(i) = DZERO
     end do
     !$omp end parallel do
 
@@ -151,7 +152,7 @@ module nonlinear_solution
       end if
 
       ! -- Make coefficients matrix and constant vector (matvec)
-        call make_matvec(st_coef, st_sol)
+        call make_matvec(st_coef, st_sol, func_scal, qext_sum)
 
       if (st_sim%sim_type == -1 .and. st_ctrl%conv_type == 1) then
         if (st_time%out_iter == 1) then
@@ -323,7 +324,7 @@ module nonlinear_solution
         ! -- Calculate function value (func)
           call calc_func(st_sol%stor_old, st_sol%stor_new, st_sol%surf_head, st_sol%head_new,&
                          st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, new_func,&
-                         func_scal)
+                         func_scal, qext_sum)
         ! -- Calculate l2 norm square (resl2norm2)
           call calc_l2norm2(1, new_func, l2norm_new)
 #ifdef MPI_MSG
@@ -986,7 +987,8 @@ module nonlinear_solution
 
     ! -- Calculate function value (func)
       call calc_func(st_sol%stor_old, st_sol%stor_new, st_sol%surf_head, st_sol%head_new,&
-                     st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, new_f, func_scal)
+                     st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, new_f, func_scal,&
+                     qext_sum)
     ! -- Calculate l2 norm square (resl2norm2)
       call calc_l2norm2(1, new_f, l2_new)
 

@@ -106,7 +106,7 @@ module set_condition
 
     if (present(tg_flag)) then
       !$omp parallel do private(i)
-      do i = 1, ncalc
+      do i = 1, out_num
         tg_flag(i) = temp_flag(i)
       end do
       !$omp end parallel do
@@ -164,7 +164,7 @@ module set_condition
 
     if (present(tg_flag)) then
       !$omp parallel do private(i)
-      do i = 1, ncalc
+      do i = 1, out_num
         tg_flag(i) = temp_flag(i)
       end do
       !$omp end parallel do

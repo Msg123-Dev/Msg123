@@ -1040,6 +1040,12 @@ module set_boundary
         call calc_wlbd(st_lake%cflag%bl, st_lake%calc%bl, st_lake%cflag%wd, st_lake%calc%wd,&
                        st_lake%cflag%wl, st_lake%calc%wl, st_lake%num%wl)
       deallocate(st_lake%cflag%wd, st_lake%calc%wd)
+#ifdef MPI_MSG
+      ! -- Sum value for MPI (val)
+        call mpisum_val(st_lake%num%wl, "lake water level", sum_lawln)
+#else
+      sum_lawln = st_lake%num%wl
+#endif
       if (st_mpi%rank == 0) then
         call write_logf("Lake water level is calculated from bottom level.")
         allocate(character(get_ilen(sum_lawln)) :: num_str)
@@ -1053,6 +1059,12 @@ module set_boundary
         call calc_blld(st_lake%cflag%wl, st_lake%calc%wl, st_lake%cflag%wd, st_lake%calc%wd,&
                        st_lake%cflag%bl, st_lake%calc%bl, st_lake%num%bl)
       deallocate(st_lake%cflag%wd, st_lake%calc%wd)
+#ifdef MPI_MSG
+      ! -- Sum value for MPI (val)
+        call mpisum_val(st_lake%num%bl, "lake bottom level", sum_labln)
+#else
+      sum_labln = st_lake%num%bl
+#endif
       if (st_mpi%rank == 0) then
         call write_logf("Lake bottom level is calculated from water level and water depth.")
         allocate(character(get_ilen(sum_labln)) :: num_str)
@@ -1070,6 +1082,12 @@ module set_boundary
     else if (sum_lawln == 0 .and. sum_labln /= 0 .and. sum_lawdn == 0) then
       ! -- Set level from surface (levsurf)
         call calc_lsurf(st_lake%cflag%bl, st_lake%cflag%wl, st_lake%calc%wl, st_lake%num%wl)
+#ifdef MPI_MSG
+      ! -- Sum value for MPI (val)
+        call mpisum_val(st_lake%num%wl, "lake water level", sum_lawln)
+#else
+      sum_lawln = st_lake%num%wl
+#endif
       if (st_mpi%rank == 0) then
         call write_logf("Lake water level is setted to surface elevation.")
         allocate(character(get_ilen(sum_lawln)) :: num_str)
@@ -1081,7 +1099,7 @@ module set_boundary
     else if (sum_lawln /= 0 .and. sum_labln == 0 .and. sum_lawdn == 0) then
       if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
-        err_mes = "Not calculated river bottom level."
+        err_mes = "Not calculated lake bottom level."
         call write_err_stop(err_mes)
       end if
     end if

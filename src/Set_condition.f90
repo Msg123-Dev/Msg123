@@ -428,8 +428,9 @@ module set_condition
     cnum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz ; gridxyz = st_grid%nxyz
     if (ftype == in_type(3) .or. int_ft == in_type(3)) then
+      allocate(array_flat(gridxyz))
       if (st_mpi%rank == 0) then
-        allocate(array_read(gridx,gridy), array_flat(gridxyz))
+        allocate(array_read(gridx,gridy))
         !$omp parallel
         !$omp do private(i)
         do i = 1, gridxyz
@@ -551,8 +552,9 @@ module set_condition
     cnum = size(val_out(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz ; gridxyz = st_grid%nxyz
     if (ftype == in_type(5) .or. int_ft == in_type(5)) then
+      allocate(array_flat(gridxyz))
       if (st_mpi%rank == 0) then
-        allocate(array_read(gridx,gridy,gridz), array_flat(gridxyz))
+        allocate(array_read(gridx,gridy,gridz))
         !$omp parallel
         !$omp do private(i)
         do i = 1, gridxyz

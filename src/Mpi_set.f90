@@ -2813,7 +2813,7 @@ module mpi_set
     ! -- inout
     integer(I4), intent(in) :: loc_num
     integer(I4), intent(in) :: l2g_ij(:)
-    integer(I4), intent(in) :: xycell_in(:)
+    integer(I4), intent(inout) :: xycell_in(:)
     integer(I4), intent(out) :: xycalc_out(:)
     ! -- local
     integer(I4) :: i, s_num, ierr
@@ -2844,7 +2844,7 @@ module mpi_set
     ! -- inout
     integer(I4), intent(in) :: loc_num
     integer(I4), intent(in) :: l2g_ij(:)
-    real(SP), intent(in) :: xycell_in(:)
+    real(SP), intent(inout) :: xycell_in(:)
     real(SP), intent(out) :: xycalc_out(:)
     ! -- local
     integer(I4) :: i, s_num, ierr
@@ -2875,7 +2875,7 @@ module mpi_set
     ! -- inout
     integer(I4), intent(in) :: loc_num
     integer(I4), intent(in) :: l2g_ij(:)
-    real(DP), intent(in) :: xycell_in(:)
+    real(DP), intent(inout) :: xycell_in(:)
     real(DP), intent(out) :: xycalc_out(:)
     ! -- local
     integer(I4) :: i, s_num, ierr
@@ -2906,7 +2906,7 @@ module mpi_set
     ! -- inout
     integer(I4), intent(in) :: loc_num
     integer(I4), intent(in) :: l2g_ijk(:)
-    integer(I4), intent(in) :: xyzcalc_in(:)
+    integer(I4), intent(inout) :: xyzcalc_in(:)
     integer(I4), intent(out) :: xyzcalc_out(:)
     ! -- local
     integer(I4) :: i, c_num, ierr
@@ -2937,7 +2937,7 @@ module mpi_set
     ! -- inout
     integer(I4), intent(in) :: loc_num
     integer(I4), intent(in) :: l2g_ijk(:)
-    real(SP), intent(in) :: xyzcalc_in(:)
+    real(SP), intent(inout) :: xyzcalc_in(:)
     real(SP), intent(out) :: xyzcalc_out(:)
     ! -- local
     integer(I4) :: i, c_num, ierr
@@ -2968,7 +2968,7 @@ module mpi_set
     ! -- inout
     integer(I4), intent(in) :: loc_num
     integer(I4), intent(in) :: l2g_ijk(:)
-    real(DP), intent(in) :: xyzcalc_in(:)
+    real(DP), intent(inout) :: xyzcalc_in(:)
     real(DP), intent(out) :: xyzcalc_out(:)
     ! -- local
     integer(I4) :: i, c_num, ierr

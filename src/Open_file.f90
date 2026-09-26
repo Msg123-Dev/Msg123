@@ -2033,7 +2033,7 @@ module open_file
       lake_totn = st_grid%nx*st_grid%ny
 
       if (lake_multi /= SINFI) then
-        if (any(laken(i) == lak_txt_type(:))) then
+        if (any(laket(i) == lak_txt_type(:))) then
           if (st_mpi%rank == 0) then
             call skip_file(laket(i), laken(i), mess_lake, lake_multi, lake_totn, lake_etime)
           end if

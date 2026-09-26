@@ -66,6 +66,7 @@ module nonlinear_solution
     use make_linearsystem, only: make_matvec
     use check_simulation, only: check_abserrmax, check_residual
     use linear_solution, only: solve_linalg, in_iter
+    use time_module, only: check_outstep
 #ifdef MPI_MSG
     use mpi_solve, only: check_mpimaxerr, bcast_convinfo
 #endif
@@ -172,7 +173,7 @@ module nonlinear_solution
           if (st_out_step%rest == DZERO) then
             ! -- Write restart file (rest)
               call write_rest(st_sol%head_new)
-          else if (mod(st_time%current_t,st_out_step%rest) == 0) then
+          else if (check_outstep(st_out_step%rest)) then
             ! -- Write restart file (rest)
               call write_rest(st_sol%head_new)
           end if
@@ -419,7 +420,7 @@ module nonlinear_solution
         if (st_out_step%rest == DZERO) then
           ! -- Write restart file (rest)
             call write_rest(st_sol%head_new)
-        else if (mod(st_time%current_t,st_out_step%rest) == 0) then
+        else if (check_outstep(st_out_step%rest)) then
           ! -- Write restart file (rest)
             call write_rest(st_sol%head_new)
         end if
@@ -455,7 +456,8 @@ module nonlinear_solution
     end do outer_loop
 
     if (.not. st_time%conv_flag .and. (st_sim%sim_type == -1 .or.&
-        st_time%delt*st_sim%dec_fact < max(real(st_sim%min_step, kind=DP), DSMAL))) then
+        st_time%delt*st_sim%dec_fact < max(st_sim%min_step, DSMAL,&
+                                           spacing(st_time%current_t)))) then
       if (st_ctrl%noconv_type == 1 .and. .not. ieee_is_nan(max_unk) .and.&
           check_val < VARMAX .and. max_unk < XMAX) then
         st_time%conv_flag = .true. ; noconv_num = noconv_num + 1
@@ -469,7 +471,7 @@ module nonlinear_solution
         if (st_out_step%rest == DZERO) then
           ! -- Write restart file (rest)
             call write_rest(st_sol%head_new)
-        else if (mod(st_time%current_t,st_out_step%rest) == 0) then
+        else if (check_outstep(st_out_step%rest)) then
           ! -- Write restart file (rest)
             call write_rest(st_sol%head_new)
         end if

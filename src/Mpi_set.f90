@@ -1607,14 +1607,14 @@ module mpi_set
       end if
     end if
 
-    call MPI_BCAST(st_sim%end_time, 1, MPI_REAL4, 0, st_mpi%comm, ierr)
+    call MPI_BCAST(st_sim%end_time, 1, MPI_REAL8, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Broadcast simulation end time.")
       end if
     end if
 
-    call MPI_BCAST(st_sim%cal_fact, 1, MPI_REAL4, 0, st_mpi%comm, ierr)
+    call MPI_BCAST(st_sim%cal_fact, 1, MPI_REAL8, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Broadcast calculation factor for end time.")

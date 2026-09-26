@@ -3,7 +3,7 @@ program msg123
 ! Main program of Multi-scale groundwater 1phase 2resolution 3dimensional model (Msg123)
 !***********************************************************************************************
   ! -- modules
-  use kind_module, only: I4, DP
+  use kind_module, only: I4, SP, DP
   use types_module, only: kryl_set, amgt_set, coef_set, sol_set
   use utility_module, only: log_fnum, st_mpi
   use initial_module, only: init_msg, st_ctrl
@@ -121,7 +121,7 @@ program msg123
       ! -- Check last time step conditions (lastts)
         call check_lastts()
       ! -- Write output file (outf)
-        call write_outf(st_time%now_time, st_sol)
+        call write_outf(real(st_time%now_time, kind=SP), st_sol)
 #ifdef ICI
       ! -- Put variables (var)
         call put_var(st_sol)

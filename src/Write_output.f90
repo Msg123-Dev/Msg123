@@ -37,6 +37,7 @@ module write_output
     use allocate_output, only: allocate_outvar
     use calc_output, only: calc_cell_mas, calc_rivr_off, calc_lakr_off, calc_sufr_off
     use calc_output, only: calc_dunr_off, calc_seal_res, calc_rech_res, calc_well_res
+    use time_module, only: check_outstep
 #ifdef MPI_MSG
     use mpi_write, only: write_mpi_rest, set_senrec_wtab
 #endif
@@ -115,7 +116,7 @@ module write_output
       if (st_out_step%head == SZERO) then
         ! -- Write output head file (out_headf)
           call write_out_headf(time_val, st_sol)
-      else if (mod(st_time%current_t,st_out_step%head) == 0) then
+      else if (check_outstep(st_out_step%head)) then
         ! -- Write output head file (out_headf)
           call write_out_headf(time_val, st_sol)
       else if (lasttime_flag == 1) then
@@ -127,11 +128,11 @@ module write_output
         rest_fnum = st_out_fnum%rest
 #ifdef MPI_MSG
         ! -- Write mpi restart file (mpi_rest)
-          call write_mpi_rest(rest_fnum, time_val, len_scal, st_sol%head_new)
+          call write_mpi_rest(rest_fnum, st_time%now_time, len_scal, st_sol%head_new)
           call close_mpi_file(rest_fnum)
 #else
         ! -- Write restart file (out_restf)
-          call write_out_restf(rest_fnum, time_val, st_sol)
+          call write_out_restf(rest_fnum, st_time%now_time, st_sol)
 #endif
       end if
 
@@ -139,7 +140,7 @@ module write_output
         if (st_out_step%srat == SZERO) then
           ! -- Write output saturation file (out_sratf)
             call write_out_sratf(time_val, st_sol)
-        else if (mod(st_time%current_t,st_out_step%srat) == 0) then
+        else if (check_outstep(st_out_step%srat)) then
           ! -- Write output saturation file (out_sratf)
             call write_out_sratf(time_val, st_sol)
         else if (lasttime_flag == 1) then
@@ -152,7 +153,7 @@ module write_output
         if (st_out_step%wtab == SZERO) then
           ! -- Write watertable file (out_wtabf)
             call write_out_wtabf(time_val, st_sol)
-        else if (mod(st_time%current_t,st_out_step%wtab) == 0) then
+        else if (check_outstep(st_out_step%wtab)) then
           ! -- Write watertable file (out_wtabf)
             call write_out_wtabf(time_val, st_sol)
         else if (lasttime_flag== 1) then
@@ -165,7 +166,7 @@ module write_output
         if (st_out_step%mass == SZERO) then
           ! -- Write massbalance file (out_massf)
             call write_out_massf(time_val)
-        else if (mod(st_time%current_t,st_out_step%mass) == 0) then
+        else if (check_outstep(st_out_step%mass)) then
           ! -- Write massbalance file (out_massf)
             call write_out_massf(time_val)
         else if (lasttime_flag== 1) then
@@ -178,7 +179,7 @@ module write_output
         if (st_out_step%velc == SZERO) then
           ! -- Write velocity file (out_velcf)
             call write_out_velcf(time_val, st_sol)
-        else if (mod(st_time%current_t,st_out_step%velc) == 0) then
+        else if (check_outstep(st_out_step%velc)) then
           ! -- Write velocity file (out_velcf)
             call write_out_velcf(time_val, st_sol)
         else if (lasttime_flag== 1) then
@@ -191,7 +192,7 @@ module write_output
         if (st_out_step%rivr == SZERO) then
           ! -- Write river runoff file (out_rivrf)
             call write_out_rivrf(time_val)
-        else if (mod(st_time%current_t,st_out_step%rivr) == 0) then
+        else if (check_outstep(st_out_step%rivr)) then
           ! -- Write river runoff file (out_rivrf)
             call write_out_rivrf(time_val)
         else if (lasttime_flag== 1) then
@@ -204,7 +205,7 @@ module write_output
         if (st_out_step%lakr == SZERO) then
           ! -- Write lake runoff file (out_lakrf)
             call write_out_lakrf(time_val)
-        else if (mod(st_time%current_t,st_out_step%lakr) == 0) then
+        else if (check_outstep(st_out_step%lakr)) then
           ! -- Write lake runoff file (out_lakrf)
             call write_out_lakrf(time_val)
         else if (lasttime_flag== 1) then
@@ -217,7 +218,7 @@ module write_output
         if (st_out_step%sufr == SZERO) then
           ! -- Write surface runoff file (out_sufrf)
             call write_out_sufrf(time_val)
-        else if (mod(st_time%current_t,st_out_step%sufr) == 0) then
+        else if (check_outstep(st_out_step%sufr)) then
           ! -- Write surface runoff file (out_sufrf)
             call write_out_sufrf(time_val)
         else if (lasttime_flag== 1) then
@@ -230,7 +231,7 @@ module write_output
         if (st_out_step%dunr == SZERO) then
           ! -- Write dunne runoff file (out_dunrf)
             call write_out_dunrf(time_val)
-        else if (mod(st_time%current_t,st_out_step%dunr) == 0) then
+        else if (check_outstep(st_out_step%dunr)) then
           ! -- Write dunne runoff file (out_dunrf)
             call write_out_dunrf(time_val)
         else if (lasttime_flag== 1) then
@@ -243,7 +244,7 @@ module write_output
         if (st_out_step%seal == SZERO) then
           ! -- Write sea results file (out_sealf)
             call write_out_sealf(time_val)
-        else if (mod(st_time%current_t,st_out_step%seal) == 0) then
+        else if (check_outstep(st_out_step%seal)) then
           ! -- Write sea results file (out_sealf)
             call write_out_sealf(time_val)
         else if (lasttime_flag== 1) then
@@ -256,7 +257,7 @@ module write_output
         if (st_out_step%rech == SZERO) then
           ! -- Write recharge results file (out_rechf)
             call write_out_rechf(time_val)
-        else if (mod(st_time%current_t,st_out_step%rech) == 0) then
+        else if (check_outstep(st_out_step%rech)) then
           ! -- Write recharge results file (out_rechf)
             call write_out_rechf(time_val)
         else if (lasttime_flag== 1) then
@@ -269,7 +270,7 @@ module write_output
         if (st_out_step%well == SZERO) then
           ! -- Write well pumping results file (out_wellf)
             call write_out_wellf(time_val)
-        else if (mod(st_time%current_t,st_out_step%well) == 0) then
+        else if (check_outstep(st_out_step%well)) then
           ! -- Write well pumping results file (out_wellf)
             call write_out_wellf(time_val)
         else if (lasttime_flag== 1) then
@@ -413,13 +414,13 @@ module write_output
 
     ! -- inout
     integer(I4), intent(in) :: fnum_rest
-    real(SP), intent(in) :: time_out
+    real(DP), intent(in) :: time_out
     type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
     rewind(fnum_rest)
-    write(fnum_rest) real(time_out, kind=DP)
+    write(fnum_rest) time_out
     write(fnum_rest) (st_sol%head_new(i)*len_scal + z_base, i = 1, ncalc)
     call close_file(fnum_rest)
 

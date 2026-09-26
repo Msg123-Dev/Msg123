@@ -327,11 +327,11 @@ module read_input
     ! -- local
     integer(I4) :: ierr
     integer(I4) :: stime_type
-    real(SP) :: end_time, calc_multi
+    real(DP) :: end_time, calc_multi
     character(TIMELEN) :: calc_unit
     namelist/set_calc_time/stime_type, sdate, edate, end_time, calc_unit
     !-------------------------------------------------------------------------------------------
-    ierr = 0 ; stime_type = -1 ; end_time = SZERO ; calc_multi = SZERO ; calc_unit = ""
+    ierr = 0 ; stime_type = -1 ; end_time = DZERO ; calc_multi = DZERO ; calc_unit = ""
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_calc_time,iostat=ierr)
 
@@ -480,12 +480,12 @@ module read_input
   ! read_sol_list -- Read solution name list
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: SINFI
+    use constval_module, only: DINFI
     ! -- inout
 
     ! -- local
     integer(I4) :: ierr
-    real(SP) :: init_step, incr_multi, decr_multi, min_tstep, max_tstep
+    real(DP) :: init_step, incr_multi, decr_multi, min_tstep, max_tstep
     integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type, expd_type
     integer(I4) :: conv_type, noconv_type, datum_type, deri_type, picard_btr
     real(DP) :: criteria, res_abs_tol, res_rel_tol, dilu_shift, dsat_max
@@ -496,8 +496,8 @@ module read_input
                           conv_type, noconv_type, datum_type, deri_type, picard_btr,&
                           picard_btol, picard_bfact, picard_blim
     !-------------------------------------------------------------------------------------------
-    ierr = 0 ; init_step = SZERO ; incr_multi = SZERO ; decr_multi = SZERO ; max_tstep = SINFI
-    min_tstep = SZERO ; noconv_type = st_ctrl%noconv_type
+    ierr = 0 ; init_step = DZERO ; incr_multi = DZERO ; decr_multi = DZERO ; max_tstep = DINFI
+    min_tstep = DZERO ; noconv_type = st_ctrl%noconv_type
     tstep_type = st_ctrl%tstep_type ; maxout_iter = st_ctrl%maxout_iter
     picard_iter = st_ctrl%picard_iter ; maxinn_iter = st_ctrl%maxinn_iter
     precon_type = st_ctrl%precon_type ; criteria = st_ctrl%criteria
@@ -1521,11 +1521,11 @@ module read_input
     use constval_module, only: MINSEC, HOURSEC, DAYSEC
     ! -- inout
     integer(I4), intent(inout) :: stad(:), endd(:)
-    real(SP), intent(out) :: etime
+    real(DP), intent(out) :: etime
     ! -- local
     integer(I4) :: stayear, stamonth, endmonth, temp_day
     !-------------------------------------------------------------------------------------------
-    etime = SZERO
+    etime = DZERO
     ! plus second
     etime = etime + (endd(6)-stad(6))*SONE
     if (endd(6) < stad(6)) then
@@ -1616,7 +1616,7 @@ module read_input
     integer(I4) :: i, ierr
     integer(I4) :: head_time, rest_time, srat_time, wtab_time, mass_time
     integer(I4) :: velc_time, rivr_time, lakr_time, sufr_time, dunr_time
-    integer(I4) :: seal_time, well_time, rech_time
+    integer(I4) :: seal_time, well_time, rech_time, ostep_type
     character(:), allocatable :: str_sim_type, str_sim_name
     character(TIMELEN) :: head_unit, rest_unit, srat_unit, wtab_unit, mass_unit
     character(TIMELEN) :: velc_unit, rivr_unit, lakr_unit, sufr_unit, dunr_unit
@@ -1626,12 +1626,15 @@ module read_input
                           seal_unit, well_unit, rech_unit
     namelist/set_out_time/head_time, rest_time, srat_time, wtab_time, mass_time,&
                           velc_time, rivr_time, lakr_time, sufr_time, dunr_time,&
-                          seal_time, well_time, rech_time
+                          seal_time, well_time, rech_time, ostep_type
     !-------------------------------------------------------------------------------------------
     ierr = 0
     head_unit = "" ; rest_unit = "" ; srat_unit = "" ; wtab_unit = "" ; mass_unit = ""
     velc_unit = "" ; rivr_unit = "" ; lakr_unit = "" ; sufr_unit = "" ; dunr_unit = ""
     seal_unit = "" ; well_unit = "" ; rech_unit = ""
+    head_time = 0 ; rest_time = 0 ; srat_time = 0 ; wtab_time = 0 ; mass_time = 0
+    velc_time = 0 ; rivr_time = 0 ; lakr_time = 0 ; sufr_time = 0 ; dunr_time = 0
+    seal_time = 0 ; well_time = 0 ; rech_time = 0 ; ostep_type = st_ctrl%ostep_type
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_out_unit,iostat=ierr)
     if (ierr /= 0) then
@@ -1643,6 +1646,11 @@ module read_input
     if (ierr /= 0) then
       call write_err_stop("While reading output interval time section in main file.")
     end if
+
+    if (ostep_type < 0 .or. ostep_type > 1) then
+      call write_err_stop("Input a valid value for output step type.")
+    end if
+    st_ctrl%ostep_type = ostep_type
 
     allocate(character(0) :: str_sim_type, str_sim_name)
 

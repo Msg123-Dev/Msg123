@@ -16,6 +16,11 @@ module utility_module
   public :: iquick_sort, iquick_sort2
   public :: gmap_init, gmap_put, gmap_get, gmap_free
 
+  interface conv_unit
+    module procedure conv_unit_r4
+    module procedure conv_unit_r8
+  end interface
+
   ! -- local
 
   contains
@@ -326,21 +331,41 @@ module utility_module
 
   end subroutine write_err_stop
 
-  subroutine conv_unit(rank, time_char, mess_char, date, time_conv)
+  subroutine conv_unit_r4(rank, time_char, mess_char, date, time_conv)
   !*********************************************************************************************
-  ! conv_unit -- Convert unit
+  ! conv_unit_r4 -- Convert real4 unit
   !*********************************************************************************************
     ! -- modules
     use kind_module, only: SP
-    use constval_module, only: MINSEC, HOURSEC, DAYSEC, SONE
     ! -- inout
     integer(I4), intent(in) :: rank
     character(*), intent(in) :: time_char, mess_char
     integer(I4), intent(in) :: date(:)
     real(SP), intent(out) :: time_conv
     ! -- local
+    real(DP) :: temp_conv
+    !-------------------------------------------------------------------------------------------
+    ! -- Convert real8 unit (unit_r8)
+      call conv_unit_r8(rank, time_char, mess_char, date, temp_conv)
+    time_conv = real(temp_conv, kind=SP)
+
+  end subroutine conv_unit_r4
+
+  subroutine conv_unit_r8(rank, time_char, mess_char, date, time_conv)
+  !*********************************************************************************************
+  ! conv_unit_r8 -- Convert real8 unit
+  !*********************************************************************************************
+    ! -- modules
+    use constval_module, only: MINSEC, HOURSEC, DAYSEC, SONE, DZERO
+    ! -- inout
+    integer(I4), intent(in) :: rank
+    character(*), intent(in) :: time_char, mess_char
+    integer(I4), intent(in) :: date(:)
+    real(DP), intent(out) :: time_conv
+    ! -- local
     integer(I4) :: mday, year
     !-------------------------------------------------------------------------------------------
+    time_conv = DZERO
     if (time_char == "SEC") then
         time_conv = SONE
     else if (time_char == "MIN") then
@@ -380,7 +405,7 @@ module utility_module
       call write_err_stop("Specified wrong time unit in "//mess_char//".")
     end if
 
-  end subroutine conv_unit
+  end subroutine conv_unit_r8
 
   function get_ilen(num) result(num_digit)
   !*********************************************************************************************

@@ -139,14 +139,14 @@ module ici_module
         mat_noval = ici_get_get_fill_value('water_input')
         if (wain_get .and. runa_get .and. runb_get .and. evas_get .and. evav_get) then
           call calc_infil(water_in, roff_a, roff_b, evap_s, evap_v, st_forc%read_rech)
-          st_rech%etime = real(int_mat, kind=SP)
+          st_rech%etime = real(int_mat, kind=DP)
         else if (st_mpi%rank == 0) then
           call write_err_stop("Not get initial variables from MATSIRO.")
         end if
       else if (st_step_flag%rech == 1) then
         if (wain_get .or. runa_get .or. runb_get .or. evas_get .or. evav_get) then
           call calc_infil(water_in, roff_a, roff_b, evap_s, evap_v, st_forc%read_rech)
-          st_rech%etime = st_rech%etime + real(int_mat, kind=SP)
+          st_rech%etime = st_rech%etime + real(int_mat, kind=DP)
         end if
       end if
     end if
@@ -179,14 +179,14 @@ module ici_module
         cama_noval = ici_get_get_fill_value('rive_wdep')
         if (rivd_get) then
           call conv_rive(rive_wd, st_rive%cflag%wd, st_rive%calc%wd, st_rive%num%wd)
-          st_riwd%etime = real(int_cama, kind=SP)
+          st_riwd%etime = real(int_cama, kind=DP)
         else if (st_mpi%rank == 0) then
           call write_err_stop("Not get initial variables from CaMa-Flood.")
         end if
       else if (st_step_flag%riwd == 1) then
         if (rivd_get) then
           call conv_rive(rive_wd, st_rive%cflag%wd, st_rive%calc%wd, st_rive%num%wd)
-          st_riwd%etime = st_riwd%etime + real(int_cama, kind=SP)
+          st_riwd%etime = st_riwd%etime + real(int_cama, kind=DP)
         end if
       end if
       deallocate(rive_wd)

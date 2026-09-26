@@ -602,13 +602,14 @@ module read_module
     ! -- inout
     integer(I4), intent(in) :: ftype, fnum
     character(*), intent(in) :: fname
-    real(SP), intent(in) :: fmulti
+    real(DP), intent(in) :: fmulti
     integer(I4), intent(out) :: file_totn
-    real(SP), intent(inout) :: fetime
+    real(DP), intent(inout) :: fetime
     ! -- local
     integer(I4) :: ierr
     integer(I4) :: time_flag
     integer(I4), allocatable :: type_txt(:), type_bin(:)
+    real(SP) :: temp_etime
     character(:), allocatable :: err_mes
     !-------------------------------------------------------------------------------------------
     ierr = 0
@@ -634,10 +635,11 @@ module read_module
           call write_err_read(fnum)
         end if
       else if (any(ftype == type_bin(:))) then
-        read(unit=fnum,iostat=ierr) fetime
+        read(unit=fnum,iostat=ierr) temp_etime
         if (ierr /= 0) then
           call write_err_read(fnum)
         end if
+        fetime = temp_etime
       end if
 
       fetime = fetime*fmulti
@@ -673,8 +675,8 @@ module read_module
     integer(I4), intent(in) :: ftype, bunit
     integer(I4), intent(inout) :: fnum
     character(*), intent(in) :: fname
-    real(SP), intent(in) :: fmulti, fstep, finend
-    real(SP), intent(inout) :: fetime
+    real(DP), intent(in) :: fmulti, fstep, finend
+    real(DP), intent(inout) :: fetime
     ! -- local
     integer(I4) :: ierr
     integer(I4) :: time_flag, count_num
@@ -1073,10 +1075,10 @@ module read_module
 #endif
     ! -- inout
     integer(I4), intent(in) :: ftype, fnum
-    real(SP), intent(in) :: multi
+    real(DP), intent(in) :: multi
     character(*), intent(in) :: mess
     integer(I4), intent(out) :: nx_totn, flag, ierr
-    real(SP), intent(out) :: etime
+    real(DP), intent(out) :: etime
     ! -- local
     integer(I4), allocatable :: type_txt(:), type_bin(:)
     real(SP) :: temp_etime
@@ -1093,7 +1095,7 @@ module read_module
         read(unit=fnum,fmt=*,iostat=ierr) nx_totn, etime
         if (ierr /= 0) then
           call write_logf(err_mes)
-          flag = 0 ; etime = real(st_sim%end_time, kind=SP)
+          flag = 0 ; etime = st_sim%end_time
         else
           etime = etime*multi
         end if
@@ -1110,7 +1112,7 @@ module read_module
         read(unit=fnum,fmt=*,iostat=ierr) etime
         if (ierr /= 0) then
           call write_logf(err_mes)
-          flag = 0 ; etime = real(st_sim%end_time, kind=SP)
+          flag = 0 ; etime = st_sim%end_time
         else
           etime = etime*multi
         end if
@@ -1127,7 +1129,7 @@ module read_module
         if (st_mpi%rank == 0) then
           call write_logf(err_mes)
         end if
-        flag = 0 ; etime = real(st_sim%end_time, kind=SP)
+        flag = 0 ; etime = st_sim%end_time
       else
         etime = temp_etime*multi
       end if
@@ -1160,10 +1162,10 @@ module read_module
 #endif
     ! -- inout
     integer(I4), intent(in) :: ftype, fnum
-    real(SP), intent(in) :: multi, fstep
+    real(DP), intent(in) :: multi, fstep
     character(*), intent(in) :: mess
     integer(I4), intent(inout) :: intfn, flag, ierr
-    real(SP), intent(inout) :: etime
+    real(DP), intent(inout) :: etime
     ! -- local
     integer(I4), allocatable :: type_txt(:), type_bin(:)
     character(CHALEN) :: nxi_path
@@ -1191,7 +1193,7 @@ module read_module
 #endif
 
     if (ierr /= 0) then
-      flag = 0 ; etime = real(st_sim%end_time, kind=SP)
+      flag = 0 ; etime = st_sim%end_time
       return
     end if
 

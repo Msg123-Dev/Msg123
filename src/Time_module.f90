@@ -1023,7 +1023,7 @@ module time_module
         call assign_rilav(st_rivf_type%widt, 0, st_riwi, st_rive%num%wi, st_rive%cflag%wi,&
                           st_rive%calc%wi)
 
-      st_step_flag%riwi = 0 ; rive_aflag = rive_aflag + 1
+      st_step_flag%riwi = 0 ; rive_aflag = rive_aflag + 1 ; rive_stepflag = rive_stepflag + 1
     else if (st_riwi%etime == next_time) then
       st_step_flag%riwi = 1
     end if
@@ -1042,7 +1042,7 @@ module time_module
         call assign_rilav(st_rivf_type%leng, 0, st_rile, st_rive%num%le, st_rive%cflag%le,&
                           st_rive%calc%le)
 
-      st_step_flag%rile = 0 ; rive_aflag = rive_aflag + 1
+      st_step_flag%rile = 0 ; rive_aflag = rive_aflag + 1 ; rive_stepflag = rive_stepflag + 1
     else if (st_rile%etime == next_time) then
       st_step_flag%rile = 1
     end if

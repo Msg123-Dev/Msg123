@@ -127,11 +127,11 @@ module write_output
         rest_fnum = st_out_fnum%rest
 #ifdef MPI_MSG
         ! -- Write mpi restart file (mpi_rest)
-          call write_mpi_rest(rest_fnum, time_val, len_scal, st_sol%head_new)
+          call write_mpi_rest(rest_fnum, st_time%now_time, len_scal, st_sol%head_new)
           call close_mpi_file(rest_fnum)
 #else
         ! -- Write restart file (out_restf)
-          call write_out_restf(rest_fnum, time_val, st_sol)
+          call write_out_restf(rest_fnum, st_time%now_time, st_sol)
 #endif
       end if
 
@@ -413,13 +413,13 @@ module write_output
 
     ! -- inout
     integer(I4), intent(in) :: fnum_rest
-    real(SP), intent(in) :: time_out
+    real(DP), intent(in) :: time_out
     type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
     rewind(fnum_rest)
-    write(fnum_rest) real(time_out, kind=DP)
+    write(fnum_rest) time_out
     write(fnum_rest) (st_sol%head_new(i)*len_scal + z_base, i = 1, ncalc)
     call close_file(fnum_rest)
 

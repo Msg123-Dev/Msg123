@@ -486,7 +486,7 @@ module open_file
     end if
 
     if (len_trim(adjustl(init_unit)) == 0) then
-      st_init%multi = st_sim%cal_fact
+      st_init%multi = real(st_sim%cal_fact, kind=SP)
     else
       ! -- Convert unit (unit)
         call conv_unit(st_mpi%rank, init_unit, err_mes, st_sim%sta_date, st_init%multi)
@@ -682,7 +682,7 @@ module open_file
     end if
 
     if (st_seal%etime > st_sim%end_time) then
-      st_seal%etime = st_sim%end_time
+      st_seal%etime = real(st_sim%end_time, kind=SP)
     end if
 
     ! -- Check the unused time series (steady_etime)
@@ -861,7 +861,7 @@ module open_file
     end if
 
     if (st_rech%etime > st_sim%end_time) then
-      st_rech%etime = st_sim%end_time
+      st_rech%etime = real(st_sim%end_time, kind=SP)
     end if
 
     ! -- Check the unused time series (steady_etime)
@@ -1050,7 +1050,7 @@ module open_file
     end if
 
     if (st_well%etime > st_sim%end_time) then
-      st_well%etime = st_sim%end_time
+      st_well%etime = real(st_sim%end_time, kind=SP)
     end if
 
     ! -- Check the unused time series (steady_etime)
@@ -1308,7 +1308,7 @@ module open_file
     end if
 
     if (st_prec%etime > st_sim%end_time) then
-      st_prec%etime = st_sim%end_time
+      st_prec%etime = real(st_sim%end_time, kind=SP)
     end if
 
     ! -- Check the unused time series (steady_etime)
@@ -1485,7 +1485,7 @@ module open_file
     end if
 
     if (st_evap%etime > st_sim%end_time) then
-      st_evap%etime = st_sim%end_time
+      st_evap%etime = real(st_sim%end_time, kind=SP)
     end if
 
     ! -- Check the unused time series (steady_etime)
@@ -1752,7 +1752,7 @@ module open_file
       end if
 
       if (rive_etime > st_sim%end_time) then
-        rive_etime = st_sim%end_time
+        rive_etime = real(st_sim%end_time, kind=SP)
       end if
 
       ! -- Check the unused time series (steady_etime)
@@ -2092,7 +2092,7 @@ module open_file
       end if
 
       if (lake_etime > st_sim%end_time) then
-        lake_etime = st_sim%end_time
+        lake_etime = real(st_sim%end_time, kind=SP)
       end if
 
       ! -- Check the unused time series (steady_etime)
@@ -2234,6 +2234,7 @@ module open_file
   ! open_out_binf -- Open output binary file
   !*********************************************************************************************
     ! -- modules
+    use kind_module, only: DP
     use utility_module, only: open_new_wbin
 #ifdef MPI_MSG
     use mpi_read, only: open_mpi_write_file
@@ -2241,7 +2242,7 @@ module open_file
     ! -- inout
     integer(I4), intent(inout) :: out_file, out_tint
     character(*), intent(inout) :: out_path, out_unit, out_chra
-    real(SP), intent(out) :: out_trel
+    real(DP), intent(out) :: out_trel
     ! -- local
 #ifdef MPI_MSG
     integer(I4) :: out_fh

@@ -1093,7 +1093,7 @@ module read_module
         read(unit=fnum,fmt=*,iostat=ierr) nx_totn, etime
         if (ierr /= 0) then
           call write_logf(err_mes)
-          flag = 0 ; etime = st_sim%end_time
+          flag = 0 ; etime = real(st_sim%end_time, kind=SP)
         else
           etime = etime*multi
         end if
@@ -1110,7 +1110,7 @@ module read_module
         read(unit=fnum,fmt=*,iostat=ierr) etime
         if (ierr /= 0) then
           call write_logf(err_mes)
-          flag = 0 ; etime = st_sim%end_time
+          flag = 0 ; etime = real(st_sim%end_time, kind=SP)
         else
           etime = etime*multi
         end if
@@ -1127,7 +1127,7 @@ module read_module
         if (st_mpi%rank == 0) then
           call write_logf(err_mes)
         end if
-        flag = 0 ; etime = st_sim%end_time
+        flag = 0 ; etime = real(st_sim%end_time, kind=SP)
       else
         etime = temp_etime*multi
       end if
@@ -1191,7 +1191,7 @@ module read_module
 #endif
 
     if (ierr /= 0) then
-      flag = 0 ; etime = st_sim%end_time
+      flag = 0 ; etime = real(st_sim%end_time, kind=SP)
       return
     end if
 

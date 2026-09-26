@@ -165,14 +165,14 @@ module check_simulation
     step_flag = st_step_flag%rech + st_step_flag%well + st_step_flag%seal +&
                 st_step_flag%prec + st_step_flag%evap + st_step_flag%riwl +&
                 st_step_flag%riwd + st_step_flag%ribl + st_step_flag%ride +&
-                st_step_flag%riwi + st_step_flag%lawl + st_step_flag%lawd +&
-                st_step_flag%labl + st_step_flag%laar
+                st_step_flag%riwi + st_step_flag%rile + st_step_flag%lawl +&
+                st_step_flag%lawd + st_step_flag%labl + st_step_flag%laar
 
     if (step_flag > 0) then
       write_flag = 1
     else if (st_time%current_t >= st_sim%end_time) then
       write_flag = 1
-    else if (st_time%conv_flag .and. st_sim%sim_type /= 1) then
+    else if (st_time%conv_flag .and. (st_sim%sim_type /= 1 .or. st_ctrl%ostep_type == 1)) then
       write_flag = 1
     else
       write_flag = 0

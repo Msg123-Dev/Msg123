@@ -18,12 +18,12 @@ module time_module
 
   implicit none
   private
-  public :: update_tstep
+  public :: update_tstep, check_outstep
 
   ! -- local
   integer(I4) :: timestep_num, boundstep
   real(DP) :: next_time, prev_time, time_tol
-  real(DP) :: delt_old1
+  real(DP) :: delt_old1, delt_uncut
   real(DP), allocatable :: whead_new(:)
 
   contains
@@ -61,12 +61,14 @@ module time_module
       end if
       ! -- Set next variable (nextvar)
         call set_nextvar()
-    else if (st_time%conv_flag .and. st_sim%sim_type == 0) then
+    else if (st_sim%sim_type == 1) then
       ! -- Set delta time (delt)
         call set_delt()
-    else if (next_time > st_sim%end_time - time_tol) then
-      st_time%delt = st_sim%end_time - st_time%current_t
-      next_time = st_sim%end_time
+      ! -- Set next variable (nextvar)
+        call set_nextvar()
+    else if (st_sim%sim_type == 0) then
+      ! -- Set delta time (delt)
+        call set_delt()
     end if
 
     if (st_time%delt < max(DSMAL, spacing(st_time%current_t)) .and. st_sim%sim_type /= -1 .and.&
@@ -130,7 +132,7 @@ module time_module
     !-------------------------------------------------------------------------------------------
     if (st_time%current_t == DZERO) then
       timestep_num = 0 ; boundstep = 0
-      delt_old1 = DZERO ; resi_time = DZERO
+      delt_old1 = DZERO ; delt_uncut = DZERO ; resi_time = DZERO
       time_tol = max(st_sim%min_step, DSMAL, spacing(st_sim%end_time))
       if (st_sim%sim_type == -1) then
         st_time%delt = DNOVAL
@@ -200,6 +202,9 @@ module time_module
           delt_old1 = st_time%delt
         end if
         timestep_num = timestep_num + 1
+        if (delt_uncut > DZERO) then
+          st_time%delt = delt_uncut ; delt_uncut = DZERO
+        end if
         delt_old1 = st_time%delt
 
         if (st_mpi%rank == 0) then
@@ -237,7 +242,7 @@ module time_module
           call set_valexc(ncalc, st_sol%stor_new, st_sol%stor_old)
           call set_valexc(ncals, st_sol%surf_head, st_sol%surf_old)
       else
-        st_time%current_t = prev_time
+        st_time%current_t = prev_time ; delt_uncut = DZERO
         st_time%delt = st_time%delt*st_sim%dec_fact
         ! -- Set value exchange (valexc)
           call set_valexc(ncalc, st_sol%head_old, st_sol%head_new)
@@ -775,34 +780,44 @@ module time_module
   ! set_delt -- Set delta time
   !*********************************************************************************************
     ! -- modules
-
+    use initial_module, only: st_out_step
     ! -- inout
 
     ! -- local
-    real(DP) :: min_step
+    real(DP) :: min_step, min_otime
     !-------------------------------------------------------------------------------------------
     min_step = min(st_rech%etime, st_well%etime, st_seal%etime, st_prec%etime,&
                    st_evap%etime, st_riwl%etime, st_riwd%etime, st_ribl%etime,&
                    st_ride%etime, st_riwi%etime, st_rile%etime, st_lawl%etime,&
                    st_lawd%etime, st_labl%etime, st_laar%etime)
+    if (min_step <= st_time%current_t .or. min_step >= real(st_sim%end_time, kind=SP)) then
+      min_step = st_sim%end_time
+    end if
+    min_step = min(min_step, st_sim%end_time)
+
+    min_otime = st_sim%end_time
+    if (st_sim%sim_type == 0 .or. st_ctrl%ostep_type == 1) then
+      min_otime = min(get_nextout(st_out_step%head), get_nextout(st_out_step%rest),&
+                      get_nextout(st_out_step%srat), get_nextout(st_out_step%wtab),&
+                      get_nextout(st_out_step%mass), get_nextout(st_out_step%velc),&
+                      get_nextout(st_out_step%rivr), get_nextout(st_out_step%lakr),&
+                      get_nextout(st_out_step%sufr), get_nextout(st_out_step%dunr),&
+                      get_nextout(st_out_step%seal), get_nextout(st_out_step%well),&
+                      get_nextout(st_out_step%rech))
+    end if
 
     if (st_time%delt > st_sim%max_step) then
       st_time%delt = st_sim%max_step
-      next_time = st_time%current_t + st_time%delt
     end if
+    next_time = st_time%current_t + st_time%delt
 
-    if (min_step == st_time%current_t) then
-      st_time%delt = st_time%delt
-      next_time = st_time%current_t + st_time%delt
-    else if (min_step > st_time%current_t .and. min_step < next_time + time_tol .and.&
-             next_time < st_sim%end_time) then
+    if (min_otime < min_step - time_tol .and. next_time > min_otime - time_tol) then
+      delt_uncut = st_time%delt
+      st_time%delt = min_otime - st_time%current_t
+      next_time = min_otime
+    else if (next_time > min_step - time_tol) then
       st_time%delt = min_step - st_time%current_t
       next_time = min_step
-    else if (next_time > st_sim%end_time - time_tol) then
-      st_time%delt = st_sim%end_time - st_time%current_t
-      next_time = st_sim%end_time
-    else
-      next_time = st_time%current_t + st_time%delt
     end if
 
   end subroutine set_delt
@@ -1405,8 +1420,8 @@ module time_module
     bchange = st_step_flag%rech + st_step_flag%well + st_step_flag%seal +&
               st_step_flag%prec + st_step_flag%evap + st_step_flag%riwl +&
               st_step_flag%riwd + st_step_flag%ribl + st_step_flag%ride +&
-              st_step_flag%riwi + st_step_flag%lawl + st_step_flag%lawd +&
-              st_step_flag%labl + st_step_flag%laar
+              st_step_flag%riwi + st_step_flag%rile + st_step_flag%lawl +&
+              st_step_flag%lawd + st_step_flag%labl + st_step_flag%laar
 
     conv_fnum = st_out_fnum%conv ; cond_format = "(a,f10.3)"
 
@@ -1441,6 +1456,9 @@ module time_module
     end if
     if (st_step_flag%riwi == 1) then
       write(conv_fnum,cond_format) "Changed river width at ", st_time%now_time
+    end if
+    if (st_step_flag%rile == 1) then
+      write(conv_fnum,cond_format) "Changed river length at ", st_time%now_time
     end if
     if (st_step_flag%lawl == 1) then
       write(conv_fnum,cond_format) "Changed lake water level at ", st_time%now_time
@@ -1510,6 +1528,10 @@ module time_module
     !$omp section
     if (st_step_flag%riwi == 1) then
       st_step_flag%riwi = 0
+    end if
+    !$omp section
+    if (st_step_flag%rile == 1) then
+      st_step_flag%rile = 0
     end if
     !$omp section
     if (st_step_flag%lawl == 1) then
@@ -1618,5 +1640,56 @@ module time_module
     end do
 
   end subroutine set_date
+
+  function get_nextout(step_val) result(next_otime)
+  !*********************************************************************************************
+  ! get_nextout -- Get next output time
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(DP), intent(in) :: step_val
+    ! -- local
+    real(DP) :: next_otime, ostep_num
+    !-------------------------------------------------------------------------------------------
+    next_otime = st_sim%end_time
+    if (step_val > DZERO) then
+      ostep_num = aint(st_time%current_t/step_val) + DONE
+      next_otime = ostep_num*step_val
+      do while (next_otime <= st_time%current_t + time_tol)
+        ostep_num = ostep_num + DONE
+        next_otime = ostep_num*step_val
+      end do
+    end if
+
+  end function get_nextout
+
+  function check_outstep(step_val) result(out_flag)
+  !*********************************************************************************************
+  ! check_outstep -- Check output step
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(DP), intent(in) :: step_val
+    ! -- local
+    integer(I4) :: step_flag
+    logical :: out_flag
+    !-------------------------------------------------------------------------------------------
+    step_flag = st_step_flag%rech + st_step_flag%well + st_step_flag%seal +&
+                st_step_flag%prec + st_step_flag%evap + st_step_flag%riwl +&
+                st_step_flag%riwd + st_step_flag%ribl + st_step_flag%ride +&
+                st_step_flag%riwi + st_step_flag%rile + st_step_flag%lawl +&
+                st_step_flag%lawd + st_step_flag%labl + st_step_flag%laar
+
+    if (st_sim%sim_type == 1 .and. step_flag > 0) then
+      out_flag = .true.
+    else if (st_sim%sim_type == 1 .and. st_ctrl%ostep_type == 0) then
+      out_flag = .false.
+    else
+      out_flag = abs(st_time%current_t - anint(st_time%current_t/step_val)*step_val) <= time_tol
+    end if
+
+  end function check_outstep
 
 end module time_module

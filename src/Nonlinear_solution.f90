@@ -66,6 +66,7 @@ module nonlinear_solution
     use make_linearsystem, only: make_matvec
     use check_simulation, only: check_abserrmax, check_residual
     use linear_solution, only: solve_linalg, in_iter
+    use time_module, only: check_outstep
 #ifdef MPI_MSG
     use mpi_solve, only: check_mpimaxerr, bcast_convinfo
 #endif
@@ -172,7 +173,7 @@ module nonlinear_solution
           if (st_out_step%rest == DZERO) then
             ! -- Write restart file (rest)
               call write_rest(st_sol%head_new)
-          else if (mod(st_time%current_t,st_out_step%rest) == 0) then
+          else if (check_outstep(st_out_step%rest)) then
             ! -- Write restart file (rest)
               call write_rest(st_sol%head_new)
           end if
@@ -419,7 +420,7 @@ module nonlinear_solution
         if (st_out_step%rest == DZERO) then
           ! -- Write restart file (rest)
             call write_rest(st_sol%head_new)
-        else if (mod(st_time%current_t,st_out_step%rest) == 0) then
+        else if (check_outstep(st_out_step%rest)) then
           ! -- Write restart file (rest)
             call write_rest(st_sol%head_new)
         end if
@@ -470,7 +471,7 @@ module nonlinear_solution
         if (st_out_step%rest == DZERO) then
           ! -- Write restart file (rest)
             call write_rest(st_sol%head_new)
-        else if (mod(st_time%current_t,st_out_step%rest) == 0) then
+        else if (check_outstep(st_out_step%rest)) then
           ! -- Write restart file (rest)
             call write_rest(st_sol%head_new)
         end if

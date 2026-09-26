@@ -1616,7 +1616,7 @@ module read_input
     integer(I4) :: i, ierr
     integer(I4) :: head_time, rest_time, srat_time, wtab_time, mass_time
     integer(I4) :: velc_time, rivr_time, lakr_time, sufr_time, dunr_time
-    integer(I4) :: seal_time, well_time, rech_time
+    integer(I4) :: seal_time, well_time, rech_time, ostep_type
     character(:), allocatable :: str_sim_type, str_sim_name
     character(TIMELEN) :: head_unit, rest_unit, srat_unit, wtab_unit, mass_unit
     character(TIMELEN) :: velc_unit, rivr_unit, lakr_unit, sufr_unit, dunr_unit
@@ -1626,12 +1626,15 @@ module read_input
                           seal_unit, well_unit, rech_unit
     namelist/set_out_time/head_time, rest_time, srat_time, wtab_time, mass_time,&
                           velc_time, rivr_time, lakr_time, sufr_time, dunr_time,&
-                          seal_time, well_time, rech_time
+                          seal_time, well_time, rech_time, ostep_type
     !-------------------------------------------------------------------------------------------
     ierr = 0
     head_unit = "" ; rest_unit = "" ; srat_unit = "" ; wtab_unit = "" ; mass_unit = ""
     velc_unit = "" ; rivr_unit = "" ; lakr_unit = "" ; sufr_unit = "" ; dunr_unit = ""
     seal_unit = "" ; well_unit = "" ; rech_unit = ""
+    head_time = 0 ; rest_time = 0 ; srat_time = 0 ; wtab_time = 0 ; mass_time = 0
+    velc_time = 0 ; rivr_time = 0 ; lakr_time = 0 ; sufr_time = 0 ; dunr_time = 0
+    seal_time = 0 ; well_time = 0 ; rech_time = 0 ; ostep_type = st_ctrl%ostep_type
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_out_unit,iostat=ierr)
     if (ierr /= 0) then
@@ -1643,6 +1646,11 @@ module read_input
     if (ierr /= 0) then
       call write_err_stop("While reading output interval time section in main file.")
     end if
+
+    if (ostep_type < 0 .or. ostep_type > 1) then
+      call write_err_stop("Input a valid value for output step type.")
+    end if
+    st_ctrl%ostep_type = ostep_type
 
     allocate(character(0) :: str_sim_type, str_sim_name)
 

@@ -478,7 +478,7 @@ module assign_calc
       end if
       call close_file(st_init%fnum)
 #endif
-    st_init%rest_time = real(temp_end, kind=SP)
+    st_init%rest_time = temp_end
     !$omp parallel do private(i)
     do i = 1, ncalc
       if (st_hydr%read_init(i) /= DNOVAL) then
@@ -504,7 +504,7 @@ module assign_calc
 #else
           read(unit=init_fnum,iostat=ierr) temp_end
 #endif
-          st_init%rest_time = real(temp_end, kind=SP)
+          st_init%rest_time = temp_end
           if (ierr /= 0 .and. st_mpi%rank == 0) then
             call write_err_stop("While reading header time in initial file.")
           end if

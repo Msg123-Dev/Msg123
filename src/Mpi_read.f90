@@ -501,8 +501,8 @@ module mpi_read
     ! -- inout
     integer(I4), intent(in) :: ftype, fnum, fview
     character(*), intent(in) :: err_mes
-    real(SP), intent(in) :: fmulti
-    real(SP), intent(out) :: fetime
+    real(DP), intent(in) :: fmulti
+    real(DP), intent(out) :: fetime
     ! -- local
     integer(I4) :: i, ierr, time_flag, read_count
     integer(I4), allocatable :: istat(:)
@@ -592,8 +592,8 @@ module mpi_read
     integer(I4), intent(in) :: bnum
     character(*), intent(in) :: err_mes
     integer(I4), intent(inout) :: fnum
-    real(SP), intent(in) :: fmulti, fstep, finend
-    real(SP), intent(inout) :: fetime
+    real(DP), intent(in) :: fmulti, fstep, finend
+    real(DP), intent(inout) :: fetime
     ! -- local
     integer(I4) :: ierr, time_flag, count_num, file_len
     character(CHALEN) :: intpath

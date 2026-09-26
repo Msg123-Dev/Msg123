@@ -147,12 +147,13 @@ module types_module
 
   type :: init_set
     integer(I4) :: fnum
-    real(SP) :: multi, depth, rest_time
+    real(SP) :: depth
+    real(DP) :: multi, rest_time
   end type init_set
 
   type :: seal_set
     integer(I4) :: totn, fnum
-    real(SP) :: etime, multi
+    real(DP) :: etime, multi
     character(VARLEN), allocatable :: name(:)
     integer(I4), allocatable :: i(:), j(:), k(:)
     real(DP), allocatable :: value(:)
@@ -160,21 +161,23 @@ module types_module
 
   type :: surfb_set
     integer(I4) :: totn, fnum
-    real(SP) :: etime, uni_conv, multi
+    real(SP) :: uni_conv
+    real(DP) :: etime, multi
     character(VARLEN), allocatable :: name(:)
     real(SP), allocatable :: value(:)
   end type surfb_set
 
   type :: well_set
     integer(I4) :: totn, fnum
-    real(SP) :: etime, uni_conv, multi
+    real(SP) :: uni_conv
+    real(DP) :: etime, multi
     integer(I4), allocatable :: i(:), j(:), k(:), ij(:), ks(:), ke(:)
     real(SP), allocatable :: value(:)
   end type well_set
 
   type :: surfw_set
     integer(I4) :: totn, fnum, inttype, intfnum
-    real(SP) :: etime, multi, intstep
+    real(DP) :: etime, multi, intstep
     character(VARLEN), allocatable :: name(:)
     integer(I4), allocatable :: i(:), j(:)
     real(DP), allocatable :: value(:)

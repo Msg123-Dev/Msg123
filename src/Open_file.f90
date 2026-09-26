@@ -1,6 +1,6 @@
 module open_file
   ! -- modules
-  use kind_module, only: I4, SP
+  use kind_module, only: I4, SP, DP
   use constval_module, only: CHALEN, TIMELEN, HOURSEC, SZERO, SINFI
   use utility_module, only: st_mpi, open_new_rtxt, open_new_rbin, open_new_wtxt, close_file
   use utility_module, only: write_logf, write_err_stop, conv_unit
@@ -22,7 +22,7 @@ module open_file
 
   type, public :: intf_set
     integer(I4) :: type, fnum
-    real(SP) :: step
+    real(DP) :: step
   end type intf_set
   type(intf_set), public :: st_intse, st_intre, st_intwe, st_intpr, st_intev
 
@@ -486,7 +486,7 @@ module open_file
     end if
 
     if (len_trim(adjustl(init_unit)) == 0) then
-      st_init%multi = real(st_sim%cal_fact, kind=SP)
+      st_init%multi = st_sim%cal_fact
     else
       ! -- Convert unit (unit)
         call conv_unit(st_mpi%rank, init_unit, err_mes, st_sim%sta_date, st_init%multi)
@@ -513,7 +513,7 @@ module open_file
     integer(I4) :: temp_view
     integer(I4) :: intse_fnum, intse_type
     integer(I4), allocatable :: txt_seal_type(:), bin_seal_type(:)
-    real(SP) :: intse_step, intse_end
+    real(DP) :: intse_step, intse_end
     character(CHALEN) :: intsep
     character(:), allocatable :: vname, err_mes
     logical, allocatable :: txt_seal_mask(:), bin_seal_mask(:)
@@ -682,7 +682,7 @@ module open_file
     end if
 
     if (st_seal%etime > st_sim%end_time) then
-      st_seal%etime = real(st_sim%end_time, kind=SP)
+      st_seal%etime = st_sim%end_time
     end if
 
     ! -- Check the unused time series (steady_etime)
@@ -710,7 +710,7 @@ module open_file
     integer(I4) :: ierr
     integer(I4) :: temp_view
     integer(I4) :: intre_fnum, intre_type
-    real(SP) :: intre_step, intre_end
+    real(DP) :: intre_step, intre_end
     character(CHALEN) :: intrep
     character(:), allocatable :: vname, err_mes
     !-------------------------------------------------------------------------------------------
@@ -861,7 +861,7 @@ module open_file
     end if
 
     if (st_rech%etime > st_sim%end_time) then
-      st_rech%etime = real(st_sim%end_time, kind=SP)
+      st_rech%etime = st_sim%end_time
     end if
 
     ! -- Check the unused time series (steady_etime)
@@ -889,7 +889,7 @@ module open_file
     integer(I4) :: temp_view
     integer(I4) :: intwe_fnum, intwe_type
     integer(I4), allocatable :: txt_well_type(:), bin_well_type(:)
-    real(SP) :: intwe_step, intwe_end
+    real(DP) :: intwe_step, intwe_end
     character(CHALEN) :: intwep
     character(:), allocatable :: vname, err_mes
     logical, allocatable :: txt_well_mask(:), bin_well_mask(:)
@@ -1050,7 +1050,7 @@ module open_file
     end if
 
     if (st_well%etime > st_sim%end_time) then
-      st_well%etime = real(st_sim%end_time, kind=SP)
+      st_well%etime = st_sim%end_time
     end if
 
     ! -- Check the unused time series (steady_etime)
@@ -1157,7 +1157,7 @@ module open_file
     integer(I4) :: ierr
     integer(I4) :: temp_view
     integer(I4) :: intpr_fnum, intpr_type
-    real(SP) :: intpr_step, intpr_end
+    real(DP) :: intpr_step, intpr_end
     character(CHALEN) :: intprp
     character(:), allocatable :: vname, err_mes
     !-------------------------------------------------------------------------------------------
@@ -1308,7 +1308,7 @@ module open_file
     end if
 
     if (st_prec%etime > st_sim%end_time) then
-      st_prec%etime = real(st_sim%end_time, kind=SP)
+      st_prec%etime = st_sim%end_time
     end if
 
     ! -- Check the unused time series (steady_etime)
@@ -1334,7 +1334,7 @@ module open_file
     integer(I4) :: ierr
     integer(I4) :: temp_view
     integer(I4) :: intev_fnum, intev_type
-    real(SP) :: intev_step, intev_end
+    real(DP) :: intev_step, intev_end
     character(CHALEN) :: intevp
     character(:), allocatable :: vname, err_mes
     !-------------------------------------------------------------------------------------------
@@ -1485,7 +1485,7 @@ module open_file
     end if
 
     if (st_evap%etime > st_sim%end_time) then
-      st_evap%etime = real(st_sim%end_time, kind=SP)
+      st_evap%etime = st_sim%end_time
     end if
 
     ! -- Check the unused time series (steady_etime)
@@ -1514,7 +1514,7 @@ module open_file
     integer(I4) :: riven(6), rivet(6)
     integer(I4) :: rive_view
     integer(I4), allocatable :: riv_txt_type(:)
-    real(SP) :: intri_end, rive_multi, rive_etime, intri_step
+    real(DP) :: intri_end, rive_multi, rive_etime, intri_step
     character(CHALEN) :: riwl_path, riwd_path, ribl_path, ride_path
     character(CHALEN) :: riwi_path, rile_path, intri_path
     character(TIMELEN) :: riwl_unit, riwd_unit, ribl_unit, ride_unit
@@ -1752,7 +1752,7 @@ module open_file
       end if
 
       if (rive_etime > st_sim%end_time) then
-        rive_etime = real(st_sim%end_time, kind=SP)
+        rive_etime = st_sim%end_time
       end if
 
       ! -- Check the unused time series (steady_etime)
@@ -1870,7 +1870,7 @@ module open_file
     integer(I4) :: laken(4), laket(4)
     integer(I4) :: lake_view
     integer(I4), allocatable :: lak_txt_type(:)
-    real(SP) :: intla_end, lake_multi, lake_etime, intla_step
+    real(DP) :: intla_end, lake_multi, lake_etime, intla_step
     character(CHALEN) :: lawl_path, lawd_path, labl_path, laar_path, intla_path
     character(TIMELEN) :: lawl_unit, lawd_unit, labl_unit, laar_unit
     character(:), allocatable :: mess_wl, mess_wd, mess_bl, mess_ar
@@ -2092,7 +2092,7 @@ module open_file
       end if
 
       if (lake_etime > st_sim%end_time) then
-        lake_etime = real(st_sim%end_time, kind=SP)
+        lake_etime = st_sim%end_time
       end if
 
       ! -- Check the unused time series (steady_etime)
@@ -2234,7 +2234,6 @@ module open_file
   ! open_out_binf -- Open output binary file
   !*********************************************************************************************
     ! -- modules
-    use kind_module, only: DP
     use utility_module, only: open_new_wbin
 #ifdef MPI_MSG
     use mpi_read, only: open_mpi_write_file
@@ -2321,7 +2320,7 @@ module open_file
     ! -- modules
 
     ! -- inout
-    real(SP), intent(in) :: fetime
+    real(DP), intent(in) :: fetime
     character(*), intent(in) :: fname
     ! -- local
     character(:), allocatable :: warn_mes

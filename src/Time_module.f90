@@ -309,7 +309,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%seal = 0
-        st_seal%etime = real(st_sim%end_time, kind=SP)
+        st_seal%etime = st_sim%end_time
       else
         deallocate(st_forc%read_seal)
       end if
@@ -339,7 +339,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%rech = 0
-        st_rech%etime = real(st_sim%end_time, kind=SP)
+        st_rech%etime = st_sim%end_time
         ! -- Reset cell value (value)
           call reset_value(st_bcnd%rech_num, st_forc%read_rech)
       else
@@ -371,7 +371,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%well = 0
-        st_well%etime = real(st_sim%end_time, kind=SP)
+        st_well%etime = st_sim%end_time
         ! -- Reset cell value (value)
           call reset_value(st_bcnd%well_num, st_forc%read_well)
       else
@@ -407,7 +407,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%prec = 0
-        st_prec%etime = real(st_sim%end_time, kind=SP)
+        st_prec%etime = st_sim%end_time
         ! -- Reset cell value (value)
           call reset_value(st_bcnd%prec_num, st_forc%read_prec)
       else
@@ -441,7 +441,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%evap = 0
-        st_evap%etime = real(st_sim%end_time, kind=SP)
+        st_evap%etime = st_sim%end_time
         ! -- Reset cell value (value)
           call reset_value(st_bcnd%evap_num, st_forc%read_evap)
       else
@@ -476,7 +476,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%riwl = 0
-        st_riwl%etime = real(st_sim%end_time, kind=SP)
+        st_riwl%etime = st_sim%end_time
       else
         deallocate(st_rive%cflag%wl, st_rive%calc%wl)
       end if
@@ -507,7 +507,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%riwd = 0
-        st_riwd%etime = real(st_sim%end_time, kind=SP)
+        st_riwd%etime = st_sim%end_time
       end if
     end if
 
@@ -536,7 +536,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%ribl = 0
-        st_ribl%etime = real(st_sim%end_time, kind=SP)
+        st_ribl%etime = st_sim%end_time
       else
         deallocate(st_rive%cflag%bl, st_rive%calc%bl)
       end if
@@ -567,7 +567,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%ride = 0
-        st_ride%etime = real(st_sim%end_time, kind=SP)
+        st_ride%etime = st_sim%end_time
       else
         if (st_ride%totn > 0) then
           deallocate(st_rive%cflag%de, st_rive%calc%de)
@@ -600,7 +600,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%riwi = 0
-        st_riwi%etime = real(st_sim%end_time, kind=SP)
+        st_riwi%etime = st_sim%end_time
       else
         if (st_riwi%totn > 0) then
           deallocate(st_rive%cflag%wi, st_rive%calc%wi)
@@ -633,7 +633,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%rile = 0
-        st_rile%etime = real(st_sim%end_time, kind=SP)
+        st_rile%etime = st_sim%end_time
       else
         if (st_rile%totn > 0) then
           deallocate(st_rive%cflag%le, st_rive%calc%le)
@@ -666,7 +666,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%lawl = 0
-        st_lawl%etime = real(st_sim%end_time, kind=SP)
+        st_lawl%etime = st_sim%end_time
       else
         deallocate(st_lake%cflag%wl, st_lake%calc%wl)
       end if
@@ -697,7 +697,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%lawd = 0
-        st_lawd%etime = real(st_sim%end_time, kind=SP)
+        st_lawd%etime = st_sim%end_time
       else
         if (st_lawd%totn > 0) then
           deallocate(st_lake%cflag%wd, st_lake%calc%wd)
@@ -730,7 +730,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%labl = 0
-        st_labl%etime = real(st_sim%end_time, kind=SP)
+        st_labl%etime = st_sim%end_time
       else
         deallocate(st_lake%cflag%bl, st_lake%calc%bl)
       end if
@@ -761,7 +761,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%laar = 0
-        st_laar%etime = real(st_sim%end_time, kind=SP)
+        st_laar%etime = st_sim%end_time
       else
         if (st_laar%totn > 0) then
           deallocate(st_lake%cflag%ar, st_lake%calc%ar)
@@ -790,7 +790,7 @@ module time_module
                    st_evap%etime, st_riwl%etime, st_riwd%etime, st_ribl%etime,&
                    st_ride%etime, st_riwi%etime, st_rile%etime, st_lawl%etime,&
                    st_lawd%etime, st_labl%etime, st_laar%etime)
-    if (min_step <= st_time%current_t .or. min_step >= real(st_sim%end_time, kind=SP)) then
+    if (min_step <= st_time%current_t) then
       min_step = st_sim%end_time
     end if
     min_step = min(min_step, st_sim%end_time)

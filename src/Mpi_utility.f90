@@ -999,7 +999,7 @@ module mpi_utility
 
     ! -- inout
     integer(I4), intent(inout) :: extr_type
-    real(SP), intent(inout) :: extr_step, extr_end
+    real(DP), intent(inout) :: extr_step, extr_end
     character(*), intent(inout) :: extr_path
     character(*), intent(in) :: err_mes
     ! -- local
@@ -1016,7 +1016,7 @@ module mpi_utility
       call abort_proc(st_mpi%rank, log_fnum)
     end if
 
-    call MPI_BCAST(extr_step, 1, MPI_REAL4, 0, st_mpi%comm, ierr)
+    call MPI_BCAST(extr_step, 1, MPI_REAL8, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file step in MPI program."
@@ -1024,7 +1024,7 @@ module mpi_utility
       call abort_proc(st_mpi%rank, log_fnum)
     end if
 
-    call MPI_BCAST(extr_end, 1, MPI_REAL4, 0, st_mpi%comm, ierr)
+    call MPI_BCAST(extr_end, 1, MPI_REAL8, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         write(log_fnum,'(a)') "Error!! Broadcast "//err_mes//" file end time in MPI program."

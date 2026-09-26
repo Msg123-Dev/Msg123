@@ -608,7 +608,7 @@ module open_file
 
     if (len_trim(adjustl(seal_unit)) == 0) then
       if (st_mpi%rank == 0) then
-        call write_logf("Not specified "//vname//" time unit. Simulation time unit is used")
+        call write_logf("Not specified "//vname//" time unit. Same value is used in simulation")
       end if
       st_seal%multi = SINFI ; st_seal%etime = SINFI
     else
@@ -788,7 +788,7 @@ module open_file
 
     if (len_trim(adjustl(rech_unit)) == 0) then
       if (st_mpi%rank == 0) then
-        call write_logf("Not specified "//vname//" time unit. Simulation time unit is used")
+        call write_logf("Not specified "//vname//" time unit. Same value is used in simulation")
       end if
       st_rech%multi = SINFI ; st_rech%etime = SINFI
     else
@@ -978,7 +978,7 @@ module open_file
 
     if (len_trim(adjustl(well_unit)) == 0) then
       if (st_mpi%rank == 0) then
-        call write_logf("Not specified "//vname//" time unit. Simulation time unit is used")
+        call write_logf("Not specified "//vname//" time unit. Same value is used in simulation")
       end if
       st_well%multi = SINFI ; st_well%etime = SINFI
     else
@@ -1236,7 +1236,7 @@ module open_file
 
     if (len_trim(adjustl(prec_unit)) == 0) then
       if (st_mpi%rank == 0) then
-        call write_logf("Not specified "//vname//" time unit. Simulation time unit is used")
+        call write_logf("Not specified "//vname//" time unit. Same value is used in simulation")
       end if
       st_prec%multi = SINFI ; st_prec%etime = SINFI
     else
@@ -1413,7 +1413,7 @@ module open_file
 
     if (len_trim(adjustl(evap_unit)) == 0) then
       if (st_mpi%rank == 0) then
-        call write_logf("Not specified "//vname//" time unit. Simulation time unit is used")
+        call write_logf("Not specified "//vname//" time unit. Same value is used in simulation")
       end if
       st_evap%multi = SINFI ; st_evap%etime = SINFI
     else

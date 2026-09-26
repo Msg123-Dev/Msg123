@@ -50,7 +50,7 @@ ifneq ($(filter $(COMPILER),ifort ifx),)
 	ifeq ($(MODE),debug)
 		FFLAGS := -fpp -warn all -g -O0 -traceback -check bounds -fpe0 -check all -std -ftrapuv -gen-interfaces
 	else
-		FFLAGS := -fpp -warn all -O3
+		FFLAGS := -fpp -warn all -O3 -heap-arrays
 	endif
 	FFLAGS += -diag-disable=10448 -fpscomp logicals
 	ifneq ($(filter OpenMP Hybrid,$(PARA)),)

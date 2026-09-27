@@ -378,7 +378,7 @@ module make_linearsystem
       per_riv(i) = per_relp(s) ; rel_riv(i) = st_sol%rel_perm(s)
       dkr_riv(i) = dkr_dpsi(s)
       head_eff = max(st_forc%rive_head(i), st_forc%rive_bott(i))
-      tran_riv(i) = st_hydr%hydf_surf(s)*st_forc%abyd_rive(i)
+      tran_riv(i) = st_forc%rive_hydk(i)*st_forc%abyd_rive(i)
       if (st_sol%head_new(s) >= st_forc%rive_bott(i)) then
         delh_r(i) = head_eff - st_sol%head_new(s)
         over_riv(i) = DONE

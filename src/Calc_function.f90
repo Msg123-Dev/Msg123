@@ -507,7 +507,7 @@ module calc_function
       head_eff = max(st_forc%rive_head(i), st_forc%rive_bott(i))
       delh_r(i) = head_eff - max(infrive(s), st_forc%rive_bott(i))
 
-      rivfunc(s) = st_hydr%hydf_surf(s)*st_forc%abyd_rive(i)*delh_r(i)*rperm(s)
+      rivfunc(s) = st_forc%rive_hydk(i)*st_forc%abyd_rive(i)*delh_r(i)*rperm(s)
     end do
     !$omp end do
     !$omp end parallel

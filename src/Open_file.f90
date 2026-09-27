@@ -1497,42 +1497,48 @@ module open_file
 
   end subroutine open_in_evapf
 
-  subroutine open_in_rivef(rive_path, nohv, hv, riwlv, riwdv, riblv, ridev, riwiv, rilev)
+  subroutine open_in_rivef(rive_path, nohv, hv, wlv, wdv, blv, dev, wiv, lev, bkv, btv)
   !*********************************************************************************************
   ! open_in_rivef -- Read input river file
   !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_rivf_type, st_riwl, st_riwd, st_ribl, st_ride, st_riwi, st_rile
+    use initial_module, only: st_ribk, st_ribt
     ! -- inout
     character(*), intent(in) :: rive_path
     integer(I4), intent(in) :: nohv, hv
-    integer(I4), intent(out) :: riwlv, riwdv, riblv, ridev, riwiv, rilev
+    integer(I4), intent(out) :: wlv, wdv, blv, dev, wiv, lev, bkv, btv
     ! -- local
     integer(I4) :: i, ierr
     integer(I4) :: rive_fnum, rive_totn, intri_type, intri_num, rive_stepflag
     integer(I4) :: riwl_type, riwd_type, ribl_type, ride_type, riwi_type, rile_type
-    integer(I4) :: riven(6), rivet(6)
+    integer(I4) :: ribk_type, ribt_type
+    integer(I4) :: riven(8), rivet(8)
     integer(I4) :: rive_view
     integer(I4), allocatable :: riv_txt_type(:)
     real(DP) :: intri_end, rive_multi, rive_etime, intri_step
     character(CHALEN) :: riwl_path, riwd_path, ribl_path, ride_path
-    character(CHALEN) :: riwi_path, rile_path, intri_path
+    character(CHALEN) :: riwi_path, rile_path, ribk_path, ribt_path, intri_path
     character(TIMELEN) :: riwl_unit, riwd_unit, ribl_unit, ride_unit
-    character(TIMELEN) :: riwi_unit, rile_unit
+    character(TIMELEN) :: riwi_unit, rile_unit, ribk_unit, ribt_unit
     character(:), allocatable :: mess_wl, mess_wd, mess_bl, mess_de, mess_wi, mess_le
+    character(:), allocatable :: mess_bk, mess_bt
     character(:), allocatable :: path_rive, mess_rive, err_mes, unit_rive
     logical, allocatable :: rive_mask(:)
-    namelist/inrive_type/riwl_type, riwd_type, ribl_type, ride_type, riwi_type, rile_type
-    namelist/inrive_path/riwl_path, riwd_path, ribl_path, ride_path, riwi_path, rile_path
-    namelist/inrive_unit/riwl_unit, riwd_unit, ribl_unit, ride_unit, riwi_unit, rile_unit
+    namelist/inrive_type/riwl_type, riwd_type, ribl_type, ride_type, riwi_type, rile_type,&
+                         ribk_type, ribt_type
+    namelist/inrive_path/riwl_path, riwd_path, ribl_path, ride_path, riwi_path, rile_path,&
+                         ribk_path, ribt_path
+    namelist/inrive_unit/riwl_unit, riwd_unit, ribl_unit, ride_unit, riwi_unit, rile_unit,&
+                         ribk_unit, ribt_unit
     !-------------------------------------------------------------------------------------------
     riwl_type = 0 ; riwd_type = 0 ; ribl_type = 0 ; ride_type = 0 ; riwi_type = 0
-    rile_type = 0
+    rile_type = 0 ; ribk_type = 0 ; ribt_type = 0
     riwl_path = "" ; riwd_path = "" ; ribl_path = "" ; ride_path = "" ; riwi_path = ""
-    rile_path = ""
+    rile_path = "" ; ribk_path = "" ; ribt_path = ""
     riwl_unit = "" ; riwd_unit = "" ; ribl_unit = "" ; ride_unit = "" ; riwi_unit = ""
-    rile_unit = ""
-    riwlv = 0 ; riwdv = 0 ; riblv = 0 ; ridev = 0 ; riwiv = 0 ; rilev = 0
+    rile_unit = "" ; ribk_unit = "" ; ribt_unit = ""
+    wlv = 0 ; wdv = 0 ; blv = 0 ; dev = 0 ; wiv = 0 ; lev = 0 ; bkv = 0 ; btv = 0
 
     if (st_mpi%rank == 0) then
       ! -- Open new read text file (new_rtxt)
@@ -1553,12 +1559,15 @@ module open_file
     end if
 
     allocate(character(0) :: mess_wl, mess_wd, mess_bl, mess_de, mess_wi, mess_le)
+    allocate(character(0) :: mess_bk, mess_bt)
     mess_wl = "input river water level"
     mess_wd = "input river water depth"
     mess_bl = "input river bottom level"
     mess_de = "input river depth"
     mess_wi = "input river width"
     mess_le = "input river length"
+    mess_bk = "input river bed conductivity"
+    mess_bt = "input river bed thickness"
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
@@ -1569,19 +1578,29 @@ module open_file
         call bcast_file(ride_type, ride_path, ride_unit, mess_de)
         call bcast_file(riwi_type, riwi_path, riwi_unit, mess_wi)
         call bcast_file(rile_type, rile_path, rile_unit, mess_le)
+        call bcast_file(ribk_type, ribk_path, ribk_unit, mess_bk)
+        call bcast_file(ribt_type, ribt_path, ribt_unit, mess_bt)
     end if
 #endif
 
+    if ((ribk_type > 0) .neqv. (ribt_type > 0)) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Specify both river bed conductivity and thickness in river file.")
+      end if
+    end if
+
     rivet(1) = riwl_type ; rivet(2) = riwd_type ; rivet(3) = ribl_type
     rivet(4) = ride_type ; rivet(5) = riwi_type ; rivet(6) = rile_type
+    rivet(7) = ribk_type ; rivet(8) = ribt_type
     riven(1) = 0 ; riven(2) = 0 ; riven(3) = 0
     riven(4) = 0 ; riven(5) = 0 ; riven(6) = 0
+    riven(7) = 0 ; riven(8) = 0
 
     allocate(character(0) :: err_mes, path_rive, mess_rive, unit_rive)
     allocate(riv_txt_type(3), rive_mask(3))
     riv_txt_type(:) = [in_type(1:3)]
 
-    do i = 1, 6
+    do i = 1, 8
       rive_totn = 0
       rive_mask(:) = (rivet(i) /= riv_txt_type(:))
       if (all(rive_mask) .and. rivet(i) /= in_type(4) .and. rivet(i) /= in_type(7)) then
@@ -1609,6 +1628,12 @@ module open_file
       case (6)
         path_rive = trim(adjustl(rile_path)) ; mess_rive = mess_le ; unit_rive = rile_unit
         deallocate(mess_le)
+      case (7)
+        path_rive = trim(adjustl(ribk_path)) ; mess_rive = mess_bk ; unit_rive = ribk_unit
+        deallocate(mess_bk)
+      case (8)
+        path_rive = trim(adjustl(ribt_path)) ; mess_rive = mess_bt ; unit_rive = ribt_unit
+        deallocate(mess_bt)
       case default
 
       end select
@@ -1766,7 +1791,7 @@ module open_file
         st_riwl%etime = rive_etime ; st_step_flag%riwl = rive_stepflag
         st_riwl%inttype = intri_type
 #ifdef MPI_MSG
-        riwlv = rive_view
+        wlv = rive_view
 #endif
         if (rivet(i) == in_type(7)) then
           st_riwl%fnum = intri_num ; st_riwl%intpath = trim(adjustl(intri_path))
@@ -1779,7 +1804,7 @@ module open_file
         st_riwd%etime = rive_etime ; st_step_flag%riwd = rive_stepflag
         st_riwd%inttype = intri_type
 #ifdef MPI_MSG
-        riwdv = rive_view
+        wdv = rive_view
 #endif
         if (rivet(i) == in_type(7)) then
           st_riwd%fnum = intri_num ; st_riwd%intpath = trim(adjustl(intri_path))
@@ -1792,7 +1817,7 @@ module open_file
         st_ribl%etime = rive_etime ; st_step_flag%ribl = rive_stepflag
         st_ribl%inttype = intri_type
 #ifdef MPI_MSG
-        riblv = rive_view
+        blv = rive_view
 #endif
         if (rivet(i) == in_type(7)) then
           st_ribl%fnum = intri_num ; st_ribl%intpath = trim(adjustl(intri_path))
@@ -1805,7 +1830,7 @@ module open_file
         st_ride%etime = rive_etime ; st_step_flag%ride = rive_stepflag
         st_ride%inttype = intri_type
 #ifdef MPI_MSG
-        ridev = rive_view
+        dev = rive_view
 #endif
         if (rivet(i) == in_type(7)) then
           st_ride%fnum = intri_num ; st_ride%intpath = trim(adjustl(intri_path))
@@ -1818,7 +1843,7 @@ module open_file
         st_riwi%etime = rive_etime ; st_step_flag%riwi = rive_stepflag
         st_riwi%inttype = intri_type
 #ifdef MPI_MSG
-        riwiv = rive_view
+        wiv = rive_view
 #endif
         if (rivet(i) == in_type(7)) then
           st_riwi%fnum = intri_num ; st_riwi%intpath = trim(adjustl(intri_path))
@@ -1831,13 +1856,39 @@ module open_file
         st_rile%etime = rive_etime ; st_step_flag%rile = rive_stepflag
         st_rile%inttype = intri_type
 #ifdef MPI_MSG
-        rilev = rive_view
+        lev = rive_view
 #endif
         if (rivet(i) == in_type(7)) then
           st_rile%fnum = intri_num ; st_rile%intpath = trim(adjustl(intri_path))
           st_rile%intstep = intri_step ; st_rile%intfnum = riven(i)
         else
           st_rile%fnum = riven(i)
+        end if
+      case (7)
+        st_ribk%multi = rive_multi ; st_ribk%totn = rive_totn
+        st_ribk%etime = rive_etime ; st_step_flag%ribk = rive_stepflag
+        st_ribk%inttype = intri_type
+#ifdef MPI_MSG
+        bkv = rive_view
+#endif
+        if (rivet(i) == in_type(7)) then
+          st_ribk%fnum = intri_num ; st_ribk%intpath = trim(adjustl(intri_path))
+          st_ribk%intstep = intri_step ; st_ribk%intfnum = riven(i)
+        else
+          st_ribk%fnum = riven(i)
+        end if
+      case (8)
+        st_ribt%multi = rive_multi ; st_ribt%totn = rive_totn
+        st_ribt%etime = rive_etime ; st_step_flag%ribt = rive_stepflag
+        st_ribt%inttype = intri_type
+#ifdef MPI_MSG
+        btv = rive_view
+#endif
+        if (rivet(i) == in_type(7)) then
+          st_ribt%fnum = intri_num ; st_ribt%intpath = trim(adjustl(intri_path))
+          st_ribt%intstep = intri_step ; st_ribt%intfnum = riven(i)
+        else
+          st_ribt%fnum = riven(i)
         end if
       end select
 
@@ -1846,6 +1897,7 @@ module open_file
     st_rivf_type%wlev = riwl_type ; st_rivf_type%wdep = riwd_type
     st_rivf_type%blev = ribl_type ; st_rivf_type%dept = ride_type
     st_rivf_type%widt = riwi_type ; st_rivf_type%leng = rile_type
+    st_rivf_type%bedk = ribk_type ; st_rivf_type%bedt = ribt_type
 
     deallocate(riv_txt_type)
     deallocate(rive_mask)

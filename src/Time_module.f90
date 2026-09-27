@@ -6,8 +6,8 @@ module time_module
   use utility_module, only: st_mpi
   use initial_module, only: st_sim, st_ctrl, st_in_type, st_rivf_type, st_lakf_type, st_seal
   use initial_module, only: st_rech, st_prec, st_evap, st_well, st_riwl, st_riwd, st_ribl
-  use initial_module, only: st_ride, st_riwi, st_rile, st_lawl, st_lawd, st_labl, st_laar
-  use initial_module, only: st_step_flag
+  use initial_module, only: st_ride, st_riwi, st_rile, st_ribk, st_ribt, st_lawl, st_lawd
+  use initial_module, only: st_labl, st_laar, st_step_flag
   use open_file, only: st_intre, st_intpr, st_intev
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc, ncals
@@ -641,6 +641,70 @@ module time_module
       end if
     end if
 
+    if (st_step_flag%ribk == 1) then
+      bound_name = "river bed conductivity"
+      if (st_rivf_type%bedk /= in_type(7)) then
+        ! -- Read next time (next)
+          call read_next(st_rivf_type%bedk, st_ribk%fnum, st_ribk%multi, bound_name,&
+                         st_ribk%totn, st_step_flag%ribk, ierr, st_ribk%etime)
+      else if (st_rivf_type%bedk == in_type(7)) then
+        ! -- Read next time for time interval file (intn)
+          call read_intn(st_ribk%inttype, st_ribk%intfnum, st_ribk%multi, st_ribk%intstep,&
+                         bound_name, st_ribk%fnum, st_step_flag%ribk, ierr, st_ribk%etime)
+#ifdef MPI_MSG
+        ! -- Set real4 file view (real4_fview)
+          call set_real4_fview(st_ribk%fnum, rfview%bk, bound_name)
+#endif
+      end if
+
+      if (ierr /= 0) then
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
+          call write_logf(err_mes)
+        end if
+        st_step_flag%ribk = 0
+        st_ribk%etime = st_sim%end_time
+      else
+        if (st_ribk%totn > 0) then
+          deallocate(st_rive%cflag%bk, st_rive%calc%bk)
+        end if
+      end if
+    end if
+
+    if (st_step_flag%ribt == 1) then
+      bound_name = "river bed thickness"
+      if (st_rivf_type%bedt /= in_type(7)) then
+        ! -- Read next time (next)
+          call read_next(st_rivf_type%bedt, st_ribt%fnum, st_ribt%multi, bound_name,&
+                         st_ribt%totn, st_step_flag%ribt, ierr, st_ribt%etime)
+      else if (st_rivf_type%bedt == in_type(7)) then
+        ! -- Read next time for time interval file (intn)
+          call read_intn(st_ribt%inttype, st_ribt%intfnum, st_ribt%multi, st_ribt%intstep,&
+                         bound_name, st_ribt%fnum, st_step_flag%ribt, ierr, st_ribt%etime)
+#ifdef MPI_MSG
+        ! -- Set real4 file view (real4_fview)
+          call set_real4_fview(st_ribt%fnum, rfview%bt, bound_name)
+#endif
+      end if
+
+      if (ierr /= 0) then
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
+          call write_logf(err_mes)
+        end if
+        st_step_flag%ribt = 0
+        st_ribt%etime = st_sim%end_time
+      else
+        if (st_ribt%totn > 0) then
+          deallocate(st_rive%cflag%bt, st_rive%calc%bt)
+        end if
+      end if
+    end if
+
     if (st_step_flag%lawl == 1) then
       bound_name = "lake water level"
       if (st_lakf_type%wlev /= in_type(7)) then
@@ -786,10 +850,10 @@ module time_module
     ! -- local
     real(DP) :: min_step, min_otime
     !-------------------------------------------------------------------------------------------
-    min_step = min(st_rech%etime, st_well%etime, st_seal%etime, st_prec%etime,&
-                   st_evap%etime, st_riwl%etime, st_riwd%etime, st_ribl%etime,&
-                   st_ride%etime, st_riwi%etime, st_rile%etime, st_lawl%etime,&
-                   st_lawd%etime, st_labl%etime, st_laar%etime)
+    min_step = min(st_rech%etime, st_well%etime, st_seal%etime, st_prec%etime, st_evap%etime,&
+                   st_riwl%etime, st_riwd%etime, st_ribl%etime, st_ride%etime, st_riwi%etime,&
+                   st_rile%etime, st_ribk%etime, st_ribt%etime, st_lawl%etime, st_lawd%etime,&
+                   st_labl%etime, st_laar%etime)
     if (min_step <= st_time%current_t) then
       min_step = st_sim%end_time
     end if
@@ -832,6 +896,7 @@ module time_module
     use assign_boundary, only: assign_sealv, assign_surfbv, assign_wellv, assign_rilav
     use calc_boundary, only: calc_reprev, conv_rech2calc, count_rivecalc, count_lakecalc
     use calc_boundary, only: calc_wlbd, calc_rivea
+    use set_boundary, only: set_rive_bed
 #ifdef MPI_MSG
     use mpi_utility, only: mpisum_val
 #endif
@@ -1047,6 +1112,44 @@ module time_module
       st_step_flag%rile = 1
     end if
 
+    if (st_step_flag%ribk == 1) then
+      if (st_ribk%totn > 0) then
+        allocate(st_rive%cflag%bk(ncals), st_rive%calc%bk(ncals))
+        !$omp parallel do private(i)
+        do i = 1, ncals
+          st_rive%cflag%bk(i) = 0
+          st_rive%calc%bk(i) = SNOVAL
+        end do
+        !$omp end parallel do
+      end if
+      ! -- Assign river bed conductivity value
+        call assign_rilav(st_rivf_type%bedk, 0, st_ribk, st_rive%num%bk, st_rive%cflag%bk,&
+                          st_rive%calc%bk)
+
+      st_step_flag%ribk = 0 ; rive_stepflag = rive_stepflag + 1
+    else if (st_ribk%etime == next_time) then
+      st_step_flag%ribk = 1
+    end if
+
+    if (st_step_flag%ribt == 1) then
+      if (st_ribt%totn > 0) then
+        allocate(st_rive%cflag%bt(ncals), st_rive%calc%bt(ncals))
+        !$omp parallel do private(i)
+        do i = 1, ncals
+          st_rive%cflag%bt(i) = 0
+          st_rive%calc%bt(i) = SNOVAL
+        end do
+        !$omp end parallel do
+      end if
+      ! -- Assign river bed thickness value
+        call assign_rilav(st_rivf_type%bedt, 0, st_ribt, st_rive%num%bt, st_rive%cflag%bt,&
+                          st_rive%calc%bt)
+
+      st_step_flag%ribt = 0 ; rive_stepflag = rive_stepflag + 1
+    else if (st_ribt%etime == next_time) then
+      st_step_flag%ribt = 1
+    end if
+
     if (rive_aflag > 0) then
       !$omp parallel do private(i)
       do i = 1, ncals
@@ -1077,6 +1180,8 @@ module time_module
         call count_rivecalc(st_rive%cflag%wl, st_rive%cflag%bl, st_rive%cflag%ar,&
                             st_rive%calc%wl, st_rive%calc%bl, st_rive%calc%ar,&
                             st_bcnd%rive_num)
+      ! -- Set river bed conductivity and thickness (rive_bed)
+        call set_rive_bed()
       if (st_bcnd%rive_num /= 0) then
         deallocate(st_forc%abyd_rive)
         allocate(st_forc%abyd_rive(st_bcnd%rive_num))
@@ -1085,9 +1190,15 @@ module time_module
           st_forc%abyd_rive(i) = DZERO
         end do
         !$omp end parallel do
-        ! -- Set surface&recharge area and area by distance (srabyd)
-          call set_srabyd(st_bcnd%rive_num, st_forc%rive_bott, st_forc%rive_area,&
-                        st_bcnd%rive2cals, st_forc%abyd_rive)
+        if (allocated(st_forc%rive_bedt)) then
+          ! -- Set surface&recharge area and area by distance (srabyd)
+            call set_srabyd(st_bcnd%rive_num, st_forc%rive_bott, st_forc%rive_area,&
+                            st_bcnd%rive2cals, st_forc%abyd_rive, st_forc%rive_bedt)
+        else
+          ! -- Set surface&recharge area and area by distance (srabyd)
+            call set_srabyd(st_bcnd%rive_num, st_forc%rive_bott, st_forc%rive_area,&
+                            st_bcnd%rive2cals, st_forc%abyd_rive)
+        end if
       end if
     end if
 
@@ -1417,11 +1528,11 @@ module time_module
     integer(I4) :: conv_fnum
     character(9) :: cond_format
     !-------------------------------------------------------------------------------------------
-    bchange = st_step_flag%rech + st_step_flag%well + st_step_flag%seal +&
-              st_step_flag%prec + st_step_flag%evap + st_step_flag%riwl +&
-              st_step_flag%riwd + st_step_flag%ribl + st_step_flag%ride +&
-              st_step_flag%riwi + st_step_flag%rile + st_step_flag%lawl +&
-              st_step_flag%lawd + st_step_flag%labl + st_step_flag%laar
+    bchange = st_step_flag%rech + st_step_flag%well + st_step_flag%seal + st_step_flag%prec +&
+              st_step_flag%evap + st_step_flag%riwl + st_step_flag%riwd + st_step_flag%ribl +&
+              st_step_flag%ride + st_step_flag%riwi + st_step_flag%rile + st_step_flag%ribk +&
+              st_step_flag%ribt + st_step_flag%lawl + st_step_flag%lawd + st_step_flag%labl +&
+              st_step_flag%laar
 
     conv_fnum = st_out_fnum%conv ; cond_format = "(a,f10.3)"
 
@@ -1459,6 +1570,12 @@ module time_module
     end if
     if (st_step_flag%rile == 1) then
       write(conv_fnum,cond_format) "Changed river length at ", st_time%now_time
+    end if
+    if (st_step_flag%ribk == 1) then
+      write(conv_fnum,cond_format) "Changed river bed conductivity at ", st_time%now_time
+    end if
+    if (st_step_flag%ribt == 1) then
+      write(conv_fnum,cond_format) "Changed river bed thickness at ", st_time%now_time
     end if
     if (st_step_flag%lawl == 1) then
       write(conv_fnum,cond_format) "Changed lake water level at ", st_time%now_time
@@ -1532,6 +1649,14 @@ module time_module
     !$omp section
     if (st_step_flag%rile == 1) then
       st_step_flag%rile = 0
+    end if
+    !$omp section
+    if (st_step_flag%ribk == 1) then
+      st_step_flag%ribk = 0
+    end if
+    !$omp section
+    if (st_step_flag%ribt == 1) then
+      st_step_flag%ribt = 0
     end if
     !$omp section
     if (st_step_flag%lawl == 1) then
@@ -1676,11 +1801,11 @@ module time_module
     integer(I4) :: step_flag
     logical :: out_flag
     !-------------------------------------------------------------------------------------------
-    step_flag = st_step_flag%rech + st_step_flag%well + st_step_flag%seal +&
-                st_step_flag%prec + st_step_flag%evap + st_step_flag%riwl +&
-                st_step_flag%riwd + st_step_flag%ribl + st_step_flag%ride +&
-                st_step_flag%riwi + st_step_flag%rile + st_step_flag%lawl +&
-                st_step_flag%lawd + st_step_flag%labl + st_step_flag%laar
+    step_flag = st_step_flag%rech + st_step_flag%well + st_step_flag%seal + st_step_flag%prec +&
+                st_step_flag%evap + st_step_flag%riwl + st_step_flag%riwd + st_step_flag%ribl +&
+                st_step_flag%ride + st_step_flag%riwi + st_step_flag%rile + st_step_flag%ribk +&
+                st_step_flag%ribt + st_step_flag%lawl + st_step_flag%lawd + st_step_flag%labl +&
+                st_step_flag%laar
 
     if (st_sim%sim_type == 1 .and. step_flag > 0) then
       out_flag = .true.

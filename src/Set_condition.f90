@@ -2541,7 +2541,7 @@ module set_condition
 
   end subroutine set_wellconn
 
-  subroutine set_srabyd(surfn, bott_s, area_s, surf2surf, abyd_surftemp)
+  subroutine set_srabyd(surfn, bott_s, area_s, surf2surf, abyd_surftemp, thick_s)
   !*********************************************************************************************
   ! set_srabyd -- Set surface&recharge area and area by distance
   !*********************************************************************************************
@@ -2551,6 +2551,7 @@ module set_condition
     integer(I4), intent(in) :: surfn, surf2surf(:)
     real(DP), intent(in) :: bott_s(:), area_s(:)
     real(DP), intent(out) :: abyd_surftemp(:)
+    real(DP), intent(in), optional :: thick_s(:)
     ! -- local
     integer(I4) :: i, s
     real(DP) :: dis_s, dis_h
@@ -2567,6 +2568,11 @@ module set_condition
       case default
         dis_s = abs(bott_s(i) - st_geom%cell_cent(s))
       end select
+      if (present(thick_s)) then
+        if (thick_s(i) > DZERO) then
+          dis_s = thick_s(i)
+        end if
+      end if
       abyd_surftemp(i) = abs(area_s(i))/dis_s
       st_hydr%surf_area(s) = st_hydr%surf_area(s) - area_s(i)
       st_hydr%rech_area(s) = st_hydr%rech_area(s) - area_s(i)

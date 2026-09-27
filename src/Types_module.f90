@@ -41,6 +41,7 @@ module types_module
     integer(I4) :: stor_type = 1
     integer(I4) :: abyd_type = 0
     integer(I4) :: surfw_type = 0
+    integer(I4) :: rbed_type = 0
     real(DP) :: abyd_ratio = 0.00_DP
     real(DP) :: krlin_head = 0.00_DP
   end type schm_set
@@ -85,7 +86,7 @@ module types_module
   end type geog_in
 
   type :: rive_in
-    integer(I4) :: wlev, wdep, blev, dept, widt, leng
+    integer(I4) :: wlev, wdep, blev, dept, widt, leng, bedk, bedt
   end type rive_in
 
   type :: lake_in
@@ -185,7 +186,7 @@ module types_module
   end type surfw_set
 
   type :: step_flag
-    integer(I4) :: seal, rech, well, prec, evap, riwl, riwd, ribl, ride, riwi, rile
+    integer(I4) :: seal, rech, well, prec, evap, riwl, riwd, ribl, ride, riwi, rile, ribk, ribt
     integer(I4) :: lawl, lawd, labl, laar
   end type step_flag
 
@@ -249,6 +250,7 @@ module types_module
     real(DP), allocatable :: read_head(:), abyd_rive(:), abyd_lake(:)
     real(DP), allocatable :: calc_rech(:)
     real(DP), allocatable :: rive_head(:), rive_bott(:), rive_area(:)
+    real(DP), allocatable :: rive_hydk(:), rive_bedt(:)
     real(DP), allocatable :: lake_head(:), lake_bott(:), lake_area(:)
     real(DP), allocatable :: read_seal(:)
     real(SP), allocatable :: read_rech(:), read_well(:)
@@ -257,15 +259,15 @@ module types_module
   end type forc_set
 
   type :: bflag_set
-    integer(I4), allocatable :: wl(:), wd(:), bl(:), de(:), wi(:), le(:), ar(:)
+    integer(I4), allocatable :: wl(:), wd(:), bl(:), de(:), wi(:), le(:), ar(:), bk(:), bt(:)
   end type bflag_set
 
   type :: bcalc_set
-    real(DP), allocatable :: wl(:), wd(:), bl(:), de(:), wi(:), le(:), ar(:)
+    real(DP), allocatable :: wl(:), wd(:), bl(:), de(:), wi(:), le(:), ar(:), bk(:), bt(:)
   end type bcalc_set
 
   type :: bcount_set
-    integer(I4) :: wl = 0, wd = 0, bl = 0, de = 0, wi = 0, le = 0, ar = 0
+    integer(I4) :: wl = 0, wd = 0, bl = 0, de = 0, wi = 0, le = 0, ar = 0, bk = 0, bt = 0
   end type bcount_set
 
   type :: rlbc_set
@@ -275,7 +277,7 @@ module types_module
   end type rlbc_set
 
   type :: bfview_set
-    integer(I4) :: wl = 0, wd = 0, bl = 0, de = 0, wi = 0, le = 0, ar = 0
+    integer(I4) :: wl = 0, wd = 0, bl = 0, de = 0, wi = 0, le = 0, ar = 0, bk = 0, bt = 0
   end type bfview_set
 
   type :: bound_fview

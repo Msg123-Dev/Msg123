@@ -162,11 +162,11 @@ module check_simulation
     ! -- local
     integer(I4) :: step_flag
     !-------------------------------------------------------------------------------------------
-    step_flag = st_step_flag%rech + st_step_flag%well + st_step_flag%seal +&
-                st_step_flag%prec + st_step_flag%evap + st_step_flag%riwl +&
-                st_step_flag%riwd + st_step_flag%ribl + st_step_flag%ride +&
-                st_step_flag%riwi + st_step_flag%rile + st_step_flag%lawl +&
-                st_step_flag%lawd + st_step_flag%labl + st_step_flag%laar
+    step_flag = st_step_flag%rech + st_step_flag%well + st_step_flag%seal + st_step_flag%prec +&
+                st_step_flag%evap + st_step_flag%riwl + st_step_flag%riwd + st_step_flag%ribl +&
+                st_step_flag%ride + st_step_flag%riwi + st_step_flag%rile + st_step_flag%ribk +&
+                st_step_flag%ribt + st_step_flag%lawl + st_step_flag%lawd + st_step_flag%labl +&
+                st_step_flag%laar
 
     if (step_flag > 0) then
       write_flag = 1

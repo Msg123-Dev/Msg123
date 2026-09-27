@@ -492,7 +492,7 @@ module calc_function
     real(DP), intent(inout) :: rivfunc(:)
     ! -- local
     integer(I4) :: i, s
-    real(DP) :: head_eff
+    real(DP) :: head_eff, bott_eff
     !-------------------------------------------------------------------------------------------
     !$omp parallel
     !$omp do private(i)
@@ -501,11 +501,16 @@ module calc_function
     end do
     !$omp end do
 
-    !$omp do private(i, s, head_eff)
+    !$omp do private(i, s, head_eff, bott_eff)
     do i = 1, st_bcnd%rive_num
       s = st_bcnd%rive2cals(i)
       head_eff = max(st_forc%rive_head(i), st_forc%rive_bott(i))
-      delh_r(i) = head_eff - max(infrive(s), st_forc%rive_bott(i) - st_forc%rive_bedt(i))
+      if (st_forc%rive_head(i) > st_forc%rive_bott(i)) then
+        bott_eff = st_forc%rive_bott(i) - st_forc%rive_bedt(i)
+      else
+        bott_eff = st_forc%rive_bott(i)
+      end if
+      delh_r(i) = head_eff - max(infrive(s), bott_eff)
 
       rivfunc(s) = st_forc%rive_hydk(i)*st_forc%abyd_rive(i)*delh_r(i)*rperm(s)
     end do

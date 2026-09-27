@@ -73,7 +73,7 @@ module make_amg_matrix
   ! make_grapfilt -- Make graph for next coase level matrix by filtering
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: FACE, DTWO
+    use constval_module, only: DTWO
     ! -- inout
 
     ! -- local
@@ -81,7 +81,8 @@ module make_amg_matrix
     real(DP) :: ddmat, lulumat
     !-------------------------------------------------------------------------------------------
     allocate(temp_dmat(nfine))
-    allocate(aggr_luflag(nfine), nonaggr_lu(nfine*FACE), nonaggr_index(0:nfine))
+    allocate(aggr_luflag(nfine), nonaggr_index(0:nfine))
+    allocate(nonaggr_lu(crs_index(amglev-1)%offind(nfine)))
     !$omp parallel
     !$omp do private(i)
     do i = 1, nfine
@@ -90,7 +91,7 @@ module make_amg_matrix
     end do
     !$omp end do
     !$omp do private(i)
-    do i = 1, nfine*FACE
+    do i = 1, size(nonaggr_lu)
       nonaggr_lu(i) = 0
     end do
     !$omp end do
@@ -195,7 +196,7 @@ module make_amg_matrix
 
     ! aggregate check
     aggre_check: do i = 1, nfine
-      if (aggr_luflag(i) == 0) then
+      if (aggr_num(i) == 0) then
         do k = nonaggr_index(i-1)+1, nonaggr_index(i)
           j = crs_index(amglev-1)%offrow(nonaggr_lu(k))
           if (j > nfine) then
@@ -643,6 +644,10 @@ module make_amg_matrix
           end do
         end do
 
+        if (coase_index+node_size > size(new_row)) then
+          ! -- Grow galerkin work arrays (galerkin)
+            call grow_galerkin(coase_index+node_size, new_row, new_col, new_lumat)
+        end if
         do j = 1, node_size
           if (i /= temp_node(j)) then
             new_tconn_num = new_tconn_num + 1
@@ -688,6 +693,34 @@ module make_amg_matrix
     deallocate(new_row, new_col, new_lumat)
 
   end subroutine make_galerkin
+
+  subroutine grow_galerkin(need, new_row, new_col, new_lumat)
+  !*********************************************************************************************
+  ! grow_galerkin -- Grow galerkin work arrays
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(in) :: need
+    integer(I4), allocatable, intent(inout) :: new_row(:), new_col(:)
+    real(DP), allocatable, intent(inout) :: new_lumat(:)
+    ! -- local
+    integer(I4) :: nsize
+    integer(I4), allocatable :: temp_int(:)
+    real(DP), allocatable :: temp_real(:)
+    !-------------------------------------------------------------------------------------------
+    nsize = max(need, 2*size(new_row))
+    allocate(temp_int(nsize))
+    temp_int(:) = 0 ; temp_int(1:size(new_row)) = new_row(:)
+    call move_alloc(temp_int, new_row)
+    allocate(temp_int(nsize))
+    temp_int(:) = 0 ; temp_int(1:size(new_col)) = new_col(:)
+    call move_alloc(temp_int, new_col)
+    allocate(temp_real(nsize))
+    temp_real(:) = DZERO ; temp_real(1:size(new_lumat)) = new_lumat(:)
+    call move_alloc(temp_real, new_lumat)
+
+  end subroutine grow_galerkin
 
   subroutine remove_enter_quedeep(n)
   !*********************************************************************************************

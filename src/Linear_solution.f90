@@ -625,11 +625,16 @@ module linear_solution
     type(amgt_set), intent(inout) :: st_amgt
     ! -- local
     integer(I4) :: i, j, k, d_size, lu_size, reg_size
-    integer(I4) :: mgd_size, mgreg_size
+    integer(I4) :: mgd_size, mgreg_size, lu_max
     integer(I4) :: v_iter, vlevel, ncoa, nfin
     integer(I4) :: rst, ren, pst, pen
     !-------------------------------------------------------------------------------------------
     mgd_size = crs_index(alevel)%unknow ; mgreg_size = size(array_var(alevel)%x)
+    lu_max = maxval(crs_index(alevel:st_ctrl%nlevel)%lunum)
+    if (lu_max > size(st_amgt%tmp_lumat)) then
+      deallocate(st_amgt%tmp_lumat)
+      allocate(st_amgt%tmp_lumat(lu_max))
+    end if
     !$omp parallel
     !$omp do private(i)
     do i = 1, mgd_size
@@ -1009,7 +1014,7 @@ module linear_solution
       off_end = crs_index(plevel)%offind(i)
       do k = off_sta, off_end
         offr = crs_index(plevel)%offrow(k)
-        if (3 >= dir_conn(k)) then
+        if (offr < i) then
           temp_outx = temp_outx - inlumat(k)*outx(offr)
         end if
       end do
@@ -1025,7 +1030,7 @@ module linear_solution
       off_end = crs_index(plevel)%offind(i)
       do k = off_sta, off_end
         offr = crs_index(plevel)%offrow(k)
-        if (3 < dir_conn(k)) then
+        if (offr > i) then
           temp_outx = temp_outx + inlumat(k)*outx(offr)
         end if
       end do

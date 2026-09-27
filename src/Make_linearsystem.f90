@@ -362,7 +362,7 @@ module make_linearsystem
     real(DP), intent(out) :: rel_riv(:), tran_riv(:)
     ! -- local
     integer(I4) :: i, s
-    real(DP) :: head_eff
+    real(DP) :: head_eff, bott_eff
     !-------------------------------------------------------------------------------------------
     !$omp parallel
     !$omp do private(i)
@@ -372,19 +372,24 @@ module make_linearsystem
       tran_riv(i) = DZERO
     end do
     !$omp end do
-    !$omp do private(i, s, head_eff)
+    !$omp do private(i, s, head_eff, bott_eff)
     do i = 1, st_bcnd%rive_num
       s = st_bcnd%rive2cals(i)
       per_riv(i) = per_relp(s) ; rel_riv(i) = st_sol%rel_perm(s)
       dkr_riv(i) = dkr_dpsi(s)
       head_eff = max(st_forc%rive_head(i), st_forc%rive_bott(i))
+      if (st_forc%rive_head(i) > st_forc%rive_bott(i)) then
+        bott_eff = st_forc%rive_bott(i) - st_forc%rive_bedt(i)
+      else
+        bott_eff = st_forc%rive_bott(i)
+      end if
       tran_riv(i) = st_forc%rive_hydk(i)*st_forc%abyd_rive(i)
-      if (st_sol%head_new(s) >= st_forc%rive_bott(i) - st_forc%rive_bedt(i)) then
+      if (st_sol%head_new(s) >= bott_eff) then
         delh_r(i) = head_eff - st_sol%head_new(s)
         over_riv(i) = DONE
         deri_r(i) = -tran_riv(i)*rel_riv(i)
       else
-        delh_r(i) = head_eff - (st_forc%rive_bott(i) - st_forc%rive_bedt(i))
+        delh_r(i) = head_eff - bott_eff
         over_riv(i) = DZERO
         deri_r(i) = DZERO
       end if

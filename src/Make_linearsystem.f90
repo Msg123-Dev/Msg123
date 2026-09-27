@@ -379,12 +379,12 @@ module make_linearsystem
       dkr_riv(i) = dkr_dpsi(s)
       head_eff = max(st_forc%rive_head(i), st_forc%rive_bott(i))
       tran_riv(i) = st_forc%rive_hydk(i)*st_forc%abyd_rive(i)
-      if (st_sol%head_new(s) >= st_forc%rive_bott(i)) then
+      if (st_sol%head_new(s) >= st_forc%rive_bott(i) - st_forc%rive_bedt(i)) then
         delh_r(i) = head_eff - st_sol%head_new(s)
         over_riv(i) = DONE
         deri_r(i) = -tran_riv(i)*rel_riv(i)
       else
-        delh_r(i) = head_eff - st_forc%rive_bott(i)
+        delh_r(i) = head_eff - (st_forc%rive_bott(i) - st_forc%rive_bedt(i))
         over_riv(i) = DZERO
         deri_r(i) = DZERO
       end if

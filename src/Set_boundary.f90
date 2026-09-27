@@ -292,15 +292,9 @@ module set_boundary
         st_forc%abyd_rive(i) = DZERO
       end do
       !$omp end parallel do
-      if (allocated(st_forc%rive_bedt)) then
-        ! -- Set surface&recharge area and area by distance (srabyd)
-          call set_srabyd(st_bcnd%rive_num, st_forc%rive_bott, st_forc%rive_area,&
-                          st_bcnd%rive2cals, st_forc%abyd_rive, st_forc%rive_bedt)
-      else
-        ! -- Set surface&recharge area and area by distance (srabyd)
-          call set_srabyd(st_bcnd%rive_num, st_forc%rive_bott, st_forc%rive_area,&
-                          st_bcnd%rive2cals, st_forc%abyd_rive)
-      end if
+      ! -- Set surface&recharge area and area by distance (srabyd)
+        call set_srabyd(st_bcnd%rive_num, st_forc%rive_bott, st_forc%rive_area,&
+                        st_bcnd%rive2cals, st_forc%abyd_rive, st_forc%rive_bedt)
     end if
 
     if (st_bcnd%lake_num /= 0) then
@@ -902,21 +896,20 @@ module set_boundary
     if (allocated(st_forc%rive_bedt)) then
       deallocate(st_forc%rive_bedt)
     end if
-    allocate(st_forc%rive_hydk(st_bcnd%rive_num))
+    allocate(st_forc%rive_hydk(st_bcnd%rive_num), st_forc%rive_bedt(st_bcnd%rive_num))
     !$omp parallel do private(i)
     do i = 1, st_bcnd%rive_num
       st_forc%rive_hydk(i) = st_hydr%hydf_surf(st_bcnd%rive2cals(i))
+      st_forc%rive_bedt(i) = DZERO
     end do
     !$omp end parallel do
 
     if (st_rivf_type%bedk > 0) then
-      allocate(st_forc%rive_bedt(st_bcnd%rive_num))
       bed_flag = allocated(st_rive%cflag%bk) .and. allocated(st_rive%cflag%bt)
       miss_num = 0 ; bad_num = 0
       !$omp parallel do private(i, s) reduction(+:miss_num, bad_num)
       do i = 1, st_bcnd%rive_num
         s = st_bcnd%rive2cals(i)
-        st_forc%rive_bedt(i) = DZERO
         if (.not. bed_flag) then
           miss_num = miss_num + 1
         else if (st_rive%cflag%bk(s) /= 1 .or. st_rive%cflag%bt(s) /= 1) then

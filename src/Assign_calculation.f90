@@ -1,7 +1,7 @@
 module assign_calc
   ! -- modules
-  use kind_module, only: I4, SP
-  use constval_module, only: VARLEN, SZERO, SNOVAL
+  use kind_module, only: I4, SP, DP
+  use constval_module, only: VARLEN, SZERO, SNOVAL, DNOVAL
   use utility_module, only: st_mpi, close_file, write_err_stop, gmap_get
   use initial_module, only: in_type, st_grid, st_init
   use read_input, only: len_scal, len_scal_inv, z_base
@@ -344,7 +344,8 @@ module assign_calc
     integer(I4) :: i, j
     integer(I4), allocatable :: geo_fnum(:), geo_ftype(:)
     integer(I4), allocatable :: geo_cflag(:)
-    real(SP), allocatable :: geo_val(:)
+    real(DP), allocatable :: geo_val(:)
+    real(SP), allocatable :: geo_r4(:)
     !-------------------------------------------------------------------------------------------
     allocate(geo_fnum(3), geo_ftype(3))
     allocate(geo_cflag(ncals), st_hydr%surf_parm(ncals))
@@ -364,11 +365,19 @@ module assign_calc
     do i = 1, 3
       !$omp parallel do private(j)
       do j = 1, ncals
-        geo_val(j) = SNOVAL
+        geo_val(j) = DNOVAL
       end do
       !$omp end parallel do
 
-      call set_2dfile2cals(geo_fnum(i), geo_ftype(i), 0, SNOVAL, geo_val, geo_cflag, geog_num)
+      if (i < 3 .and. geo_ftype(i) == in_type(3)) then
+        call set_2dfile2cals(geo_fnum(i), geo_ftype(i), 0, DNOVAL, geo_val, geo_cflag, geog_num)
+      else
+        allocate(geo_r4(ncals))
+        geo_r4(:) = SNOVAL
+        call set_2dfile2cals(geo_fnum(i), geo_ftype(i), 0, SNOVAL, geo_r4, geo_cflag, geog_num)
+        geo_val(:) = geo_r4(:)
+        deallocate(geo_r4)
+      end if
 
       select case (i)
       case (1)
@@ -431,8 +440,6 @@ module assign_calc
   ! assign_initv -- Assign initial value
   !*********************************************************************************************
     ! -- modules
-    use kind_module, only: DP
-    use constval_module, only: DNOVAL
     use set_cell, only: get_calc_grid
 #ifdef MPI_MSG
     use mpi_utility, only: mpisum_val

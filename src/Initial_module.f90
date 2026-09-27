@@ -58,6 +58,7 @@ module initial_module
   type(surfb_set), public :: st_rech, st_prec, st_evap
   type(well_set), public :: st_well
   type(surfw_set), public :: st_riwl, st_riwd, st_ribl, st_ride, st_riwi, st_rile
+  type(surfw_set), public :: st_ribk, st_ribt
   type(surfw_set), public :: st_lawl, st_lawd, st_labl, st_laar
 
   type(step_flag), public :: st_step_flag
@@ -164,6 +165,7 @@ module initial_module
     st_geof_type%geoz = -1 ; st_geof_type%geor = -1 ; st_geof_type%geoa = -1
     st_rivf_type%wlev = -1 ; st_rivf_type%wdep = -1 ; st_rivf_type%blev = -1
     st_rivf_type%dept = -1 ; st_rivf_type%widt = -1 ; st_rivf_type%leng = -1
+    st_rivf_type%bedk = -1 ; st_rivf_type%bedt = -1
     st_lakf_type%wlev = -1 ; st_lakf_type%wdep = -1 ; st_lakf_type%blev = -1
     st_lakf_type%area = -1
 
@@ -171,22 +173,24 @@ module initial_module
     st_clas%totn = 0 ; st_retn%totn = 0 ; st_parm%totn = 0 ; st_seal%totn = 0
     st_rech%totn = 0 ; st_well%totn = 0 ; st_prec%totn = 0 ; st_evap%totn = 0
     st_riwl%totn = 0 ; st_riwd%totn = 0 ; st_ribl%totn = 0 ; st_ride%totn = 0
-    st_riwi%totn = 0 ; st_rile%totn = 0 ; st_lawl%totn = 0 ; st_lawd%totn = 0
-    st_labl%totn = 0 ; st_laar%totn = 0
+    st_riwi%totn = 0 ; st_rile%totn = 0 ; st_ribk%totn = 0 ; st_ribt%totn = 0
+    st_lawl%totn = 0 ; st_lawd%totn = 0 ; st_labl%totn = 0 ; st_laar%totn = 0
 
     ! end time of each variable
     st_seal%etime = SINFI ; st_rech%etime = SINFI ; st_well%etime = SINFI
     st_prec%etime = SINFI ; st_evap%etime = SINFI ; st_riwl%etime = SINFI
     st_riwd%etime = SINFI ; st_ribl%etime = SINFI ; st_ride%etime = SINFI
-    st_riwi%etime = SINFI ; st_rile%etime = SINFI ; st_lawl%etime = SINFI
-    st_lawd%etime = SINFI ; st_labl%etime = SINFI ; st_laar%etime = SINFI
+    st_riwi%etime = SINFI ; st_rile%etime = SINFI ; st_ribk%etime = SINFI
+    st_ribt%etime = SINFI ; st_lawl%etime = SINFI ; st_lawd%etime = SINFI
+    st_labl%etime = SINFI ; st_laar%etime = SINFI
 
     ! step flag of each variable
     st_step_flag%seal = 0 ; st_step_flag%rech = 0 ; st_step_flag%well = 0
     st_step_flag%prec = 0 ; st_step_flag%evap = 0 ; st_step_flag%riwl = 0
     st_step_flag%riwd = 0 ; st_step_flag%ribl = 0 ; st_step_flag%ride = 0
-    st_step_flag%riwi = 0 ; st_step_flag%rile = 0 ; st_step_flag%lawl = 0
-    st_step_flag%lawd = 0 ; st_step_flag%labl = 0 ; st_step_flag%laar = 0
+    st_step_flag%riwi = 0 ; st_step_flag%rile = 0 ; st_step_flag%ribk = 0
+    st_step_flag%ribt = 0 ; st_step_flag%lawl = 0 ; st_step_flag%lawd = 0
+    st_step_flag%labl = 0 ; st_step_flag%laar = 0
 
     ! output time of each variable
     st_out_step%head = SZERO ; st_out_step%rest = SZERO ; st_out_step%srat = SZERO
@@ -217,7 +221,7 @@ module initial_module
     ! input scheme file
     st_schm%krpos_type = 0 ; st_schm%stor_type = 1
     st_schm%abyd_type = 0 ; st_schm%abyd_ratio = DZERO
-    st_schm%krlin_head = DZERO ; st_schm%surfw_type = 0
+    st_schm%krlin_head = DZERO ; st_schm%surfw_type = 0 ; st_schm%rbed_type = 0
 
     ! time unit
     unit_list = ["SEC", "MIN", "HOU", "DAY", "YEA"]

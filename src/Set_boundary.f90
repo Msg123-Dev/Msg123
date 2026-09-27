@@ -1,13 +1,13 @@
 module set_boundary
   ! -- modules
   use kind_module, only: I4
-  use constval_module, only: SNOVAL
+  use constval_module, only: SNOVAL, DZERO
   use types_module, only: rlbc_set, bfview_set, bound_fview
   use utility_module, only: st_mpi, write_logf, write_err_stop, get_ilen, conv_i2s
   use initial_module, only: in_type, st_in_type, st_rivf_type, st_lakf_type, st_in_path
   use initial_module, only: st_in_unit
   use set_cell, only: ncals
-  use set_condition, only: st_bcnd
+  use set_condition, only: st_bcnd, st_hydr
   use assign_boundary, only: assign_surfbv, assign_rilav, st_forc
   use calc_boundary, only: conv_rech2calc, calc_wlbd, calc_blld, calc_lsurf
 #ifdef MPI_MSG
@@ -17,7 +17,7 @@ module set_boundary
 
   implicit none
   private
-  public :: set_bound
+  public :: set_bound, set_rive_bed
 
   type(rlbc_set), public :: st_rive, st_lake
 #ifdef MPI_MSG
@@ -36,10 +36,9 @@ module set_boundary
   ! set_bound -- Set boundary
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: DZERO
     use open_file, only: open_in_rivef, open_in_lakef
     use set_cell, only: ncalc
-    use set_condition, only: st_hydr, set_connect, set_srabyd, set_chabyd, set_wellconn
+    use set_condition, only: set_connect, set_srabyd, set_chabyd, set_wellconn
     use calc_boundary, only: calc_reprev, count_rivecalc, count_lakecalc, calc_rivea
 #ifdef MPI_MSG
    use mpi_set, only: bcast_bound_ftype, bcast_solval
@@ -49,7 +48,7 @@ module set_boundary
     ! -- local
     integer(I4) :: i
     integer(I4) :: sum_rechn, sum_precn, sum_evapn
-    integer(I4) :: rfv_wl, rfv_wd, rfv_bl, rfv_de, rfv_wi, rfv_le
+    integer(I4) :: rfv_wl, rfv_wd, rfv_bl, rfv_de, rfv_wi, rfv_le, rfv_bk, rfv_bt
     integer(I4) :: lfv_wl, lfv_wd, lfv_bl, lfv_ar
     character(:), allocatable :: num_str, err_mes
     !-------------------------------------------------------------------------------------------
@@ -109,13 +108,13 @@ module set_boundary
 #ifdef MPI_MSG
       ! -- Read input river file (inrivef)
         call open_in_rivef(st_in_path%rive, cals_r4view, cals_r4hview, rfv_wl, rfv_wd, rfv_bl,&
-                           rfv_de, rfv_wi, rfv_le)
+                           rfv_de, rfv_wi, rfv_le, rfv_bk, rfv_bt)
       rfview%wl = rfv_wl ; rfview%wd = rfv_wd ; rfview%bl = rfv_bl ; rfview%de = rfv_de
-      rfview%wi = rfv_wi ; rfview%le = rfv_le
+      rfview%wi = rfv_wi ; rfview%le = rfv_le ; rfview%bk = rfv_bk ; rfview%bt = rfv_bt
 #else
       ! -- Read input river file (inrivef)
         call open_in_rivef(st_in_path%rive, 0, 0, rfv_wl, rfv_wd, rfv_bl, rfv_de, rfv_wi,&
-                           rfv_le)
+                           rfv_le, rfv_bk, rfv_bt)
 #endif
     end if
 
@@ -173,6 +172,12 @@ module set_boundary
 
     ! -- Set river length information (rile_info)
       call set_rile_info()
+
+    ! -- Set river bed conductivity information (ribk_info)
+      call set_ribk_info()
+
+    ! -- Set river bed thickness information (ribt_info)
+      call set_ribt_info()
 
 #ifdef MPI_MSG
     ! -- Sum value for MPI (val)
@@ -277,6 +282,9 @@ module set_boundary
         call set_wellconn(st_bcnd%well_num, st_hydr%read_hydx, st_hydr%read_hydy)
     end if
 
+    ! -- Set river bed conductivity and thickness (rive_bed)
+      call set_rive_bed()
+
     if (st_bcnd%rive_num /= 0) then
       allocate(st_forc%abyd_rive(st_bcnd%rive_num))
       !$omp parallel do private(i)
@@ -284,9 +292,15 @@ module set_boundary
         st_forc%abyd_rive(i) = DZERO
       end do
       !$omp end parallel do
-      ! -- Set surface&recharge area and area by distance (srabyd)
-        call set_srabyd(st_bcnd%rive_num, st_forc%rive_bott, st_forc%rive_area,&
-                        st_bcnd%rive2cals, st_forc%abyd_rive)
+      if (allocated(st_forc%rive_bedt)) then
+        ! -- Set surface&recharge area and area by distance (srabyd)
+          call set_srabyd(st_bcnd%rive_num, st_forc%rive_bott, st_forc%rive_area,&
+                          st_bcnd%rive2cals, st_forc%abyd_rive, st_forc%rive_bedt)
+      else
+        ! -- Set surface&recharge area and area by distance (srabyd)
+          call set_srabyd(st_bcnd%rive_num, st_forc%rive_bott, st_forc%rive_area,&
+                          st_bcnd%rive2cals, st_forc%abyd_rive)
+      end if
     end if
 
     if (st_bcnd%lake_num /= 0) then
@@ -814,6 +828,136 @@ module set_boundary
     end if
 
   end subroutine set_rile_info
+
+  subroutine set_ribk_info()
+  !*********************************************************************************************
+  ! set_ribk_info -- Set river bed conductivity information
+  !*********************************************************************************************
+    ! -- modules
+    use initial_module, only: st_ribk
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i
+    !-------------------------------------------------------------------------------------------
+    if (st_ribk%totn > 0) then
+      allocate(st_rive%cflag%bk(ncals))
+      allocate(st_rive%calc%bk(ncals))
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        st_rive%cflag%bk(i) = 0
+        st_rive%calc%bk(i) = SNOVAL
+      end do
+      !$omp end parallel do
+      ! -- Assign river bed conductivity value
+        call assign_rilav(st_rivf_type%bedk, 0, st_ribk, st_rive%num%bk, st_rive%cflag%bk,&
+                          st_rive%calc%bk)
+    end if
+
+  end subroutine set_ribk_info
+
+  subroutine set_ribt_info()
+  !*********************************************************************************************
+  ! set_ribt_info -- Set river bed thickness information
+  !*********************************************************************************************
+    ! -- modules
+    use initial_module, only: st_ribt
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i
+    !-------------------------------------------------------------------------------------------
+    if (st_ribt%totn > 0) then
+      allocate(st_rive%cflag%bt(ncals))
+      allocate(st_rive%calc%bt(ncals))
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        st_rive%cflag%bt(i) = 0
+        st_rive%calc%bt(i) = SNOVAL
+      end do
+      !$omp end parallel do
+      ! -- Assign river bed thickness value
+        call assign_rilav(st_rivf_type%bedt, 0, st_ribt, st_rive%num%bt, st_rive%cflag%bt,&
+                          st_rive%calc%bt)
+    end if
+
+  end subroutine set_ribt_info
+
+  subroutine set_rive_bed()
+  !*********************************************************************************************
+  ! set_rive_bed -- Set river bed conductivity and thickness
+  !*********************************************************************************************
+    ! -- modules
+    use initial_module, only: st_schm
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i, s, miss_num, bad_num, sum_missn, sum_badn
+    logical :: bed_flag
+    character(:), allocatable :: num_str, err_mes
+    !-------------------------------------------------------------------------------------------
+    if (allocated(st_forc%rive_hydk)) then
+      deallocate(st_forc%rive_hydk)
+    end if
+    if (allocated(st_forc%rive_bedt)) then
+      deallocate(st_forc%rive_bedt)
+    end if
+    allocate(st_forc%rive_hydk(st_bcnd%rive_num))
+    !$omp parallel do private(i)
+    do i = 1, st_bcnd%rive_num
+      st_forc%rive_hydk(i) = st_hydr%hydf_surf(st_bcnd%rive2cals(i))
+    end do
+    !$omp end parallel do
+
+    if (st_rivf_type%bedk > 0) then
+      allocate(st_forc%rive_bedt(st_bcnd%rive_num))
+      bed_flag = allocated(st_rive%cflag%bk) .and. allocated(st_rive%cflag%bt)
+      miss_num = 0 ; bad_num = 0
+      !$omp parallel do private(i, s) reduction(+:miss_num, bad_num)
+      do i = 1, st_bcnd%rive_num
+        s = st_bcnd%rive2cals(i)
+        st_forc%rive_bedt(i) = DZERO
+        if (.not. bed_flag) then
+          miss_num = miss_num + 1
+        else if (st_rive%cflag%bk(s) /= 1 .or. st_rive%cflag%bt(s) /= 1) then
+          miss_num = miss_num + 1
+        else if (st_rive%calc%bk(s) < DZERO .or. st_rive%calc%bt(s) <= DZERO) then
+          bad_num = bad_num + 1
+        else
+          st_forc%rive_hydk(i) = st_rive%calc%bk(s)
+          st_forc%rive_bedt(i) = st_rive%calc%bt(s)
+        end if
+      end do
+      !$omp end parallel do
+#ifdef MPI_MSG
+      ! -- Sum value for MPI (val)
+        call mpisum_val(miss_num, "river cell without river bed", sum_missn)
+        call mpisum_val(bad_num, "river cell with invalid river bed", sum_badn)
+#else
+      sum_missn = miss_num ; sum_badn = bad_num
+#endif
+      if (st_mpi%rank == 0) then
+        if (sum_badn > 0) then
+          call write_err_stop("Input a non-negative river bed conductivity and a positive "//&
+                              "river bed thickness.")
+        else if (sum_missn > 0) then
+          allocate(character(get_ilen(sum_missn)) :: num_str)
+          allocate(character(0) :: err_mes)
+          call conv_i2s(sum_missn, num_str)
+          if (st_schm%rbed_type == 0) then
+            err_mes = "River bed conductivity or thickness is missing at "//num_str//&
+                      " river cells."
+            call write_err_stop(err_mes)
+          else
+            err_mes = "Used aquifer conductance at "//num_str//" river cells without river bed."
+            call write_logf(err_mes)
+          end if
+          deallocate(num_str, err_mes)
+        end if
+      end if
+    end if
+
+  end subroutine set_rive_bed
 
   subroutine set_lawl_info()
   !*********************************************************************************************

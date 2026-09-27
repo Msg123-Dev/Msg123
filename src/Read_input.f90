@@ -608,19 +608,22 @@ module read_input
 
     ! -- local
     integer(I4) :: ierr
-    integer(I4) :: krpos_type, stor_type, abyd_type, surfw_type
+    integer(I4) :: krpos_type, stor_type, abyd_type, surfw_type, rbed_type
     real(DP) :: abyd_ratio, krlin_head
-    namelist/set_scheme/krpos_type, stor_type, abyd_type, surfw_type, abyd_ratio, krlin_head
+    namelist/set_scheme/krpos_type, stor_type, abyd_type, surfw_type, abyd_ratio, krlin_head,&
+                        rbed_type
     !-------------------------------------------------------------------------------------------
     ierr = 0
     krpos_type = st_schm%krpos_type ; stor_type = st_schm%stor_type
     abyd_type = st_schm%abyd_type ; abyd_ratio = st_schm%abyd_ratio
     krlin_head = st_schm%krlin_head ; surfw_type = st_schm%surfw_type
+    rbed_type = st_schm%rbed_type
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_scheme,iostat=ierr)
     st_schm%krpos_type = krpos_type ; st_schm%stor_type = stor_type
     st_schm%abyd_type = abyd_type ; st_schm%abyd_ratio = abyd_ratio
     st_schm%krlin_head = krlin_head ; st_schm%surfw_type = surfw_type
+    st_schm%rbed_type = rbed_type
 
     if (ierr /= 0 .and. find_nml_name("set_scheme", main_name(1:main_namen))) then
       call write_err_stop("While reading scheme section in main file.")
@@ -642,6 +645,8 @@ module read_input
       call write_err_stop("Input a non-negative value for kr linear bridge head.")
     else if (st_schm%surfw_type < 0 .or. st_schm%surfw_type > 3) then
       call write_err_stop("Input a valid value for surface water level type.")
+    else if (st_schm%rbed_type < 0 .or. st_schm%rbed_type > 1) then
+      call write_err_stop("Input a valid value for river bed type.")
     end if
 
   end subroutine read_schm_list

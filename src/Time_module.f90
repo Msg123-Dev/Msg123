@@ -1190,15 +1190,9 @@ module time_module
           st_forc%abyd_rive(i) = DZERO
         end do
         !$omp end parallel do
-        if (allocated(st_forc%rive_bedt)) then
-          ! -- Set surface&recharge area and area by distance (srabyd)
-            call set_srabyd(st_bcnd%rive_num, st_forc%rive_bott, st_forc%rive_area,&
-                            st_bcnd%rive2cals, st_forc%abyd_rive, st_forc%rive_bedt)
-        else
-          ! -- Set surface&recharge area and area by distance (srabyd)
-            call set_srabyd(st_bcnd%rive_num, st_forc%rive_bott, st_forc%rive_area,&
-                            st_bcnd%rive2cals, st_forc%abyd_rive)
-        end if
+        ! -- Set surface&recharge area and area by distance (srabyd)
+          call set_srabyd(st_bcnd%rive_num, st_forc%rive_bott, st_forc%rive_area,&
+                          st_bcnd%rive2cals, st_forc%abyd_rive, st_forc%rive_bedt)
       end if
     end if
 

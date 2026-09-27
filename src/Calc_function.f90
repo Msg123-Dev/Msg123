@@ -505,7 +505,7 @@ module calc_function
     do i = 1, st_bcnd%rive_num
       s = st_bcnd%rive2cals(i)
       head_eff = max(st_forc%rive_head(i), st_forc%rive_bott(i))
-      delh_r(i) = head_eff - max(infrive(s), st_forc%rive_bott(i))
+      delh_r(i) = head_eff - max(infrive(s), st_forc%rive_bott(i) - st_forc%rive_bedt(i))
 
       rivfunc(s) = st_forc%rive_hydk(i)*st_forc%abyd_rive(i)*delh_r(i)*rperm(s)
     end do

@@ -1984,6 +1984,7 @@ module set_condition
     allocate(st_hydr%hydf_surf(ncals), st_hydr%abyd_surf(ncals))
     allocate(st_hydr%sea_abyd(seal_cnum*FACE), st_hydr%sea_hydf(seal_cnum*FACE))
     allocate(left_off(totn_clac*FACE), right_off(totn_clac*FACE))
+    allocate(st_geom%cell_down(ncalc))
     off_index(0) = 0
     !$omp parallel
     !$omp do private(i)
@@ -2002,6 +2003,11 @@ module set_condition
     do i = 1, ncals
       st_hydr%surf_area(i) = DZERO ; st_hydr%rech_area(i) = DZERO
       st_hydr%hydf_surf(i) = DZERO ; st_hydr%abyd_surf(i) = DZERO
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncalc
+      st_geom%cell_down(i) = 0
     end do
     !$omp end do
     !$omp do private(i)
@@ -2464,6 +2470,9 @@ module set_condition
             if (st_conn%calc2reg(i) == st_conn%calc2reg(off_num) .or. st_sim%reg_neib == 1) then
               sflag = 0 ; aks = reg_cksz(off_num) ; tconn_num = tconn_num + 1
               off_row(tconn_num) = off_num ; conn_dir(tconn_num) = 6
+              if (i <= ncalc) then
+                st_geom%cell_down(i) = off_num
+              end if
               right_num = right_num + 1 ; right_off(tconn_num) = right_num
               ! -- Set distance between adjacent cell (dis_adj)
                 call set_dis_adj(6, sflag, i, off_num, dis1, dis2, dis12)

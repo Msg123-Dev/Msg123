@@ -63,21 +63,22 @@ module calc_output
 
     type(sol_set), intent(inout) :: st_sol
     ! -- local
-    integer(I4) :: i
+    integer(I4) :: i, s, c
     real(DP), allocatable :: ms_st(:), ms_co(:), ms_se(:), ms_we(:)
     real(DP), allocatable :: ms_re(:), ms_su(:), ms_ri(:), ms_la(:)
     !-------------------------------------------------------------------------------------------
     allocate(ms_st(ncalc), ms_co(ncalc), ms_se(ncalc), ms_we(ncalc))
-    allocate(ms_re(ncals), ms_su(ncals), ms_ri(ncals), ms_la(ncals))
+    allocate(ms_re(ncals), ms_su(ncals), ms_ri(ncalc), ms_la(ncals))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc
       ms_st(i) = DZERO ; ms_co(i) = DZERO ; ms_se(i) = DZERO ; ms_we(i) = DZERO
+      ms_ri(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i)
     do i = 1, ncals
-      ms_re(i) = DZERO ; ms_su(i) = DZERO ; ms_ri(i) = DZERO ; ms_la(i) = DZERO
+      ms_re(i) = DZERO ; ms_su(i) = DZERO ; ms_la(i) = DZERO
     end do
     !$omp end do
     !$omp end parallel
@@ -101,6 +102,15 @@ module calc_output
       st_msloc%sur(i) = st_msloc%sur(i) + ms_su(i)
       st_msloc%riv(i) = st_msloc%riv(i) + ms_ri(i)
       st_msloc%lak(i) = st_msloc%lak(i) + ms_la(i)
+    end do
+    !$omp end do
+    !$omp do private(i, s, c)
+    do i = 1, st_bcnd%rive_num
+      c = st_bcnd%rive2calc(i)
+      if (c > ncals) then
+        s = st_bcnd%rive2cals(i)
+        st_msloc%riv(s) = st_msloc%riv(s) + ms_ri(c)
+      end if
     end do
     !$omp end do
     !$omp end parallel
@@ -269,13 +279,13 @@ module calc_output
 
     type(sol_set), intent(in) :: st_sol
     ! -- local
-    integer(I4) :: i, s
+    integer(I4) :: i, c
     real(DP), allocatable :: rives(:), temp_rive(:)
     !-------------------------------------------------------------------------------------------
-    allocate(rives(ncals), temp_rive(st_bcnd%rive_num))
+    allocate(rives(ncalc), temp_rive(st_bcnd%rive_num))
     !$omp parallel
     !$omp do private(i)
-    do i = 1, ncals
+    do i = 1, ncalc
       rives(i) = DZERO
     end do
     !$omp end do
@@ -289,10 +299,10 @@ module calc_output
     ! -- Function river term (riveterm)
       call func_riveterm(st_sol%head_new, st_sol%rel_perm, rives)
 
-    !$omp parallel do private(i, s)
+    !$omp parallel do private(i, c)
     do i = 1, st_bcnd%rive_num
-      s = st_bcnd%rive2cals(i)
-      roff_rive(i) = temp_rive(i) - rives(s)*st_time%delt
+      c = st_bcnd%rive2calc(i)
+      roff_rive(i) = temp_rive(i) - rives(c)*st_time%delt
     end do
     !$omp end parallel do
 

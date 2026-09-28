@@ -882,11 +882,21 @@ module set_boundary
   ! set_rive_bed -- Set river bed conductivity and thickness
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_schm
+    use kind_module, only: DP
+    use initial_module, only: st_schm, st_grid
+    use read_input, only: len_scal, z_base
+    use set_cell, only: st_conn
+    use make_cell, only: st_geom
+#ifdef MPI_MSG
+    use mpi_utility, only: mpimin_val
+#endif
     ! -- inout
 
     ! -- local
-    integer(I4) :: i, s, miss_num, bad_num, sum_missn, sum_badn
+    integer(I4) :: i, s, c, miss_num, bad_num, sum_missn, sum_badn
+    integer(I4) :: low_num, sum_lown, low_ij, min_ij
+    real(DP) :: bed_bot, low_z(2), sum_z(2)
+    character(200) :: low_mes
     logical :: bed_flag
     character(:), allocatable :: num_str, err_mes
     !-------------------------------------------------------------------------------------------
@@ -947,6 +957,57 @@ module set_boundary
           end if
           deallocate(num_str, err_mes)
         end if
+      end if
+    end if
+
+    if (allocated(st_bcnd%rive2calc)) then
+      deallocate(st_bcnd%rive2calc)
+    end if
+    allocate(st_bcnd%rive2calc(st_bcnd%rive_num))
+    !$omp parallel do private(i)
+    do i = 1, st_bcnd%rive_num
+      st_bcnd%rive2calc(i) = st_bcnd%rive2cals(i)
+    end do
+    !$omp end parallel do
+
+    if (st_rivf_type%bedk > 0) then
+      low_num = 0 ; low_ij = huge(low_ij) ; low_z(:) = DZERO
+      do i = 1, st_bcnd%rive_num
+        s = st_bcnd%rive2cals(i) ; c = s
+        if (st_forc%rive_bedt(i) > DZERO) then
+          bed_bot = st_forc%rive_bott(i) - st_forc%rive_bedt(i)
+          do while (bed_bot <= st_geom%cell_bot(c) .and. st_geom%cell_down(c) > 0)
+            c = st_geom%cell_down(c)
+          end do
+          if (bed_bot <= st_geom%cell_bot(c)) then
+            low_num = low_num + 1
+            if (st_conn%loc2glo_ij(s) < low_ij) then
+              low_ij = st_conn%loc2glo_ij(s)
+              low_z(1) = bed_bot*len_scal + z_base
+              low_z(2) = st_geom%cell_bot(c)*len_scal + z_base
+            end if
+          end if
+        end if
+        st_bcnd%rive2calc(i) = c
+      end do
+#ifdef MPI_MSG
+      ! -- Minimum value for MPI (val)
+        call mpimin_val(low_ij, "river bed below the cells", min_ij)
+      if (low_ij /= min_ij) then
+        low_z(:) = DZERO
+      end if
+      ! -- Sum value for MPI (val)
+        call mpisum_val(low_num, "river bed below the cells", sum_lown)
+        call mpisum_val(low_z, "river bed below the cells", sum_z)
+#else
+      sum_lown = low_num ; min_ij = low_ij ; sum_z(:) = low_z(:)
+#endif
+      if (st_mpi%rank == 0 .and. sum_lown > 0) then
+        write(low_mes,'(a,i0,a,2(i0,a),2(g0.6,a))') "River bed bottom is below the lowest "//&
+          "cell at ", sum_lown, " river cells, first at (", mod(min_ij-1, st_grid%nx)+1, ",",&
+          (min_ij-1)/st_grid%nx+1, "): bed bottom ", sum_z(1), " m, cell bottom ", sum_z(2),&
+          " m."
+        call write_err_stop(trim(low_mes))
       end if
     end if
 

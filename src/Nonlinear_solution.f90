@@ -93,8 +93,8 @@ module nonlinear_solution
     real(DP) :: var_max, unk_max, var_abs_max
 #endif
     ! -- format
-    10 format(//1x,"CURRENT TIME : ",es12.5,1x,"(",a,")",20x,"TIME STEP : ",&
-              es12.5,1x,"(SEC)",/,1x,95("-"),/,1x,&
+    10 format(//1x,"CURRENT TIME : ",es18.11,1x,"(",a,")",20x,"TIME STEP : ",&
+              es18.11,1x,"(SEC)",/,1x,95("-"),/,1x,&
               " OUTER INNER BACK BETA    MAXIMUM           MAXIMUM   DIAGONAL RIGHT HAND    &
               &UNKNOWN       MASS",/,1x,&
               "                           CHANGE              CELL     MATRIX     VECTOR      &
@@ -104,7 +104,7 @@ module nonlinear_solution
     13 format(1X,"Stop due to maximum value or change in backtracking")
     14 format(1X,"Stop due to maximum number of nonlinear iteration")
     15 format(1X,"Didn't converge in steady state calculation")
-    16 format(1X,"RESIDUAL  SUM OF |F| = ",es11.3)
+    16 format(1X,"SUM OF |MASS BALANCE RESIDUAL| = ",es11.3," (m3/s)")
     17 format(1X,"Stop due to stagnation of mass balance error")
     18 format(1X,"Accept the non-converged step (noconv_type = 1)")
     19 format(1X,"Stop due to cycling of mass balance error")

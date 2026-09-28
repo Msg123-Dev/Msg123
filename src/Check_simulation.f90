@@ -92,22 +92,26 @@ module check_simulation
 
   end subroutine check_abserrmax
 
-  subroutine check_residual(funcv, fscal, res_flag, res_fact)
+  subroutine check_residual(funcv, fscal, res_flag, res_fact, stnew, stold)
   !*********************************************************************************************
   ! check_residual -- Check residual convergence criteria
   !*********************************************************************************************
     ! -- modules
+    use constval_module, only: UROUND
+    use make_cell, only: st_geom
 #ifdef MPI_MSG
     use mpi_utility, only: mpisum_val
 #endif
     ! -- inout
     real(DP), intent(in) :: funcv(:), fscal(:), res_fact
     logical, intent(out) :: res_flag
+    real(DP), intent(in), optional :: stnew(:), stold(:)
     ! -- local
     integer(I4) :: i, viol_num
     real(DP), parameter :: ACC_FLOOR = 1.00E-15_DP
+    real(DP), parameter :: ROUND_FACT = 4.00E+00_DP
     real(DP) :: vol_scal, res_val, scal_val, abs_tol, rel_tol
-    logical :: abs_flag, rel_flag, pass_flag
+    logical :: abs_flag, rel_flag, pass_flag, round_flag
 #ifdef MPI_MSG
     integer(I4) :: sum_viol
 #endif
@@ -117,6 +121,7 @@ module check_simulation
     if (.not. abs_flag .and. .not. rel_flag) then
       return
     end if
+    round_flag = present(stnew) .and. present(stold)
 
     viol_num = 0 ; vol_scal = len_scal**3
     abs_tol = st_ctrl%res_abs_tol*res_fact ; rel_tol = st_ctrl%res_rel_tol*res_fact
@@ -131,6 +136,9 @@ module check_simulation
         pass_flag = .true.
       else if (rel_flag .and. res_val <= rel_tol*scal_val) then
         pass_flag = .true.
+      else if (round_flag) then
+        pass_flag = res_val <= ROUND_FACT*UROUND*max(abs(stnew(i)), abs(stold(i)))&
+                    *st_geom%cell_vol(i)*st_time%delt_inv*vol_scal
       end if
       if (.not. pass_flag) then
         viol_num = viol_num + 1

@@ -1520,7 +1520,7 @@ module time_module
     integer(I4), intent(out) :: bchange
     ! -- local
     integer(I4) :: conv_fnum
-    character(9) :: cond_format
+    character(:), allocatable :: cond_format
     !-------------------------------------------------------------------------------------------
     bchange = st_step_flag%rech + st_step_flag%well + st_step_flag%seal + st_step_flag%prec +&
               st_step_flag%evap + st_step_flag%riwl + st_step_flag%riwd + st_step_flag%ribl +&
@@ -1528,7 +1528,8 @@ module time_module
               st_step_flag%ribt + st_step_flag%lawl + st_step_flag%lawd + st_step_flag%labl +&
               st_step_flag%laar
 
-    conv_fnum = st_out_fnum%conv ; cond_format = "(a,f10.3)"
+    conv_fnum = st_out_fnum%conv
+    cond_format = '(1x,a,es18.11," ('//trim(st_sim%cal_unit)//')")'
 
     !$omp parallel shared(conv_fnum, cond_format)
     !$omp single

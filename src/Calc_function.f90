@@ -512,7 +512,11 @@ module calc_function
       end if
       delh_r(i) = head_eff - max(infrive(s), bott_eff)
 
-      rivfunc(s) = st_forc%rive_hydk(i)*st_forc%abyd_rive(i)*delh_r(i)*rperm(s)
+      if (st_forc%rive_bedt(i) > DZERO .and. delh_r(i) > DZERO) then
+        rivfunc(s) = st_forc%rive_hydk(i)*st_forc%abyd_rive(i)*delh_r(i)
+      else
+        rivfunc(s) = st_forc%rive_hydk(i)*st_forc%abyd_rive(i)*delh_r(i)*rperm(s)
+      end if
     end do
     !$omp end do
     !$omp end parallel

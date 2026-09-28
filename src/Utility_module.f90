@@ -317,6 +317,7 @@ module utility_module
 
     !-------------------------------------------------------------------------------------------
     write(log_fnum,'(a)') "Error!! "//err_mes
+    flush(log_fnum)
 
 #ifdef MPI_MSG
     ! -- Abort process (proc)

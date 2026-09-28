@@ -52,6 +52,7 @@ module types_module
     real(DP), allocatable :: cell_top(:)
     real(DP), allocatable :: cell_cent(:)
     real(DP), allocatable :: cell_bot(:)
+    integer(I4), allocatable :: cell_down(:)
     real(DP), allocatable :: dis2face(:,:), face_area(:,:), area_r(:)
   end type geom_set
 
@@ -239,7 +240,7 @@ module types_module
     integer(I4) :: rech_num = 0, well_num = 0, prec_num = 0
     integer(I4) :: evap_num = 0, rive_num = 0, lake_num = 0
     integer(I4) :: seal_num
-    integer(I4), allocatable :: rech2cals(:), rive2cals(:), lake2cals(:)
+    integer(I4), allocatable :: rech2cals(:), rive2cals(:), lake2cals(:), rive2calc(:)
     integer(I4), allocatable :: rech_cflag(:), prec_cflag(:), evap_cflag(:)
     integer(I4), allocatable :: well_index(:), well_conn(:)
     integer(I4), allocatable :: sea2cal(:), sea2sea(:)

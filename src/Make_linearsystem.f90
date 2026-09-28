@@ -40,7 +40,7 @@ module make_linearsystem
     allocate(st_coef%stor_per(ncalc))
     allocate(st_coef%stod(ncalc), st_coef%cond(nreg_num), st_coef%sead(ncalc))
     allocate(st_coef%dmats(ncalc))
-    allocate(st_coef%rivd(ncals), st_coef%lakd(ncals), st_coef%surd(ncals))
+    allocate(st_coef%rivd(ncalc), st_coef%lakd(ncals), st_coef%surd(ncals))
     allocate(st_coef%deri_dcon(tot_ind), st_coef%rel_hyd(tot_ind), st_coef%deri_lucon(tot_ind))
     allocate(st_coef%deri_con1(tot_ind), st_coef%deri_con2(tot_ind))
     allocate(st_coef%over_riv(st_bcnd%rive_num), st_coef%deri_r(st_bcnd%rive_num))
@@ -123,7 +123,7 @@ module make_linearsystem
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, ncalc
-      st_coef%dstor_dpsi(i) = DZERO
+      st_coef%dstor_dpsi(i) = DZERO ; st_coef%rivd(i) = DZERO
       st_coef%stod(i) = DZERO ; st_coef%sead(i) = DZERO ; st_coef%dmats(i) = DZERO
     end do
     !$omp end parallel do
@@ -135,7 +135,7 @@ module make_linearsystem
     !$omp end parallel do
     !$omp parallel do private(i)
     do i = 1, ncals
-      st_coef%rivd(i) = DZERO ; st_coef%lakd(i) = DZERO ; st_coef%surd(i) = DZERO
+      st_coef%lakd(i) = DZERO ; st_coef%surd(i) = DZERO
     end do
     !$omp end parallel do
 
@@ -200,6 +200,11 @@ module make_linearsystem
     !$omp do private(s)
     do s = 1, ncals
       st_coef%dmats(s) = st_coef%surd(s) + st_coef%rivd(s) + st_coef%lakd(s)
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = ncals+1, ncalc
+      st_coef%dmats(i) = st_coef%rivd(i)
     end do
     !$omp end do
 
@@ -361,7 +366,7 @@ module make_linearsystem
     real(DP), intent(out) :: dkr_riv(:)
     real(DP), intent(out) :: rel_riv(:), tran_riv(:)
     ! -- local
-    integer(I4) :: i, s
+    integer(I4) :: i, c
     real(DP) :: head_eff, bott_eff
     !-------------------------------------------------------------------------------------------
     !$omp parallel
@@ -372,11 +377,11 @@ module make_linearsystem
       tran_riv(i) = DZERO
     end do
     !$omp end do
-    !$omp do private(i, s, head_eff, bott_eff)
+    !$omp do private(i, c, head_eff, bott_eff)
     do i = 1, st_bcnd%rive_num
-      s = st_bcnd%rive2cals(i)
-      per_riv(i) = per_relp(s) ; rel_riv(i) = st_sol%rel_perm(s)
-      dkr_riv(i) = dkr_dpsi(s)
+      c = st_bcnd%rive2calc(i)
+      per_riv(i) = per_relp(c) ; rel_riv(i) = st_sol%rel_perm(c)
+      dkr_riv(i) = dkr_dpsi(c)
       head_eff = max(st_forc%rive_head(i), st_forc%rive_bott(i))
       if (st_forc%rive_head(i) > st_forc%rive_bott(i)) then
         bott_eff = st_forc%rive_bott(i) - st_forc%rive_bedt(i)
@@ -387,8 +392,8 @@ module make_linearsystem
       if (st_forc%rive_bedt(i) > DZERO) then
         per_riv(i) = DONE ; rel_riv(i) = DONE ; dkr_riv(i) = DZERO
       end if
-      if (st_sol%head_new(s) >= bott_eff) then
-        delh_r(i) = head_eff - st_sol%head_new(s)
+      if (st_sol%head_new(c) >= bott_eff) then
+        delh_r(i) = head_eff - st_sol%head_new(c)
         over_riv(i) = DONE
         deri_r(i) = -tran_riv(i)*rel_riv(i)
       else
@@ -411,10 +416,10 @@ module make_linearsystem
       !$omp end do
     end if
 
-    !$omp do private(i, s)
+    !$omp do private(i, c)
     do i = 1, st_bcnd%rive_num
-      s = st_bcnd%rive2cals(i)
-      dmat_riv(s) = deri_r(i) + deri_ks_riv(i)
+      c = st_bcnd%rive2calc(i)
+      dmat_riv(c) = deri_r(i) + deri_ks_riv(i)
     end do
     !$omp end do
     !$omp end parallel

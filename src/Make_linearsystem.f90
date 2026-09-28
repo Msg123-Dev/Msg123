@@ -384,7 +384,7 @@ module make_linearsystem
         bott_eff = st_forc%rive_bott(i)
       end if
       tran_riv(i) = st_forc%rive_hydk(i)*st_forc%abyd_rive(i)
-      if (st_forc%rive_bedt(i) > DZERO .and. head_eff > max(st_sol%head_new(s), bott_eff)) then
+      if (st_forc%rive_bedt(i) > DZERO) then
         per_riv(i) = DONE ; rel_riv(i) = DONE ; dkr_riv(i) = DZERO
       end if
       if (st_sol%head_new(s) >= bott_eff) then

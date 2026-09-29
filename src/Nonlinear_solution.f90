@@ -386,7 +386,7 @@ module nonlinear_solution
           st_sim%sim_type /= -1) then
         ! -- Check residual convergence (residual)
           call check_residual(new_func, func_scal, res_flag, DONE, st_sol%stor_new,&
-                              st_sol%stor_old)
+                              st_sol%stor_old, st_sol%head_new)
         st_time%conv_flag = res_flag
       end if
       if (.not. st_time%conv_flag) then

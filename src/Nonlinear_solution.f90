@@ -756,7 +756,7 @@ module nonlinear_solution
     real(DP), parameter :: BACK_ALPHA = 1.00E-4_DP, BACK_BETA = 0.9_DP, MAXSTEP_RATIO = 0.99_DP
     real(DP), parameter :: DSAT_STEP_FRAC = 0.9_DP
     real(DP), parameter :: DIVERGE_LIMIT = huge(1.00_DP)*0.1_DP
-    real(DP), parameter :: STEP_TOL = 1.00E-07_DP
+    real(DP), parameter :: STEP_TOL = 1.00E-07_DP, LAM_FLOOR_MAX = 1.00E-01_DP
 #ifdef MPI_MSG
     real(DP) :: sum_l2, max_val
 #endif
@@ -811,7 +811,7 @@ module nonlinear_solution
     end if
 #endif
     if (lam_length > DZERO) then
-      lam_min = STEP_TOL/lam_length
+      lam_min = min(STEP_TOL/lam_length, LAM_FLOOR_MAX)
     else
       lam_min = DZERO
     end if

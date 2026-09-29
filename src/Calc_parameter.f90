@@ -45,13 +45,6 @@ module calc_parameter
       pors_val = st_hydr%read_pors(i) ; resi_val = st_hydr%read_resi(i)
       retm = DONE - DONE/st_hydr%read_vann(i)
       per_phead = pres(i) - st_geom%cell_top(i) + pertur
-      kr_lin = DONE ; kr_grad = DZERO
-      ! -- Relative permeability and its slope at the linear bridge head
-      if (st_schm%krlin_head > DZERO) then
-        call calc_kr_vgm(phead0, st_hydr%read_vana(i), st_hydr%read_vann(i), retm, kr_lin, dkr)
-        kr_grad = (DONE-kr_lin)/st_schm%krlin_head
-      end if
-
       ! -- Storage and saturation ratio at the cell top
       if (per_phead < DZERO) then
         beta = abs(per_phead*st_hydr%read_vana(i))**st_hydr%read_vann(i)
@@ -90,6 +83,9 @@ module calc_parameter
       if (kr_phead >= DZERO) then
         kr = DONE ; dkr = DZERO
       else if (kr_phead > phead0) then
+        ! -- Relative permeability and its slope at the linear bridge head
+        call calc_kr_vgm(phead0, st_hydr%read_vana(i), st_hydr%read_vann(i), retm, kr_lin, dkr)
+        kr_grad = (DONE-kr_lin)/st_schm%krlin_head
         kr = kr_lin + (kr_phead-phead0)*kr_grad ; dkr = kr_grad
       else
         call calc_kr_vgm(kr_phead, st_hydr%read_vana(i), st_hydr%read_vann(i), retm, kr, dkr)

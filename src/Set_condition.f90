@@ -1981,6 +1981,7 @@ module set_condition
     allocate(off_row(totn_clac*FACE), off_index(0:totn_clac), conn_dir(totn_clac*FACE))
     allocate(st_hydr%area_dis(totn_clac*FACE), st_hydr%sat_hydf(totn_clac*FACE))
     allocate(st_hydr%surf_area(ncals), st_hydr%rech_area(ncals))
+    allocate(st_hydr%surf_net(ncals), st_hydr%rech_net(ncals))
     allocate(st_hydr%hydf_surf(ncals), st_hydr%abyd_surf(ncals))
     allocate(st_hydr%sea_abyd(seal_cnum*FACE), st_hydr%sea_hydf(seal_cnum*FACE))
     allocate(left_off(totn_clac*FACE), right_off(totn_clac*FACE))
@@ -2002,6 +2003,7 @@ module set_condition
     !$omp do private(i)
     do i = 1, ncals
       st_hydr%surf_area(i) = DZERO ; st_hydr%rech_area(i) = DZERO
+      st_hydr%surf_net(i) = DZERO ; st_hydr%rech_net(i) = DZERO
       st_hydr%hydf_surf(i) = DZERO ; st_hydr%abyd_surf(i) = DZERO
     end do
     !$omp end do
@@ -2233,6 +2235,8 @@ module set_condition
       else if (i <= ncals) then
         st_hydr%surf_area(i) = reg_fare(i,1)
         st_hydr%rech_area(i) = st_geom%area_r(i)
+        st_hydr%surf_net(i) = reg_fare(i,1)
+        st_hydr%rech_net(i) = st_geom%area_r(i)
         st_hydr%hydf_surf(i) = reg_cksz(i)
       end if
       ! north direction
@@ -2583,8 +2587,10 @@ module set_condition
         end if
       end if
       abyd_surftemp(i) = abs(area_s(i))/dis_s
-      st_hydr%surf_area(s) = st_hydr%surf_area(s) - area_s(i)
-      st_hydr%rech_area(s) = st_hydr%rech_area(s) - area_s(i)
+      st_hydr%surf_net(s) = st_hydr%surf_net(s) - area_s(i)
+      st_hydr%rech_net(s) = st_hydr%rech_net(s) - area_s(i)
+      st_hydr%surf_area(s) = st_hydr%surf_net(s)
+      st_hydr%rech_area(s) = st_hydr%rech_net(s)
       if (st_hydr%surf_area(s) < DZERO) then
         st_hydr%surf_area(s) = DZERO
       end if

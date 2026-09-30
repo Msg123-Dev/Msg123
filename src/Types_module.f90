@@ -230,6 +230,7 @@ module types_module
     real(DP), allocatable :: surf_bott(:), surf_reli(:), surf_parm(:)
     real(DP), allocatable :: sat_hydf(:), hydf_surf(:), abyd_surf(:), abyd_well(:)
     real(DP), allocatable :: area_dis(:), conn_dis(:), surf_area(:), rech_area(:)
+    real(DP), allocatable :: surf_net(:), rech_net(:)
     real(DP), allocatable :: sea_hydf(:), sea_dis(:), sea_abyd(:)
     real(DP), allocatable :: surf_top(:)
     real(DP), allocatable :: abyd_conn(:), hydf_conn(:), inv_dis(:)

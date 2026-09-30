@@ -6,6 +6,7 @@ module ici_module
   use initial_module, only: out_type, st_grid, st_out_type
   use read_input, only: len_scal, len_scal_inv, z_base
   use set_cell, only: get_calc_grid, ncalc, ncals
+  use make_cell, only: st_geom
   use set_condition, only: st_hydr, st_bcnd
   use prep_calculation, only: st_time
   use palmtime, only: palm_TimeStart, palm_TimeEnd
@@ -625,7 +626,7 @@ module ici_module
   ! calc_wtab_depth -- Calculate water table depth
   !*********************************************************************************************
     ! -- module
-    use make_cell, only: st_geom
+
     ! -- inout
     real(DP), intent(in) :: wtab(:)
     real(DP), intent(out) :: wtab_depth(:)
@@ -666,7 +667,7 @@ module ici_module
     !$omp parallel do private(i, s)
     do i = 1, st_bcnd%rive_num
       s = st_bcnd%rive2cals(i)
-      rivflux(i) = rivoff(i)/st_hydr%rech_area(s)/rive_sumtime
+      rivflux(i) = rivoff(i)/st_geom%area_r(s)/rive_sumtime
     end do
     !$omp end parallel do
 
@@ -689,7 +690,7 @@ module ici_module
     !$omp parallel do private(i, s)
     do i = 1, st_bcnd%lake_num
       s = st_bcnd%lake2cals(i)
-      lakflux(i) = lakoff(i)/st_hydr%rech_area(s)/lake_sumtime
+      lakflux(i) = lakoff(i)/st_geom%area_r(s)/lake_sumtime
     end do
     !$omp end parallel do
 
@@ -711,7 +712,7 @@ module ici_module
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, ncals
-      sufflux(i) = sufoff(i)/st_hydr%rech_area(i)/surf_sumtime
+      sufflux(i) = sufoff(i)/st_geom%area_r(i)/surf_sumtime
     end do
     !$omp end parallel do
 

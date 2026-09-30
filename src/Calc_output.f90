@@ -418,7 +418,11 @@ module calc_output
     !$omp do private(i, s)
     do i = 1, st_bcnd%rech_num
       s = st_bcnd%rech2cals(i)
-      dunns(i) = st_forc%read_rech(i) - st_forc%calc_rech(i)/st_hydr%rech_area(s)
+      if (st_hydr%rech_area(s) > DZERO) then
+        dunns(i) = st_forc%read_rech(i) - st_forc%calc_rech(i)/st_hydr%rech_area(s)
+      else
+        dunns(i) = st_forc%read_rech(i)
+      end if
     end do
     !$omp end do
 

@@ -12,7 +12,6 @@ module read_input
   private
   public :: read_main_file, read_grid_file, add_nml_name
   real(SP), public :: len_scal, len_scal_inv
-  real(DP), parameter :: RES_STEADY = 1.00E-05_DP
   real(DP), public :: z_base
   real(DP), allocatable, public :: glob_x(:,:), glob_y(:,:), glob_z(:,:,:)
 
@@ -507,9 +506,6 @@ module read_input
     datum_type = st_ctrl%datum_type ; deri_type = st_ctrl%deri_type
     picard_btr = st_ctrl%picard_btr ; picard_btol = st_ctrl%picard_btol
     picard_bfact = st_ctrl%picard_bfact ; picard_blim = st_ctrl%picard_blim
-    if (st_sim%sim_type == -1) then
-      conv_type = 1 ; res_rel_tol = RES_STEADY
-    end if
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_solution,iostat=ierr)
     st_ctrl%tstep_type = tstep_type ; st_ctrl%maxout_iter = maxout_iter
@@ -570,7 +566,7 @@ module read_input
     else if (deri_type < 0 .or. deri_type > 1) then
       call write_err_stop("Input a valid value for derivative type.")
     else if (conv_type == 1 .and. res_abs_tol <= DZERO .and. res_rel_tol <= DZERO) then
-      call write_err_stop("Input a residual tolerance for the selected convergence type.")
+      call write_err_stop("Input a residual tolerance for conv_type=1, or set conv_type=0.")
     else if (picard_btr < 0) then
       call write_err_stop("Input a non-negative value for picard backtracking number.")
     else if (picard_btol < DONE) then

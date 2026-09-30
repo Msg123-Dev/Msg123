@@ -43,7 +43,7 @@ module types_module
     integer(I4) :: surfw_type = 0
     integer(I4) :: rbed_type = 0
     real(DP) :: abyd_ratio = 0.00_DP
-    real(DP) :: krlin_head = 0.00_DP
+    real(DP) :: krlin_head = 2.00E-03_DP
   end type schm_set
 
   type :: geom_set

@@ -2514,7 +2514,6 @@ module set_condition
 
     deallocate(reg_cksx, reg_cksy, reg_cksz)
     deallocate(reg_dis, reg_fare)
-    deallocate(st_geom%area_r)
     deallocate(st_conn%calc2reg)
     call gmap_free(st_conn%glo2loc_map)
 

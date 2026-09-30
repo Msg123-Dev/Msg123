@@ -7,6 +7,7 @@ module write_output
   use read_input, only: len_scal, z_base
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc, ncals
+  use make_cell, only: st_geom
   use set_condition, only: st_hydr, st_bcnd
   use assign_calc, only: msout_tnum
   use check_simulation, only: lasttime_flag
@@ -620,7 +621,7 @@ module write_output
     !$omp parallel do private(i, s)
     do i = 1, st_bcnd%rive_num
       s = st_bcnd%rive2cals(i)
-      rive_flux(i) = roff_rive(i)/st_hydr%rech_area(s)/rive_sumtime
+      rive_flux(i) = roff_rive(i)/st_geom%area_r(s)/rive_sumtime
     end do
     !$omp end parallel do
 
@@ -670,7 +671,7 @@ module write_output
     !$omp parallel do private(i, s)
     do i = 1, st_bcnd%lake_num
       s = st_bcnd%lake2cals(i)
-      lake_flux(i) = roff_lake(i)/st_hydr%rech_area(s)/lake_sumtime
+      lake_flux(i) = roff_lake(i)/st_geom%area_r(s)/lake_sumtime
     end do
     !$omp end parallel do
 
@@ -722,7 +723,7 @@ module write_output
     !$omp parallel do private(i)
     do i = 1, ncals
       cals2cals(i) = i
-      surf_flux(i) = roff_surf(i)/st_hydr%rech_area(i)/surf_sumtime
+      surf_flux(i) = roff_surf(i)/st_geom%area_r(i)/surf_sumtime
     end do
     !$omp end parallel do
 

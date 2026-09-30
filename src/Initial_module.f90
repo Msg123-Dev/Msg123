@@ -209,9 +209,9 @@ module initial_module
     st_ctrl%maxinn_iter = 10 ; st_ctrl%precon_type = 0 ; st_ctrl%nlevel = 0
     st_ctrl%maxvcy_iter = 1 ; st_ctrl%amg_nlevel = 5 ; st_ctrl%max_sweep = 1
     st_ctrl%criteria = 1.00E-03_DP ; st_ctrl%errtol = DZERO
-    st_ctrl%res_abs_tol = DZERO ; st_ctrl%res_rel_tol = DZERO
+    st_ctrl%res_abs_tol = DZERO ; st_ctrl%res_rel_tol = 1.00E-05_DP
     st_ctrl%dilu_shift = DZERO ; st_ctrl%dsat_max = DZERO ; st_ctrl%expd_type = 0
-    st_ctrl%conv_type = 0 ; st_ctrl%datum_type = 0 ; st_ctrl%deri_type = 0
+    st_ctrl%conv_type = 1 ; st_ctrl%datum_type = 0 ; st_ctrl%deri_type = 0
     st_ctrl%noconv_type = 0 ; st_ctrl%ostep_type = 0
     st_ctrl%picard_btr = 0 ; st_ctrl%picard_btol = 1.05_DP
     st_ctrl%picard_bfact = 0.10_DP ; st_ctrl%picard_blim = DZERO
@@ -221,7 +221,7 @@ module initial_module
     ! input scheme file
     st_schm%krpos_type = 0 ; st_schm%stor_type = 1
     st_schm%abyd_type = 0 ; st_schm%abyd_ratio = DZERO
-    st_schm%krlin_head = DZERO ; st_schm%surfw_type = 0 ; st_schm%rbed_type = 0
+    st_schm%krlin_head = 2.00E-03_DP ; st_schm%surfw_type = 0 ; st_schm%rbed_type = 0
 
     ! time unit
     unit_list = ["SEC", "MIN", "HOU", "DAY", "YEA"]

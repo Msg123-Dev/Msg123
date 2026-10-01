@@ -475,17 +475,17 @@ module calc_output
 
   end subroutine calc_seal_res
 
-  subroutine calc_rech_res()
+  subroutine calc_rech_res(st_sol)
   !*********************************************************************************************
-  ! calc_rech_res -- Calculate recharge results
+  ! calc_rech_res -- Calculate recharge results as input minus applied
   !*********************************************************************************************
     ! -- modules
     use calc_function, only: func_rechterm
     use allocate_output, only: res_rnum, res_rech
     ! -- inout
-
+    type(sol_set), intent(in) :: st_sol
     ! -- local
-    integer(I4) :: i
+    integer(I4) :: i, s
     real(DP), allocatable :: rechr(:), temp_rech(:)
     !-------------------------------------------------------------------------------------------
     allocate(rechr(ncals), temp_rech(ncals))
@@ -497,7 +497,14 @@ module calc_output
     !$omp end parallel do
 
     ! -- Function recharge term (rechterm)
-      call func_rechterm(rechr)
+      call func_rechterm(st_sol%head_new, rechr)
+
+    !$omp parallel do private(i, s)
+    do i = 1, st_bcnd%rech_num
+      s = st_bcnd%rech2cals(i)
+      rechr(s) = st_forc%read_rech(i)*st_hydr%rech_area(s) - rechr(s)
+    end do
+    !$omp end parallel do
 
     !$omp parallel do private(i)
     do i = 1, ncals

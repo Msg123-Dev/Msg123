@@ -42,8 +42,11 @@ module types_module
     integer(I4) :: abyd_type = 0
     integer(I4) :: surfw_type = 0
     integer(I4) :: rbed_type = 0
+    integer(I4) :: rech_dreg_type = 0
     real(DP) :: abyd_ratio = 0.00_DP
     real(DP) :: krlin_head = 2.00E-03_DP
+    real(DP) :: rech_hmin = 0.00_DP
+    real(DP) :: rech_hwid = 0.00_DP
   end type schm_set
 
   type :: geom_set
@@ -312,7 +315,7 @@ module types_module
     real(DP), allocatable :: dstor_dpsi(:)
     real(DP), allocatable :: temp_rhs(:)
     real(DP), allocatable :: stod(:), cond(:), sead(:), dmats(:)
-    real(DP), allocatable :: rivd(:), lakd(:), surd(:)
+    real(DP), allocatable :: rivd(:), lakd(:), surd(:), recd(:)
     real(DP), allocatable :: deri_dcon(:), rel_hyd(:), deri_lucon(:), deri_con1(:), deri_con2(:)
     real(DP), allocatable :: over_riv(:), deri_r(:), deri_ks_riv(:), delh_r(:)
     real(DP), allocatable :: per_riv(:), rel_riv(:), tran_riv(:), dkr_riv(:)

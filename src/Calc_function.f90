@@ -19,7 +19,7 @@ module calc_function
   private
   public :: allocate_calfun, calc_func, calc_mass, calc_vecjacf, set_surfw_head
   public :: func_rechterm, func_wellterm, func_surfterm, func_riveterm
-  public :: func_laketerm, func_sealterm
+  public :: func_laketerm, func_sealterm, calc_rech_fact
   ! -- local
   real(DP), allocatable :: stof(:), conf(:), welf(:), seaf(:)
   real(DP), allocatable :: funcvs(:)
@@ -106,7 +106,7 @@ module calc_function
       call func_connflow(infx, rperm, conf, present(fscal))
 
     ! -- Function recharge term (rechterm)
-      call func_rechterm(recf)
+      call func_rechterm(infx, recf)
 
     ! -- Function well term (wellterm)
       call func_wellterm(welf)
@@ -218,7 +218,7 @@ module calc_function
       call func_connflow(hnew, rperm, conm, .false.)
 
     ! -- Function recharge term (rechterm)
-      call func_rechterm(recm)
+      call func_rechterm(hnew, recm)
 
     ! -- Function well term (wellterm)
       call func_wellterm(welm)
@@ -367,24 +367,51 @@ module calc_function
 
   end subroutine set_surfw_head
 
-  subroutine func_rechterm(recfunc)
+  subroutine func_rechterm(infrech, recfunc)
   !*********************************************************************************************
   ! func_rechterm -- Function recharge term
   !*********************************************************************************************
     ! -- modules
     ! -- inout
+    real(DP), intent(in) :: infrech(:)
     real(DP), intent(inout) :: recfunc(:)
     ! -- local
     integer(I4) :: i, s
+    real(DP) :: rech_fact
     !-------------------------------------------------------------------------------------------
-    !$omp parallel do private(i, s)
+    !$omp parallel do private(i, s, rech_fact)
     do i = 1, st_bcnd%rech_num
       s = st_bcnd%rech2cals(i)
-      recfunc(s) = st_forc%calc_rech(i)
+      if (st_schm%rech_dreg_type == 1 .and. st_forc%calc_rech(i) < DZERO) then
+        call calc_rech_fact(infrech(s)-st_geom%cell_top(s), rech_fact)
+        recfunc(s) = st_forc%calc_rech(i)*rech_fact
+      else
+        recfunc(s) = st_forc%calc_rech(i)
+      end if
     end do
     !$omp end parallel do
 
   end subroutine func_rechterm
+
+  subroutine calc_rech_fact(phead, rfact, drfact)
+  !*********************************************************************************************
+  ! calc_rech_fact -- Calculate recharge downregulation factor
+  !*********************************************************************************************
+    ! -- modules
+    ! -- inout
+    real(DP), intent(in) :: phead
+    real(DP), intent(out) :: rfact
+    real(DP), intent(out), optional :: drfact
+    ! -- local
+    real(DP) :: norm_head
+    !-------------------------------------------------------------------------------------------
+    norm_head = min(max((phead-st_schm%rech_hmin)/st_schm%rech_hwid, DZERO), DONE)
+    rfact = DONE - (DONE-norm_head**2)**2
+    if (present(drfact)) then
+      drfact = 4.00_DP*norm_head*(DONE-norm_head**2)/st_schm%rech_hwid
+    end if
+
+  end subroutine calc_rech_fact
 
   subroutine func_wellterm(welfunc)
   !*********************************************************************************************

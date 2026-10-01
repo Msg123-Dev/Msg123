@@ -604,22 +604,24 @@ module read_input
 
     ! -- local
     integer(I4) :: ierr
-    integer(I4) :: krpos_type, stor_type, abyd_type, surfw_type, rbed_type
-    real(DP) :: abyd_ratio, krlin_head
+    integer(I4) :: krpos_type, stor_type, abyd_type, surfw_type, rbed_type, rech_dreg_type
+    real(DP) :: abyd_ratio, krlin_head, rech_hmin, rech_hwid
     namelist/set_scheme/krpos_type, stor_type, abyd_type, surfw_type, abyd_ratio, krlin_head,&
-                        rbed_type
+                        rbed_type, rech_dreg_type, rech_hmin, rech_hwid
     !-------------------------------------------------------------------------------------------
     ierr = 0
     krpos_type = st_schm%krpos_type ; stor_type = st_schm%stor_type
     abyd_type = st_schm%abyd_type ; abyd_ratio = st_schm%abyd_ratio
     krlin_head = st_schm%krlin_head ; surfw_type = st_schm%surfw_type
-    rbed_type = st_schm%rbed_type
+    rbed_type = st_schm%rbed_type ; rech_dreg_type = st_schm%rech_dreg_type
+    rech_hmin = st_schm%rech_hmin ; rech_hwid = st_schm%rech_hwid
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_scheme,iostat=ierr)
     st_schm%krpos_type = krpos_type ; st_schm%stor_type = stor_type
     st_schm%abyd_type = abyd_type ; st_schm%abyd_ratio = abyd_ratio
     st_schm%krlin_head = krlin_head ; st_schm%surfw_type = surfw_type
-    st_schm%rbed_type = rbed_type
+    st_schm%rbed_type = rbed_type ; st_schm%rech_dreg_type = rech_dreg_type
+    st_schm%rech_hmin = rech_hmin ; st_schm%rech_hwid = rech_hwid
 
     if (ierr /= 0 .and. find_nml_name("set_scheme", main_name(1:main_namen))) then
       call write_err_stop("While reading scheme section in main file.")
@@ -643,6 +645,12 @@ module read_input
       call write_err_stop("Input a valid value for surface water level type.")
     else if (st_schm%rbed_type < 0 .or. st_schm%rbed_type > 1) then
       call write_err_stop("Input a valid value for river bed type.")
+    else if (st_schm%rech_dreg_type < 0 .or. st_schm%rech_dreg_type > 1) then
+      call write_err_stop("Input a valid value for recharge downregulation type.")
+    else if (st_schm%rech_dreg_type /= 0 .and. st_schm%rech_hmin >= DZERO) then
+      call write_err_stop("Input a negative pressure head for recharge downregulation.")
+    else if (st_schm%rech_dreg_type /= 0 .and. st_schm%rech_hwid <= DZERO) then
+      call write_err_stop("Input a positive width for recharge downregulation.")
     end if
 
   end subroutine read_schm_list

@@ -104,7 +104,7 @@ module write_output
 
     if (st_out_type%rech == out_type(2)) then
       ! -- Calculate recharge results (rech_res)
-        call calc_rech_res()
+        call calc_rech_res(st_sol)
     end if
 
     if (st_out_type%well == out_type(3)) then

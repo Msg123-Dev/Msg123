@@ -77,6 +77,8 @@ module prep_calculation
     st_time%current_t = SZERO ; st_time%delt = DZERO ; st_time%delt_inv = DZERO
     st_ctrl%newper = NEWPER_BASE*len_scal_inv ; st_ctrl%newper_inv = DONE/st_ctrl%newper
     st_schm%krlin_head = st_schm%krlin_head*len_scal_inv
+    st_schm%rech_hmin = st_schm%rech_hmin*len_scal_inv
+    st_schm%rech_hwid = st_schm%rech_hwid*len_scal_inv
     st_time%now_date(:) = st_sim%sta_date(:) ; st_time%out_iter = 0 ; st_time%form_switch = 0
     st_time%conv_flag = .false.
 

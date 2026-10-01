@@ -5,6 +5,7 @@ module make_linearsystem
   use types_module, only: coef_set, sol_set
   use initial_module, only: st_ctrl
   use set_cell, only: ncalc, ncals
+  use make_cell, only: st_geom
   use set_condition, only: st_hydr, st_bcnd
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
@@ -40,7 +41,7 @@ module make_linearsystem
     allocate(st_coef%stor_per(ncalc))
     allocate(st_coef%stod(ncalc), st_coef%cond(nreg_num), st_coef%sead(ncalc))
     allocate(st_coef%dmats(ncalc))
-    allocate(st_coef%rivd(ncalc), st_coef%lakd(ncals), st_coef%surd(ncals))
+    allocate(st_coef%rivd(ncalc), st_coef%lakd(ncals), st_coef%surd(ncals), st_coef%recd(ncals))
     allocate(st_coef%deri_dcon(tot_ind), st_coef%rel_hyd(tot_ind), st_coef%deri_lucon(tot_ind))
     allocate(st_coef%deri_con1(tot_ind), st_coef%deri_con2(tot_ind))
     allocate(st_coef%over_riv(st_bcnd%rive_num), st_coef%deri_r(st_bcnd%rive_num))
@@ -112,7 +113,7 @@ module make_linearsystem
   ! make_matrix -- Make matrix
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_sim
+    use initial_module, only: st_sim, st_schm
     use calc_parameter, only: calc_srat_rperm
     ! -- inout
     type(sol_set), intent(in) :: st_sol
@@ -135,7 +136,7 @@ module make_linearsystem
     !$omp end parallel do
     !$omp parallel do private(i)
     do i = 1, ncals
-      st_coef%lakd(i) = DZERO ; st_coef%surd(i) = DZERO
+      st_coef%lakd(i) = DZERO ; st_coef%surd(i) = DZERO ; st_coef%recd(i) = DZERO
     end do
     !$omp end parallel do
 
@@ -196,12 +197,24 @@ module make_linearsystem
                         st_coef%deri_sea, st_coef%deri_ks_sea, st_coef%delh_sea,&
                         st_coef%per_sea, st_coef%rel_sea, st_coef%tran_sea)
 
+    if (st_schm%rech_dreg_type == 1) then
+      ! -- Set recharge boundary dmat (rechbound)
+        call set_rechbound(st_sol, st_coef%recd)
+    end if
+
     !$omp parallel
     !$omp do private(s)
     do s = 1, ncals
       st_coef%dmats(s) = st_coef%surd(s) + st_coef%rivd(s) + st_coef%lakd(s)
     end do
     !$omp end do
+    if (st_schm%rech_dreg_type == 1) then
+      !$omp do private(s)
+      do s = 1, ncals
+        st_coef%dmats(s) = st_coef%dmats(s) + st_coef%recd(s)
+      end do
+      !$omp end do
+    end if
     !$omp do private(i)
     do i = ncals+1, ncalc
       st_coef%dmats(i) = st_coef%rivd(i)
@@ -222,7 +235,6 @@ module make_linearsystem
   ! form_stochn -- Form storage change
   !*********************************************************************************************
     ! -- modules
-    use make_cell, only: st_geom
     ! -- inout
     real(DP), intent(in) :: stor_out(:)
     real(DP), intent(in) :: dstor_dpsi(:)
@@ -647,5 +659,30 @@ module make_linearsystem
     !$omp end parallel
 
   end subroutine set_seabound
+
+  subroutine set_rechbound(st_sol, dmat_rec)
+  !*********************************************************************************************
+  ! set_rechbound -- Set recharge boundary to dmat
+  !*********************************************************************************************
+    ! -- modules
+    use calc_function, only: calc_rech_fact
+    ! -- inout
+    real(DP), intent(inout) :: dmat_rec(:)
+    type(sol_set), intent(in) :: st_sol
+    ! -- local
+    integer(I4) :: i, s
+    real(DP) :: rech_fact, drech_fact
+    !-------------------------------------------------------------------------------------------
+    !$omp parallel do private(i, s, rech_fact, drech_fact)
+    do i = 1, st_bcnd%rech_num
+      s = st_bcnd%rech2cals(i)
+      if (st_forc%calc_rech(i) < DZERO) then
+        call calc_rech_fact(st_sol%head_new(s)-st_geom%cell_top(s), rech_fact, drech_fact)
+        dmat_rec(s) = st_forc%calc_rech(i)*drech_fact
+      end if
+    end do
+    !$omp end parallel do
+
+  end subroutine set_rechbound
 
 end module make_linearsystem

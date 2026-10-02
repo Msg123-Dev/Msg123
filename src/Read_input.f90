@@ -651,6 +651,9 @@ module read_input
       call write_err_stop("Input a negative pressure head for recharge downregulation.")
     else if (st_schm%rech_dreg_type /= 0 .and. st_schm%rech_hwid <= DZERO) then
       call write_err_stop("Input a positive width for recharge downregulation.")
+    else if (st_schm%rech_dreg_type == 0 .and.&
+             (st_schm%rech_hmin /= DZERO .or. st_schm%rech_hwid /= DZERO)) then
+      call write_err_stop("Set rech_dreg_type to use rech_hmin and rech_hwid.")
     end if
 
   end subroutine read_schm_list

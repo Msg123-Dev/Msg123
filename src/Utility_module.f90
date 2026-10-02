@@ -82,7 +82,7 @@ module utility_module
 
     if (ierr == 0 .and. write_flag == 1) then
       call write_success("Open "//err_mes//" file", file_num)
-    else if (stop_flag == 1) then
+    else if (ierr /= 0 .and. stop_flag == 1) then
       call write_err_stop("Open "//err_mes//" file.")
     end if
 
@@ -116,7 +116,7 @@ module utility_module
 
     if (ierr == 0 .and. write_flag == 1) then
       call write_success("Open "//err_mes//" file", file_num)
-    else if (stop_flag == 1) then
+    else if (ierr /= 0 .and. stop_flag == 1) then
       call write_err_stop("Open "//err_mes//" file.")
     end if
 

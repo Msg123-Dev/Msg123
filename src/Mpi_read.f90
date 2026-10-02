@@ -610,8 +610,8 @@ module mpi_read
           if (ierr /= 0) then
             call write_err_read(bnum)
           end if
-          file_len = len(intpath)
         end if
+        file_len = len(intpath)
         call MPI_BCAST(intpath, file_len, MPI_CHARACTER, 0, st_mpi%comm, ierr)
         if (ierr /= MPI_SUCCESS) then
           if (st_mpi%rank == 0) then

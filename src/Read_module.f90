@@ -688,13 +688,13 @@ module read_module
     allocate(type_txt(2), type_bin(2))
     type_txt(:) = [in_type(3), in_type(5)] ; type_bin(:) = [in_type(4), in_type(6)]
 
+    allocate(character(0) :: err_mes)
+    err_mes = "input "//trim(adjustl(fname))//" time interval"
     time_flag = 0 ; count_num = 0
     do while (time_flag == 0)
       fetime = finend + fstep*count_num
       fetime = fetime*fmulti
       if (fetime <= st_init%rest_time .and. st_sim%res_type == 1) then
-        allocate(character(0) :: err_mes)
-        err_mes = "input"//trim(adjustl(fname))//" time interval"
         if (any(ftype == type_txt(:))) then
           call close_file(fnum)
           read(unit=bunit,fmt='(a)',iostat=ierr) intpath
@@ -715,13 +715,10 @@ module read_module
         count_num = count_num + 1
       else
         time_flag = 1
-        if (allocated(err_mes)) then
-          deallocate(err_mes)
-        end if
       end if
     end do
 
-    deallocate(type_txt, type_bin)
+    deallocate(type_txt, type_bin, err_mes)
 
   end subroutine skip_file_int
 

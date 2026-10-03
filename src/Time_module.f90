@@ -1702,12 +1702,11 @@ module time_module
     ! -- inout
     integer(I4), intent(in) :: out_num
     ! -- local
-    integer(I4) :: incr_num, decr_num
+
     !-------------------------------------------------------------------------------------------
-    incr_num = int(st_ctrl%maxout_iter*0.4) ; decr_num = int(st_ctrl%maxout_iter*0.8)
-    if (out_num <= incr_num) then
+    if (out_num <= st_ctrl%incr_iter) then
       st_time%delt = delt_old1*st_sim%inc_fact
-    else if (out_num <= decr_num) then
+    else if (out_num <= st_ctrl%decr_iter) then
       st_time%delt = delt_old1
     else
       st_time%delt = delt_old1*st_sim%dec_fact

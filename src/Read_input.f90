@@ -487,13 +487,14 @@ module read_input
     real(DP) :: init_step, incr_multi, decr_multi, min_tstep, max_tstep
     integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type, expd_type
     integer(I4) :: conv_type, noconv_type, datum_type, deri_type, picard_btr
+    integer(I4) :: incr_iter, decr_iter
     real(DP) :: criteria, res_abs_tol, res_rel_tol, dilu_shift, dsat_max
     real(DP) :: picard_btol, picard_bfact, picard_blim
     namelist/set_solution/init_step, tstep_type, incr_multi, decr_multi, min_tstep, max_tstep,&
                           maxout_iter, picard_iter, criteria, maxinn_iter, precon_type,&
                           res_abs_tol, res_rel_tol, dilu_shift, expd_type, dsat_max,&
                           conv_type, noconv_type, datum_type, deri_type, picard_btr,&
-                          picard_btol, picard_bfact, picard_blim
+                          picard_btol, picard_bfact, picard_blim, incr_iter, decr_iter
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; init_step = DZERO ; incr_multi = DZERO ; decr_multi = DZERO ; max_tstep = DINFI
     min_tstep = DZERO ; noconv_type = st_ctrl%noconv_type
@@ -506,6 +507,7 @@ module read_input
     datum_type = st_ctrl%datum_type ; deri_type = st_ctrl%deri_type
     picard_btr = st_ctrl%picard_btr ; picard_btol = st_ctrl%picard_btol
     picard_bfact = st_ctrl%picard_bfact ; picard_blim = st_ctrl%picard_blim
+    incr_iter = st_ctrl%incr_iter ; decr_iter = st_ctrl%decr_iter
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_solution,iostat=ierr)
     st_ctrl%tstep_type = tstep_type ; st_ctrl%maxout_iter = maxout_iter
@@ -518,6 +520,7 @@ module read_input
     st_ctrl%picard_btr = picard_btr ; st_ctrl%picard_btol = picard_btol
     st_ctrl%picard_bfact = picard_bfact ; st_ctrl%picard_blim = picard_blim
     st_ctrl%noconv_type = noconv_type
+    st_ctrl%incr_iter = incr_iter ; st_ctrl%decr_iter = decr_iter
 
     if (ierr /= 0) then
       call write_err_stop("While reading solution section in main file.")
@@ -575,6 +578,22 @@ module read_input
       call write_err_stop("Input a value between zero and one for picard step reduction.")
     else if (picard_blim < DZERO) then
       call write_err_stop("Input a non-negative value for picard backtracking limit.")
+    else if (incr_iter < 0) then
+      call write_err_stop("Input a non-negative value for step increase iteration.")
+    else if (decr_iter < 0) then
+      call write_err_stop("Input a non-negative value for step decrease iteration.")
+    else if (tstep_type /= 1 .and. (incr_iter /= 0 .or. decr_iter /= 0)) then
+      call write_err_stop("Set tstep_type=1 to use incr_iter and decr_iter.")
+    end if
+
+    if (st_ctrl%incr_iter == 0) then
+      st_ctrl%incr_iter = int(st_ctrl%maxout_iter*0.4)
+    end if
+    if (st_ctrl%decr_iter == 0) then
+      st_ctrl%decr_iter = int(st_ctrl%maxout_iter*0.8)
+    end if
+    if (st_ctrl%incr_iter > st_ctrl%decr_iter) then
+      call write_err_stop("Step increase iteration is larger than step decrease iteration.")
     end if
 
     st_ctrl%nlevel = 1

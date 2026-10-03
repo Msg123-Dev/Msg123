@@ -27,6 +27,7 @@ module types_module
 
   type :: ctrl_set
     integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type, expd_type
+    integer(I4) :: incr_iter, decr_iter
     integer(I4) :: conv_type, noconv_type, datum_type, deri_type, picard_btr, ostep_type
     integer(I4) :: nlevel, maxvcy_iter, amg_nlevel, max_sweep
     integer(I4) :: noclas_flag = 0

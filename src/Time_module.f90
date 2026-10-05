@@ -1531,8 +1531,6 @@ module time_module
     conv_fnum = st_out_fnum%conv
     cond_format = '(1x,a,es18.11," ('//trim(st_sim%cal_unit)//')")'
 
-    !$omp parallel shared(conv_fnum, cond_format)
-    !$omp single
     if (st_step_flag%rech == 1) then
       write(conv_fnum,cond_format) "Changed recharge condition at ", st_time%now_time
     end if
@@ -1584,8 +1582,6 @@ module time_module
     if (st_step_flag%laar == 1) then
       write(conv_fnum,cond_format) "Changed lake area at ", st_time%now_time
     end if
-    !$omp end single
-    !$omp end parallel
 
   end subroutine write_bound_change
 

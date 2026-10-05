@@ -980,7 +980,7 @@ module check_condition
     integer(I4) :: dunr_file
     character(:), allocatable :: out_mess
     !-------------------------------------------------------------------------------------------
-    if (st_out_type%dunr == out_type(3)) then
+    if (st_out_type%dunr == out_type(2)) then
       allocate(character(len=0) :: out_mess)
       dunr_file = 0 ; out_mess = "output dunne runoff"
       ! -- Open output binary file (out_binf)

@@ -699,6 +699,15 @@ module calc_function
     end if
 #endif
 
+    if (l2_v <= DZERO) then
+      !$omp parallel do private(i)
+      do i = 1, vj_num
+        outjv(i) = DZERO
+      end do
+      !$omp end parallel do
+      return
+    end if
+
     if (l2_x < DZERO) then
       sign = -DONE
     else

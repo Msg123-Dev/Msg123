@@ -19,7 +19,7 @@ module calc_function
   private
   public :: allocate_calfun, calc_func, calc_mass, calc_vecjacf, set_surfw_head
   public :: func_rechterm, func_wellterm, func_surfterm, func_riveterm
-  public :: func_laketerm, func_sealterm, calc_rech_fact
+  public :: func_laketerm, func_sealterm, calc_rech_fact, calc_rech_rej, calc_hort_fcap
   ! -- local
   real(DP), allocatable :: stof(:), conf(:), welf(:), seaf(:)
   real(DP), allocatable :: funcvs(:)
@@ -378,13 +378,18 @@ module calc_function
     ! -- local
     integer(I4) :: i, s
     real(DP) :: rech_fact
+    logical :: rej_flag
     !-------------------------------------------------------------------------------------------
+    rej_flag = st_schm%rech_hort_type /= 0 .or. st_schm%rech_dunn_type /= 0
     !$omp parallel do private(i, s, rech_fact)
     do i = 1, st_bcnd%rech_num
       s = st_bcnd%rech2cals(i)
       if (st_schm%rech_dreg_type == 1 .and. st_forc%calc_rech(i) < DZERO) then
-        call calc_rech_fact(infrech(s)-st_geom%cell_top(s), rech_fact)
+        call calc_rech_fact(infrech(s)-st_geom%cell_top(s), st_schm%rech_dreg_hmin,&
+                            st_schm%rech_dreg_hwid, rech_fact)
         recfunc(s) = st_forc%calc_rech(i)*rech_fact
+      else if (rej_flag .and. st_forc%calc_rech(i) > DZERO) then
+        call calc_rech_rej(i, s, infrech(s), recfunc(s))
       else
         recfunc(s) = st_forc%calc_rech(i)
       end if
@@ -393,25 +398,129 @@ module calc_function
 
   end subroutine func_rechterm
 
-  subroutine calc_rech_fact(phead, rfact, drfact)
+  subroutine calc_rech_fact(phead, hmin, hwid, rfact, drfact)
   !*********************************************************************************************
   ! calc_rech_fact -- Calculate recharge downregulation factor
   !*********************************************************************************************
     ! -- modules
     ! -- inout
-    real(DP), intent(in) :: phead
+    real(DP), intent(in) :: phead, hmin, hwid
     real(DP), intent(out) :: rfact
     real(DP), intent(out), optional :: drfact
     ! -- local
     real(DP) :: norm_head
     !-------------------------------------------------------------------------------------------
-    norm_head = min(max((phead-st_schm%rech_hmin)/st_schm%rech_hwid, DZERO), DONE)
+    norm_head = min(max((phead-hmin)/hwid, DZERO), DONE)
     rfact = DONE - (DONE-norm_head**2)**2
     if (present(drfact)) then
-      drfact = 4.00_DP*norm_head*(DONE-norm_head**2)/st_schm%rech_hwid
+      drfact = 4.00_DP*norm_head*(DONE-norm_head**2)/hwid
     end if
 
   end subroutine calc_rech_fact
+
+  subroutine calc_rech_rej(rnum, snum, head, qval, gval, sval, dqval)
+  !*********************************************************************************************
+  ! calc_rech_rej -- Calculate positive recharge left after horton and dunne rejection
+  !*********************************************************************************************
+    ! -- modules
+    ! -- inout
+    integer(I4), intent(in) :: rnum, snum
+    real(DP), intent(in) :: head
+    real(DP), intent(out) :: qval
+    real(DP), intent(out), optional :: gval, sval, dqval
+    ! -- local
+    real(DP) :: rech_val, dunn_fact, ddunn_fact, fcap, dfcap, smin_val, dsmin
+    !-------------------------------------------------------------------------------------------
+    rech_val = st_forc%calc_rech(rnum) ; dunn_fact = DONE ; ddunn_fact = DZERO
+    if (st_schm%rech_dunn_type == 1) then
+      dunn_fact = st_forc%dunn_rati(rnum)
+    else if (st_schm%rech_dunn_type == 2) then
+      call calc_rech_fact(st_geom%cell_top(snum)-head, DZERO, st_schm%rech_dunn_hwid,&
+                          dunn_fact, ddunn_fact)
+      ddunn_fact = -ddunn_fact
+    end if
+
+    smin_val = rech_val ; dsmin = DZERO
+    if (st_schm%rech_hort_type == 1) then
+      call calc_rech_smin(rech_val, st_forc%hort_fcap(rnum), smin_val)
+    else if (st_schm%rech_hort_type == 2) then
+      call calc_hort_fcap(snum, head, fcap, dfcap)
+      call calc_rech_smin(rech_val, fcap, smin_val, dsmin)
+      dsmin = dsmin*dfcap
+    end if
+
+    qval = dunn_fact*smin_val
+    if (present(gval)) then
+      gval = dunn_fact
+    end if
+    if (present(sval)) then
+      sval = smin_val
+    end if
+    if (present(dqval)) then
+      dqval = ddunn_fact*smin_val + dunn_fact*dsmin
+    end if
+
+  end subroutine calc_rech_rej
+
+  subroutine calc_rech_smin(rval, fval, sval, dsval)
+  !*********************************************************************************************
+  ! calc_rech_smin -- Calculate smoothed minimum of recharge and infiltration capacity
+  !*********************************************************************************************
+    ! -- modules
+    ! -- inout
+    real(DP), intent(in) :: rval, fval
+    real(DP), intent(out) :: sval
+    real(DP), intent(out), optional :: dsval
+    ! -- local
+    real(DP) :: rwid, rati, dsmin
+    !-------------------------------------------------------------------------------------------
+    rwid = st_schm%rech_hort_rwid ; rati = fval/rval
+    if (rati <= DONE-rwid) then
+      sval = fval ; dsmin = DONE
+    else if (rati >= DONE+rwid) then
+      sval = rval ; dsmin = DZERO
+    else
+      sval = rval*(rati-(rati-DONE+rwid)**2/(4.00_DP*rwid))
+      dsmin = DONE - (rati-DONE+rwid)/(2.00_DP*rwid)
+    end if
+    if (present(dsval)) then
+      dsval = dsmin
+    end if
+
+  end subroutine calc_rech_smin
+
+  subroutine calc_hort_fcap(snum, head, fcap, dfcap)
+  !*********************************************************************************************
+  ! calc_hort_fcap -- Calculate horton infiltration capacity
+  !*********************************************************************************************
+    ! -- modules
+    ! -- inout
+    integer(I4), intent(in) :: snum
+    real(DP), intent(in) :: head
+    real(DP), intent(out) :: fcap
+    real(DP), intent(out), optional :: dfcap
+    ! -- local
+    real(DP), parameter :: FCAP_RFAC = 0.10_DP
+    real(DP) :: ks_area, half_dis, rwid, grad_head, cap_fact, dcap_fact
+    !-------------------------------------------------------------------------------------------
+    ks_area = st_hydr%hydf_surf(snum)*st_hydr%rech_area(snum)
+    cap_fact = DONE ; dcap_fact = DZERO
+    if (st_schm%rech_hort_form == 0) then
+      half_dis = st_geom%cell_top(snum) - st_geom%cell_cent(snum) ; rwid = FCAP_RFAC*half_dis
+      grad_head = st_geom%surf_elev(snum) - head
+      if (grad_head >= half_dis+rwid) then
+        cap_fact = grad_head/half_dis ; dcap_fact = DONE/half_dis
+      else if (grad_head > half_dis-rwid) then
+        cap_fact = DONE + (grad_head-half_dis+rwid)**2/(4.00_DP*rwid*half_dis)
+        dcap_fact = (grad_head-half_dis+rwid)/(2.00_DP*rwid*half_dis)
+      end if
+    end if
+    fcap = ks_area*cap_fact
+    if (present(dfcap)) then
+      dfcap = -ks_area*dcap_fact
+    end if
+
+  end subroutine calc_hort_fcap
 
   subroutine func_wellterm(welfunc)
   !*********************************************************************************************

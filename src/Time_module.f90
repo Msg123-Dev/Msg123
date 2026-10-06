@@ -7,7 +7,7 @@ module time_module
   use initial_module, only: st_sim, st_ctrl, st_in_type, st_rivf_type, st_lakf_type, st_seal
   use initial_module, only: st_rech, st_prec, st_evap, st_well, st_riwl, st_riwd, st_ribl
   use initial_module, only: st_ride, st_riwi, st_rile, st_ribk, st_ribt, st_lawl, st_lawd
-  use initial_module, only: st_labl, st_laar, st_step_flag
+  use initial_module, only: st_labl, st_laar, st_step_flag, st_schm
   use open_file, only: st_intre, st_intpr, st_intev
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc, ncals
@@ -99,6 +99,10 @@ module time_module
         if (geog_num /= 0) then
           ! -- Change the recharge volume
             call change_recharge(st_sol)
+        end if
+        if (st_schm%rech_hort_type == 1 .or. st_schm%rech_dunn_type == 1) then
+          ! -- Set recharge rejection at the step start (rech_step)
+            call set_rech_step(st_sol)
         end if
       end if
     end if
@@ -866,8 +870,8 @@ module time_module
                       get_nextout(st_out_step%mass), get_nextout(st_out_step%velc),&
                       get_nextout(st_out_step%rivr), get_nextout(st_out_step%lakr),&
                       get_nextout(st_out_step%sufr), get_nextout(st_out_step%dunr),&
-                      get_nextout(st_out_step%seal), get_nextout(st_out_step%well),&
-                      get_nextout(st_out_step%rech))
+                      get_nextout(st_out_step%horr), get_nextout(st_out_step%seal),&
+                      get_nextout(st_out_step%well), get_nextout(st_out_step%rech))
     end if
 
     if (st_time%delt > st_sim%max_step) then
@@ -1396,6 +1400,43 @@ module time_module
     deallocate(water_dep, rech_rati)
 
   end subroutine change_recharge
+
+  subroutine set_rech_step(st_sol)
+  !*********************************************************************************************
+  ! set_rech_step -- Set recharge rejection at the step start
+  !*********************************************************************************************
+    ! -- modules
+    use make_cell, only: st_geom
+    use calc_function, only: calc_rech_fact, calc_hort_fcap
+    ! -- inout
+    type(sol_set), intent(in) :: st_sol
+    ! -- local
+    integer(I4) :: i, s
+    !-------------------------------------------------------------------------------------------
+    if (allocated(st_forc%dunn_rati)) then
+      if (size(st_forc%dunn_rati) /= st_bcnd%rech_num) then
+        deallocate(st_forc%dunn_rati, st_forc%hort_fcap)
+      end if
+    end if
+    if (.not. allocated(st_forc%dunn_rati)) then
+      allocate(st_forc%dunn_rati(st_bcnd%rech_num), st_forc%hort_fcap(st_bcnd%rech_num))
+    end if
+
+    !$omp parallel do private(i, s)
+    do i = 1, st_bcnd%rech_num
+      s = st_bcnd%rech2cals(i)
+      st_forc%dunn_rati(i) = DONE ; st_forc%hort_fcap(i) = DZERO
+      if (st_schm%rech_dunn_type == 1) then
+        call calc_rech_fact(st_geom%cell_top(s)-st_sol%head_new(s), DZERO,&
+                            st_schm%rech_dunn_hwid, st_forc%dunn_rati(i))
+      end if
+      if (st_schm%rech_hort_type == 1) then
+        call calc_hort_fcap(s, st_sol%head_new(s), st_forc%hort_fcap(i))
+      end if
+    end do
+    !$omp end parallel do
+
+  end subroutine set_rech_step
 
   subroutine calc_vheadout(st_sol)
   !*********************************************************************************************

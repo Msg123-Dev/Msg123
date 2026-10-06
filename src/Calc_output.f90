@@ -3,16 +3,18 @@ module calc_output
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE
   use types_module, only: sol_set
+  use initial_module, only: st_schm
   use set_cell, only: ncalc, ncals
   use set_condition, only: st_hydr, st_bcnd
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
+  use calc_function, only: calc_rech_rej
   use allocate_output, only: st_msloc
 
   implicit none
   private
   public :: calc_wtable, calc_cell_mas, calc_out_mass, calc_outvelc
-  public :: calc_rivr_off, calc_lakr_off, calc_sufr_off, calc_dunr_off
+  public :: calc_rivr_off, calc_lakr_off, calc_sufr_off, calc_dunr_off, calc_horr_off
   public :: calc_seal_res, calc_rech_res, calc_well_res
 
   ! -- local
@@ -394,16 +396,17 @@ module calc_output
 
   end subroutine calc_sufr_off
 
-  subroutine calc_dunr_off()
+  subroutine calc_dunr_off(st_sol)
   !*********************************************************************************************
   ! calc_dunr_off -- Calculate dunne runoff
   !*********************************************************************************************
     ! -- modules
     use allocate_output, only: dunn_sumtime, roff_dunn
     ! -- inout
-
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, s
+    real(DP) :: rech_val, dunn_fact
     real(DP), allocatable :: dunns(:), temp_dunn(:)
     !-------------------------------------------------------------------------------------------
     allocate(dunns(st_bcnd%rech_num), temp_dunn(st_bcnd%rech_num))
@@ -415,10 +418,15 @@ module calc_output
     end do
     !$omp end do
 
-    !$omp do private(i, s)
+    !$omp do private(i, s, rech_val, dunn_fact)
     do i = 1, st_bcnd%rech_num
       s = st_bcnd%rech2cals(i)
-      if (st_hydr%rech_area(s) > DZERO) then
+      if (st_schm%rech_dunn_type /= 0) then
+        if (st_forc%calc_rech(i) > DZERO .and. st_hydr%rech_area(s) > DZERO) then
+          call calc_rech_rej(i, s, st_sol%head_new(s), rech_val, gval=dunn_fact)
+          dunns(i) = (DONE-dunn_fact)*st_forc%calc_rech(i)/st_hydr%rech_area(s)
+        end if
+      else if (st_hydr%rech_area(s) > DZERO) then
         dunns(i) = st_forc%read_rech(i) - st_forc%calc_rech(i)/st_hydr%rech_area(s)
       else
         dunns(i) = st_forc%read_rech(i)
@@ -438,6 +446,52 @@ module calc_output
     dunn_sumtime = dunn_sumtime + st_time%delt
 
   end subroutine calc_dunr_off
+
+  subroutine calc_horr_off(st_sol)
+  !*********************************************************************************************
+  ! calc_horr_off -- Calculate horton runoff
+  !*********************************************************************************************
+    ! -- modules
+    use allocate_output, only: hort_sumtime, roff_hort
+    ! -- inout
+    type(sol_set), intent(in) :: st_sol
+    ! -- local
+    integer(I4) :: i, s
+    real(DP) :: rech_val, dunn_fact, smin_val
+    real(DP), allocatable :: horts(:), temp_hort(:)
+    !-------------------------------------------------------------------------------------------
+    allocate(horts(st_bcnd%rech_num), temp_hort(st_bcnd%rech_num))
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, st_bcnd%rech_num
+      horts(i) = DZERO
+      temp_hort(i) = roff_hort(i)
+    end do
+    !$omp end do
+
+    !$omp do private(i, s, rech_val, dunn_fact, smin_val)
+    do i = 1, st_bcnd%rech_num
+      s = st_bcnd%rech2cals(i)
+      if (st_schm%rech_hort_type /= 0 .and. st_forc%calc_rech(i) > DZERO .and.&
+          st_hydr%rech_area(s) > DZERO) then
+        call calc_rech_rej(i, s, st_sol%head_new(s), rech_val, gval=dunn_fact, sval=smin_val)
+        horts(i) = dunn_fact*(st_forc%calc_rech(i)-smin_val)/st_hydr%rech_area(s)
+      end if
+    end do
+    !$omp end do
+
+    !$omp do private(i)
+    do i = 1, st_bcnd%rech_num
+      roff_hort(i) = temp_hort(i) + horts(i)*st_time%delt
+    end do
+    !$omp end do
+    !$omp end parallel
+
+    deallocate(horts, temp_hort)
+
+    hort_sumtime = hort_sumtime + st_time%delt
+
+  end subroutine calc_horr_off
 
   subroutine calc_seal_res(st_sol)
   !*********************************************************************************************

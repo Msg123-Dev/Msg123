@@ -624,26 +624,39 @@ module read_input
     ! -- local
     integer(I4) :: ierr
     integer(I4) :: krpos_type, stor_type, abyd_type, surfw_type, rbed_type, rech_dreg_type
-    real(DP) :: abyd_ratio, krlin_head, rech_hmin, rech_hwid
+    integer(I4) :: rech_hort_type, rech_hort_form, rech_dunn_type
+    real(DP) :: abyd_ratio, krlin_head, rech_dreg_hmin, rech_dreg_hwid
+    real(DP) :: rech_hort_rwid, rech_dunn_hwid, rech_hmin, rech_hwid
     namelist/set_scheme/krpos_type, stor_type, abyd_type, surfw_type, abyd_ratio, krlin_head,&
-                        rbed_type, rech_dreg_type, rech_hmin, rech_hwid
+                        rbed_type, rech_dreg_type, rech_dreg_hmin, rech_dreg_hwid,&
+                        rech_hort_type, rech_hort_form, rech_hort_rwid, rech_dunn_type,&
+                        rech_dunn_hwid, rech_hmin, rech_hwid
     !-------------------------------------------------------------------------------------------
     ierr = 0
     krpos_type = st_schm%krpos_type ; stor_type = st_schm%stor_type
     abyd_type = st_schm%abyd_type ; abyd_ratio = st_schm%abyd_ratio
     krlin_head = st_schm%krlin_head ; surfw_type = st_schm%surfw_type
     rbed_type = st_schm%rbed_type ; rech_dreg_type = st_schm%rech_dreg_type
-    rech_hmin = st_schm%rech_hmin ; rech_hwid = st_schm%rech_hwid
+    rech_dreg_hmin = st_schm%rech_dreg_hmin ; rech_dreg_hwid = st_schm%rech_dreg_hwid
+    rech_hort_type = st_schm%rech_hort_type ; rech_hort_form = st_schm%rech_hort_form
+    rech_hort_rwid = st_schm%rech_hort_rwid ; rech_dunn_type = st_schm%rech_dunn_type
+    rech_dunn_hwid = st_schm%rech_dunn_hwid ; rech_hmin = DNOVAL ; rech_hwid = DNOVAL
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_scheme,iostat=ierr)
     st_schm%krpos_type = krpos_type ; st_schm%stor_type = stor_type
     st_schm%abyd_type = abyd_type ; st_schm%abyd_ratio = abyd_ratio
     st_schm%krlin_head = krlin_head ; st_schm%surfw_type = surfw_type
     st_schm%rbed_type = rbed_type ; st_schm%rech_dreg_type = rech_dreg_type
-    st_schm%rech_hmin = rech_hmin ; st_schm%rech_hwid = rech_hwid
+    st_schm%rech_dreg_hmin = rech_dreg_hmin ; st_schm%rech_dreg_hwid = rech_dreg_hwid
+    st_schm%rech_hort_type = rech_hort_type ; st_schm%rech_hort_form = rech_hort_form
+    st_schm%rech_hort_rwid = rech_hort_rwid ; st_schm%rech_dunn_type = rech_dunn_type
+    st_schm%rech_dunn_hwid = rech_dunn_hwid
 
     if (ierr /= 0 .and. find_nml_name("set_scheme", main_name(1:main_namen))) then
       call write_err_stop("While reading scheme section in main file.")
+    else if (rech_hmin /= DNOVAL .or. rech_hwid /= DNOVAL) then
+      call write_err_stop("Rename rech_hmin and rech_hwid to rech_dreg_hmin and "//&
+                          "rech_dreg_hwid.")
     else if (st_schm%krpos_type < 0) then
       call write_err_stop("Input a non-negative value for kr position type.")
     else if (st_schm%krpos_type > 1) then
@@ -666,13 +679,35 @@ module read_input
       call write_err_stop("Input a valid value for river bed type.")
     else if (st_schm%rech_dreg_type < 0 .or. st_schm%rech_dreg_type > 1) then
       call write_err_stop("Input a valid value for recharge downregulation type.")
-    else if (st_schm%rech_dreg_type /= 0 .and. st_schm%rech_hmin >= DZERO) then
+    else if (st_schm%rech_dreg_type /= 0 .and. st_schm%rech_dreg_hmin >= DZERO) then
       call write_err_stop("Input a negative pressure head for recharge downregulation.")
-    else if (st_schm%rech_dreg_type /= 0 .and. st_schm%rech_hwid <= DZERO) then
+    else if (st_schm%rech_dreg_type /= 0 .and. st_schm%rech_dreg_hwid <= DZERO) then
       call write_err_stop("Input a positive width for recharge downregulation.")
     else if (st_schm%rech_dreg_type == 0 .and.&
-             (st_schm%rech_hmin /= DZERO .or. st_schm%rech_hwid /= DZERO)) then
-      call write_err_stop("Set rech_dreg_type to use rech_hmin and rech_hwid.")
+             (st_schm%rech_dreg_hmin /= DZERO .or. st_schm%rech_dreg_hwid /= DZERO)) then
+      call write_err_stop("Set rech_dreg_type to use rech_dreg_hmin and rech_dreg_hwid.")
+    else if (st_schm%rech_hort_type < 0 .or. st_schm%rech_hort_type > 2) then
+      call write_err_stop("Input a valid value for horton rejection type.")
+    else if (st_schm%rech_hort_form < 0 .or. st_schm%rech_hort_form > 1) then
+      call write_err_stop("Input a valid value for horton capacity form.")
+    else if (st_schm%rech_hort_rwid < DZERO .or. st_schm%rech_hort_rwid >= DONE) then
+      call write_err_stop("Input a value between zero and one for horton rejection width.")
+    else if (st_schm%rech_hort_type == 0 .and.&
+             (st_schm%rech_hort_form /= 0 .or. st_schm%rech_hort_rwid /= DZERO)) then
+      call write_err_stop("Set rech_hort_type to use rech_hort_form and rech_hort_rwid.")
+    else if (st_schm%rech_dunn_type < 0 .or. st_schm%rech_dunn_type > 2) then
+      call write_err_stop("Input a valid value for dunne rejection type.")
+    else if (st_schm%rech_dunn_type /= 0 .and. st_schm%rech_dunn_hwid <= DZERO) then
+      call write_err_stop("Input a positive width for dunne rejection.")
+    else if (st_schm%rech_dunn_type == 0 .and. st_schm%rech_dunn_hwid /= DZERO) then
+      call write_err_stop("Set rech_dunn_type to use rech_dunn_hwid.")
+    else if ((st_schm%rech_hort_type /= 0 .or. st_schm%rech_dunn_type /= 0) .and.&
+             st_schm%surfw_type == 0) then
+      call write_err_stop("Set surfw_type to 1, 2 or 3 to use horton or dunne rejection.")
+    end if
+
+    if (st_schm%rech_hort_type /= 0 .and. st_schm%rech_hort_rwid == DZERO) then
+      st_schm%rech_hort_rwid = 0.10_DP
     end if
 
   end subroutine read_schm_list
@@ -1254,6 +1289,9 @@ module read_input
       end if
 
       st_in_type%geog = geog_type ; st_in_path%geog = trim(adjustl(geog_file))
+      if (st_schm%rech_dunn_type /= 0) then
+        call write_err_stop("Set rech_dunn_type to 0 when set_geog is used.")
+      end if
     end if
 
   end subroutine read_geog_list
@@ -1646,26 +1684,27 @@ module read_input
     ! -- local
     integer(I4) :: i, ierr
     integer(I4) :: head_time, rest_time, srat_time, wtab_time, mass_time
-    integer(I4) :: velc_time, rivr_time, lakr_time, sufr_time, dunr_time
+    integer(I4) :: velc_time, rivr_time, lakr_time, sufr_time, dunr_time, horr_time
     integer(I4) :: seal_time, well_time, rech_time, ostep_type
     character(:), allocatable :: str_sim_type, str_sim_name
     character(TIMELEN) :: head_unit, rest_unit, srat_unit, wtab_unit, mass_unit
-    character(TIMELEN) :: velc_unit, rivr_unit, lakr_unit, sufr_unit, dunr_unit
+    character(TIMELEN) :: velc_unit, rivr_unit, lakr_unit, sufr_unit, dunr_unit, horr_unit
     character(TIMELEN) :: seal_unit, well_unit, rech_unit
     namelist/set_out_unit/head_unit, rest_unit, srat_unit, wtab_unit, mass_unit,&
                           velc_unit, rivr_unit, lakr_unit, sufr_unit, dunr_unit,&
-                          seal_unit, well_unit, rech_unit
+                          horr_unit, seal_unit, well_unit, rech_unit
     namelist/set_out_time/head_time, rest_time, srat_time, wtab_time, mass_time,&
                           velc_time, rivr_time, lakr_time, sufr_time, dunr_time,&
-                          seal_time, well_time, rech_time, ostep_type
+                          horr_time, seal_time, well_time, rech_time, ostep_type
     !-------------------------------------------------------------------------------------------
     ierr = 0
     head_unit = "" ; rest_unit = "" ; srat_unit = "" ; wtab_unit = "" ; mass_unit = ""
     velc_unit = "" ; rivr_unit = "" ; lakr_unit = "" ; sufr_unit = "" ; dunr_unit = ""
-    seal_unit = "" ; well_unit = "" ; rech_unit = ""
+    horr_unit = "" ; seal_unit = "" ; well_unit = "" ; rech_unit = ""
     head_time = 0 ; rest_time = 0 ; srat_time = 0 ; wtab_time = 0 ; mass_time = 0
     velc_time = 0 ; rivr_time = 0 ; lakr_time = 0 ; sufr_time = 0 ; dunr_time = 0
-    seal_time = 0 ; well_time = 0 ; rech_time = 0 ; ostep_type = st_ctrl%ostep_type
+    horr_time = 0 ; seal_time = 0 ; well_time = 0 ; rech_time = 0
+    ostep_type = st_ctrl%ostep_type
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_out_unit,iostat=ierr)
     if (ierr /= 0) then
@@ -1741,6 +1780,10 @@ module read_input
         st_out_type%dunr = out_type(2)
         st_out_path%dunr = "dunr_"//str_sim_name//".bin"
         st_out_unit%dunr = dunr_unit ; st_out_time%dunr = dunr_time
+      case ('horr')
+        st_out_type%horr = out_type(2)
+        st_out_path%horr = "horr_"//str_sim_name//".bin"
+        st_out_unit%horr = horr_unit ; st_out_time%horr = horr_time
       case ('seal')
         st_out_type%seal = out_type(3)
         st_out_path%seal = "seal_"//str_sim_name//".bin"

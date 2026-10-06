@@ -23,7 +23,7 @@ module check_condition
 
   type :: fnum_out
     integer(I4) :: conv, head, rest, srat, wtab, mass, velx, vely, velz
-    integer(I4) :: rivr, lakr, sufr, dunr, seal, well, rech, calg
+    integer(I4) :: rivr, lakr, sufr, dunr, horr, seal, well, rech, calg
   end type fnum_out
   type(fnum_out), public :: st_out_fnum
 
@@ -431,6 +431,9 @@ module check_condition
 
     ! -- Check dunne runoff file (dunrf)
       call check_dunrf()
+
+    ! -- Check horton runoff file (horrf)
+      call check_horrf()
 
     ! -- Check output sea results file (out_sealf)
       call check_out_sealf()
@@ -996,6 +999,35 @@ module check_condition
     end if
 
   end subroutine check_dunrf
+
+  subroutine check_horrf()
+  !*********************************************************************************************
+  ! check_horrf -- Check horton runoff file
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: horr_file
+    character(:), allocatable :: out_mess
+    !-------------------------------------------------------------------------------------------
+    if (st_out_type%horr == out_type(2)) then
+      allocate(character(len=0) :: out_mess)
+      horr_file = 0 ; out_mess = "output horton runoff"
+      ! -- Open output binary file (out_binf)
+        call open_out_binf(horr_file, st_out_time%horr, st_out_path%horr, st_out_unit%horr,&
+                           out_mess, st_out_step%horr)
+#ifdef MPI_MSG
+      ! -- Set real4 file view (real4_fview)
+        call set_real4_fview(horr_file, write_2dview, out_mess)
+#endif
+      st_out_fnum%horr = horr_file
+
+      deallocate(out_mess)
+    end if
+
+  end subroutine check_horrf
 
   subroutine check_out_sealf()
   !*********************************************************************************************

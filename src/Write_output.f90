@@ -37,7 +37,8 @@ module write_output
     use check_simulation, only: check_outtiming, write_flag
     use allocate_output, only: allocate_outvar
     use calc_output, only: calc_cell_mas, calc_rivr_off, calc_lakr_off, calc_sufr_off
-    use calc_output, only: calc_dunr_off, calc_seal_res, calc_rech_res, calc_well_res
+    use calc_output, only: calc_dunr_off, calc_horr_off, calc_seal_res, calc_rech_res
+    use calc_output, only: calc_well_res
     use time_module, only: check_outstep
 #ifdef MPI_MSG
     use mpi_write, only: write_mpi_rest, set_senrec_wtab
@@ -94,7 +95,12 @@ module write_output
 
     if (st_out_type%dunr == out_type(2)) then
       ! -- Calculate dunne runoff (dunr_off)
-        call calc_dunr_off()
+        call calc_dunr_off(st_sol)
+    end if
+
+    if (st_out_type%horr == out_type(2)) then
+      ! -- Calculate horton runoff (horr_off)
+        call calc_horr_off(st_sol)
     end if
 
     if (st_out_type%seal == out_type(3)) then
@@ -238,6 +244,19 @@ module write_output
         else if (lasttime_flag== 1) then
           ! -- Write dunne runoff file (out_dunrf)
             call write_out_dunrf(time_val)
+        end if
+      end if
+
+      if (st_out_type%horr == out_type(2)) then
+        if (st_out_step%horr == SZERO) then
+          ! -- Write horton runoff file (out_horrf)
+            call write_out_horrf(time_val)
+        else if (check_outstep(st_out_step%horr)) then
+          ! -- Write horton runoff file (out_horrf)
+            call write_out_horrf(time_val)
+        else if (lasttime_flag== 1) then
+          ! -- Write horton runoff file (out_horrf)
+            call write_out_horrf(time_val)
         end if
       end if
 
@@ -805,6 +824,55 @@ module write_output
     deallocate(dunn_flux)
 
   end subroutine write_out_dunrf
+
+  subroutine write_out_horrf(time_out)
+  !*********************************************************************************************
+  ! write_out_horrf -- Write horton runoff file
+  !*********************************************************************************************
+    ! -- modules
+    use allocate_output, only: hort_sumtime, roff_hort
+    ! -- inout
+    real(SP), intent(in) :: time_out
+    ! -- local
+    integer(I4) :: i, horr_file
+    real(DP), allocatable :: hort_flux(:)
+    !-------------------------------------------------------------------------------------------
+    allocate(hort_flux(st_bcnd%rech_num))
+    !$omp parallel do private(i)
+    do i = 1, st_bcnd%rech_num
+      hort_flux(i) = roff_hort(i)/hort_sumtime
+    end do
+    !$omp end parallel do
+
+    horr_file = st_out_fnum%horr
+
+#ifdef MPI_MSG
+    ! -- Write MPI 2D binary file (mpi_2dbin)
+      call write_mpi_2dbin(horr_file, st_bcnd%rech_num, st_bcnd%rech2cals,&
+                           len_scal, hort_flux, time_out)
+    if (lasttime_flag == 1) then
+      call close_mpi_file(horr_file)
+    end if
+#else
+    ! -- Write header binary file (header_bin)
+      call write_header_bin(horr_file, time_out)
+    ! -- Write 2D binary file (2dbin)
+      call write_2dbin(horr_file, st_bcnd%rech_num, st_bcnd%rech2cals, len_scal, hort_flux)
+    if (lasttime_flag == 1) then
+      call close_file(horr_file)
+    end if
+#endif
+
+    !$omp parallel do private(i)
+    do i = 1, st_bcnd%rech_num
+      roff_hort(i) = DZERO
+    end do
+    !$omp end parallel do
+    hort_sumtime = DZERO
+
+    deallocate(hort_flux)
+
+  end subroutine write_out_horrf
 
   subroutine write_out_sealf(time_out)
   !*********************************************************************************************

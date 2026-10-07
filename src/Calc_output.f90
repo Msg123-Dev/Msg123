@@ -401,6 +401,7 @@ module calc_output
   ! calc_dunr_off -- Calculate dunne runoff
   !*********************************************************************************************
     ! -- modules
+    use assign_calc, only: geog_num
     use allocate_output, only: dunn_sumtime, roff_dunn
     ! -- inout
     type(sol_set), intent(in) :: st_sol
@@ -427,7 +428,9 @@ module calc_output
           dunns(i) = (DONE-dunn_fact)*st_forc%calc_rech(i)/st_hydr%rech_area(s)
         end if
       else if (st_hydr%rech_area(s) > DZERO) then
-        dunns(i) = st_forc%read_rech(i) - st_forc%calc_rech(i)/st_hydr%rech_area(s)
+        if (geog_num /= 0) then
+          dunns(i) = st_forc%read_rech(i) - st_forc%calc_rech(i)/st_hydr%rech_area(s)
+        end if
       else
         dunns(i) = st_forc%read_rech(i)
       end if

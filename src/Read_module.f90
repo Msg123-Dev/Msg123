@@ -1211,7 +1211,7 @@ module read_module
     else if (any(ftype == type_bin(:))) then
 #ifdef MPI_MSG
       ! -- Open mpi read file (mpi_read_file)
-        call open_mpi_read_file(0, 0, trim(adjustl(nxi_path)), err_mes, intfn, ierr)
+        call open_mpi_read_file(0, 0, trim(adjustl(nxi_path)), mess//" timeseries", intfn, ierr)
 #else
       ! -- Open read new binary file (new_rbin)
         call open_new_rbin(0, 0, trim(adjustl(nxi_path)), err_mes, intfn, ierr)

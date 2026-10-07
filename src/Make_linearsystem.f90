@@ -3,7 +3,7 @@ module make_linearsystem
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE
   use types_module, only: coef_set, sol_set
-  use initial_module, only: st_ctrl
+  use initial_module, only: st_ctrl, st_schm
   use set_cell, only: ncalc, ncals
   use make_cell, only: st_geom
   use set_condition, only: st_hydr, st_bcnd
@@ -113,7 +113,7 @@ module make_linearsystem
   ! make_matrix -- Make matrix
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_sim, st_schm
+    use initial_module, only: st_sim
     use calc_parameter, only: calc_srat_rperm
     ! -- inout
     type(sol_set), intent(in) :: st_sol
@@ -197,7 +197,8 @@ module make_linearsystem
                         st_coef%deri_sea, st_coef%deri_ks_sea, st_coef%delh_sea,&
                         st_coef%per_sea, st_coef%rel_sea, st_coef%tran_sea)
 
-    if (st_schm%rech_dreg_type == 1) then
+    if (st_schm%rech_dreg_type == 1 .or. st_schm%rech_hort_type == 2 .or.&
+        st_schm%rech_dunn_type == 2) then
       ! -- Set recharge boundary dmat (rechbound)
         call set_rechbound(st_sol, st_coef%recd)
     end if
@@ -208,7 +209,8 @@ module make_linearsystem
       st_coef%dmats(s) = st_coef%surd(s) + st_coef%rivd(s) + st_coef%lakd(s)
     end do
     !$omp end do
-    if (st_schm%rech_dreg_type == 1) then
+    if (st_schm%rech_dreg_type == 1 .or. st_schm%rech_hort_type == 2 .or.&
+        st_schm%rech_dunn_type == 2) then
       !$omp do private(s)
       do s = 1, ncals
         st_coef%dmats(s) = st_coef%dmats(s) + st_coef%recd(s)
@@ -665,20 +667,26 @@ module make_linearsystem
   ! set_rechbound -- Set recharge boundary to dmat
   !*********************************************************************************************
     ! -- modules
-    use calc_function, only: calc_rech_fact
+    use calc_function, only: calc_rech_fact, calc_rech_rej
     ! -- inout
     real(DP), intent(inout) :: dmat_rec(:)
     type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, s
-    real(DP) :: rech_fact, drech_fact
+    real(DP) :: rech_fact, drech_fact, rech_val
+    logical :: rej_flag
     !-------------------------------------------------------------------------------------------
-    !$omp parallel do private(i, s, rech_fact, drech_fact)
+    rej_flag = st_schm%rech_hort_type == 2 .or. st_schm%rech_dunn_type == 2
+    !$omp parallel do private(i, s, rech_fact, drech_fact, rech_val)
     do i = 1, st_bcnd%rech_num
       s = st_bcnd%rech2cals(i)
-      if (st_forc%calc_rech(i) < DZERO) then
-        call calc_rech_fact(st_sol%head_new(s)-st_geom%cell_top(s), rech_fact, drech_fact)
+      if (st_schm%rech_dreg_type == 1 .and. st_forc%calc_rech(i) < DZERO) then
+        call calc_rech_fact(st_sol%head_new(s)-st_geom%cell_top(s), st_schm%rech_dreg_hmin,&
+                            st_schm%rech_dreg_hwid, rech_fact, drech_fact)
         dmat_rec(s) = st_forc%calc_rech(i)*drech_fact
+      else if (rej_flag .and. st_forc%calc_rech(i) > DZERO) then
+        call calc_rech_rej(i, s, st_sol%head_new(s), rech_val, dqval=drech_fact)
+        dmat_rec(s) = drech_fact
       end if
     end do
     !$omp end parallel do

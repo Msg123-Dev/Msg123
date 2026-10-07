@@ -197,12 +197,14 @@ module initial_module
     st_out_step%wtab = SZERO ; st_out_step%mass = SZERO ; st_out_step%velc = SZERO
     st_out_step%rivr = SZERO ; st_out_step%lakr = SZERO ; st_out_step%sufr = SZERO
     st_out_step%dunr = SZERO ; st_out_step%well = SZERO ; st_out_step%rech = SZERO
+    st_out_step%horr = SZERO
 
     ! output type of each variable
     st_out_type%srat = 0 ; st_out_type%wtab = 0 ; st_out_type%mass = 0
     st_out_type%velc = 0 ; st_out_type%rivr = 0 ; st_out_type%lakr = 0
     st_out_type%sufr = 0 ; st_out_type%dunr = 0 ; st_out_type%seal = 0
     st_out_type%rech = 0 ; st_out_type%well = 0 ; st_out_type%calg = 0
+    st_out_type%horr = 0
 
     ! input solution file
     st_ctrl%tstep_type = 0 ; st_ctrl%maxout_iter = 20 ; st_ctrl%picard_iter = 0
@@ -223,7 +225,9 @@ module initial_module
     st_schm%krpos_type = 0 ; st_schm%stor_type = 1
     st_schm%abyd_type = 0 ; st_schm%abyd_ratio = DZERO
     st_schm%krlin_head = 2.00E-03_DP ; st_schm%surfw_type = 0 ; st_schm%rbed_type = 0
-    st_schm%rech_dreg_type = 0 ; st_schm%rech_hmin = DZERO ; st_schm%rech_hwid = DZERO
+    st_schm%rech_dreg_type = 0 ; st_schm%rech_dreg_hmin = DZERO ; st_schm%rech_dreg_hwid = DZERO
+    st_schm%rech_hort_type = 0 ; st_schm%rech_hort_form = 0 ; st_schm%rech_hort_rwid = DZERO
+    st_schm%rech_dunn_type = 0 ; st_schm%rech_dunn_hwid = DZERO
 
     ! time unit
     unit_list = ["SEC", "MIN", "HOU", "DAY", "YEA"]
@@ -275,6 +279,7 @@ module initial_module
     st_out_path%lakr = repeat(' ', CHALEN)
     st_out_path%sufr = repeat(' ', CHALEN)
     st_out_path%dunr = repeat(' ', CHALEN)
+    st_out_path%horr = repeat(' ', CHALEN)
     st_out_path%seal = repeat(' ', CHALEN)
     st_out_path%well = repeat(' ', CHALEN)
     st_out_path%rech = repeat(' ', CHALEN)
@@ -290,6 +295,7 @@ module initial_module
     st_out_unit%lakr = repeat(' ', TIMELEN)
     st_out_unit%sufr = repeat(' ', TIMELEN)
     st_out_unit%dunr = repeat(' ', TIMELEN)
+    st_out_unit%horr = repeat(' ', TIMELEN)
     st_out_unit%seal = repeat(' ', TIMELEN)
     st_out_unit%well = repeat(' ', TIMELEN)
     st_out_unit%rech = repeat(' ', TIMELEN)

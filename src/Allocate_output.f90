@@ -11,13 +11,15 @@ module allocate_output
   private
   public :: allocate_outvar
   public :: allocate_wtab, allocate_mass, allocate_velc, allocate_rivr, allocate_lakr
-  public :: allocate_sufr, allocate_dunr, allocate_sear, allocate_recr, allocate_welr
+  public :: allocate_sufr, allocate_dunr, allocate_horr, allocate_sear, allocate_recr
+  public :: allocate_welr
 
   integer(I4), allocatable, public :: res_snum(:), res_rnum(:), res_wnum(:)
-  real(DP), public :: rive_sumtime, lake_sumtime, surf_sumtime, dunn_sumtime
+  real(DP), public :: rive_sumtime, lake_sumtime, surf_sumtime, dunn_sumtime, hort_sumtime
   real(DP), allocatable, public :: wtable(:)
   real(DP), allocatable, public :: pointv(:,:), facev(:,:)
   real(DP), allocatable, public :: roff_rive(:), roff_lake(:), roff_surf(:), roff_dunn(:)
+  real(DP), allocatable, public :: roff_hort(:)
   real(DP), allocatable, public :: res_seal(:), res_rech(:), res_well(:)
   character(:), allocatable, public :: ms_head
   type(msout_set), public :: st_msloc, st_msglo
@@ -102,6 +104,12 @@ module allocate_output
     if (st_out_type%dunr == out_type(2)) then
       ! -- Allocate dunne runoff (dunr)
         call allocate_dunr()
+    end if
+
+    ! horton runoff file
+    if (st_out_type%horr == out_type(2)) then
+      ! -- Allocate horton runoff (horr)
+        call allocate_horr()
     end if
 
     ! sea results file
@@ -298,6 +306,27 @@ module allocate_output
     dunn_sumtime = DZERO
 
   end subroutine allocate_dunr
+
+  subroutine allocate_horr()
+  !*********************************************************************************************
+  ! allocate_horr -- Allocate horton runoff
+  !*********************************************************************************************
+    ! -- modules
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i
+    !-------------------------------------------------------------------------------------------
+    allocate(roff_hort(st_bcnd%rech_num))
+    !$omp parallel do private(i)
+    do i = 1, st_bcnd%rech_num
+      roff_hort(i) = DZERO
+    end do
+    !$omp end parallel do
+
+    hort_sumtime = DZERO
+
+  end subroutine allocate_horr
 
   subroutine allocate_sear()
   !*********************************************************************************************

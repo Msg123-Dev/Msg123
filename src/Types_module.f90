@@ -44,10 +44,15 @@ module types_module
     integer(I4) :: surfw_type = 0
     integer(I4) :: rbed_type = 0
     integer(I4) :: rech_dreg_type = 0
+    integer(I4) :: rech_hort_type = 0
+    integer(I4) :: rech_hort_form = 0
+    integer(I4) :: rech_dunn_type = 0
     real(DP) :: abyd_ratio = 0.00_DP
     real(DP) :: krlin_head = 2.00E-03_DP
-    real(DP) :: rech_hmin = 0.00_DP
-    real(DP) :: rech_hwid = 0.00_DP
+    real(DP) :: rech_dreg_hmin = 0.00_DP
+    real(DP) :: rech_dreg_hwid = 0.00_DP
+    real(DP) :: rech_hort_rwid = 0.00_DP
+    real(DP) :: rech_dunn_hwid = 0.00_DP
   end type schm_set
 
   type :: geom_set
@@ -196,28 +201,28 @@ module types_module
   end type step_flag
 
   type :: ftype_out
-    integer(I4) :: srat, wtab, mass, velc, rivr, lakr, sufr, dunr, seal, rech, well, calg
+    integer(I4) :: srat, wtab, mass, velc, rivr, lakr, sufr, dunr, horr, seal, rech, well, calg
   end type ftype_out
 
   type :: path_out
     character(:), allocatable :: conv, head, rest, srat, wtab, mass, velx, vely, velz
-    character(:), allocatable :: rivr, lakr, sufr, dunr
+    character(:), allocatable :: rivr, lakr, sufr, dunr, horr
     character(:), allocatable :: seal, well, rech, calg
   end type path_out
 
   type :: unit_out
     character(:), allocatable :: head, rest, srat, wtab, mass, velc
-    character(:), allocatable :: rivr, lakr, sufr, dunr
+    character(:), allocatable :: rivr, lakr, sufr, dunr, horr
     character(:), allocatable :: seal, well, rech
   end type unit_out
 
   type :: out_time
-    integer(I4) :: head, rest, srat, wtab, mass, velc, rivr, lakr, sufr, dunr
+    integer(I4) :: head, rest, srat, wtab, mass, velc, rivr, lakr, sufr, dunr, horr
     integer(I4) :: seal, well, rech
   end type out_time
 
   type :: out_step
-    real(DP) :: head, rest, srat, wtab, mass, velc, rivr, lakr, sufr, dunr
+    real(DP) :: head, rest, srat, wtab, mass, velc, rivr, lakr, sufr, dunr, horr
     real(DP) :: seal, well, rech
   end type out_step
 
@@ -254,7 +259,7 @@ module types_module
 
   type :: forc_set
     real(DP), allocatable :: read_head(:), abyd_rive(:), abyd_lake(:)
-    real(DP), allocatable :: calc_rech(:)
+    real(DP), allocatable :: calc_rech(:), dunn_rati(:), hort_fcap(:)
     real(DP), allocatable :: rive_head(:), rive_bott(:), rive_area(:)
     real(DP), allocatable :: rive_hydk(:), rive_bedt(:)
     real(DP), allocatable :: lake_head(:), lake_bott(:), lake_area(:)

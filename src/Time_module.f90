@@ -7,7 +7,7 @@ module time_module
   use initial_module, only: st_sim, st_ctrl, st_in_type, st_rivf_type, st_lakf_type, st_seal
   use initial_module, only: st_rech, st_prec, st_evap, st_well, st_riwl, st_riwd, st_ribl
   use initial_module, only: st_ride, st_riwi, st_rile, st_ribk, st_ribt, st_lawl, st_lawd
-  use initial_module, only: st_labl, st_laar, st_step_flag, st_schm
+  use initial_module, only: st_labl, st_laar, st_step_flag, st_schm, st_out_step
   use open_file, only: st_intre, st_intpr, st_intev
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc, ncals
@@ -18,7 +18,7 @@ module time_module
 
   implicit none
   private
-  public :: update_tstep, check_outstep
+  public :: update_tstep, check_outstep, write_outstep_note
 
   ! -- local
   integer(I4) :: timestep_num, boundstep
@@ -848,11 +848,11 @@ module time_module
   ! set_delt -- Set delta time
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_out_step
+
     ! -- inout
 
     ! -- local
-    real(DP) :: min_step, min_otime
+    real(DP) :: min_step, min_outtime
     !-------------------------------------------------------------------------------------------
     min_step = min(st_rech%etime, st_well%etime, st_seal%etime, st_prec%etime, st_evap%etime,&
                    st_riwl%etime, st_riwd%etime, st_ribl%etime, st_ride%etime, st_riwi%etime,&
@@ -863,15 +863,15 @@ module time_module
     end if
     min_step = min(min_step, st_sim%end_time)
 
-    min_otime = st_sim%end_time
-    if (st_sim%sim_type == 0 .or. st_ctrl%ostep_type == 1) then
-      min_otime = min(get_nextout(st_out_step%head), get_nextout(st_out_step%rest),&
-                      get_nextout(st_out_step%srat), get_nextout(st_out_step%wtab),&
-                      get_nextout(st_out_step%mass), get_nextout(st_out_step%velc),&
-                      get_nextout(st_out_step%rivr), get_nextout(st_out_step%lakr),&
-                      get_nextout(st_out_step%sufr), get_nextout(st_out_step%dunr),&
-                      get_nextout(st_out_step%horr), get_nextout(st_out_step%seal),&
-                      get_nextout(st_out_step%well), get_nextout(st_out_step%rech))
+    min_outtime = st_sim%end_time
+    if (st_sim%sim_type == 0 .or. st_ctrl%outstep_type == 1) then
+      min_outtime = min(get_nextout(st_out_step%head), get_nextout(st_out_step%rest),&
+                        get_nextout(st_out_step%srat), get_nextout(st_out_step%wtab),&
+                        get_nextout(st_out_step%mass), get_nextout(st_out_step%velc),&
+                        get_nextout(st_out_step%rivr), get_nextout(st_out_step%lakr),&
+                        get_nextout(st_out_step%sufr), get_nextout(st_out_step%dunr),&
+                        get_nextout(st_out_step%horr), get_nextout(st_out_step%seal),&
+                        get_nextout(st_out_step%well), get_nextout(st_out_step%rech))
     end if
 
     if (st_time%delt > st_sim%max_step) then
@@ -879,10 +879,10 @@ module time_module
     end if
     next_time = st_time%current_t + st_time%delt
 
-    if (min_otime < min_step - time_tol .and. next_time > min_otime - time_tol) then
+    if (min_outtime < min_step - time_tol .and. next_time > min_outtime - time_tol) then
       delt_uncut = st_time%delt
-      st_time%delt = min_otime - st_time%current_t
-      next_time = min_otime
+      st_time%delt = min_outtime - st_time%current_t
+      next_time = min_outtime
     else if (next_time > min_step - time_tol) then
       st_time%delt = min_step - st_time%current_t
       next_time = min_step
@@ -1797,7 +1797,7 @@ module time_module
 
   end subroutine set_date
 
-  function get_nextout(step_val) result(next_otime)
+  function get_nextout(step_val) result(next_outtime)
   !*********************************************************************************************
   ! get_nextout -- Get next output time
   !*********************************************************************************************
@@ -1806,15 +1806,15 @@ module time_module
     ! -- inout
     real(DP), intent(in) :: step_val
     ! -- local
-    real(DP) :: next_otime, ostep_num
+    real(DP) :: next_outtime, outstep_num
     !-------------------------------------------------------------------------------------------
-    next_otime = st_sim%end_time
+    next_outtime = st_sim%end_time
     if (step_val > DZERO) then
-      ostep_num = aint(st_time%current_t/step_val) + DONE
-      next_otime = ostep_num*step_val
-      do while (next_otime <= st_time%current_t + time_tol)
-        ostep_num = ostep_num + DONE
-        next_otime = ostep_num*step_val
+      outstep_num = aint(st_time%current_t/step_val) + DONE
+      next_outtime = outstep_num*step_val
+      do while (next_outtime <= st_time%current_t + time_tol)
+        outstep_num = outstep_num + DONE
+        next_outtime = outstep_num*step_val
       end do
     end if
 
@@ -1838,14 +1838,101 @@ module time_module
                 st_step_flag%ribt + st_step_flag%lawl + st_step_flag%lawd + st_step_flag%labl +&
                 st_step_flag%laar
 
-    if (st_sim%sim_type == 1 .and. step_flag > 0) then
+    if (step_val < DZERO) then
+      out_flag = .false.
+    else if (st_sim%sim_type == 1 .and. step_flag > 0) then
       out_flag = .true.
-    else if (st_sim%sim_type == 1 .and. st_ctrl%ostep_type == 0) then
+    else if (st_sim%sim_type == 1 .and. st_ctrl%outstep_type == 0) then
       out_flag = .false.
     else
       out_flag = abs(st_time%current_t - anint(st_time%current_t/step_val)*step_val) <= time_tol
     end if
 
   end function check_outstep
+
+  subroutine write_outstep_note()
+  !*********************************************************************************************
+  ! write_outstep_note -- Write a note on output steps in log file
+  !*********************************************************************************************
+    ! -- modules
+    use constval_module, only: TIMELEN
+    use utility_module, only: log_fnum
+    use initial_module, only: st_grid, st_out_type, st_out_unit, st_out_time
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i
+    integer(I4) :: outtime_list(14)
+    real(DP) :: min_outstep, outrec_num, outbyte_num
+    real(DP) :: outstep_list(14), outcell_list(14)
+    logical :: outuse_list(14)
+    character(4) :: outname_list(14)
+    character(TIMELEN) :: outunit_list(14)
+    !-------------------------------------------------------------------------------------------
+    outname_list = ["head", "rest", "srat", "wtab", "mass", "velc", "rivr", "lakr", "sufr",&
+                    "dunr", "horr", "seal", "well", "rech"]
+    outstep_list = [st_out_step%head, st_out_step%rest, st_out_step%srat, st_out_step%wtab,&
+                    st_out_step%mass, st_out_step%velc, st_out_step%rivr, st_out_step%lakr,&
+                    st_out_step%sufr, st_out_step%dunr, st_out_step%horr, st_out_step%seal,&
+                    st_out_step%well, st_out_step%rech]
+    outtime_list = [st_out_time%head, st_out_time%rest, st_out_time%srat, st_out_time%wtab,&
+                    st_out_time%mass, st_out_time%velc, st_out_time%rivr, st_out_time%lakr,&
+                    st_out_time%sufr, st_out_time%dunr, st_out_time%horr, st_out_time%seal,&
+                    st_out_time%well, st_out_time%rech]
+    outunit_list = [character(TIMELEN) :: st_out_unit%head, st_out_unit%rest, st_out_unit%srat,&
+                    st_out_unit%wtab, st_out_unit%mass, st_out_unit%velc, st_out_unit%rivr,&
+                    st_out_unit%lakr, st_out_unit%sufr, st_out_unit%dunr, st_out_unit%horr,&
+                    st_out_unit%seal, st_out_unit%well, st_out_unit%rech]
+    outuse_list = [.true., .true., st_out_type%srat /= 0, st_out_type%wtab /= 0,&
+                   st_out_type%mass /= 0, st_out_type%velc /= 0, st_out_type%rivr /= 0,&
+                   st_out_type%lakr /= 0, st_out_type%sufr /= 0, st_out_type%dunr /= 0,&
+                   st_out_type%horr /= 0, st_out_type%seal /= 0, st_out_type%well /= 0,&
+                   st_out_type%rech /= 0]
+    outcell_list(:) = real(st_grid%nx, DP)*real(st_grid%ny, DP)
+    outcell_list([1, 3, 12, 13]) = outcell_list([1, 3, 12, 13])*st_grid%nz
+    outcell_list(6) = 3.00_DP*outcell_list(6)*st_grid%nz
+    outcell_list([2, 5]) = DZERO
+
+    min_outstep = st_sim%end_time - st_time%current_t
+    do i = 1, size(outname_list)
+      if (outuse_list(i) .and. outstep_list(i) > DZERO) then
+        min_outstep = min(min_outstep, outstep_list(i))
+      end if
+    end do
+
+    if (st_mpi%rank == 0 .and. st_sim%sim_type /= -1) then
+      if ((st_sim%sim_type == 0 .or. st_ctrl%outstep_type == 1) .and.&
+          min_outstep < st_sim%end_time - st_time%current_t) then
+        write(log_fnum,'(a)') "Time steps are cut to land on output times. The shortest "//&
+                              "output interval limits the time step."
+        outrec_num = aint((st_sim%end_time - st_time%current_t)/min_outstep)
+        do i = 1, size(outname_list)
+          if (.not. outuse_list(i) .or. outstep_list(i) /= min_outstep) then
+            cycle
+          end if
+          if (outcell_list(i) > DZERO) then
+            outbyte_num = outrec_num*4.00_DP*(DONE + outcell_list(i))
+            write(log_fnum,'(3a,i0,3a,es8.2,a,es7.1,a)') "Shortest output interval: ",&
+              outname_list(i), " every ", outtime_list(i), " ", trim(outunit_list(i)),&
+              ", about ", outrec_num, " records and ", outbyte_num, " bytes by the end time."
+          else if (outname_list(i) == "rest") then
+            write(log_fnum,'(3a,i0,3a,es8.2,a)') "Shortest output interval: ", outname_list(i),&
+              " every ", outtime_list(i), " ", trim(outunit_list(i)), ", about ", outrec_num,&
+              " records (the file is overwritten each time)."
+          else
+            write(log_fnum,'(3a,i0,3a,es8.2,a)') "Shortest output interval: ", outname_list(i),&
+              " every ", outtime_list(i), " ", trim(outunit_list(i)), ", about ", outrec_num,&
+              " records."
+          end if
+        end do
+      end if
+      if (any(outuse_list .and. outstep_list < DZERO)) then
+        write(log_fnum,'(a,*(a,:,", "))',advance='no') "Written only at the end (the time "//&
+          "step is not cut): ", pack(outname_list, outuse_list .and. outstep_list < DZERO)
+        write(log_fnum,'(a)') "."
+      end if
+    end if
+
+  end subroutine write_outstep_note
 
 end module time_module

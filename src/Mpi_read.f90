@@ -35,17 +35,40 @@ module mpi_read
   ! open_mpi_read_file -- Open mpi read file
   !*********************************************************************************************
     ! -- module
-    use utility_module, only: write_success
+    use mpi_initfin, only: abort_proc
+    use utility_module, only: log_fnum, write_success
+    use mpi_utility, only: mpisum_val, mpimax_val
     ! -- inout
     integer(I4), intent(in) :: stop_flag, write_flag
     character(*), intent(in) :: mpi_path, err_mes
     integer(I4), intent(out) :: mpi_fh
     integer(I4), intent(out), optional :: mpi_ier
     ! -- local
-    integer(I4) :: ierr
+    integer(I4) :: ierr, miss_num, sum_miss, max_ierr
+    logical :: exist_flag
     !-------------------------------------------------------------------------------------------
-    ierr = 0
-    call MPI_FILE_OPEN(st_mpi%comm, mpi_path, MPI_MODE_RDONLY, MPI_INFO_NULL, mpi_fh, ierr)
+    ierr = 0 ; miss_num = 0
+    inquire(file=mpi_path, exist=exist_flag)
+    if (.not. exist_flag) then
+      miss_num = 1
+    end if
+    ! -- Sum value for MPI (val)
+      call mpisum_val(miss_num, "missing "//err_mes//" file", sum_miss)
+
+    if (sum_miss > 0 .and. sum_miss < st_mpi%totn) then
+      if (st_mpi%rank == 0) then
+        write(log_fnum,'(a)') "Error!! Check that every rank can read the "//err_mes//" file."
+        flush(log_fnum)
+      end if
+      call abort_proc(st_mpi%rank, log_fnum)
+    else if (sum_miss > 0) then
+      ierr = MPI_ERR_NO_SUCH_FILE ; mpi_fh = MPI_FILE_NULL
+    else
+      call MPI_FILE_OPEN(st_mpi%comm, mpi_path, MPI_MODE_RDONLY, MPI_INFO_NULL, mpi_fh, ierr)
+      ! -- Max value for MPI (val)
+        call mpimax_val(ierr, "open "//err_mes//" file error", max_ierr)
+      ierr = max_ierr
+    end if
 
     if (ierr == MPI_SUCCESS) then
       if (st_mpi%rank == 0 .and. write_flag == 1) then

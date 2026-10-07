@@ -1,7 +1,7 @@
 module open_file
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: CHALEN, TIMELEN, HOURSEC, SZERO, SINFI
+  use constval_module, only: CHALEN, TIMELEN, HOURSEC, SZERO, DZERO, DONE, SINFI
   use utility_module, only: st_mpi, open_new_rtxt, open_new_rbin, open_new_wtxt, close_file
   use utility_module, only: write_logf, write_err_stop, conv_unit
   use initial_module, only: in_type, st_sim, st_grid, st_step_flag
@@ -2314,12 +2314,14 @@ module open_file
       call open_new_wbin(out_path, out_chra, out_file)
 #endif
 
-    if (out_tint /= 0) then
+    out_trel = DZERO
+    if (out_tint > 0) then
       ! -- Convert unit (unit)
         call conv_unit(st_mpi%rank, out_unit, out_chra, st_sim%sta_date, out_trel)
+      out_trel = out_trel*out_tint
+    else if (out_tint < 0) then
+      out_trel = -DONE
     end if
-
-    out_trel = out_trel*out_tint
 
   end subroutine open_out_binf
 
@@ -2354,12 +2356,13 @@ module open_file
     end if
 #endif
 
-    if (out_mass_time /= 0) then
+    if (out_mass_time > 0) then
       ! -- Convert unit (unit)
         call conv_unit(st_mpi%rank, out_mass_unit, out_chra, st_sim%sta_date, st_out_step%mass)
+      st_out_step%mass = st_out_step%mass*out_mass_time
+    else if (out_mass_time < 0) then
+      st_out_step%mass = -DONE
     end if
-
-    st_out_step%mass = st_out_step%mass*out_mass_time
 
     deallocate(out_chra)
 

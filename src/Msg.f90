@@ -16,7 +16,7 @@ program msg123
   use make_linearsystem, only: allocate_matvec
   use check_simulation, only: check_lastts, lasttime_flag
   use linear_solution, only: allocate_amgalg, allocate_krylov
-  use time_module, only: update_tstep
+  use time_module, only: update_tstep, write_outstep_note
   use nonlinear_solution, only: allocate_nonlin, calc_numsol, noconv_num
   use write_output, only: write_outf
 #ifdef ICI
@@ -108,6 +108,9 @@ program msg123
     ! -- Time loop start time
       call CPU_TIME(loop_stime)
   end if
+
+  ! -- Write output step note (outstep_note)
+    call write_outstep_note()
 
   ! start time step loop
   tstep_loop: do

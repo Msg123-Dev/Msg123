@@ -1685,17 +1685,19 @@ module read_input
     integer(I4) :: i, ierr
     integer(I4) :: head_time, rest_time, srat_time, wtab_time, mass_time
     integer(I4) :: velc_time, rivr_time, lakr_time, sufr_time, dunr_time, horr_time
-    integer(I4) :: seal_time, well_time, rech_time, ostep_type
+    integer(I4) :: seal_time, well_time, rech_time, outstep_type
+    integer(I4) :: outtime_list(14)
     character(:), allocatable :: str_sim_type, str_sim_name
     character(TIMELEN) :: head_unit, rest_unit, srat_unit, wtab_unit, mass_unit
     character(TIMELEN) :: velc_unit, rivr_unit, lakr_unit, sufr_unit, dunr_unit, horr_unit
     character(TIMELEN) :: seal_unit, well_unit, rech_unit
+    character(9) :: outname_list(14)
     namelist/set_out_unit/head_unit, rest_unit, srat_unit, wtab_unit, mass_unit,&
                           velc_unit, rivr_unit, lakr_unit, sufr_unit, dunr_unit,&
                           horr_unit, seal_unit, well_unit, rech_unit
     namelist/set_out_time/head_time, rest_time, srat_time, wtab_time, mass_time,&
                           velc_time, rivr_time, lakr_time, sufr_time, dunr_time,&
-                          horr_time, seal_time, well_time, rech_time, ostep_type
+                          horr_time, seal_time, well_time, rech_time, outstep_type
     !-------------------------------------------------------------------------------------------
     ierr = 0
     head_unit = "" ; rest_unit = "" ; srat_unit = "" ; wtab_unit = "" ; mass_unit = ""
@@ -1704,7 +1706,7 @@ module read_input
     head_time = 0 ; rest_time = 0 ; srat_time = 0 ; wtab_time = 0 ; mass_time = 0
     velc_time = 0 ; rivr_time = 0 ; lakr_time = 0 ; sufr_time = 0 ; dunr_time = 0
     horr_time = 0 ; seal_time = 0 ; well_time = 0 ; rech_time = 0
-    ostep_type = st_ctrl%ostep_type
+    outstep_type = st_ctrl%outstep_type
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_out_unit,iostat=ierr)
     if (ierr /= 0) then
@@ -1717,10 +1719,22 @@ module read_input
       call write_err_stop("While reading output interval time section in main file.")
     end if
 
-    if (ostep_type < 0 .or. ostep_type > 1) then
+    if (outstep_type < 0 .or. outstep_type > 1) then
       call write_err_stop("Input a valid value for output step type.")
     end if
-    st_ctrl%ostep_type = ostep_type
+    st_ctrl%outstep_type = outstep_type
+
+    outtime_list = [head_time, rest_time, srat_time, wtab_time, mass_time, velc_time,&
+                    rivr_time, lakr_time, sufr_time, dunr_time, horr_time, seal_time,&
+                    well_time, rech_time]
+    outname_list = ["head_time", "rest_time", "srat_time", "wtab_time", "mass_time",&
+                    "velc_time", "rivr_time", "lakr_time", "sufr_time", "dunr_time",&
+                    "horr_time", "seal_time", "well_time", "rech_time"]
+    do i = 1, size(outtime_list)
+      if (outtime_list(i) < -1) then
+        call write_err_stop("Input -1, 0 or a positive value for "//outname_list(i)//".")
+      end if
+    end do
 
     allocate(character(0) :: str_sim_type, str_sim_name)
 

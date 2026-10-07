@@ -186,7 +186,7 @@ module check_simulation
       write_flag = 1
     else if (st_time%current_t >= st_sim%end_time) then
       write_flag = 1
-    else if (st_time%conv_flag .and. (st_sim%sim_type /= 1 .or. st_ctrl%ostep_type == 1)) then
+    else if (st_time%conv_flag .and. (st_sim%sim_type /= 1 .or. st_ctrl%outstep_type == 1)) then
       write_flag = 1
     else
       write_flag = 0

@@ -932,6 +932,7 @@ module time_module
   !*********************************************************************************************
     ! -- modules
     use constval_module, only: SNOVAL
+    use check_condition, only: check_input_nan
     use set_condition, only: set_srabyd, set_chabyd, set_wellconn
     use assign_boundary, only: assign_sealv, assign_surfbv, assign_wellv, assign_rilav
     use calc_boundary, only: calc_reprev, conv_rech2calc, count_rivecalc, count_lakecalc
@@ -951,6 +952,10 @@ module time_module
     if (st_step_flag%seal == 1) then
       ! -- Assign sea level value (sealv)
         call assign_sealv(st_in_type%seal)
+      if (allocated(st_forc%read_seal)) then
+        ! -- Check input nan (input_nan)
+          call check_input_nan(st_forc%read_seal, "sea level", st_time%now_time)
+      end if
 
       st_step_flag%seal = 0
 
@@ -970,6 +975,8 @@ module time_module
         call assign_surfbv(st_in_type%rech, st_intre%type, st_rech, st_bcnd%rech_num,&
                            st_bcnd%rech_cflag,&
                            st_forc%read_rech)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_forc%read_rech, "recharge", st_time%now_time)
 
       call conv_rech2calc(st_bcnd%rech_num)
 
@@ -981,6 +988,10 @@ module time_module
     if (st_step_flag%well == 1) then
       ! -- Assign well value (wellv)
         call assign_wellv(st_in_type%well, st_in_type%weks, st_in_type%weke, st_bcnd%well_num)
+      if (allocated(st_forc%read_well)) then
+        ! -- Check input nan (input_nan)
+          call check_input_nan(st_forc%read_well, "well", st_time%now_time)
+      end if
 
       st_step_flag%well = 0
       if (st_bcnd%well_num /= 0) then
@@ -1006,6 +1017,8 @@ module time_module
         call assign_surfbv(st_in_type%prec, st_intpr%type, st_prec, st_bcnd%prec_num,&
                            st_bcnd%prec_cflag,&
                            st_forc%read_prec)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_forc%read_prec, "precipitation", st_time%now_time)
       prec_stepflag = prec_stepflag + 1
       deallocate(st_bcnd%prec_cflag)
 
@@ -1028,6 +1041,8 @@ module time_module
         call assign_surfbv(st_in_type%evap, st_intev%type, st_evap, st_bcnd%evap_num,&
                            st_bcnd%evap_cflag,&
                            st_forc%read_evap)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_forc%read_evap, "evapotranspiration", st_time%now_time)
       evap_stepflag = evap_stepflag + 1
       deallocate(st_bcnd%evap_cflag)
 
@@ -1056,6 +1071,8 @@ module time_module
       ! -- Assign river water level value
         call assign_rilav(st_rivf_type%wlev, 2, st_riwl, st_rive%num%wl, st_rive%cflag%wl,&
                           st_rive%calc%wl)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_rive%calc%wl, "river water level", st_time%now_time)
 
       st_step_flag%riwl = 0 ; rive_stepflag = rive_stepflag + 1
     else if (st_riwl%etime == next_time) then
@@ -1073,6 +1090,8 @@ module time_module
       ! -- Assign river bottom level value
         call assign_rilav(st_rivf_type%blev, 2, st_ribl, st_rive%num%bl, st_rive%cflag%bl,&
                           st_rive%calc%bl)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_rive%calc%bl, "river bottom level", st_time%now_time)
 
       st_step_flag%ribl = 0 ; rive_stepflag = rive_stepflag + 1
     else if (st_ribl%etime == next_time) then
@@ -1092,6 +1111,8 @@ module time_module
       ! -- Assign river water depth value
         call assign_rilav(st_rivf_type%wdep, 0, st_riwd, st_rive%num%wd, st_rive%cflag%wd,&
                           st_rive%calc%wd)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_rive%calc%wd, "river water depth", st_time%now_time)
 
 #ifdef MPI_MSG
       ! -- Sum value for MPI (val)
@@ -1127,6 +1148,8 @@ module time_module
       ! -- Assign river width value
         call assign_rilav(st_rivf_type%widt, 0, st_riwi, st_rive%num%wi, st_rive%cflag%wi,&
                           st_rive%calc%wi)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_rive%calc%wi, "river width", st_time%now_time)
 
       st_step_flag%riwi = 0 ; rive_aflag = rive_aflag + 1 ; rive_stepflag = rive_stepflag + 1
     else if (st_riwi%etime == next_time) then
@@ -1146,6 +1169,8 @@ module time_module
       ! -- Assign river length value
         call assign_rilav(st_rivf_type%leng, 0, st_rile, st_rive%num%le, st_rive%cflag%le,&
                           st_rive%calc%le)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_rive%calc%le, "river length", st_time%now_time)
 
       st_step_flag%rile = 0 ; rive_aflag = rive_aflag + 1 ; rive_stepflag = rive_stepflag + 1
     else if (st_rile%etime == next_time) then
@@ -1165,6 +1190,8 @@ module time_module
       ! -- Assign river bed conductivity value
         call assign_rilav(st_rivf_type%bedk, 0, st_ribk, st_rive%num%bk, st_rive%cflag%bk,&
                           st_rive%calc%bk)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_rive%calc%bk, "river bed conductivity", st_time%now_time)
 
       st_step_flag%ribk = 0 ; rive_stepflag = rive_stepflag + 1
     else if (st_ribk%etime == next_time) then
@@ -1184,6 +1211,8 @@ module time_module
       ! -- Assign river bed thickness value
         call assign_rilav(st_rivf_type%bedt, 0, st_ribt, st_rive%num%bt, st_rive%cflag%bt,&
                           st_rive%calc%bt)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_rive%calc%bt, "river bed thickness", st_time%now_time)
 
       st_step_flag%ribt = 0 ; rive_stepflag = rive_stepflag + 1
     else if (st_ribt%etime == next_time) then
@@ -1244,6 +1273,8 @@ module time_module
       ! -- Assign lake water level value
         call assign_rilav(st_lakf_type%wlev, 2, st_lawl, st_lake%num%wl, st_lake%cflag%wl,&
                           st_lake%calc%wl)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_lake%calc%wl, "lake water level", st_time%now_time)
 
       st_step_flag%lawl = 0 ; lake_stepflag = lake_stepflag + 1
     else if (st_lawl%etime == next_time) then
@@ -1261,6 +1292,8 @@ module time_module
       ! -- Assign lake bottom level value
         call assign_rilav(st_lakf_type%blev, 2, st_labl, st_lake%num%bl, st_lake%cflag%bl,&
                           st_lake%calc%bl)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_lake%calc%bl, "lake bottom level", st_time%now_time)
 
       st_step_flag%labl = 0 ; lake_stepflag = lake_stepflag + 1
     else if (st_labl%etime == next_time) then
@@ -1280,6 +1313,8 @@ module time_module
       ! -- Assign lake water depth value
         call assign_rilav(st_lakf_type%wdep, 0, st_lawd, st_lake%num%wd, st_lake%cflag%wd,&
                           st_lake%calc%wd)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_lake%calc%wd, "lake water depth", st_time%now_time)
 
 #ifdef MPI_MSG
       ! -- Sum value for MPI (val)
@@ -1315,6 +1350,8 @@ module time_module
       ! -- Assign lake area value
         call assign_rilav(st_lakf_type%area, 1, st_laar, st_lake%num%ar, st_lake%cflag%ar,&
                           st_lake%calc%ar)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_lake%calc%ar, "lake area", st_time%now_time)
 
       st_step_flag%laar = 0 ; lake_stepflag = lake_stepflag + 1
     else if (st_laar%etime == next_time) then

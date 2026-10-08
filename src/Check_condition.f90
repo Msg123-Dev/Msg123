@@ -1,11 +1,12 @@
 module check_condition
   ! -- modules
-  use kind_module, only: I4, SP
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
+  use kind_module, only: I4, SP, DP
   use constval_module, only: CHALEN, VARLEN, SONE, SNOVAL
   use utility_module, only: st_mpi, write_err_stop, get_ilen, conv_i2s, close_file
   use utility_module, only: open_new_rtxt
   use initial_module, only: in_type, out_type, st_grid, st_in_type, st_seal, st_out_type
-  use initial_module, only: st_in_path, st_in_unit
+  use initial_module, only: st_sim, st_in_path, st_in_unit
   use initial_module, only: st_out_path, st_out_unit, st_out_time, st_out_step
   use read_module, only: read_clasf, read_3dpointf
   use open_file, only: open_out_binf
@@ -20,6 +21,12 @@ module check_condition
   private
   public :: check_calc_retn, check_calc_parm, check_calc_init, check_outf_cond
   public :: read_seal_set, read_seal_clasf, read_seal_point, read_sea_allv
+  public :: check_input_nan
+
+  interface check_input_nan
+    module procedure check_input_nan_r4
+    module procedure check_input_nan_r8
+  end interface
 
   type :: fnum_out
     integer(I4) :: conv, head, rest, srat, wtab, mass, velx, vely, velz
@@ -1115,5 +1122,79 @@ module check_condition
     end if
 
   end subroutine check_out_wellf
+
+  subroutine check_input_nan_r4(in_val, in_name, in_time)
+  !*********************************************************************************************
+  ! check_input_nan_r4 -- Check nan in real4 input
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(SP), intent(in) :: in_val(:)
+    character(*), intent(in) :: in_name
+    real(DP), intent(in), optional :: in_time
+    ! -- local
+    integer(I4) :: nan_num
+#ifdef MPI_MSG
+    integer(I4) :: sum_nan
+#endif
+    character(32) :: str_time
+    !-------------------------------------------------------------------------------------------
+    nan_num = count(ieee_is_nan(in_val))
+#ifdef MPI_MSG
+    if (st_mpi%totn /= 1) then
+      ! -- Sum value for MPI (val)
+        call mpisum_val(nan_num, "nan input", sum_nan)
+      nan_num = sum_nan
+    end if
+#endif
+    if (nan_num > 0 .and. st_mpi%rank == 0) then
+      if (present(in_time)) then
+        write(str_time,'(f0.3)') in_time
+        call write_err_stop("NaN in the "//in_name//" input at "//trim(str_time)//&
+                            trim(st_sim%cal_unit)//".")
+      else
+        call write_err_stop("NaN in the "//in_name//" input.")
+      end if
+    end if
+
+  end subroutine check_input_nan_r4
+
+  subroutine check_input_nan_r8(in_val, in_name, in_time)
+  !*********************************************************************************************
+  ! check_input_nan_r8 -- Check nan in real8 input
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(DP), intent(in) :: in_val(:)
+    character(*), intent(in) :: in_name
+    real(DP), intent(in), optional :: in_time
+    ! -- local
+    integer(I4) :: nan_num
+#ifdef MPI_MSG
+    integer(I4) :: sum_nan
+#endif
+    character(32) :: str_time
+    !-------------------------------------------------------------------------------------------
+    nan_num = count(ieee_is_nan(in_val))
+#ifdef MPI_MSG
+    if (st_mpi%totn /= 1) then
+      ! -- Sum value for MPI (val)
+        call mpisum_val(nan_num, "nan input", sum_nan)
+      nan_num = sum_nan
+    end if
+#endif
+    if (nan_num > 0 .and. st_mpi%rank == 0) then
+      if (present(in_time)) then
+        write(str_time,'(f0.3)') in_time
+        call write_err_stop("NaN in the "//in_name//" input at "//trim(str_time)//&
+                            trim(st_sim%cal_unit)//".")
+      else
+        call write_err_stop("NaN in the "//in_name//" input.")
+      end if
+    end if
+
+  end subroutine check_input_nan_r8
 
 end module check_condition

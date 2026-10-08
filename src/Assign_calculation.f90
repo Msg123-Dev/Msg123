@@ -5,6 +5,7 @@ module assign_calc
   use utility_module, only: st_mpi, close_file, write_err_stop, gmap_get
   use initial_module, only: in_type, st_grid, st_init
   use read_input, only: len_scal, len_scal_inv, z_base
+  use check_condition, only: check_input_nan
   use set_cell, only: ncalc, ncals, st_conn
   use set_condition, only: set_clas2calc, set_2dfile2calc, set_3dfile2calc, st_hydr
 #ifdef MPI_MSG
@@ -160,6 +161,13 @@ module assign_calc
     if (retn_ftype == in_type(0)) then
       deallocate(ret_fnum, ret_ftype)
     end if
+
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_hydr%read_vana, "van genuchten parameter alpha")
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_hydr%read_vann, "van genuchten parameter n")
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_hydr%read_resi, "residual water content")
 
   end subroutine assign_retnv
 
@@ -328,6 +336,17 @@ module assign_calc
       deallocate(par_fnum, par_ftype)
     end if
 
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_hydr%read_hydx, "saturated hydraulic conductivity in x direction")
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_hydr%read_hydy, "saturated hydraulic conductivity in y direction")
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_hydr%read_hydz, "saturated hydraulic conductivity in z direction")
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_hydr%read_spst, "specific storage")
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_hydr%read_pors, "porosity")
+
   end subroutine assign_parmv
 
   subroutine assign_geogv()
@@ -432,6 +451,13 @@ module assign_calc
 #endif
 
     deallocate(geo_fnum, geo_ftype)
+
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_hydr%surf_bott, "minimum z elevation")
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_hydr%surf_reli, "relief")
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_hydr%surf_parm, "geography parameter")
 
   end subroutine assign_geogv
 
@@ -595,6 +621,9 @@ module assign_calc
 #endif
 
     st_init%rest_time = st_init%rest_time*st_init%multi
+
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_hydr%read_init, "initial")
 
   end subroutine assign_initv
 

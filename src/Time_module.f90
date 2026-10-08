@@ -284,11 +284,17 @@ module time_module
 
     ! -- local
     integer(I4) :: ierr
+#ifdef MPI_MSG
+    integer(I4) :: type_bin(2)
+#endif
     character(:), allocatable :: bound_name, err_mes
     character(32) :: str_time
     !-------------------------------------------------------------------------------------------
     allocate(character(0) :: err_mes, bound_name)
     ierr = 0 ; str_time = "" ; err_mes = "" ; bound_name = ""
+#ifdef MPI_MSG
+    type_bin(:) = [in_type(4), in_type(6)]
+#endif
     if (st_step_flag%seal == 1) then
       bound_name = "sea level"
       if (st_in_type%seal /= in_type(7)) then
@@ -300,8 +306,10 @@ module time_module
           call read_intn(st_intse%type, st_intse%fnum, st_seal%multi, st_intse%step,&
                          bound_name, st_seal%fnum, st_step_flag%seal, ierr, st_seal%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_seal%fnum, bfview%seal, bound_name)
+        if (ierr == 0 .and. any(st_intse%type == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_seal%fnum, bfview%seal, bound_name)
+        end if
 #endif
       end if
 
@@ -330,8 +338,10 @@ module time_module
           call read_intn(st_intre%type, st_intre%fnum, st_rech%multi, st_intre%step,&
                          bound_name, st_rech%fnum, st_step_flag%rech, ierr, st_rech%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_rech%fnum, bfview%rech, bound_name)
+        if (ierr == 0 .and. any(st_intre%type == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_rech%fnum, bfview%rech, bound_name)
+        end if
 #endif
       end if
 
@@ -362,8 +372,10 @@ module time_module
           call read_intn(st_intwe%type, st_intwe%fnum, st_well%multi, st_intwe%step,&
                          bound_name, st_well%fnum, st_step_flag%well, ierr, st_well%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_well%fnum, bfview%well, bound_name)
+        if (ierr == 0 .and. any(st_intwe%type == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_well%fnum, bfview%well, bound_name)
+        end if
 #endif
       end if
 
@@ -398,8 +410,10 @@ module time_module
           call read_intn(st_intpr%type, st_intpr%fnum, st_prec%multi, st_intpr%step,&
                          bound_name, st_prec%fnum, st_step_flag%prec, ierr, st_prec%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_prec%fnum, bfview%prec, bound_name)
+        if (ierr == 0 .and. any(st_intpr%type == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_prec%fnum, bfview%prec, bound_name)
+        end if
 #endif
       end if
 
@@ -432,8 +446,10 @@ module time_module
           call read_intn(st_intev%type, st_intev%fnum, st_evap%multi, st_intev%step,&
                          bound_name, st_evap%fnum, st_step_flag%evap, ierr, st_evap%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_evap%fnum, bfview%evap, bound_name)
+        if (ierr == 0 .and. any(st_intev%type == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_evap%fnum, bfview%evap, bound_name)
+        end if
 #endif
       end if
 
@@ -467,8 +483,10 @@ module time_module
                          st_riwl%intstep, bound_name, st_riwl%fnum, st_step_flag%riwl,&
                          ierr, st_riwl%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_riwl%fnum, rfview%wl, bound_name)
+        if (ierr == 0 .and. any(st_riwl%inttype == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_riwl%fnum, rfview%wl, bound_name)
+        end if
 #endif
       end if
 
@@ -498,8 +516,10 @@ module time_module
                          st_riwd%intstep, bound_name, st_riwd%fnum, st_step_flag%riwd,&
                          ierr, st_riwd%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_riwd%fnum, rfview%wd, bound_name)
+        if (ierr == 0 .and. any(st_riwd%inttype == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_riwd%fnum, rfview%wd, bound_name)
+        end if
 #endif
       end if
 
@@ -527,8 +547,10 @@ module time_module
                          st_ribl%intstep, bound_name, st_ribl%fnum, st_step_flag%ribl,&
                          ierr, st_ribl%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_ribl%fnum, rfview%bl, bound_name)
+        if (ierr == 0 .and. any(st_ribl%inttype == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_ribl%fnum, rfview%bl, bound_name)
+        end if
 #endif
       end if
 
@@ -558,8 +580,10 @@ module time_module
                          st_ride%intstep, bound_name, st_ride%fnum, st_step_flag%ride,&
                          ierr, st_ride%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_ride%fnum, rfview%de, bound_name)
+        if (ierr == 0 .and. any(st_ride%inttype == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_ride%fnum, rfview%de, bound_name)
+        end if
 #endif
       end if
 
@@ -591,8 +615,10 @@ module time_module
                          st_riwi%intstep, bound_name, st_riwi%fnum, st_step_flag%riwi,&
                          ierr, st_riwi%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_riwi%fnum, rfview%wi, bound_name)
+        if (ierr == 0 .and. any(st_riwi%inttype == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_riwi%fnum, rfview%wi, bound_name)
+        end if
 #endif
       end if
 
@@ -624,8 +650,10 @@ module time_module
                          st_rile%intstep, bound_name, st_rile%fnum, st_step_flag%rile,&
                          ierr, st_rile%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_rile%fnum, rfview%le, bound_name)
+        if (ierr == 0 .and. any(st_rile%inttype == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_rile%fnum, rfview%le, bound_name)
+        end if
 #endif
       end if
 
@@ -656,8 +684,10 @@ module time_module
           call read_intn(st_ribk%inttype, st_ribk%intfnum, st_ribk%multi, st_ribk%intstep,&
                          bound_name, st_ribk%fnum, st_step_flag%ribk, ierr, st_ribk%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_ribk%fnum, rfview%bk, bound_name)
+        if (ierr == 0 .and. any(st_ribk%inttype == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_ribk%fnum, rfview%bk, bound_name)
+        end if
 #endif
       end if
 
@@ -688,8 +718,10 @@ module time_module
           call read_intn(st_ribt%inttype, st_ribt%intfnum, st_ribt%multi, st_ribt%intstep,&
                          bound_name, st_ribt%fnum, st_step_flag%ribt, ierr, st_ribt%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_ribt%fnum, rfview%bt, bound_name)
+        if (ierr == 0 .and. any(st_ribt%inttype == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_ribt%fnum, rfview%bt, bound_name)
+        end if
 #endif
       end if
 
@@ -721,8 +753,10 @@ module time_module
                          st_lawl%intstep, bound_name, st_lawl%fnum, st_step_flag%lawl,&
                          ierr, st_lawl%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_lawl%fnum, lfview%wl, bound_name)
+        if (ierr == 0 .and. any(st_lawl%inttype == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_lawl%fnum, lfview%wl, bound_name)
+        end if
 #endif
       end if
 
@@ -752,8 +786,10 @@ module time_module
                          st_lawd%intstep, bound_name, st_lawd%fnum, st_step_flag%lawd,&
                          ierr, st_lawd%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_lawd%fnum, lfview%wd, bound_name)
+        if (ierr == 0 .and. any(st_lawd%inttype == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_lawd%fnum, lfview%wd, bound_name)
+        end if
 #endif
       end if
 

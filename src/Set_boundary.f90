@@ -475,10 +475,9 @@ module set_boundary
   ! set_well_info -- Set well information
   !*********************************************************************************************
     ! -- modules
-    use open_file, only: open_in_wellf, open_in_wlayf
+    use open_file, only: open_in_wellf, open_in_wlayf, st_intwe
     use assign_boundary, only: assign_wellv
 #ifdef MPI_MSG
-    use open_file, only: st_intwe
     use mpi_set, only: cals_i4view, calc_r4view, calc_r4hview
 #endif
     ! -- inout
@@ -515,13 +514,22 @@ module set_boundary
       end if
 
       ! -- Open input well file (in_wellf)
-        call open_in_wellf(st_in_type%well, st_in_path%well, st_in_unit%well, bfview%well)
+        call open_in_wellf(st_in_type%well, st_in_path%well, st_in_unit%well, bfview%well,&
+                           cals_r4view, calc_r4view)
 #else
       ! -- Open input well file (in_wellf)
         call open_in_wellf(st_in_type%well, st_in_path%well, st_in_unit%well)
 #endif
 
-      if (st_in_type%well == in_type(3) .or. st_in_type%well == in_type(4)) then
+      if (st_in_type%well == in_type(3) .or. st_in_type%well == in_type(4) .or.&
+          st_intwe%type == in_type(3) .or. st_intwe%type == in_type(4)) then
+        if (st_in_type%weks /= in_type(3) .and. st_in_type%weks /= in_type(4) .and.&
+            st_mpi%rank == 0) then
+          call write_err_stop("Specify correct number for well start in timeseries input file.")
+        else if (st_in_type%weke /= in_type(3) .and. st_in_type%weke /= in_type(4) .and.&
+                 st_mpi%rank == 0) then
+          call write_err_stop("Specify correct number for well end in timeseries input file.")
+        end if
 #ifdef MPI_MSG
         ! -- Open input well layer file (in_wlayf)
           call open_in_wlayf(st_in_type%weks, st_in_type%weke, st_in_path%weks,&
@@ -530,6 +538,10 @@ module set_boundary
         ! -- Open input well layer file (in_wlayf)
           call open_in_wlayf(st_in_type%weks, st_in_type%weke, st_in_path%weks, st_in_path%weke)
 #endif
+      else if (st_in_type%weks > 0 .and. st_mpi%rank == 0) then
+        call write_logf("Ignored well start in timeseries input file.")
+      else if (st_in_type%weke > 0 .and. st_mpi%rank == 0) then
+        call write_logf("Ignored well end in timeseries input file.")
       end if
     end if
 

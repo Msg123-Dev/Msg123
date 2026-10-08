@@ -1197,7 +1197,7 @@ module read_module
     if (any(ftype == type_txt(:))) then
       if (st_mpi%rank == 0) then
         ! -- Open new read text file (new_rtxt)
-          call open_new_rtxt(0, 0, trim(adjustl(nxi_path)), err_mes, intfn, ierr)
+          call open_new_rtxt(1, 0, trim(adjustl(nxi_path)), mess//" timeseries", intfn, ierr)
       end if
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
@@ -1211,10 +1211,10 @@ module read_module
     else if (any(ftype == type_bin(:))) then
 #ifdef MPI_MSG
       ! -- Open mpi read file (mpi_read_file)
-        call open_mpi_read_file(0, 0, trim(adjustl(nxi_path)), mess//" timeseries", intfn, ierr)
+        call open_mpi_read_file(1, 0, trim(adjustl(nxi_path)), mess//" timeseries", intfn, ierr)
 #else
       ! -- Open read new binary file (new_rbin)
-        call open_new_rbin(0, 0, trim(adjustl(nxi_path)), err_mes, intfn, ierr)
+        call open_new_rbin(1, 0, trim(adjustl(nxi_path)), mess//" timeseries", intfn, ierr)
 #endif
     end if
 

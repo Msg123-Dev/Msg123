@@ -506,6 +506,9 @@ module mpi_solve
       end if
     end if
 
+    if (st_mpi%rank /= wrank) then
+      cval = ""
+    end if
     call MPI_BCAST(cval, str_len, MPI_CHARACTER, wrank, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then

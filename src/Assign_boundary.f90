@@ -298,11 +298,17 @@ module assign_boundary
           ! -- Set well value from 3d text file (3dfile2well)
             call set_3dfile2well(st_well%fnum, well_ftype, intwe_type, num_well, well2calc)
         end if
+        if (intwe_type == in_type(3) .or. intwe_type == in_type(5)) then
+          if (st_mpi%rank == 0) then
+            call close_file(st_well%fnum)
+          end if
+        else if (intwe_type == in_type(4) .or. intwe_type == in_type(6)) then
 #ifdef MPI_MSG
-        call close_mpi_file(st_well%fnum)
+          call close_mpi_file(st_well%fnum)
 #else
-        call close_file(st_well%fnum)
+          call close_file(st_well%fnum)
 #endif
+        end if
       end if
 
       if (well_ftype == in_type(2) .or. any(well_ftype == type_2d)) then

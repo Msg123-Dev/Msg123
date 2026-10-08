@@ -1636,37 +1636,62 @@ module set_condition
   ! set_2dwell -- Set well from 2d file
   !*********************************************************************************************
     ! -- modules
+    use utility_module, only: close_file
     use open_file, only: wells_fnum, welle_fnum
+#ifdef MPI_MSG
+    use mpi_read, only: close_mpi_file
+#endif
     ! -- inout
     integer(I4), intent(in) :: wfnum, wf_ftype, wf_int_ft, ws_ftype, we_ftype
     integer(I4), intent(inout) :: mw_totn
     ! -- local
-    integer(I4) :: i, w, size_n
+    integer(I4) :: i, w
     integer(I4), save :: wswe_flag = 0
-    integer(I4), allocatable :: w_ij(:), w_ks(:), w_ke(:), cals2well(:)
+    integer(I4), allocatable :: w_ij(:), cals2well(:)
+    integer(I4), allocatable, save :: w_ks(:), w_ke(:)
     real(SP), allocatable :: w_val(:)
     !-------------------------------------------------------------------------------------------
-    allocate(w_ij(ncals), w_ks(ncals), w_ke(ncals))
-    allocate(w_val(ncals))
+    allocate(w_ij(ncals), w_val(ncals))
     !$omp parallel do private(i)
     do i = 1, ncals
-      w_ij(i) = 0 ; w_ks(i) = 0 ; w_ke(i) = 0 ; w_val(i) = SZERO
+      w_ij(i) = 0 ; w_val(i) = SZERO
     end do
     !$omp end parallel do
 
     call set_2dfile2cals(wfnum, wf_ftype, wf_int_ft, SZERO, w_val)
 
     if (wswe_flag == 0) then
+      allocate(w_ks(ncals), w_ke(ncals))
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        w_ks(i) = 0 ; w_ke(i) = 0
+      end do
+      !$omp end parallel do
       if (ws_ftype == in_type(3) .or. ws_ftype == in_type(4)) then
-        call set_2dfile2cals(wells_fnum, ws_ftype, wf_int_ft, 0, w_ks)
+        call set_2dfile2cals(wells_fnum, ws_ftype, 0, 0, w_ks)
       end if
 
       if (we_ftype == in_type(3) .or. we_ftype == in_type(4)) then
-        call set_2dfile2cals(welle_fnum, we_ftype, wf_int_ft, 0, w_ke)
+        call set_2dfile2cals(welle_fnum, we_ftype, 0, 0, w_ke)
       end if
 
-      if (st_mpi%rank == 0) then
-        close(wells_fnum) ; close(welle_fnum)
+      if (ws_ftype == in_type(3) .and. st_mpi%rank == 0) then
+        call close_file(wells_fnum)
+      else if (ws_ftype == in_type(4)) then
+#ifdef MPI_MSG
+        call close_mpi_file(wells_fnum)
+#else
+        call close_file(wells_fnum)
+#endif
+      end if
+      if (we_ftype == in_type(3) .and. st_mpi%rank == 0) then
+        call close_file(welle_fnum)
+      else if (we_ftype == in_type(4)) then
+#ifdef MPI_MSG
+        call close_mpi_file(welle_fnum)
+#else
+        call close_file(welle_fnum)
+#endif
       end if
 
       wswe_flag = 1
@@ -1679,14 +1704,12 @@ module set_condition
     end do
     !$omp end parallel do
 
+    mw_totn = 0
     call set_cals2well(w_ks, w_ke, w_val, mw_totn, cals2well, w_ij)
 
     if (allocated(well_nflag)) then
-      size_n = size(well_nflag)
-      if (mw_totn < size_n) then
-        mw_totn = size_n
-      end if
-      call set_multiwell(mw_totn, ncals, cals2well, w_ij, w_ks, w_ke, w_val)
+      mw_totn = size(well_nflag) + mw_totn
+      call set_multiwell(mw_totn, ncals, w_ij, w_ij, w_ks, w_ke, w_val)
     else
       allocate(well_nflag(mw_totn), st_well%ij(mw_totn))
       allocate(st_well%ks(mw_totn), st_well%ke(mw_totn))
@@ -1704,14 +1727,15 @@ module set_condition
         w = cals2well(i)
         if (w /= 0) then
           st_well%ij(w) = w_ij(i) ; st_well%ks(w) = w_ks(i) ; st_well%ke(w) = w_ke(i)
-          st_well%value(w) = w_val(i) ; well_nflag(w) = w
+          st_well%value(w) = w_val(i) ; well_nflag(w) = w_ij(i)
         end if
       end do
       !$omp end do
       !$omp end parallel
     end if
+    mw_totn = size(well_nflag)
 
-    deallocate(w_ij, w_ks, w_ke, w_val, cals2well)
+    deallocate(w_ij, w_val, cals2well)
 
   end subroutine set_2dwell
 
@@ -2718,7 +2742,7 @@ module set_condition
       plus = plus + 1
       np = nsize + plus
       temp_wflag(np) = mw_id(m) ; temp_ij(np) = mwij(m)
-      temp_ks(np) = mwks(m) ; temp_ke(np) = mwke(m)
+      temp_ks(np) = mwks(m) ; temp_ke(np) = mwke(m) ; temp_value(np) = mwv(m)
     end do new
 
     allocate(st_well%ij(np), st_well%ks(np), st_well%ke(np))

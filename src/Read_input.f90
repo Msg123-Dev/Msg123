@@ -1177,7 +1177,8 @@ module read_input
     st_in_unit%well = well_unit
     deallocate(all_tinp_type)
 
-    if (well_type == in_type(3) .or. well_type == in_type(4)) then
+    if (well_type == in_type(3) .or. well_type == in_type(4) .or.&
+        (well_type == in_type(7) .and. (weks_type > 0 .or. weke_type > 0))) then
       if (weks_type /= in_type(3) .and. weks_type /= in_type(4)) then
         call write_err_stop("Specify correct number for well start in timeseries input file.")
       else if (weke_type /= in_type(3) .and. weke_type /= in_type(4)) then

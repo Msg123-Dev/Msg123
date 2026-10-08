@@ -1728,6 +1728,20 @@ module mpi_set
       end if
     end if
 
+    call MPI_BCAST(st_in_type%weks, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Broadcast input well start layer file type.")
+      end if
+    end if
+
+    call MPI_BCAST(st_in_type%weke, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Broadcast input well end layer file type.")
+      end if
+    end if
+
     call MPI_BCAST(st_in_type%prec, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then

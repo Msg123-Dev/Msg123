@@ -336,22 +336,20 @@ module nonlinear_solution
         end if
 #endif
       end if
+      cxyzn = "" ; conv_dmat = DZERO ; conv_rhs = DZERO ; conv_head = DZERO
 #ifdef MPI_MSG
-      if (max_var == var_max) then
+      if (max_var == var_max .and. max_num > 0) then
+#else
+      if (max_num > 0) then
+#endif
         cxyzn = get_cnum(max_num)
-      else
-        cxyzn = ""
+        conv_dmat = array_var(1)%dmat(max_num)*len_scal**2
+        conv_rhs = array_var(1)%rhs(max_num)*len_scal**3
+        conv_head = st_sol%head_new(max_num)*len_scal + z_base
       end if
-      conv_dmat = array_var(1)%dmat(max_num)*len_scal**2
-      conv_rhs = array_var(1)%rhs(max_num)*len_scal**3
-      conv_head = st_sol%head_new(max_num)*len_scal + z_base
+#ifdef MPI_MSG
       ! -- Bcast converge information (convinfo)
         call bcast_convinfo(cxyzn, conv_dmat, conv_rhs, conv_head, max_var)
-#else
-      cxyzn = get_cnum(max_num)
-      conv_dmat = array_var(1)%dmat(max_num)*len_scal**2
-      conv_rhs = array_var(1)%rhs(max_num)*len_scal**3
-      conv_head = st_sol%head_new(max_num)*len_scal + z_base
 #endif
       conv_var = max_var*len_scal
       res_l1 = DZERO

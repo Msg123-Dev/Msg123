@@ -579,7 +579,6 @@ module open_file
             call open_new_rtxt(1, 1, trim(adjustl(intsep)), "input "//err_mes, st_seal%fnum)
         end if
       else if (any(bin_seal_mask)) then
-        ! -- Pick the matching view for the inner type and hand it back
         if (intse_type == in_type(4) .and. present(view_2d)) then
           temp_view = view_2d
         else if (intse_type == in_type(6) .and. present(view_3d)) then
@@ -619,26 +618,7 @@ module open_file
     st_seal%totn = st_grid%nxyz
 
     if (st_seal%multi /= SINFI) then
-      if (any(txt_seal_mask) .or. seal_type == in_type(1) .or. seal_type == in_type(2)) then
-        if (st_mpi%rank == 0) then
-          call skip_file(seal_type, st_seal%fnum, vname, st_seal%multi, st_seal%totn,&
-                         st_seal%etime)
-        end if
-#ifdef MPI_MSG
-        if (st_mpi%totn /= 1) then
-          ! -- Bcast scalar value (val)
-            call bcast_val(st_seal%totn, "sea level number")
-        end if
-#endif
-      else if (any(bin_seal_mask)) then
-#ifdef MPI_MSG
-        call skip_mpi_file(seal_type, st_seal%fnum, temp_view, vname, st_seal%multi,&
-                           st_seal%etime)
-#else
-        call skip_file(seal_type, st_seal%fnum, vname, st_seal%multi, st_seal%totn,&
-                       st_seal%etime)
-#endif
-      else if (seal_type == in_type(7)) then
+      if (seal_type == in_type(7)) then
 #ifdef MPI_MSG
         if (any(txt_seal_mask)) then
           if (st_mpi%rank == 0) then
@@ -656,6 +636,26 @@ module open_file
 #else
         call skip_file_int(intse_type, intse_fnum, st_seal%fnum, vname, st_seal%multi,&
                            intse_step, intse_end, st_seal%etime)
+#endif
+      else if (any(txt_seal_mask) .or. seal_type == in_type(1) .or.&
+               seal_type == in_type(2)) then
+        if (st_mpi%rank == 0) then
+          call skip_file(seal_type, st_seal%fnum, vname, st_seal%multi, st_seal%totn,&
+                         st_seal%etime)
+        end if
+#ifdef MPI_MSG
+        if (st_mpi%totn /= 1) then
+          ! -- Bcast scalar value (val)
+            call bcast_val(st_seal%totn, "sea level number")
+        end if
+#endif
+      else if (any(bin_seal_mask)) then
+#ifdef MPI_MSG
+        call skip_mpi_file(seal_type, st_seal%fnum, temp_view, vname, st_seal%multi,&
+                           st_seal%etime)
+#else
+        call skip_file(seal_type, st_seal%fnum, vname, st_seal%multi, st_seal%totn,&
+                       st_seal%etime)
 #endif
       end if
 #ifdef MPI_MSG
@@ -873,7 +873,7 @@ module open_file
 
   end subroutine open_in_rechf
 
-  subroutine open_in_wellf(well_type, well_path, well_unit, well_view)
+  subroutine open_in_wellf(well_type, well_path, well_unit, well_view, view_2d, view_3d)
   !*********************************************************************************************
   ! open_in_wellf -- Open input well file
   !*********************************************************************************************
@@ -883,7 +883,8 @@ module open_file
     ! -- inout
     integer(I4), intent(in) :: well_type
     character(*), intent(inout) :: well_path, well_unit
-    integer(I4), intent(in), optional :: well_view
+    integer(I4), intent(inout), optional :: well_view
+    integer(I4), intent(in), optional :: view_2d, view_3d
     ! -- local
     integer(I4) :: ierr
     integer(I4) :: temp_view
@@ -948,14 +949,22 @@ module open_file
           call bcast_extr_set(intwe_type, intwe_step, intwe_end, intwep, err_mes)
       end if
 #endif
-      txt_well_mask(:) = (txt_well_type(:) /= intwe_type)
-      bin_well_mask(:) = (bin_well_type(:) /= intwe_type)
+      txt_well_mask(:) = (intwe_type == txt_well_type(:))
+      bin_well_mask(:) = (intwe_type == bin_well_type(:))
       if (any(txt_well_mask)) then
         if (st_mpi%rank == 0) then
           ! -- Open new read text file (new_rtxt)
             call open_new_rtxt(1, 1, trim(adjustl(intwep)), "input "//err_mes, st_well%fnum)
         end if
       else if (any(bin_well_mask)) then
+        if (intwe_type == in_type(4) .and. present(view_2d)) then
+          temp_view = view_2d
+        else if (intwe_type == in_type(6) .and. present(view_3d)) then
+          temp_view = view_3d
+        end if
+        if (present(well_view)) then
+          well_view = temp_view
+        end if
 #ifdef MPI_MSG
         ! -- Open mpi read file (mpi_read_file)
           call open_mpi_read_file(1, 1, trim(adjustl(intwep)), "input "//err_mes, st_well%fnum)
@@ -989,26 +998,7 @@ module open_file
     st_well%totn = st_grid%nxyz
 
     if (st_well%multi /= SINFI) then
-      if (any(txt_well_mask) .or. well_type == in_type(2)) then
-        if (st_mpi%rank == 0) then
-          call skip_file(well_type, st_well%fnum, vname, st_well%multi, st_well%totn,&
-                         st_well%etime)
-        end if
-#ifdef MPI_MSG
-        if (st_mpi%totn /= 1) then
-          ! -- Bcast scalar value (val)
-            call bcast_val(st_well%totn, vname//" total number")
-        end if
-#endif
-      else if (any(bin_well_mask)) then
-#ifdef MPI_MSG
-        call skip_mpi_file(well_type, st_well%fnum, temp_view, vname, st_well%multi,&
-                           st_well%etime)
-#else
-        call skip_file(well_type, st_well%fnum, vname, st_well%multi, st_well%totn,&
-                       st_well%etime)
-#endif
-      else if (well_type == in_type(7)) then
+      if (well_type == in_type(7)) then
 #ifdef MPI_MSG
         if (any(txt_well_mask)) then
           if (st_mpi%rank == 0) then
@@ -1026,6 +1016,25 @@ module open_file
 #else
         call skip_file_int(intwe_type, intwe_fnum, st_well%fnum, vname, st_well%multi,&
                            intwe_step, intwe_end, st_well%etime)
+#endif
+      else if (any(txt_well_mask) .or. well_type == in_type(2)) then
+        if (st_mpi%rank == 0) then
+          call skip_file(well_type, st_well%fnum, vname, st_well%multi, st_well%totn,&
+                         st_well%etime)
+        end if
+#ifdef MPI_MSG
+        if (st_mpi%totn /= 1) then
+          ! -- Bcast scalar value (val)
+            call bcast_val(st_well%totn, vname//" total number")
+        end if
+#endif
+      else if (any(bin_well_mask)) then
+#ifdef MPI_MSG
+        call skip_mpi_file(well_type, st_well%fnum, temp_view, vname, st_well%multi,&
+                           st_well%etime)
+#else
+        call skip_file(well_type, st_well%fnum, vname, st_well%multi, st_well%totn,&
+                       st_well%etime)
 #endif
       end if
 #ifdef MPI_MSG

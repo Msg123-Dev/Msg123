@@ -429,6 +429,7 @@ module mpi_solve
   ! check_mpimaxerr -- Check mpi max error
   !*********************************************************************************************
     ! -- module
+    use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
     use constval_module, only: DNOVAL
     use mpi_utility, only: mpimax_val
     ! -- inout
@@ -437,14 +438,26 @@ module mpi_solve
     ! -- local
     integer(I4) :: ierr
     integer(I4) :: pnum, wrank
-    real(DP) :: mpimax_err
+    integer(I4) :: nan_flag, max_nan
+    real(DP) :: mpimax_err, abs_unk
     !-------------------------------------------------------------------------------------------
+    nan_flag = 0 ; abs_unk = DZERO
+    if (ieee_is_nan(unknow)) then
+      nan_flag = 1
+    else if (ncalc > 0) then
+      abs_unk = abs(unknow)
+    end if
     ! -- MAX value for MPI (val)
       call mpimax_val(abs(change), "absolute change", mpimax_err)
     abs_max_ch = mpimax_err
     ! -- MAX value for MPI (val)
-      call mpimax_val(abs(unknow), "absolute unknown", mpimax_err)
+      call mpimax_val(abs_unk, "absolute unknown", mpimax_err)
     max_un = mpimax_err
+    ! -- MAX value for MPI (val)
+      call mpimax_val(nan_flag, "nan flag", max_nan)
+    if (max_nan > 0) then
+      max_un = transfer(-1_8, DZERO)
+    end if
 
     pnum = 0 ; wrank = 0
     if (abs(change) == abs_max_ch) then

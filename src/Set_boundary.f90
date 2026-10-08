@@ -6,6 +6,7 @@ module set_boundary
   use utility_module, only: st_mpi, write_logf, write_err_stop, get_ilen, conv_i2s
   use initial_module, only: in_type, st_in_type, st_rivf_type, st_lakf_type, st_in_path
   use initial_module, only: st_in_unit
+  use check_condition, only: check_input_nan
   use set_cell, only: ncals
   use set_condition, only: st_bcnd, st_hydr
   use assign_boundary, only: assign_surfbv, assign_rilav, st_forc
@@ -398,6 +399,10 @@ module set_boundary
 
     ! -- Assign sea level value (sealv)
       call assign_sealv(st_in_type%seal)
+    if (allocated(st_forc%read_seal)) then
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_forc%read_seal, "sea level")
+    end if
 
     deallocate(all_seal_type, all_seal_mask)
 
@@ -462,6 +467,8 @@ module set_boundary
       ! -- Assign recharge value
         call assign_surfbv(st_in_type%rech, st_intre%type, st_rech, st_bcnd%rech_num,&
                            st_bcnd%rech_cflag, st_forc%read_rech)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_forc%read_rech, "recharge")
 
       call conv_rech2calc(st_bcnd%rech_num)
     end if
@@ -548,6 +555,10 @@ module set_boundary
     st_bcnd%well_num = 0
     ! -- Assign well value (wellv)
       call assign_wellv(st_in_type%well, st_in_type%weks, st_in_type%weke, st_bcnd%well_num)
+    if (allocated(st_forc%read_well)) then
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_forc%read_well, "well")
+    end if
 
     deallocate(all_well_type, all_well_mask)
 
@@ -608,6 +619,8 @@ module set_boundary
       ! -- Assign precipitation value
         call assign_surfbv(st_in_type%prec, st_intpr%type, st_prec, st_bcnd%prec_num,&
                            st_bcnd%prec_cflag, st_forc%read_prec)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_forc%read_prec, "precipitation")
       deallocate(st_bcnd%prec_cflag)
     end if
 
@@ -670,6 +683,8 @@ module set_boundary
       ! -- Assign evapotranspiration value
         call assign_surfbv(st_in_type%evap, st_intev%type, st_evap, st_bcnd%evap_num,&
                            st_bcnd%evap_cflag, st_forc%read_evap)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_forc%read_evap, "evapotranspiration")
       deallocate(st_bcnd%evap_cflag)
     end if
 
@@ -699,6 +714,8 @@ module set_boundary
     ! -- Assign river water level value
       call assign_rilav(st_rivf_type%wlev, 2, st_riwl, st_rive%num%wl, st_rive%cflag%wl,&
                         st_rive%calc%wl)
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_rive%calc%wl, "river water level")
 
   end subroutine set_riwl_info
 
@@ -724,6 +741,8 @@ module set_boundary
     ! -- Assign river bottom level value
       call assign_rilav(st_rivf_type%blev, 2, st_ribl, st_rive%num%bl, st_rive%cflag%bl,&
                         st_rive%calc%bl)
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_rive%calc%bl, "river bottom level")
 
   end subroutine set_ribl_info
 
@@ -750,6 +769,8 @@ module set_boundary
       ! -- Assign river water depth value
         call assign_rilav(st_rivf_type%wdep, 0, st_riwd, st_rive%num%wd, st_rive%cflag%wd,&
                           st_rive%calc%wd)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_rive%calc%wd, "river water depth")
     end if
 
   end subroutine set_riwd_info
@@ -777,6 +798,8 @@ module set_boundary
       ! -- Assign river depth value
         call assign_rilav(st_rivf_type%dept, 0, st_ride, st_rive%num%de, st_rive%cflag%de,&
                           st_rive%calc%de)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_rive%calc%de, "river depth")
     end if
 
   end subroutine set_ride_info
@@ -804,6 +827,8 @@ module set_boundary
       ! -- Assign river width value
         call assign_rilav(st_rivf_type%widt, 0, st_riwi, st_rive%num%wi, st_rive%cflag%wi,&
                           st_rive%calc%wi)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_rive%calc%wi, "river width")
     end if
 
   end subroutine set_riwi_info
@@ -831,6 +856,8 @@ module set_boundary
       ! -- Assign river length value
         call assign_rilav(st_rivf_type%leng, 0, st_rile, st_rive%num%le, st_rive%cflag%le,&
                           st_rive%calc%le)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_rive%calc%le, "river length")
     end if
 
   end subroutine set_rile_info
@@ -858,6 +885,8 @@ module set_boundary
       ! -- Assign river bed conductivity value
         call assign_rilav(st_rivf_type%bedk, 0, st_ribk, st_rive%num%bk, st_rive%cflag%bk,&
                           st_rive%calc%bk)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_rive%calc%bk, "river bed conductivity")
     end if
 
   end subroutine set_ribk_info
@@ -885,6 +914,8 @@ module set_boundary
       ! -- Assign river bed thickness value
         call assign_rilav(st_rivf_type%bedt, 0, st_ribt, st_rive%num%bt, st_rive%cflag%bt,&
                           st_rive%calc%bt)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_rive%calc%bt, "river bed thickness")
     end if
 
   end subroutine set_ribt_info
@@ -1047,6 +1078,8 @@ module set_boundary
     ! -- Assign lake water level value
       call assign_rilav(st_lakf_type%wlev, 2, st_lawl, st_lake%num%wl, st_lake%cflag%wl,&
                         st_lake%calc%wl)
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_lake%calc%wl, "lake water level")
 
   end subroutine set_lawl_info
 
@@ -1072,6 +1105,8 @@ module set_boundary
     ! -- Assign lake bottom level value
       call assign_rilav(st_lakf_type%blev, 2, st_labl, st_lake%num%bl, st_lake%cflag%bl,&
                         st_lake%calc%bl)
+    ! -- Check input nan (input_nan)
+      call check_input_nan(st_lake%calc%bl, "lake bottom level")
 
   end subroutine set_labl_info
 
@@ -1098,6 +1133,8 @@ module set_boundary
       ! -- Assign lake water depth value
         call assign_rilav(st_lakf_type%wdep, 0, st_lawd, st_lake%num%wd, st_lake%cflag%wd,&
                           st_lake%calc%wd)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_lake%calc%wd, "lake water depth")
     end if
 
   end subroutine set_lawd_info
@@ -1125,6 +1162,8 @@ module set_boundary
       ! -- Assign lake area value
         call assign_rilav(st_lakf_type%area, 1, st_laar, st_lake%num%ar, st_lake%cflag%ar,&
                           st_lake%calc%ar)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_lake%calc%ar, "lake area")
     end if
 
   end subroutine set_laar_info

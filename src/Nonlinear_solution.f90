@@ -207,6 +207,17 @@ module nonlinear_solution
       else
         st_ctrl%errtol = XMAX_INV**3
       end if
+      if (ieee_is_nan(l2norm_pre) .and. st_sim%sim_type /= -1) then
+        if (st_mpi%rank == 0) then
+          write(log_fnum,'(a)') "Nan detected."
+        end if
+        exit outer_loop
+      else if (ieee_is_nan(l2norm_pre)) then
+        if (st_mpi%rank == 0) then
+          write(conv_fnum,15)
+        end if
+        call write_err_stop("Nan detected in the steady state calculation.")
+      end if
       if (l2norm_pre > DZERO) then
       ! -- Solve linear algebra (linalg)
         call solve_linalg(l2norm_pre, st_sol%head_change, st_kryl, st_amgt, l2norm_jac)
@@ -248,6 +259,7 @@ module nonlinear_solution
         if (st_mpi%rank == 0) then
           write(log_fnum,'(a)') "Nan detected."
         end if
+        st_time%conv_flag = .false.
         exit outer_loop
       else if (ieee_is_nan(max_unk) .and. st_sim%sim_type == -1) then
         if (st_mpi%rank == 0) then
@@ -458,7 +470,7 @@ module nonlinear_solution
         st_time%delt*st_sim%dec_fact < max(st_sim%min_step, DSMAL,&
                                            spacing(st_time%current_t)))) then
       if (st_ctrl%noconv_type == 1 .and. .not. ieee_is_nan(max_unk) .and.&
-          check_val < VARMAX .and. max_unk < XMAX) then
+          .not. ieee_is_nan(l2norm_pre) .and. check_val < VARMAX .and. max_unk < XMAX) then
         st_time%conv_flag = .true. ; noconv_num = noconv_num + 1
         if (st_mpi%rank == 0) then
           write(conv_fnum,18)
@@ -824,7 +836,7 @@ module nonlinear_solution
       ! -- Calculate function and l2norm2 (func2norm)
         call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol)
       if (.not. ieee_is_finite(l2_new) .or. l2_new > DIVERGE_LIMIT) then
-        if (lam < lam_min) then
+        if (lam < lam_min .or. lam_min == DZERO) then
           ! -- Calculate function and l2norm2 (func2norm)
             call calc_funcl2norm(DZERO, backi, l2_new, new_f, st_sol)
           backf = .true.

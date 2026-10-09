@@ -1074,8 +1074,9 @@ module read_module
     integer(I4), intent(in) :: ftype, fnum
     real(DP), intent(in) :: multi
     character(*), intent(in) :: mess
-    integer(I4), intent(out) :: nx_totn, flag, ierr
-    real(DP), intent(out) :: etime
+    integer(I4), intent(inout) :: nx_totn, flag
+    integer(I4), intent(out) :: ierr
+    real(DP), intent(inout) :: etime
     ! -- local
     integer(I4), allocatable :: type_txt(:), type_bin(:)
     real(SP) :: temp_etime

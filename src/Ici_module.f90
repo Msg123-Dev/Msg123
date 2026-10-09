@@ -603,8 +603,8 @@ module ici_module
     ! -- module
     ! -- inout
     real(DP), intent(in) :: inwd(:)
-    integer(I4), intent(out) :: wdflag(:)
-    real(DP), intent(out) :: outwd(:)
+    integer(I4), intent(inout) :: wdflag(:)
+    real(DP), intent(inout) :: outwd(:)
     integer(I4), intent(out) :: wdnum
     ! -- local
     integer(I4) :: i

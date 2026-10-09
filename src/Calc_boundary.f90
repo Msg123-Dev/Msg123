@@ -292,8 +292,8 @@ module calc_boundary
     ! -- inout
     integer(I4), intent(in) :: wi_flag(:), le_flag(:)
     real(DP), intent(in) :: riv_wi(:), riv_le(:)
-    integer(I4), intent(out) :: ar_flag(:)
-    real(DP), intent(out) :: riv_ar(:)
+    integer(I4), intent(inout) :: ar_flag(:)
+    real(DP), intent(inout) :: riv_ar(:)
     integer(I4), intent(out) :: riar_num
     ! -- local
     integer(I4) :: i

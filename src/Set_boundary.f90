@@ -27,11 +27,14 @@ module set_boundary
 #endif
 
   ! -- local
-  integer(I4) :: sum_riwln, sum_ribln, sum_riwdn, sum_riden, sum_riwin, sum_rilen
+  integer(I4) :: sum_riwln, sum_ribln, sum_riwdn, sum_riden
   integer(I4) :: sum_riarn, sum_lawln, sum_labln, sum_lawdn, sum_laarn
   logical :: rive_blev_dept = .false., rive_blev_wdep = .false., rive_blev_surf = .false.
   logical :: rive_wlev_wdep = .false., lake_blev_wdep = .false., lake_wlev_wdep = .false.
   logical :: lake_wlev_surf = .false.
+  logical :: riwl_given = .false., riwd_given = .false., ribl_given = .false.
+  logical :: ride_given = .false., lawl_given = .false., lawd_given = .false.
+  logical :: labl_given = .false.
 
   contains
 
@@ -135,8 +138,10 @@ module set_boundary
 #else
     sum_riwln = st_rive%num%wl ; sum_ribln = st_rive%num%bl
 #endif
+    riwl_given = st_rivf_type%wlev > 0 .or. sum_riwln /= 0
+    ribl_given = st_rivf_type%blev > 0 .or. sum_ribln /= 0
 
-    if (sum_riwln == 0 .or. sum_ribln == 0) then
+    if (.not. riwl_given .or. .not. ribl_given) then
       ! -- Set river water depth information (riwd_info)
         call set_riwd_info()
 #ifdef MPI_MSG
@@ -145,9 +150,10 @@ module set_boundary
 #else
       sum_riwdn = st_rive%num%wd
 #endif
+      riwd_given = st_rivf_type%wdep > 0 .or. sum_riwdn /= 0
     end if
 
-    if (sum_ribln == 0) then
+    if (.not. ribl_given) then
       ! -- Set river depth information (ride_info)
         call set_ride_info()
 
@@ -157,6 +163,7 @@ module set_boundary
 #else
       sum_riden = st_rive%num%de
 #endif
+      ride_given = st_rivf_type%dept > 0 .or. sum_riden /= 0
       ! -- Set river bottom level (rive_bott)
         call set_rive_bott()
 
@@ -183,15 +190,7 @@ module set_boundary
     ! -- Set river bed thickness information (ribt_info)
       call set_ribt_info()
 
-#ifdef MPI_MSG
-    ! -- Sum value for MPI (val)
-      call mpisum_val(st_rive%num%wi, "river width", sum_riwin)
-      call mpisum_val(st_rive%num%le, "river length", sum_rilen)
-#else
-    sum_riwin = st_rive%num%wi ; sum_rilen = st_rive%num%le
-#endif
-
-    if (sum_riwin > 0 .and. sum_rilen > 0) then
+    if (st_rivf_type%widt > 0 .and. st_rivf_type%leng > 0) then
       allocate(st_rive%cflag%ar(ncals))
       allocate(st_rive%calc%ar(ncals))
       !$omp parallel do private(i)
@@ -243,8 +242,10 @@ module set_boundary
 #else
     sum_lawln = st_lake%num%wl ; sum_labln = st_lake%num%bl
 #endif
+    lawl_given = st_lakf_type%wlev > 0 .or. sum_lawln /= 0
+    labl_given = st_lakf_type%blev > 0 .or. sum_labln /= 0
 
-    if (sum_lawln == 0 .or. sum_labln == 0) then
+    if (.not. lawl_given .or. .not. labl_given) then
       ! -- Set lake water depth information (lawd_info)
         call set_lawd_info()
 #ifdef MPI_MSG
@@ -253,6 +254,7 @@ module set_boundary
 #else
       sum_lawdn = st_lake%num%wd
 #endif
+      lawd_given = st_lakf_type%wdep > 0 .or. sum_lawdn /= 0
     end if
 
     ! -- Set lake water or bottom level (lake_wblevel)
@@ -756,7 +758,7 @@ module set_boundary
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    if (st_riwd%totn > 0) then
+    if (st_rivf_type%wdep > 0) then
       allocate(st_rive%cflag%wd(ncals))
       allocate(st_rive%calc%wd(ncals))
       !$omp parallel do private(i)
@@ -785,7 +787,7 @@ module set_boundary
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    if (st_ride%totn > 0) then
+    if (st_rivf_type%dept > 0) then
       allocate(st_rive%cflag%de(ncals))
       allocate(st_rive%calc%de(ncals))
       !$omp parallel do private(i)
@@ -814,7 +816,7 @@ module set_boundary
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    if (st_riwi%totn > 0) then
+    if (st_rivf_type%widt > 0) then
       allocate(st_rive%cflag%wi(ncals))
       allocate(st_rive%calc%wi(ncals))
       !$omp parallel do private(i)
@@ -843,7 +845,7 @@ module set_boundary
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    if (st_rile%totn > 0) then
+    if (st_rivf_type%leng > 0) then
       allocate(st_rive%cflag%le(ncals))
       allocate(st_rive%calc%le(ncals))
       !$omp parallel do private(i)
@@ -872,7 +874,7 @@ module set_boundary
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    if (st_ribk%totn > 0) then
+    if (st_rivf_type%bedk > 0) then
       allocate(st_rive%cflag%bk(ncals))
       allocate(st_rive%calc%bk(ncals))
       !$omp parallel do private(i)
@@ -901,7 +903,7 @@ module set_boundary
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    if (st_ribt%totn > 0) then
+    if (st_rivf_type%bedt > 0) then
       allocate(st_rive%cflag%bt(ncals))
       allocate(st_rive%calc%bt(ncals))
       !$omp parallel do private(i)
@@ -1120,7 +1122,7 @@ module set_boundary
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    if (st_lawd%totn > 0) then
+    if (st_lakf_type%wdep > 0) then
       allocate(st_lake%cflag%wd(ncals))
       allocate(st_lake%calc%wd(ncals))
       !$omp parallel do private(i)
@@ -1149,7 +1151,7 @@ module set_boundary
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    if (st_laar%totn > 0) then
+    if (st_lakf_type%area > 0) then
       allocate(st_lake%cflag%ar(ncals))
       allocate(st_lake%calc%ar(ncals))
       !$omp parallel do private(i)
@@ -1178,7 +1180,7 @@ module set_boundary
     ! -- local
     character(:), allocatable :: err_mes
     !-------------------------------------------------------------------------------------------
-    if (sum_riden /= 0) then
+    if (ride_given) then
       ! -- Calculate bottom level from surface level (blsl)
         call calc_blsl(st_rive%cflag%de, st_rive%calc%de, st_rive%cflag%bl, st_rive%calc%bl,&
                        st_rive%num%bl)
@@ -1188,7 +1190,7 @@ module set_boundary
         err_mes = "River bottom level is calculated from surface elevation and river depth."
         call write_logf(err_mes)
       end if
-    else if (sum_riwln /= 0 .and. sum_riwdn /= 0) then
+    else if (riwl_given .and. riwd_given) then
       ! -- Calculate bottom level from water level and water depth (blld)
         call calc_blld(st_rive%cflag%wl, st_rive%calc%wl, st_rive%cflag%wd, st_rive%calc%wd,&
                        st_rive%cflag%bl, st_rive%calc%bl, st_rive%num%bl)
@@ -1198,7 +1200,7 @@ module set_boundary
         err_mes = "River bottom level is calculated from water level and water depth."
         call write_logf(err_mes)
       end if
-    else if (sum_riwln /= 0 .and. sum_riwdn == 0) then
+    else if (riwl_given .and. .not. riwd_given) then
       ! -- Calculate level from surface (lsurf)
         call calc_lsurf(st_rive%cflag%wl, st_rive%cflag%bl, st_rive%calc%bl, st_rive%num%bl)
       rive_blev_surf = .true.
@@ -1207,7 +1209,7 @@ module set_boundary
         err_mes = "River bottom level is setted to surface elevation."
         call write_logf(err_mes)
       end if
-    else if (sum_riwln == 0 .and. sum_riwdn /= 0 .and. st_mpi%rank == 0) then
+    else if (.not. riwl_given .and. riwd_given .and. st_mpi%rank == 0) then
       allocate(character(0) :: err_mes)
       err_mes = "Only specified river water depth."
       call write_err_stop(err_mes)
@@ -1230,7 +1232,7 @@ module set_boundary
     ! -- local
     character(:), allocatable :: num_str, err_mes
     !-------------------------------------------------------------------------------------------
-    if (sum_riwln == 0 .and. sum_ribln /= 0 .and. sum_riwdn /= 0) then
+    if (.not. riwl_given .and. (ribl_given .or. rive_blev_dept) .and. riwd_given) then
       ! -- Calculate water level from bottom level and water depth (wlbd)
         call calc_wlbd(st_rive%cflag%bl, st_rive%calc%bl, st_rive%cflag%wd, st_rive%calc%wd,&
                        st_rive%cflag%wl, st_rive%calc%wl, st_rive%num%wl)
@@ -1249,13 +1251,13 @@ module set_boundary
         err_mes = "Set "//num_str//" river water level."
         call write_logf(err_mes)
       end if
-    else if (sum_riwln == 0 .and. sum_ribln /= 0 .and. sum_riden /= 0) then
+    else if (.not. riwl_given .and. (ribl_given .or. rive_blev_dept) .and. ride_given) then
       if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
         err_mes = "Not calculated river water level from river bottom level and river depth."
         call write_err_stop(err_mes)
       end if
-    else if (sum_riwln == 0 .and. sum_ribln /= 0 .and. sum_riden == 0) then
+    else if (.not. riwl_given .and. ribl_given .and. .not. ride_given) then
       if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
         err_mes = "Not calculated river water level from only river bottom level."
@@ -1284,7 +1286,7 @@ module set_boundary
     ! -- local
     character(:), allocatable :: num_str, err_mes
     !-------------------------------------------------------------------------------------------
-    if (sum_lawln == 0 .and. sum_labln /= 0 .and. sum_lawdn /= 0) then
+    if (.not. lawl_given .and. labl_given .and. lawd_given) then
       ! -- Calculate water level from bottom level and water depth (wlbd)
         call calc_wlbd(st_lake%cflag%bl, st_lake%calc%bl, st_lake%cflag%wd, st_lake%calc%wd,&
                        st_lake%cflag%wl, st_lake%calc%wl, st_lake%num%wl)
@@ -1303,7 +1305,7 @@ module set_boundary
         err_mes = "Set "//num_str//" lake water level."
         call write_logf(err_mes)
       end if
-    else if (sum_lawln /= 0 .and. sum_labln == 0 .and. sum_lawdn /= 0) then
+    else if (lawl_given .and. .not. labl_given .and. lawd_given) then
       ! -- Calculate bottom level from water level and water depth (blld)
         call calc_blld(st_lake%cflag%wl, st_lake%calc%wl, st_lake%cflag%wd, st_lake%calc%wd,&
                        st_lake%cflag%bl, st_lake%calc%bl, st_lake%num%bl)
@@ -1322,13 +1324,13 @@ module set_boundary
         err_mes = "Set "//num_str//" lake bottom level."
         call write_logf(err_mes)
       end if
-    else if (sum_lawln == 0 .and. sum_labln == 0 .and. sum_lawdn /= 0) then
+    else if (.not. lawl_given .and. .not. labl_given .and. lawd_given) then
       if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
         err_mes = "Only specified lake water depth."
         call write_err_stop(err_mes)
       end if
-    else if (sum_lawln == 0 .and. sum_labln /= 0 .and. sum_lawdn == 0) then
+    else if (.not. lawl_given .and. labl_given .and. .not. lawd_given) then
       ! -- Set level from surface (levsurf)
         call calc_lsurf(st_lake%cflag%bl, st_lake%cflag%wl, st_lake%calc%wl, st_lake%num%wl)
       lake_wlev_surf = .true.
@@ -1346,7 +1348,7 @@ module set_boundary
         err_mes = "Set "//num_str//" lake water level."
         call write_logf(err_mes)
       end if
-    else if (sum_lawln /= 0 .and. sum_labln == 0 .and. sum_lawdn == 0) then
+    else if (lawl_given .and. .not. labl_given .and. .not. lawd_given) then
       if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
         err_mes = "Not calculated lake bottom level."

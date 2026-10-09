@@ -636,7 +636,7 @@ module time_module
         st_step_flag%riwi = 0
         st_riwi%etime = st_sim%end_time
       else
-        if (st_riwi%totn > 0) then
+        if (allocated(st_rive%calc%wi)) then
           deallocate(st_rive%cflag%wi, st_rive%calc%wi)
         end if
       end if
@@ -671,7 +671,7 @@ module time_module
         st_step_flag%rile = 0
         st_rile%etime = st_sim%end_time
       else
-        if (st_rile%totn > 0) then
+        if (allocated(st_rive%calc%le)) then
           deallocate(st_rive%cflag%le, st_rive%calc%le)
         end if
       end if
@@ -705,7 +705,7 @@ module time_module
         st_step_flag%ribk = 0
         st_ribk%etime = st_sim%end_time
       else
-        if (st_ribk%totn > 0) then
+        if (allocated(st_rive%calc%bk)) then
           deallocate(st_rive%cflag%bk, st_rive%calc%bk)
         end if
       end if
@@ -739,7 +739,7 @@ module time_module
         st_step_flag%ribt = 0
         st_ribt%etime = st_sim%end_time
       else
-        if (st_ribt%totn > 0) then
+        if (allocated(st_rive%calc%bt)) then
           deallocate(st_rive%cflag%bt, st_rive%calc%bt)
         end if
       end if
@@ -871,7 +871,7 @@ module time_module
         st_step_flag%laar = 0
         st_laar%etime = st_sim%end_time
       else
-        if (st_laar%totn > 0) then
+        if (allocated(st_lake%calc%ar)) then
           deallocate(st_lake%cflag%ar, st_lake%calc%ar)
         end if
       end if
@@ -1100,7 +1100,7 @@ module time_module
     end if
 
     if (st_step_flag%ride == 1) then
-      if (st_ride%totn > 0) then
+      if (st_rivf_type%dept > 0) then
         allocate(st_rive%cflag%de(ncals), st_rive%calc%de(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
@@ -1121,7 +1121,7 @@ module time_module
     end if
 
     if (st_step_flag%riwd == 1) then
-      if (st_riwd%totn > 0) then
+      if (st_rivf_type%wdep > 0) then
         allocate(st_rive%cflag%wd(ncals), st_rive%calc%wd(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
@@ -1142,7 +1142,7 @@ module time_module
     end if
 
     if (st_step_flag%riwi == 1) then
-      if (st_riwi%totn > 0) then
+      if (st_rivf_type%widt > 0) then
         allocate(st_rive%cflag%wi(ncals), st_rive%calc%wi(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
@@ -1163,7 +1163,7 @@ module time_module
     end if
 
     if (st_step_flag%rile == 1) then
-      if (st_rile%totn > 0) then
+      if (st_rivf_type%leng > 0) then
         allocate(st_rive%cflag%le(ncals), st_rive%calc%le(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
@@ -1184,7 +1184,7 @@ module time_module
     end if
 
     if (st_step_flag%ribk == 1) then
-      if (st_ribk%totn > 0) then
+      if (st_rivf_type%bedk > 0) then
         allocate(st_rive%cflag%bk(ncals), st_rive%calc%bk(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
@@ -1205,7 +1205,7 @@ module time_module
     end if
 
     if (st_step_flag%ribt == 1) then
-      if (st_ribt%totn > 0) then
+      if (st_rivf_type%bedt > 0) then
         allocate(st_rive%cflag%bt(ncals), st_rive%calc%bt(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
@@ -1252,7 +1252,9 @@ module time_module
                           st_bcnd%rive2cals, st_forc%abyd_rive)
         deallocate(st_forc%rive_head, st_forc%rive_bott, st_forc%rive_area, temp_area)
       end if
-      deallocate(st_bcnd%rive2cals)
+      if (allocated(st_bcnd%rive2cals)) then
+        deallocate(st_bcnd%rive2cals)
+      end if
       ! -- Count river calculation (rivecalc)
         call count_rivecalc(st_rive%cflag%wl, st_rive%cflag%bl, st_rive%cflag%ar,&
                             st_rive%calc%wl, st_rive%calc%bl, st_rive%calc%ar,&
@@ -1260,7 +1262,9 @@ module time_module
       ! -- Set river bed conductivity and thickness (rive_bed)
         call set_rive_bed()
       if (st_bcnd%rive_num /= 0) then
-        deallocate(st_forc%abyd_rive)
+        if (allocated(st_forc%abyd_rive)) then
+          deallocate(st_forc%abyd_rive)
+        end if
         allocate(st_forc%abyd_rive(st_bcnd%rive_num))
         !$omp parallel do private(i)
         do i = 1, st_bcnd%rive_num
@@ -1309,7 +1313,7 @@ module time_module
     end if
 
     if (st_step_flag%lawd == 1) then
-      if (st_lawd%totn > 0) then
+      if (st_lakf_type%wdep > 0) then
         allocate(st_lake%cflag%wd(ncals), st_lake%calc%wd(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
@@ -1330,7 +1334,7 @@ module time_module
     end if
 
     if (st_step_flag%laar == 1) then
-      if (st_laar%totn > 0) then
+      if (st_lakf_type%area > 0) then
         allocate(st_lake%cflag%ar(ncals), st_lake%calc%ar(ncals))
         !$omp parallel do private(i)
         do i = 1, ncals
@@ -1365,13 +1369,17 @@ module time_module
                           st_bcnd%lake2cals, st_forc%abyd_lake)
         deallocate(st_forc%lake_head, st_forc%lake_bott, st_forc%lake_area, temp_area)
       end if
-      deallocate(st_bcnd%lake2cals)
+      if (allocated(st_bcnd%lake2cals)) then
+        deallocate(st_bcnd%lake2cals)
+      end if
       ! -- Count lake calculation cell (lakecalc)
         call count_lakecalc(st_lake%cflag%wl, st_lake%cflag%bl, st_lake%cflag%ar,&
                             st_lake%calc%wl, st_lake%calc%bl, st_lake%calc%ar,&
                             st_bcnd%lake_num)
       if (st_bcnd%lake_num /= 0) then
-        deallocate(st_forc%abyd_lake)
+        if (allocated(st_forc%abyd_lake)) then
+          deallocate(st_forc%abyd_lake)
+        end if
         allocate(st_forc%abyd_lake(st_bcnd%lake_num))
         !$omp parallel do private(i)
         do i = 1, st_bcnd%lake_num

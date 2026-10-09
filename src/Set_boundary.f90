@@ -10,7 +10,7 @@ module set_boundary
   use set_cell, only: ncals
   use set_condition, only: st_bcnd, st_hydr
   use assign_boundary, only: assign_surfbv, assign_rilav, st_forc
-  use calc_boundary, only: conv_rech2calc, calc_wlbd, calc_blld, calc_lsurf
+  use calc_boundary, only: conv_rech2calc, calc_wlbd, calc_blld, calc_blsl, calc_lsurf
 #ifdef MPI_MSG
   use mpi_utility, only: mpisum_val, bcast_file
   use mpi_set, only: cals_r4view, cals_r4hview
@@ -18,7 +18,7 @@ module set_boundary
 
   implicit none
   private
-  public :: set_bound, set_rive_bed
+  public :: set_bound, set_rive_bed, update_rive_wblevel, update_lake_wblevel
 
   type(rlbc_set), public :: st_rive, st_lake
 #ifdef MPI_MSG
@@ -29,6 +29,9 @@ module set_boundary
   ! -- local
   integer(I4) :: sum_riwln, sum_ribln, sum_riwdn, sum_riden, sum_riwin, sum_rilen
   integer(I4) :: sum_riarn, sum_lawln, sum_labln, sum_lawdn, sum_laarn
+  logical :: rive_blev_dept = .false., rive_blev_wdep = .false., rive_blev_surf = .false.
+  logical :: rive_wlev_wdep = .false., lake_blev_wdep = .false., lake_wlev_wdep = .false.
+  logical :: lake_wlev_surf = .false.
 
   contains
 
@@ -215,8 +218,6 @@ module set_boundary
                             st_rive%calc%wl, st_rive%calc%bl, st_rive%calc%ar, st_bcnd%rive_num)
     end if
 
-    st_rive%num%wl = 0
-
     if (st_in_type%lake == in_type(0)) then
 #ifdef MPI_MSG
       ! -- Open input lake file (in_lakef)
@@ -272,8 +273,6 @@ module set_boundary
         call count_lakecalc(st_lake%cflag%wl, st_lake%cflag%bl, st_lake%cflag%ar,&
                             st_lake%calc%wl, st_lake%calc%bl, st_lake%calc%ar, st_bcnd%lake_num)
     end if
-
-    st_lake%num%wl = 0
 
     ! -- Set connectivity (connect)
       call set_connect(st_hydr%read_hydx, st_hydr%read_hydy, st_hydr%read_hydz)
@@ -1173,7 +1172,7 @@ module set_boundary
   ! set_rive_bott -- Set river bottom
   !*********************************************************************************************
     ! -- modules
-    use calc_boundary, only: calc_blsl
+
     ! -- inout
 
     ! -- local
@@ -1183,7 +1182,7 @@ module set_boundary
       ! -- Calculate bottom level from surface level (blsl)
         call calc_blsl(st_rive%cflag%de, st_rive%calc%de, st_rive%cflag%bl, st_rive%calc%bl,&
                        st_rive%num%bl)
-      deallocate(st_rive%cflag%de, st_rive%calc%de)
+      rive_blev_dept = .true.
       if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
         err_mes = "River bottom level is calculated from surface elevation and river depth."
@@ -1193,7 +1192,7 @@ module set_boundary
       ! -- Calculate bottom level from water level and water depth (blld)
         call calc_blld(st_rive%cflag%wl, st_rive%calc%wl, st_rive%cflag%wd, st_rive%calc%wd,&
                        st_rive%cflag%bl, st_rive%calc%bl, st_rive%num%bl)
-      deallocate(st_rive%cflag%wd, st_rive%calc%wd)
+      rive_blev_wdep = .true.
       if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
         err_mes = "River bottom level is calculated from water level and water depth."
@@ -1202,6 +1201,7 @@ module set_boundary
     else if (sum_riwln /= 0 .and. sum_riwdn == 0) then
       ! -- Calculate level from surface (lsurf)
         call calc_lsurf(st_rive%cflag%wl, st_rive%cflag%bl, st_rive%calc%bl, st_rive%num%bl)
+      rive_blev_surf = .true.
       if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
         err_mes = "River bottom level is setted to surface elevation."
@@ -1234,7 +1234,7 @@ module set_boundary
       ! -- Calculate water level from bottom level and water depth (wlbd)
         call calc_wlbd(st_rive%cflag%bl, st_rive%calc%bl, st_rive%cflag%wd, st_rive%calc%wd,&
                        st_rive%cflag%wl, st_rive%calc%wl, st_rive%num%wl)
-      deallocate(st_rive%cflag%wd, st_rive%calc%wd)
+      rive_wlev_wdep = .true.
 #ifdef MPI_MSG
       ! -- Sum value for MPI (val)
         call mpisum_val(st_rive%num%wl, "river water level", sum_riwln)
@@ -1288,7 +1288,7 @@ module set_boundary
       ! -- Calculate water level from bottom level and water depth (wlbd)
         call calc_wlbd(st_lake%cflag%bl, st_lake%calc%bl, st_lake%cflag%wd, st_lake%calc%wd,&
                        st_lake%cflag%wl, st_lake%calc%wl, st_lake%num%wl)
-      deallocate(st_lake%cflag%wd, st_lake%calc%wd)
+      lake_wlev_wdep = .true.
 #ifdef MPI_MSG
       ! -- Sum value for MPI (val)
         call mpisum_val(st_lake%num%wl, "lake water level", sum_lawln)
@@ -1307,7 +1307,7 @@ module set_boundary
       ! -- Calculate bottom level from water level and water depth (blld)
         call calc_blld(st_lake%cflag%wl, st_lake%calc%wl, st_lake%cflag%wd, st_lake%calc%wd,&
                        st_lake%cflag%bl, st_lake%calc%bl, st_lake%num%bl)
-      deallocate(st_lake%cflag%wd, st_lake%calc%wd)
+      lake_blev_wdep = .true.
 #ifdef MPI_MSG
       ! -- Sum value for MPI (val)
         call mpisum_val(st_lake%num%bl, "lake bottom level", sum_labln)
@@ -1331,6 +1331,7 @@ module set_boundary
     else if (sum_lawln == 0 .and. sum_labln /= 0 .and. sum_lawdn == 0) then
       ! -- Set level from surface (levsurf)
         call calc_lsurf(st_lake%cflag%bl, st_lake%cflag%wl, st_lake%calc%wl, st_lake%num%wl)
+      lake_wlev_surf = .true.
 #ifdef MPI_MSG
       ! -- Sum value for MPI (val)
         call mpisum_val(st_lake%num%wl, "lake water level", sum_lawln)
@@ -1362,5 +1363,65 @@ module set_boundary
     end if
 
   end subroutine set_lake_wblevel
+
+  subroutine update_rive_wblevel()
+  !*********************************************************************************************
+  ! update_rive_wblevel -- Update river water and bottom level
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+
+    ! -- local
+
+    !-------------------------------------------------------------------------------------------
+    if (rive_blev_dept) then
+      ! -- Calculate bottom level from surface level (blsl)
+        call calc_blsl(st_rive%cflag%de, st_rive%calc%de, st_rive%cflag%bl, st_rive%calc%bl,&
+                       st_rive%num%bl)
+    else if (rive_blev_wdep) then
+      ! -- Calculate bottom level from water level and water depth (blld)
+        call calc_blld(st_rive%cflag%wl, st_rive%calc%wl, st_rive%cflag%wd, st_rive%calc%wd,&
+                       st_rive%cflag%bl, st_rive%calc%bl, st_rive%num%bl)
+    else if (rive_blev_surf) then
+      ! -- Calculate level from surface (lsurf)
+        call calc_lsurf(st_rive%cflag%wl, st_rive%cflag%bl, st_rive%calc%bl, st_rive%num%bl)
+    end if
+
+    if (rive_wlev_wdep) then
+      ! -- Calculate water level from bottom level and water depth (wlbd)
+        call calc_wlbd(st_rive%cflag%bl, st_rive%calc%bl, st_rive%cflag%wd, st_rive%calc%wd,&
+                       st_rive%cflag%wl, st_rive%calc%wl, st_rive%num%wl)
+    end if
+
+  end subroutine update_rive_wblevel
+
+  subroutine update_lake_wblevel()
+  !*********************************************************************************************
+  ! update_lake_wblevel -- Update lake water and bottom level
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+
+    ! -- local
+
+    !-------------------------------------------------------------------------------------------
+    if (lake_blev_wdep) then
+      ! -- Calculate bottom level from water level and water depth (blld)
+        call calc_blld(st_lake%cflag%wl, st_lake%calc%wl, st_lake%cflag%wd, st_lake%calc%wd,&
+                       st_lake%cflag%bl, st_lake%calc%bl, st_lake%num%bl)
+    end if
+
+    if (lake_wlev_wdep) then
+      ! -- Calculate water level from bottom level and water depth (wlbd)
+        call calc_wlbd(st_lake%cflag%bl, st_lake%calc%bl, st_lake%cflag%wd, st_lake%calc%wd,&
+                       st_lake%cflag%wl, st_lake%calc%wl, st_lake%num%wl)
+    else if (lake_wlev_surf) then
+      ! -- Set level from surface (levsurf)
+        call calc_lsurf(st_lake%cflag%bl, st_lake%cflag%wl, st_lake%calc%wl, st_lake%num%wl)
+    end if
+
+  end subroutine update_lake_wblevel
 
 end module set_boundary

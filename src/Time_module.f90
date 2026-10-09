@@ -532,6 +532,10 @@ module time_module
         end if
         st_step_flag%riwd = 0
         st_riwd%etime = st_sim%end_time
+      else
+        if (allocated(st_rive%calc%wd)) then
+          deallocate(st_rive%cflag%wd, st_rive%calc%wd)
+        end if
       end if
     end if
 
@@ -597,7 +601,7 @@ module time_module
         st_step_flag%ride = 0
         st_ride%etime = st_sim%end_time
       else
-        if (st_ride%totn > 0) then
+        if (allocated(st_rive%calc%de)) then
           deallocate(st_rive%cflag%de, st_rive%calc%de)
         end if
       end if
@@ -803,7 +807,7 @@ module time_module
         st_step_flag%lawd = 0
         st_lawd%etime = st_sim%end_time
       else
-        if (st_lawd%totn > 0) then
+        if (allocated(st_lake%calc%wd)) then
           deallocate(st_lake%cflag%wd, st_lake%calc%wd)
         end if
       end if
@@ -936,17 +940,14 @@ module time_module
     use set_condition, only: set_srabyd, set_chabyd, set_wellconn
     use assign_boundary, only: assign_sealv, assign_surfbv, assign_wellv, assign_rilav
     use calc_boundary, only: calc_reprev, conv_rech2calc, count_rivecalc, count_lakecalc
-    use calc_boundary, only: calc_wlbd, calc_rivea
-    use set_boundary, only: set_rive_bed
-#ifdef MPI_MSG
-    use mpi_utility, only: mpisum_val
-#endif
+    use calc_boundary, only: calc_rivea
+    use set_boundary, only: set_rive_bed, update_rive_wblevel, update_lake_wblevel
     ! -- inout
 
     ! -- local
     integer(I4) :: i
     integer(I4) :: prec_stepflag, evap_stepflag, rive_stepflag, lake_stepflag
-    integer(I4) :: rive_aflag, sum_ribln, sum_riwln, sum_lawln, sum_labln
+    integer(I4) :: rive_aflag
     real(DP), allocatable :: temp_area(:)
     !-------------------------------------------------------------------------------------------
     if (st_step_flag%seal == 1) then
@@ -1098,6 +1099,27 @@ module time_module
       st_step_flag%ribl = 1
     end if
 
+    if (st_step_flag%ride == 1) then
+      if (st_ride%totn > 0) then
+        allocate(st_rive%cflag%de(ncals), st_rive%calc%de(ncals))
+        !$omp parallel do private(i)
+        do i = 1, ncals
+          st_rive%cflag%de(i) = 0
+          st_rive%calc%de(i) = SNOVAL
+        end do
+        !$omp end parallel do
+      end if
+      ! -- Assign river depth value
+        call assign_rilav(st_rivf_type%dept, 0, st_ride, st_rive%num%de, st_rive%cflag%de,&
+                          st_rive%calc%de)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_rive%calc%de, "river depth", st_time%now_time)
+
+      st_step_flag%ride = 0 ; rive_stepflag = rive_stepflag + 1
+    else if (st_ride%etime == next_time) then
+      st_step_flag%ride = 1
+    end if
+
     if (st_step_flag%riwd == 1) then
       if (st_riwd%totn > 0) then
         allocate(st_rive%cflag%wd(ncals), st_rive%calc%wd(ncals))
@@ -1113,22 +1135,6 @@ module time_module
                           st_rive%calc%wd)
       ! -- Check input nan (input_nan)
         call check_input_nan(st_rive%calc%wd, "river water depth", st_time%now_time)
-
-#ifdef MPI_MSG
-      ! -- Sum value for MPI (val)
-        call mpisum_val(st_rive%num%wl, "river water level", sum_riwln)
-        call mpisum_val(st_rive%num%bl, "river bottom level", sum_ribln)
-#else
-      sum_riwln = st_rive%num%wl ; sum_ribln = st_rive%num%bl
-#endif
-
-      if (sum_riwln == 0 .and. sum_ribln /= 0) then
-        ! -- Calculate water level from river bottom level (wlrb)
-          call calc_wlbd(st_rive%cflag%bl, st_rive%calc%bl, st_rive%cflag%wd, st_rive%calc%wd,&
-                         st_rive%cflag%wl, st_rive%calc%wl, st_rive%num%wl)
-        st_rive%num%wl = 0
-        deallocate(st_rive%cflag%wd, st_rive%calc%wd)
-      end if
 
       st_step_flag%riwd = 0 ; rive_stepflag = rive_stepflag + 1
     else if (st_riwd%etime == next_time) then
@@ -1232,6 +1238,8 @@ module time_module
     end if
 
     if (rive_stepflag > 0) then
+      ! -- Update river water and bottom level (rive_wblevel)
+        call update_rive_wblevel()
       if (st_bcnd%rive_num /= 0) then
         allocate(temp_area(st_bcnd%rive_num))
         !$omp parallel do private(i)
@@ -1316,22 +1324,6 @@ module time_module
       ! -- Check input nan (input_nan)
         call check_input_nan(st_lake%calc%wd, "lake water depth", st_time%now_time)
 
-#ifdef MPI_MSG
-      ! -- Sum value for MPI (val)
-        call mpisum_val(st_lake%num%wl, "lake water level", sum_lawln)
-        call mpisum_val(st_lake%num%bl, "lake bottom level", sum_labln)
-#else
-      sum_lawln = st_lake%num%wl ; sum_labln = st_lake%num%bl
-#endif
-
-      if (sum_lawln == 0 .and. sum_labln /= 0) then
-        ! -- Calculate water level from bottom level and water depth (wlbd)
-          call calc_wlbd(st_lake%cflag%bl, st_lake%calc%bl, st_lake%cflag%wd, st_lake%calc%wd,&
-                         st_lake%cflag%wl, st_lake%calc%wl, st_lake%num%wl)
-        st_lake%num%wl = 0
-        deallocate(st_lake%cflag%wd, st_lake%calc%wd)
-      end if
-
       st_step_flag%lawd = 0 ; lake_stepflag = lake_stepflag + 1
     else if (st_lawd%etime == next_time) then
       st_step_flag%lawd = 1
@@ -1359,6 +1351,8 @@ module time_module
     end if
 
     if (lake_stepflag > 0) then
+      ! -- Update lake water and bottom level (lake_wblevel)
+        call update_lake_wblevel()
       if (st_bcnd%lake_num /= 0) then
         allocate(temp_area(st_bcnd%lake_num))
         !$omp parallel do private(i)

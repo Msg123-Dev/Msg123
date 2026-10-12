@@ -87,7 +87,7 @@ module nonlinear_solution
     real(DP) :: res_l1, qext_l1, mass_error
     real(DP) :: res_fact, step_pnorm, step_lmax
     logical :: back_flag, res_flag, maxs_flag, stagn_flag, cycle_flag
-    logical :: chg_flag
+    logical :: head_change_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
     real(DP) :: var_max, unk_max, var_abs_max
@@ -110,7 +110,7 @@ module nonlinear_solution
     19 format(1X,"Stop due to cycling of mass balance error")
     !-------------------------------------------------------------------------------------------
     conv_fnum = st_out_fnum%conv ; eater = DHALF ; maxstep_run = 0
-    chg_flag = .false.
+    head_change_flag = .false.
     stagn_run = 0 ; mass_error_pre = DZERO ; stagn_flag = .false.
     cycle_run = 0 ; mass_error_min = DZERO ; cycle_flag = .false.
     res_l1 = DZERO ; qext_l1 = DZERO ; mass_error = DZERO ; check_val = huge(1.00_DP)
@@ -164,7 +164,7 @@ module nonlinear_solution
         ! -- Check residual convergence (residual)
           call check_residual(array_var(1)%rhs, func_scal, res_flag, res_fact)
         if (st_time%out_iter > 1) then
-          res_flag = res_flag .and. chg_flag
+          res_flag = res_flag .and. head_change_flag
         end if
         if (res_flag) then
           st_time%conv_flag = .true.
@@ -201,7 +201,7 @@ module nonlinear_solution
       end do
       !$omp end parallel do
 
-      st_time%conv_flag = .false. ; chg_flag = .false.
+      st_time%conv_flag = .false. ; head_change_flag = .false.
       if (st_sim%sim_type /= -1) then
         st_ctrl%errtol = eater
       else
@@ -253,7 +253,7 @@ module nonlinear_solution
       if (st_time%conv_flag .and. .not. ieee_is_nan(max_unk)) then
           st_time%conv_flag = .false.
         if (check_val <= st_ctrl%criteria .and. max_unk < XMAX) then
-          st_time%conv_flag = .true. ; chg_flag = .true.
+          st_time%conv_flag = .true. ; head_change_flag = .true.
         end if
       else if (ieee_is_nan(max_unk) .and. st_sim%sim_type /= -1) then
         if (st_mpi%rank == 0) then
@@ -323,7 +323,7 @@ module nonlinear_solution
           back_flag = .true.
         else if (check_val <= st_ctrl%criteria .and. max_unk < XMAX .and.&
                  .not. (back_flag .and. st_sim%sim_type /= -1)) then
-          st_time%conv_flag = .true. ; chg_flag = .true.
+          st_time%conv_flag = .true. ; head_change_flag = .true.
         else if (st_sim%sim_type == -1) then
           back_flag = .false.
         end if

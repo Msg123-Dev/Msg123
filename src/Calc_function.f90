@@ -744,7 +744,6 @@ module calc_function
   ! calc_vecjacf -- Calculate vector by jacobi-free
   !*********************************************************************************************
     ! -- modules
-    use kind_module, only: SP
 #ifdef MPI_MSG
     use mpi_utility, only: mpisum_val
 #endif
@@ -756,7 +755,7 @@ module calc_function
     ! -- local
     integer(I4) :: i
     integer(I4) :: vj_num, vj_regnum
-    real(DP), parameter :: JFREE_EPS = epsilon(1.00_SP)
+    real(DP), parameter :: JFREE_EPS = epsilon(1.00_DP)
     real(DP) :: eps, eps_inv, l2_x, l2_v, l1_v, sign
 #ifdef MPI_MSG
     real(DP) :: sum_l2

@@ -21,6 +21,7 @@ module set_boundary
   public :: set_bound, set_rive_bed, update_rive_wblevel, update_lake_wblevel
 
   type(rlbc_set), public :: st_rive, st_lake
+  logical, public :: rech_reprev = .false.
 #ifdef MPI_MSG
   type(bound_fview), public :: bfview
   type(bfview_set), public :: rfview, lfview
@@ -54,7 +55,6 @@ module set_boundary
 
     ! -- local
     integer(I4) :: i
-    integer(I4) :: sum_rechn, sum_precn, sum_evapn
     integer(I4) :: rfv_wl, rfv_wd, rfv_bl, rfv_de, rfv_wi, rfv_le, rfv_bk, rfv_bt
     integer(I4) :: lfv_wl, lfv_wd, lfv_bl, lfv_ar
     character(:), allocatable :: num_str, err_mes
@@ -81,19 +81,12 @@ module set_boundary
     ! -- Set evapotranspiration information (evap_info)
       call set_evap_info()
 
-#ifdef MPI_MSG
-    ! -- Sum value for MPI (val)
-      call mpisum_val(st_bcnd%rech_num, "recharge", sum_rechn)
-      call mpisum_val(st_bcnd%prec_num, "precipitation", sum_precn)
-      call mpisum_val(st_bcnd%evap_num, "evapotranspiration", sum_evapn)
-#else
-    sum_rechn = st_bcnd%rech_num ; sum_precn = st_bcnd%prec_num ; sum_evapn = st_bcnd%evap_num
-#endif
-
-    if (sum_rechn == 0 .and. sum_precn /= 0 .and. sum_evapn /= 0) then
+    if (.not. allocated(st_forc%read_rech) .and. allocated(st_forc%read_prec) .and.&
+        allocated(st_forc%read_evap)) then
       ! -- Calculate recharge from precipitation and evapotranspiration (reprev)
         call calc_reprev(st_bcnd%rech_num)
         call conv_rech2calc(st_bcnd%rech_num)
+      rech_reprev = .true.
       if (st_mpi%rank == 0) then
         call write_logf("Recharge is calculated from precipitation and evapotranspiration.")
         allocate(character(get_ilen(st_bcnd%rech_num)) :: num_str)
@@ -104,9 +97,11 @@ module set_boundary
         deallocate(num_str, err_mes)
       end if
     else if (st_mpi%rank == 0) then
-      if (sum_rechn == 0 .and. sum_precn == 0 .and. sum_evapn /= 0) then
+      if (.not. allocated(st_forc%read_rech) .and. .not. allocated(st_forc%read_prec) .and.&
+          allocated(st_forc%read_evap)) then
         call write_logf("Caution!! Specified only evapotranspiration in input file.")
-      else if (sum_rechn == 0 .and. sum_precn /= 0 .and. sum_evapn == 0) then
+      else if (.not. allocated(st_forc%read_rech) .and. allocated(st_forc%read_prec) .and.&
+               .not. allocated(st_forc%read_evap)) then
         call write_logf("Caution!! Specified only precipitation in input file.")
       end if
     end if
@@ -456,7 +451,7 @@ module set_boundary
 #endif
     end if
 
-    if (st_rech%totn > 0) then
+    if (any(all_rech_mask)) then
       allocate(st_bcnd%rech_cflag(ncals))
       allocate(st_forc%read_rech(ncals))
       !$omp parallel do private(i)
@@ -608,7 +603,7 @@ module set_boundary
 #endif
     end if
 
-    if (st_prec%totn > 0) then
+    if (any(all_prec_mask)) then
       allocate(st_bcnd%prec_cflag(ncals))
       allocate(st_forc%read_prec(ncals))
       !$omp parallel do private(i)
@@ -672,7 +667,7 @@ module set_boundary
 #endif
     end if
 
-    if (st_evap%totn > 0) then
+    if (any(all_evap_mask)) then
       allocate(st_bcnd%evap_cflag(ncals))
       allocate(st_forc%read_evap(ncals))
       !$omp parallel do private(i)

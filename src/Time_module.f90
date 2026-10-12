@@ -429,7 +429,7 @@ module time_module
         ! -- Reset cell value (value)
           call reset_value(st_bcnd%prec_num, st_forc%read_prec)
       else
-        if (st_bcnd%prec_num > 0) then
+        if (allocated(st_forc%read_prec)) then
           deallocate(st_forc%read_prec)
         end if
       end if
@@ -465,7 +465,7 @@ module time_module
         ! -- Reset cell value (value)
           call reset_value(st_bcnd%evap_num, st_forc%read_evap)
       else
-        if (st_bcnd%evap_num > 0) then
+        if (allocated(st_forc%read_evap)) then
           deallocate(st_forc%read_evap)
         end if
       end if
@@ -941,7 +941,7 @@ module time_module
     use assign_boundary, only: assign_sealv, assign_surfbv, assign_wellv, assign_rilav
     use calc_boundary, only: calc_reprev, conv_rech2calc, count_rivecalc, count_lakecalc
     use calc_boundary, only: calc_rivea
-    use set_boundary, only: set_rive_bed, update_rive_wblevel, update_lake_wblevel
+    use set_boundary, only: set_rive_bed, update_rive_wblevel, update_lake_wblevel, rech_reprev
     ! -- inout
 
     ! -- local
@@ -1052,7 +1052,7 @@ module time_module
       st_step_flag%evap = 1
     end if
 
-    if (prec_stepflag /= 0 .or. evap_stepflag /= 0) then
+    if (rech_reprev .and. (prec_stepflag /= 0 .or. evap_stepflag /= 0)) then
       deallocate(st_forc%read_rech, st_bcnd%rech2cals, st_forc%calc_rech)
       ! -- Calculate recharge from precipitation and evapotranspiration (reprev)
         call calc_reprev(st_bcnd%rech_num)

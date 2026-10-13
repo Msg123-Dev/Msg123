@@ -1292,6 +1292,8 @@ module read_input
       st_in_type%geog = geog_type ; st_in_path%geog = trim(adjustl(geog_file))
       if (st_schm%rech_dunn_type /= 0) then
         call write_err_stop("Set rech_dunn_type to 0 when set_geog is used.")
+      else if (st_schm%surfw_type == 2) then
+        call write_err_stop("Set surfw_type to 3 when set_geog is used.")
       end if
     end if
 

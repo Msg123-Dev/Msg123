@@ -487,14 +487,15 @@ module read_input
     real(DP) :: init_step, incr_multi, decr_multi, min_tstep, max_tstep
     integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type, expd_type
     integer(I4) :: conv_type, noconv_type, datum_type, deri_type, picard_btr
-    integer(I4) :: incr_iter, decr_iter
+    integer(I4) :: incr_iter, decr_iter, maxbeta_iter
     real(DP) :: criteria, res_abs_tol, res_rel_tol, dilu_shift, dsat_max
     real(DP) :: picard_btol, picard_bfact, picard_blim
     namelist/set_solution/init_step, tstep_type, incr_multi, decr_multi, min_tstep, max_tstep,&
                           maxout_iter, picard_iter, criteria, maxinn_iter, precon_type,&
                           res_abs_tol, res_rel_tol, dilu_shift, expd_type, dsat_max,&
                           conv_type, noconv_type, datum_type, deri_type, picard_btr,&
-                          picard_btol, picard_bfact, picard_blim, incr_iter, decr_iter
+                          picard_btol, picard_bfact, picard_blim, incr_iter, decr_iter,&
+                          maxbeta_iter
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; init_step = DZERO ; incr_multi = DZERO ; decr_multi = DZERO ; max_tstep = DINFI
     min_tstep = DZERO ; noconv_type = st_ctrl%noconv_type
@@ -508,6 +509,7 @@ module read_input
     picard_btr = st_ctrl%picard_btr ; picard_btol = st_ctrl%picard_btol
     picard_bfact = st_ctrl%picard_bfact ; picard_blim = st_ctrl%picard_blim
     incr_iter = st_ctrl%incr_iter ; decr_iter = st_ctrl%decr_iter
+    maxbeta_iter = st_ctrl%maxbeta_iter
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_solution,iostat=ierr)
     st_ctrl%tstep_type = tstep_type ; st_ctrl%maxout_iter = maxout_iter
@@ -521,6 +523,7 @@ module read_input
     st_ctrl%picard_bfact = picard_bfact ; st_ctrl%picard_blim = picard_blim
     st_ctrl%noconv_type = noconv_type
     st_ctrl%incr_iter = incr_iter ; st_ctrl%decr_iter = decr_iter
+    st_ctrl%maxbeta_iter = maxbeta_iter
 
     if (ierr /= 0) then
       call write_err_stop("While reading solution section in main file.")
@@ -528,6 +531,9 @@ module read_input
       call write_err_stop("Input a positive value for maximum number of outer iteration.")
     else if (st_ctrl%maxinn_iter <= 0) then
       call write_err_stop("Input a positive value for maximum number of inner iteration.")
+    else if (st_ctrl%maxbeta_iter < 0) then
+      call write_err_stop("Input a non-negative value for maximum number of beta condition"//&
+                          " failures.")
     else if (st_ctrl%picard_iter < -1) then
       call write_err_stop("Input a larger than -1 value for Picard iteration.")
     else if (st_ctrl%tstep_type < 0) then

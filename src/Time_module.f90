@@ -825,8 +825,10 @@ module time_module
                          st_labl%intstep, bound_name, st_labl%fnum, st_step_flag%labl,&
                          ierr, st_labl%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_labl%fnum, lfview%bl, bound_name)
+        if (ierr == 0 .and. any(st_labl%inttype == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_labl%fnum, lfview%bl, bound_name)
+        end if
 #endif
       end if
 
@@ -856,8 +858,10 @@ module time_module
                          st_laar%intstep, bound_name, st_laar%fnum, st_step_flag%laar,&
                          ierr, st_laar%etime)
 #ifdef MPI_MSG
-        ! -- Set real4 file view (real4_fview)
-          call set_real4_fview(st_laar%fnum, lfview%ar, bound_name)
+        if (ierr == 0 .and. any(st_laar%inttype == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_laar%fnum, lfview%ar, bound_name)
+        end if
 #endif
       end if
 

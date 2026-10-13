@@ -1,20 +1,23 @@
 module check_simulation
   ! -- modules
   use kind_module, only: I4, DP
-  use constval_module, only: DZERO
+  use constval_module, only: DZERO, UROUND
   use utility_module, only: st_mpi
   use initial_module, only: st_sim, st_ctrl
   use read_input, only: len_scal
   use set_cell, only: ncalc
+  use make_cell, only: st_geom
   use prep_calculation, only: st_time
+  use allocate_solution, only: crs_index, array_var
 
   implicit none
   private
-  public :: check_insol, check_abserrmax, check_residual
+  public :: check_insol, check_abserrmax, check_residual, calc_res_weight
   public :: check_outtiming, check_lastts
   integer(I4), public :: write_flag, lasttime_flag
 
   ! -- local
+  real(DP), parameter :: ROUND_FACT = 4.00E+00_DP
 
   contains
 
@@ -97,9 +100,6 @@ module check_simulation
   ! check_residual -- Check residual convergence criteria
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: UROUND
-    use make_cell, only: st_geom
-    use allocate_solution, only: crs_index, array_var
 #ifdef MPI_MSG
     use mpi_utility, only: mpisum_val
 #endif
@@ -109,9 +109,7 @@ module check_simulation
     real(DP), intent(in), optional :: stnew(:), stold(:), hnew(:)
     ! -- local
     integer(I4) :: i, k, viol_num
-    real(DP), parameter :: ACC_FLOOR = 1.00E-15_DP
-    real(DP), parameter :: ROUND_FACT = 4.00E+00_DP
-    real(DP) :: vol_scal, res_val, scal_val, abs_tol, rel_tol, round_val
+    real(DP) :: vol_scal, res_val, scal_val, abs_tol, rel_tol, round_val, acc_val
     logical :: abs_flag, rel_flag, pass_flag, round_flag
 #ifdef MPI_MSG
     integer(I4) :: sum_viol
@@ -124,7 +122,7 @@ module check_simulation
     end if
     round_flag = present(stnew) .and. present(stold) .and. present(hnew)
 
-    viol_num = 0 ; vol_scal = len_scal**3
+    viol_num = 0 ; vol_scal = len_scal**3 ; acc_val = calc_acc_floor(fscal)
     abs_tol = st_ctrl%res_abs_tol*res_fact ; rel_tol = st_ctrl%res_rel_tol*res_fact
     !$omp parallel do private(i, k, res_val, scal_val, round_val, pass_flag) &
     !$omp             reduction(+:viol_num)
@@ -134,7 +132,7 @@ module check_simulation
       pass_flag = .false.
       if (abs_flag .and. res_val <= abs_tol) then
         pass_flag = .true.
-      else if (rel_flag .and. scal_val <= ACC_FLOOR) then
+      else if (rel_flag .and. scal_val <= acc_val) then
         pass_flag = .true.
       else if (rel_flag .and. res_val <= rel_tol*scal_val) then
         pass_flag = .true.
@@ -164,6 +162,86 @@ module check_simulation
     end if
 
   end subroutine check_residual
+
+  subroutine calc_res_weight(fscal, stnew, stold, hnew, res_wgt)
+  !*********************************************************************************************
+  ! calc_res_weight -- Calculate residual weight from the residual convergence criteria
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(DP), intent(in) :: fscal(:), stnew(:), stold(:), hnew(:)
+    real(DP), intent(out) :: res_wgt(:)
+    ! -- local
+    integer(I4) :: i, k
+    real(DP) :: vol_scal, scal_val, abs_tol, rel_tol, round_val, allow_val, acc_val
+    logical :: abs_flag, rel_flag
+    !-------------------------------------------------------------------------------------------
+    abs_flag = st_ctrl%res_abs_tol > DZERO ; rel_flag = st_ctrl%res_rel_tol > DZERO
+    vol_scal = len_scal**3 ; acc_val = calc_acc_floor(fscal)
+    abs_tol = st_ctrl%res_abs_tol ; rel_tol = st_ctrl%res_rel_tol
+    !$omp parallel do private(i, k, scal_val, round_val, allow_val)
+    do i = 1, ncalc
+      scal_val = fscal(i)*vol_scal
+      round_val = max(abs(stnew(i)), abs(stold(i)))*st_geom%cell_vol(i)*st_time%delt_inv&
+                  + abs(array_var(1)%dmat(i))*abs(hnew(i))
+      do k = crs_index(1)%offind(i-1)+1, crs_index(1)%offind(i)
+        round_val = round_val + abs(array_var(1)%lumat(k))*abs(hnew(crs_index(1)%offrow(k)))
+      end do
+      allow_val = ROUND_FACT*UROUND*round_val*vol_scal
+      if (abs_flag) then
+        allow_val = allow_val + abs_tol
+      end if
+      if (rel_flag) then
+        allow_val = allow_val + rel_tol*scal_val
+      end if
+      if (rel_flag .and. scal_val <= acc_val) then
+        res_wgt(i) = DZERO
+      else if (allow_val > DZERO) then
+        res_wgt(i) = vol_scal/allow_val
+      else
+        res_wgt(i) = DZERO
+      end if
+    end do
+    !$omp end parallel do
+
+  end subroutine calc_res_weight
+
+  function calc_acc_floor(fscal) result(acc_val)
+  !*********************************************************************************************
+  ! calc_acc_floor -- Calculate the floor of the residual scale relative to the largest cell
+  !*********************************************************************************************
+    ! -- modules
+#ifdef MPI_MSG
+    use mpi_utility, only: mpimax_val
+#endif
+    ! -- inout
+    real(DP), intent(in) :: fscal(:)
+    ! -- local
+    integer(I4) :: i
+    real(DP), parameter :: ACC_REL = 1.00E-09_DP
+    real(DP) :: smax
+    real(DP) :: acc_val
+#ifdef MPI_MSG
+    real(DP) :: all_max
+#endif
+    !-------------------------------------------------------------------------------------------
+    smax = DZERO
+    !$omp parallel do private(i) reduction(max:smax)
+    do i = 1, ncalc
+      smax = max(smax, fscal(i))
+    end do
+    !$omp end parallel do
+#ifdef MPI_MSG
+    if (st_mpi%totn /= 1) then
+      ! -- Max value for MPI (val)
+        call mpimax_val(smax, "residual scale maximum", all_max)
+      smax = all_max
+    end if
+#endif
+    acc_val = ACC_REL*smax*len_scal**3
+
+  end function calc_acc_floor
 
   subroutine check_outtiming()
   !*********************************************************************************************

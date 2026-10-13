@@ -4,7 +4,7 @@ module nonlinear_solution
   use constval_module, only: DZERO, DONE, DHALF, DTWO, DSMAL
   use types_module, only: sol_set
   use utility_module, only: st_mpi, log_fnum
-  use initial_module, only: st_ctrl
+  use initial_module, only: st_sim, st_ctrl
   use read_input, only: len_scal, len_scal_inv, z_base
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc
@@ -24,11 +24,12 @@ module nonlinear_solution
 
   ! -- local
   integer(I4), parameter :: MAXSTEP_RUN_MAX = 5, STAGN_RUN_MAX = 10, CYCLE_RUN_MAX = 100
+  integer(I4), parameter :: WPASS_RUN_MAX = 1
   real(DP), parameter :: VARMAX = 1.00E+03_DP, XMAX = 1.00E+04_DP
   real(DP), parameter :: STAGN_FLOOR = 1.00E-04_DP, CYCLE_RTOL = 1.00E-03_DP
   real(DP), parameter :: XMAX_INV = 1.00E-04_DP
   real(DP), parameter :: RES_FIRST = 1.00E-02_DP
-  real(DP), allocatable :: new_func(:), jacvec(:), func_scal(:)
+  real(DP), allocatable :: new_func(:), jacvec(:), func_scal(:), res_wgt(:)
   real(DP) :: qext_sum = DZERO
 
   contains
@@ -44,10 +45,10 @@ module nonlinear_solution
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(new_func(ncalc), jacvec(ncalc), func_scal(ncalc))
+    allocate(new_func(ncalc), jacvec(ncalc), func_scal(ncalc), res_wgt(ncalc))
     !$omp parallel do private(i)
     do i = 1, ncalc
-      new_func(i) = DZERO ; jacvec(i) = DZERO ; func_scal(i) = DZERO
+      new_func(i) = DZERO ; jacvec(i) = DZERO ; func_scal(i) = DZERO ; res_wgt(i) = DZERO
     end do
     !$omp end parallel do
 
@@ -62,7 +63,7 @@ module nonlinear_solution
     use constval_module, only: VARLEN
     use types_module, only: kryl_set, amgt_set, coef_set
     use utility_module, only: write_err_stop
-    use initial_module, only: st_sim, st_out_step
+    use initial_module, only: st_out_step
     use make_linearsystem, only: make_matvec
     use check_simulation, only: check_abserrmax, check_residual
     use linear_solution, only: solve_linalg, in_iter
@@ -79,7 +80,7 @@ module nonlinear_solution
     integer(I4) :: i
     integer(I4) :: out_iter
     integer(I4) :: max_num, conv_fnum
-    integer(I4) :: back_iter, beta_iter, maxstep_run, stagn_run, cycle_run
+    integer(I4) :: back_iter, beta_iter, maxstep_run, stagn_run, cycle_run, wpass_run
     character(VARLEN) :: cxyzn
     real(DP) :: max_var, max_unk, check_val
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var, mass_error_pre, mass_error_min
@@ -87,7 +88,7 @@ module nonlinear_solution
     real(DP) :: res_l1, qext_l1, mass_error
     real(DP) :: res_fact, step_pnorm, step_lmax
     logical :: back_flag, res_flag, maxs_flag, stagn_flag, cycle_flag
-    logical :: head_change_flag
+    logical :: head_change_flag, wpass_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
     real(DP) :: var_max, unk_max, var_abs_max
@@ -108,11 +109,12 @@ module nonlinear_solution
     17 format(1X,"Stop due to stagnation of mass balance error")
     18 format(1X,"Accept the non-converged step (noconv_type = 1)")
     19 format(1X,"Stop due to cycling of mass balance error")
+    20 format(1X,"Line search passed with the residual-weighted merit.")
     !-------------------------------------------------------------------------------------------
     conv_fnum = st_out_fnum%conv ; eater = DHALF ; maxstep_run = 0
     head_change_flag = .false.
     stagn_run = 0 ; mass_error_pre = DZERO ; stagn_flag = .false.
-    cycle_run = 0 ; mass_error_min = DZERO ; cycle_flag = .false.
+    cycle_run = 0 ; mass_error_min = DZERO ; cycle_flag = .false. ; wpass_run = 0
     res_l1 = DZERO ; qext_l1 = DZERO ; mass_error = DZERO ; check_val = huge(1.00_DP)
     ! -- Set for backtracking (backtr)
       call set_backtr(st_sol, max_step)
@@ -142,7 +144,7 @@ module nonlinear_solution
       end if
 
       back_iter = 0 ; beta_iter = 0
-      back_flag = .false.
+      back_flag = .false. ; wpass_flag = .false.
 
       ! -- Reset coefficients matrix and constant vector (matvec)
         call reset_matvec()
@@ -293,9 +295,13 @@ module nonlinear_solution
       if (st_time%form_switch == 1 .and.&
           (.not. st_time%conv_flag .or. st_ctrl%conv_type == 1)) then
         ! -- Run backtracking (backtr)
-          call run_backtr(back_iter, back_flag, beta_iter, maxs_flag, l2norm_new, l2norm_pre,&
-                          l2norm_jac, lambda, gradient, max_step, step_pnorm, step_lmax,&
-                          st_coef%temp_rhs, new_func, st_sol)
+          call run_backtr(back_iter, back_flag, beta_iter, maxs_flag, wpass_flag,&
+                          wpass_run < WPASS_RUN_MAX, l2norm_new, l2norm_pre, l2norm_jac,&
+                          lambda, gradient, max_step, step_pnorm, step_lmax, st_coef%temp_rhs,&
+                          new_func, st_sol)
+        if (wpass_flag) then
+          wpass_run = wpass_run + 1
+        end if
         if (maxs_flag) then
           maxstep_run = maxstep_run + 1
         else
@@ -390,6 +396,9 @@ module nonlinear_solution
       if (st_mpi%rank == 0) then
         write(conv_fnum,11) st_time%out_iter, in_iter, back_iter, beta_iter, conv_var,&
                             trim(adjustl(cxyzn)), conv_dmat, conv_rhs, conv_head, mass_error
+        if (wpass_flag) then
+          write(conv_fnum,20)
+        end if
       end if
 
       if (st_time%conv_flag .and. st_ctrl%conv_type == 1 .and.&
@@ -411,7 +420,7 @@ module nonlinear_solution
               mass_error >= mass_error_min*(DONE - CYCLE_RTOL)) then
             cycle_run = cycle_run + 1
           else
-            cycle_run = 0
+            cycle_run = 0 ; wpass_run = 0
           end if
           if (mass_error_min <= DZERO .or. mass_error < mass_error_min) then
             mass_error_min = mass_error
@@ -736,21 +745,23 @@ module nonlinear_solution
 
   end subroutine run_picbtr
 
-  subroutine run_backtr(backi, backf, betai, maxsf, l2_new, l2_pre, l2_jac, lam, grad, maxstep,&
-                        pnorm, lam_maxi, pre_f, new_f, st_sol)
+  subroutine run_backtr(backi, backf, betai, maxsf, wpass_flag, wretry_flag, l2_new, l2_pre,&
+                        l2_jac, lam, grad, maxstep, pnorm, lam_maxi, pre_f, new_f, st_sol)
   !*********************************************************************************************
   ! run_backtr -- Run backtracking
   !*********************************************************************************************
     ! -- modules
     use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
     use calc_function, only: calc_vecjacf
+    use check_simulation, only: calc_res_weight
 #ifdef MPI_MSG
-    use mpi_utility, only: mpimax_val, mpimin_val
+    use mpi_utility, only: mpimax_val
 #endif
     ! -- inout
     integer(I4), intent(inout) :: backi, betai
     logical, intent(inout) :: backf
-    logical, intent(out) :: maxsf
+    logical, intent(in) :: wretry_flag
+    logical, intent(out) :: maxsf, wpass_flag
     real(DP), intent(inout) :: l2_new, l2_jac, lam
     real(DP), intent(in) :: l2_pre, maxstep, pnorm, lam_maxi, pre_f(:)
     real(DP), intent(out) :: grad
@@ -763,6 +774,7 @@ module nonlinear_solution
     real(DP) :: lam2, temp_lam, lam_inv, lam2_inv, del_lam, lam_max, lam_min
     real(DP) :: lam_length, lam_base, lam_diff, lam_incr, maxpnorm
     real(DP) :: alpha_cond, beta_cond
+    logical :: wmode
     real(DP), parameter :: BACK_ALPHA = 1.00E-4_DP, BACK_BETA = 0.9_DP, MAXSTEP_RATIO = 0.99_DP
     real(DP), parameter :: DSAT_STEP_FRAC = 0.9_DP
     real(DP), parameter :: DIVERGE_LIMIT = huge(1.00_DP)*0.1_DP
@@ -772,7 +784,7 @@ module nonlinear_solution
 #endif
     !-------------------------------------------------------------------------------------------
     l2_new2 = l2_new ; lam = DONE ; lam2 = DZERO ; maxpnorm = DONE ; lam_length = DZERO
-    maxsf = .false.
+    maxsf = .false. ; wpass_flag = .false. ; wmode = .false.
     !$omp parallel do private(i)
     do i = 1, ncalc
       jacvec(i) = DZERO
@@ -845,12 +857,40 @@ module nonlinear_solution
         lam = DHALF*lam
         cycle back_aloop
       end if
-      f1_new = DHALF*l2_new
+      f1_new = calc_merit(wmode, l2_new, new_f)
       alpha_cond = f1_pre + BACK_ALPHA*lam*slope
       if (f1_new <= alpha_cond) then
+        wpass_flag = wmode
         exit back_aloop
       end if
       if (lam < lam_min) then
+        if (.not. wmode .and. wretry_flag .and. st_ctrl%conv_type == 1 .and.&
+            st_sim%sim_type /= -1) then
+          ! -- Calculate function and l2norm2 (func2norm)
+            call calc_funcl2norm(DZERO, backi, l2_new, new_f, st_sol)
+          ! -- Calculate residual weight (res_weight)
+            call calc_res_weight(func_scal, st_sol%stor_new, st_sol%stor_old, st_sol%head_pre,&
+                                 res_wgt)
+          wmode = .true. ; slope = DZERO
+          !$omp parallel do private(i) reduction(+:slope)
+          do i = 1, ncalc
+            slope = slope + res_wgt(i)*res_wgt(i)*array_var(1)%rhs(i)*jacvec(i)*maxpnorm
+          end do
+          !$omp end parallel do
+#ifdef MPI_MSG
+          if (st_mpi%totn /= 1) then
+            ! -- Sum value for MPI (val)
+              call mpisum_val(slope, "weighted slope", sum_l2)
+            slope = sum_l2
+          end if
+#endif
+          if (slope > DZERO) then
+            slope = -slope
+          end if
+          f1_pre = calc_merit(wmode, l2_pre, pre_f)
+          lam = DONE ; lam2 = DZERO
+          cycle back_aloop
+        end if
         ! -- Calculate function and l2norm2 (func2norm)
           call calc_funcl2norm(DZERO, backi, l2_new, new_f, st_sol)
         backf = .true.
@@ -887,39 +927,40 @@ module nonlinear_solution
       lam = max(temp_lam, 0.1_DP*lam)
     end do back_aloop
 
-    alpha_cond = DHALF*l2_pre + BACK_ALPHA*lam*slope
-    beta_cond = DHALF*l2_pre + BACK_BETA*lam*slope
-    if (DHALF*l2_new < beta_cond) then
+    alpha_cond = f1_pre + BACK_ALPHA*lam*slope
+    beta_cond = f1_pre + BACK_BETA*lam*slope
+    if (f1_new < beta_cond) then
       if (lam == DONE .and. lam_maxi > DONE) then
         lam_max = lam_maxi
         b1_loop: do
-          if (DHALF*l2_new > alpha_cond .or. DHALF*l2_new >= beta_cond .or. lam >= lam_max) then
+          if (f1_new > alpha_cond .or. f1_new >= beta_cond .or. lam >= lam_max) then
             exit b1_loop
           end if
-          lam2 = lam ; l2_new2 = DHALF*l2_new ; lam = min(DTWO*lam, lam_max)
+          lam2 = lam ; l2_new2 = f1_new ; lam = min(DTWO*lam, lam_max)
           ! -- Calculate function and l2norm2 (func2norm)
             call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol)
-          alpha_cond = DHALF*l2_pre + BACK_ALPHA*lam*slope
-          beta_cond = DHALF*l2_pre + BACK_BETA*lam*slope
+          f1_new = calc_merit(wmode, l2_new, new_f)
+          alpha_cond = f1_pre + BACK_ALPHA*lam*slope
+          beta_cond = f1_pre + BACK_BETA*lam*slope
         end do b1_loop
       end if
 
-      if (lam < DONE .or. (lam > DONE .and. DHALF*l2_new > alpha_cond)) then
+      if (lam < DONE .or. (lam > DONE .and. f1_new > alpha_cond)) then
         lam_base = min(lam, lam2) ; lam_diff = abs(lam2 - lam)
         b2_loop: do
-          if (DHALF*l2_new <= alpha_cond .and. (DHALF*l2_new >= beta_cond .or. &
-              lam_diff <= lam_min)) then
+          if (f1_new <= alpha_cond .and. (f1_new >= beta_cond .or. lam_diff <= lam_min)) then
             exit b2_loop
           end if
           lam_incr = DHALF*lam_diff ; lam = lam_base + lam_incr
           ! -- Calculate function and l2norm2 (func2norm)
             call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol)
-          alpha_cond = DHALF*l2_pre + BACK_ALPHA*lam*slope
-          beta_cond = DHALF*l2_pre + BACK_BETA*lam*slope
+          f1_new = calc_merit(wmode, l2_new, new_f)
+          alpha_cond = f1_pre + BACK_ALPHA*lam*slope
+          beta_cond = f1_pre + BACK_BETA*lam*slope
 
-          if (DHALF*l2_new > alpha_cond) then
+          if (f1_new > alpha_cond) then
             lam_diff = lam_incr
-          else if (DHALF*l2_new < beta_cond) then
+          else if (f1_new < beta_cond) then
             lam_base = lam ; lam_diff = lam_diff - lam_incr
           end if
           if (lam_diff == DZERO) then
@@ -927,8 +968,7 @@ module nonlinear_solution
           end if
         end do b2_loop
 
-        if (DHALF*l2_new < beta_cond .or.&
-            (lam_diff < lam_min .and. DHALF*l2_new > alpha_cond)) then
+        if (f1_new < beta_cond .or. (lam_diff < lam_min .and. f1_new > alpha_cond)) then
           ! -- Calculate function and l2norm2 (func2norm)
             call calc_funcl2norm(lam_base, backi, l2_new, new_f, st_sol)
           betai = betai + 1
@@ -940,10 +980,48 @@ module nonlinear_solution
       maxsf = .true.
     end if
 
-    grad = slope*lam
+    grad = grad*lam
     l2_jac = l2_jac*lam*lam
 
   end subroutine run_backtr
+
+  function calc_merit(wmode, l2_val, func_val) result(merit)
+  !*********************************************************************************************
+  ! calc_merit -- Calculate merit function of backtracking
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(DP), intent(in) :: l2_val, func_val(:)
+    logical, intent(in) :: wmode
+    ! -- local
+    integer(I4) :: i
+    real(DP) :: merit
+#ifdef MPI_MSG
+    real(DP) :: sum_l2
+#endif
+    !-------------------------------------------------------------------------------------------
+    if (.not. wmode) then
+      merit = DHALF*l2_val
+      return
+    end if
+
+    merit = DZERO
+    !$omp parallel do private(i) reduction(+:merit)
+    do i = 1, ncalc
+      merit = merit + (res_wgt(i)*func_val(i))**2
+    end do
+    !$omp end parallel do
+#ifdef MPI_MSG
+    if (st_mpi%totn /= 1) then
+      ! -- Sum value for MPI (val)
+        call mpisum_val(merit, "weighted function l2-norm", sum_l2)
+      merit = sum_l2
+    end if
+#endif
+    merit = DHALF*merit
+
+  end function calc_merit
 
   function get_cnum(calc_num) result(char_cell)
   !*********************************************************************************************

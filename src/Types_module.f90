@@ -41,7 +41,7 @@ module types_module
     integer(I4) :: krpos_type = 0
     integer(I4) :: stor_type = 1
     integer(I4) :: abyd_type = 0
-    integer(I4) :: surfw_type = 0
+    integer(I4) :: surfw_type = 2
     integer(I4) :: rbed_type = 0
     integer(I4) :: rech_dreg_type = 0
     integer(I4) :: rech_hort_type = 0

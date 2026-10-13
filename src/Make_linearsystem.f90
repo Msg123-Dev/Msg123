@@ -41,7 +41,7 @@ module make_linearsystem
     allocate(st_coef%stor_per(ncalc))
     allocate(st_coef%stod(ncalc), st_coef%cond(nreg_num), st_coef%sead(ncalc))
     allocate(st_coef%dmats(ncalc))
-    allocate(st_coef%rivd(ncalc), st_coef%lakd(ncals), st_coef%surd(ncals), st_coef%recd(ncals))
+    allocate(st_coef%rivd(ncalc), st_coef%lakd(ncalc), st_coef%surd(ncals), st_coef%recd(ncals))
     allocate(st_coef%deri_dcon(tot_ind), st_coef%rel_hyd(tot_ind), st_coef%deri_lucon(tot_ind))
     allocate(st_coef%deri_con1(tot_ind), st_coef%deri_con2(tot_ind))
     allocate(st_coef%over_riv(st_bcnd%rive_num), st_coef%deri_r(st_bcnd%rive_num))
@@ -124,7 +124,7 @@ module make_linearsystem
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
     do i = 1, ncalc
-      st_coef%dstor_dpsi(i) = DZERO ; st_coef%rivd(i) = DZERO
+      st_coef%dstor_dpsi(i) = DZERO ; st_coef%rivd(i) = DZERO ; st_coef%lakd(i) = DZERO
       st_coef%stod(i) = DZERO ; st_coef%sead(i) = DZERO ; st_coef%dmats(i) = DZERO
     end do
     !$omp end parallel do
@@ -136,7 +136,7 @@ module make_linearsystem
     !$omp end parallel do
     !$omp parallel do private(i)
     do i = 1, ncals
-      st_coef%lakd(i) = DZERO ; st_coef%surd(i) = DZERO ; st_coef%recd(i) = DZERO
+      st_coef%surd(i) = DZERO ; st_coef%recd(i) = DZERO
     end do
     !$omp end parallel do
 
@@ -219,7 +219,7 @@ module make_linearsystem
     end if
     !$omp do private(i)
     do i = ncals+1, ncalc
-      st_coef%dmats(i) = st_coef%rivd(i)
+      st_coef%dmats(i) = st_coef%rivd(i) + st_coef%lakd(i)
     end do
     !$omp end do
 
@@ -456,8 +456,8 @@ module make_linearsystem
     real(DP), intent(out) :: dkr_lak(:)
     real(DP), intent(out) :: rel_lak(:), tran_lak(:)
     ! -- local
-    integer(I4) :: i, s
-    real(DP) :: head_eff
+    integer(I4) :: i, c
+    real(DP) :: head_eff, bott_eff
     !-------------------------------------------------------------------------------------------
     !$omp parallel
     !$omp do private(i)
@@ -467,19 +467,27 @@ module make_linearsystem
       tran_lak(i) = DZERO
     end do
     !$omp end do
-    !$omp do private(i, s, head_eff)
+    !$omp do private(i, c, head_eff, bott_eff)
     do i = 1, st_bcnd%lake_num
-      s = st_bcnd%lake2cals(i)
-      per_lak(i) = per_relp(s) ; rel_lak(i) = st_sol%rel_perm(s)
-      dkr_lak(i) = dkr_dpsi(s)
+      c = st_bcnd%lake2calc(i)
+      per_lak(i) = per_relp(c) ; rel_lak(i) = st_sol%rel_perm(c)
+      dkr_lak(i) = dkr_dpsi(c)
       head_eff = max(st_forc%lake_head(i), st_forc%lake_bott(i))
-      tran_lak(i) = st_hydr%hydf_surf(s)*st_forc%abyd_lake(i)
-      if (st_sol%head_new(s) >= st_forc%lake_bott(i)) then
-        delh_l(i) = head_eff - st_sol%head_new(s)
+      if (st_forc%lake_head(i) > st_forc%lake_bott(i)) then
+        bott_eff = st_forc%lake_bott(i) - st_forc%lake_bedt(i)
+      else
+        bott_eff = st_forc%lake_bott(i)
+      end if
+      tran_lak(i) = st_forc%lake_hydk(i)*st_forc%abyd_lake(i)
+      if (st_forc%lake_bedt(i) > DZERO) then
+        per_lak(i) = DONE ; rel_lak(i) = DONE ; dkr_lak(i) = DZERO
+      end if
+      if (st_sol%head_new(c) >= bott_eff) then
+        delh_l(i) = head_eff - st_sol%head_new(c)
         over_lak(i) = DONE
         deri_l(i) = -tran_lak(i)*rel_lak(i)
       else
-        delh_l(i) = head_eff - st_forc%lake_bott(i)
+        delh_l(i) = head_eff - bott_eff
         over_lak(i) = DZERO
         deri_l(i) = DZERO
       end if
@@ -498,10 +506,10 @@ module make_linearsystem
       !$omp end do
     end if
 
-    !$omp do private(i, s)
+    !$omp do private(i, c)
     do i = 1, st_bcnd%lake_num
-      s = st_bcnd%lake2cals(i)
-      dmat_lak(s) = deri_l(i) + deri_ks_lak(i)
+      c = st_bcnd%lake2calc(i)
+      dmat_lak(c) = deri_l(i) + deri_ks_lak(i)
     end do
     !$omp end do
     !$omp end parallel

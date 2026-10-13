@@ -8,6 +8,7 @@ module time_module
   use initial_module, only: st_rech, st_prec, st_evap, st_well, st_riwl, st_riwd, st_ribl
   use initial_module, only: st_ride, st_riwi, st_rile, st_ribk, st_ribt, st_lawl, st_lawd
   use initial_module, only: st_labl, st_laar, st_step_flag, st_schm, st_out_step
+  use initial_module, only: st_labk, st_labt
   use open_file, only: st_intre, st_intpr, st_intev
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc, ncals
@@ -881,6 +882,76 @@ module time_module
       end if
     end if
 
+    if (st_step_flag%labk == 1) then
+      bound_name = "lake bed conductivity"
+      if (st_lakf_type%bedk /= in_type(7)) then
+        ! -- Read next time (next)
+          call read_next(st_lakf_type%bedk, st_labk%fnum, st_labk%multi, bound_name,&
+                         st_labk%totn, st_step_flag%labk, ierr, st_labk%etime)
+      else if (st_lakf_type%bedk == in_type(7)) then
+        ! -- Read next time for time interval file (intn)
+          call read_intn(st_labk%inttype, st_labk%intfnum, st_labk%multi,&
+                         st_labk%intstep, bound_name, st_labk%fnum, st_step_flag%labk,&
+                         ierr, st_labk%etime)
+#ifdef MPI_MSG
+        if (ierr == 0 .and. any(st_labk%inttype == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_labk%fnum, lfview%bk, bound_name)
+        end if
+#endif
+      end if
+
+      if (ierr /= 0) then
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
+          call write_logf(err_mes)
+        end if
+        st_step_flag%labk = 0
+        st_labk%etime = st_sim%end_time
+      else
+        if (allocated(st_lake%calc%bk)) then
+          deallocate(st_lake%cflag%bk, st_lake%calc%bk)
+        end if
+      end if
+    end if
+
+    if (st_step_flag%labt == 1) then
+      bound_name = "lake bed thickness"
+      if (st_lakf_type%bedt /= in_type(7)) then
+        ! -- Read next time (next)
+          call read_next(st_lakf_type%bedt, st_labt%fnum, st_labt%multi, bound_name,&
+                         st_labt%totn, st_step_flag%labt, ierr, st_labt%etime)
+      else if (st_lakf_type%bedt == in_type(7)) then
+        ! -- Read next time for time interval file (intn)
+          call read_intn(st_labt%inttype, st_labt%intfnum, st_labt%multi,&
+                         st_labt%intstep, bound_name, st_labt%fnum, st_step_flag%labt,&
+                         ierr, st_labt%etime)
+#ifdef MPI_MSG
+        if (ierr == 0 .and. any(st_labt%inttype == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_labt%fnum, lfview%bt, bound_name)
+        end if
+#endif
+      end if
+
+      if (ierr /= 0) then
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
+          call write_logf(err_mes)
+        end if
+        st_step_flag%labt = 0
+        st_labt%etime = st_sim%end_time
+      else
+        if (allocated(st_lake%calc%bt)) then
+          deallocate(st_lake%cflag%bt, st_lake%calc%bt)
+        end if
+      end if
+    end if
+
     if (allocated(bound_name)) then
       deallocate(bound_name)
     end if
@@ -901,7 +972,7 @@ module time_module
     min_step = min(st_rech%etime, st_well%etime, st_seal%etime, st_prec%etime, st_evap%etime,&
                    st_riwl%etime, st_riwd%etime, st_ribl%etime, st_ride%etime, st_riwi%etime,&
                    st_rile%etime, st_ribk%etime, st_ribt%etime, st_lawl%etime, st_lawd%etime,&
-                   st_labl%etime, st_laar%etime)
+                   st_labl%etime, st_laar%etime, st_labk%etime, st_labt%etime)
     if (min_step <= st_time%current_t) then
       min_step = st_sim%end_time
     end if
@@ -946,6 +1017,7 @@ module time_module
     use calc_boundary, only: calc_reprev, conv_rech2calc, count_rivecalc, count_lakecalc
     use calc_boundary, only: calc_rivea
     use set_boundary, only: set_rive_bed, update_rive_wblevel, update_lake_wblevel, rech_reprev
+    use set_boundary, only: set_lake_bed
     ! -- inout
 
     ! -- local
@@ -1358,6 +1430,48 @@ module time_module
       st_step_flag%laar = 1
     end if
 
+    if (st_step_flag%labk == 1) then
+      if (st_lakf_type%bedk > 0) then
+        allocate(st_lake%cflag%bk(ncals), st_lake%calc%bk(ncals))
+        !$omp parallel do private(i)
+        do i = 1, ncals
+          st_lake%cflag%bk(i) = 0
+          st_lake%calc%bk(i) = SNOVAL
+        end do
+        !$omp end parallel do
+      end if
+      ! -- Assign lake bed conductivity value
+        call assign_rilav(st_lakf_type%bedk, 0, st_labk, st_lake%num%bk, st_lake%cflag%bk,&
+                          st_lake%calc%bk)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_lake%calc%bk, "lake bed conductivity", st_time%now_time)
+
+      st_step_flag%labk = 0 ; lake_stepflag = lake_stepflag + 1
+    else if (st_labk%etime == next_time) then
+      st_step_flag%labk = 1
+    end if
+
+    if (st_step_flag%labt == 1) then
+      if (st_lakf_type%bedt > 0) then
+        allocate(st_lake%cflag%bt(ncals), st_lake%calc%bt(ncals))
+        !$omp parallel do private(i)
+        do i = 1, ncals
+          st_lake%cflag%bt(i) = 0
+          st_lake%calc%bt(i) = SNOVAL
+        end do
+        !$omp end parallel do
+      end if
+      ! -- Assign lake bed thickness value
+        call assign_rilav(st_lakf_type%bedt, 0, st_labt, st_lake%num%bt, st_lake%cflag%bt,&
+                          st_lake%calc%bt)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_lake%calc%bt, "lake bed thickness", st_time%now_time)
+
+      st_step_flag%labt = 0 ; lake_stepflag = lake_stepflag + 1
+    else if (st_labt%etime == next_time) then
+      st_step_flag%labt = 1
+    end if
+
     if (lake_stepflag > 0) then
       ! -- Update lake water and bottom level (lake_wblevel)
         call update_lake_wblevel()
@@ -1380,6 +1494,8 @@ module time_module
         call count_lakecalc(st_lake%cflag%wl, st_lake%cflag%bl, st_lake%cflag%ar,&
                             st_lake%calc%wl, st_lake%calc%bl, st_lake%calc%ar,&
                             st_bcnd%lake_num)
+      ! -- Set lake bed conductivity and thickness (lake_bed)
+        call set_lake_bed()
       if (st_bcnd%lake_num /= 0) then
         if (allocated(st_forc%abyd_lake)) then
           deallocate(st_forc%abyd_lake)
@@ -1392,7 +1508,7 @@ module time_module
         !$omp end parallel do
         ! -- Set surface&recharge area and area by distance (srabyd)
           call set_srabyd(st_bcnd%lake_num, st_forc%lake_bott, st_forc%lake_area,&
-                        st_bcnd%lake2cals, st_forc%abyd_lake)
+                        st_bcnd%lake2cals, st_forc%abyd_lake, st_forc%lake_bedt)
       end if
     end if
 
@@ -1646,7 +1762,7 @@ module time_module
               st_step_flag%evap + st_step_flag%riwl + st_step_flag%riwd + st_step_flag%ribl +&
               st_step_flag%ride + st_step_flag%riwi + st_step_flag%rile + st_step_flag%ribk +&
               st_step_flag%ribt + st_step_flag%lawl + st_step_flag%lawd + st_step_flag%labl +&
-              st_step_flag%laar
+              st_step_flag%laar + st_step_flag%labk + st_step_flag%labt
 
     conv_fnum = st_out_fnum%conv
     cond_format = '(1x,a,es18.11," ('//trim(st_sim%cal_unit)//')")'
@@ -1701,6 +1817,12 @@ module time_module
     end if
     if (st_step_flag%laar == 1) then
       write(conv_fnum,cond_format) "Changed lake area at ", st_time%now_time
+    end if
+    if (st_step_flag%labk == 1) then
+      write(conv_fnum,cond_format) "Changed lake bed conductivity at ", st_time%now_time
+    end if
+    if (st_step_flag%labt == 1) then
+      write(conv_fnum,cond_format) "Changed lake bed thickness at ", st_time%now_time
     end if
 
   end subroutine write_bound_change
@@ -1784,6 +1906,14 @@ module time_module
     !$omp section
     if (st_step_flag%laar == 1) then
       st_step_flag%laar = 0
+    end if
+    !$omp section
+    if (st_step_flag%labk == 1) then
+      st_step_flag%labk = 0
+    end if
+    !$omp section
+    if (st_step_flag%labt == 1) then
+      st_step_flag%labt = 0
     end if
     !$omp end parallel sections
 
@@ -1915,7 +2045,7 @@ module time_module
                 st_step_flag%evap + st_step_flag%riwl + st_step_flag%riwd + st_step_flag%ribl +&
                 st_step_flag%ride + st_step_flag%riwi + st_step_flag%rile + st_step_flag%ribk +&
                 st_step_flag%ribt + st_step_flag%lawl + st_step_flag%lawd + st_step_flag%labl +&
-                st_step_flag%laar
+                st_step_flag%laar + st_step_flag%labk + st_step_flag%labt
 
     if (step_val < DZERO) then
       out_flag = .false.

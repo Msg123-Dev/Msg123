@@ -47,7 +47,7 @@ module calc_function
     !-------------------------------------------------------------------------------------------
     allocate(stof(ncalc), conf(ncalc), welf(ncalc), seaf(ncalc))
     allocate(funcvs(ncalc))
-    allocate(recf(ncals), surf(ncals), rivf(ncalc), lakf(ncals))
+    allocate(recf(ncals), surf(ncals), rivf(ncalc), lakf(ncalc))
     allocate(stor_work(ncalc))
     allocate(conn_flow(ncalc))
     allocate(scal_work(ncalc))
@@ -76,12 +76,12 @@ module calc_function
     !$omp do private(i)
     do i = 1, ncalc
       stof(i) = DZERO ; conf(i) = DZERO ; welf(i) = DZERO ; seaf(i) = DZERO
-      funcvs(i) = DZERO ; funcv(i) = DZERO ; rivf(i) = DZERO
+      funcvs(i) = DZERO ; funcv(i) = DZERO ; rivf(i) = DZERO ; lakf(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i)
     do i = 1, ncals
-      recf(i) = DZERO ; surf(i) = DZERO ; lakf(i) = DZERO
+      recf(i) = DZERO ; surf(i) = DZERO
     end do
     !$omp end do
     !$omp end parallel
@@ -137,7 +137,7 @@ module calc_function
     !$omp end parallel do
     !$omp parallel do private(i)
     do i = ncals+1, ncalc
-      funcvs(i) = rivf(i)
+      funcvs(i) = rivf(i) + lakf(i)
     end do
     !$omp end parallel do
 
@@ -161,7 +161,7 @@ module calc_function
       !$omp end parallel do
       !$omp parallel do private(i)
       do i = ncals+1, ncalc
-        scal_work(i) = scal_work(i) + abs(rivf(i))
+        scal_work(i) = scal_work(i) + abs(rivf(i)) + abs(lakf(i))
       end do
       !$omp end parallel do
       !$omp parallel do private(i)
@@ -243,13 +243,12 @@ module calc_function
       do i = 1, ncalc
         stom(i) = stom(i)*st_time%delt ; conm(i) = conm(i)*st_time%delt
         seam(i) = seam(i)*st_time%delt ; welm(i) = welm(i)*st_time%delt
-        rivm(i) = rivm(i)*st_time%delt
+        rivm(i) = rivm(i)*st_time%delt ; lakm(i) = lakm(i)*st_time%delt
       end do
       !$omp end do
       !$omp do private(i)
       do i = 1, ncals
         recm(i) = recm(i)*st_time%delt ; surm(i) = surm(i)*st_time%delt
-        lakm(i) = lakm(i)*st_time%delt
       end do
       !$omp end do
       !$omp end parallel
@@ -679,8 +678,8 @@ module calc_function
     real(DP), intent(in) :: inflake(:), rperm(:)
     real(DP), intent(inout) :: lakfunc(:)
     ! -- local
-    integer(I4) :: i, s
-    real(DP) :: head_eff
+    integer(I4) :: i, c
+    real(DP) :: head_eff, bott_eff
     !-------------------------------------------------------------------------------------------
     !$omp parallel
     !$omp do private(i)
@@ -689,12 +688,22 @@ module calc_function
     end do
     !$omp end do
 
-    !$omp do private(i, s, head_eff)
+    !$omp do private(i, c, head_eff, bott_eff)
     do i = 1, st_bcnd%lake_num
-      s = st_bcnd%lake2cals(i)
+      c = st_bcnd%lake2calc(i)
       head_eff = max(st_forc%lake_head(i), st_forc%lake_bott(i))
-      delh_l(i) = head_eff - max(inflake(s), st_forc%lake_bott(i))
-      lakfunc(s) = st_hydr%hydf_surf(s)*st_forc%abyd_lake(i)*delh_l(i)*rperm(s)
+      if (st_forc%lake_head(i) > st_forc%lake_bott(i)) then
+        bott_eff = st_forc%lake_bott(i) - st_forc%lake_bedt(i)
+      else
+        bott_eff = st_forc%lake_bott(i)
+      end if
+      delh_l(i) = head_eff - max(inflake(c), bott_eff)
+
+      if (st_forc%lake_bedt(i) > DZERO) then
+        lakfunc(c) = st_forc%lake_hydk(i)*st_forc%abyd_lake(i)*delh_l(i)
+      else
+        lakfunc(c) = st_forc%lake_hydk(i)*st_forc%abyd_lake(i)*delh_l(i)*rperm(c)
+      end if
     end do
     !$omp end do
     !$omp end parallel

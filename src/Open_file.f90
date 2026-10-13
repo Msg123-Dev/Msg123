@@ -1915,37 +1915,42 @@ module open_file
 
   end subroutine open_in_rivef
 
-  subroutine open_in_lakef(lake_path, nohv, hv, lawlv, lawdv, lablv, laarv)
+  subroutine open_in_lakef(lake_path, nohv, hv, lawlv, lawdv, lablv, laarv, labkv, labtv)
   !*********************************************************************************************
   ! open_in_lakef -- Open input lake file
   !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_lakf_type, st_lawl, st_lawd, st_labl, st_laar
+    use initial_module, only: st_labk, st_labt
     ! -- inout
     character(*), intent(in) :: lake_path
     integer(I4), intent(in) :: nohv, hv
-    integer(I4), intent(inout) :: lawlv, lawdv, lablv, laarv
+    integer(I4), intent(inout) :: lawlv, lawdv, lablv, laarv, labkv, labtv
     ! -- local
     integer(I4) :: i, ierr
     integer(I4) :: lake_fnum, lake_totn, intla_type, intla_num, lake_stepflag
-    integer(I4) :: laken(4), laket(4)
+    integer(I4) :: laken(6), laket(6)
     integer(I4) :: lake_view
     integer(I4), allocatable :: lak_txt_type(:)
     real(DP) :: intla_end, lake_multi, lake_etime, intla_step
-    character(CHALEN) :: lawl_path, lawd_path, labl_path, laar_path, intla_path
-    character(TIMELEN) :: lawl_unit, lawd_unit, labl_unit, laar_unit
-    character(:), allocatable :: mess_wl, mess_wd, mess_bl, mess_ar
+    character(CHALEN) :: lawl_path, lawd_path, labl_path, laar_path, labk_path, labt_path
+    character(CHALEN) :: intla_path
+    character(TIMELEN) :: lawl_unit, lawd_unit, labl_unit, laar_unit, labk_unit, labt_unit
+    character(:), allocatable :: mess_wl, mess_wd, mess_bl, mess_ar, mess_bk, mess_bt
     character(:), allocatable :: path_lake, mess_lake, err_mes, unit_lake
-    integer(I4) :: lawl_type, lawd_type, labl_type, laar_type
+    integer(I4) :: lawl_type, lawd_type, labl_type, laar_type, labk_type, labt_type
     logical, allocatable :: lake_mask(:)
-    namelist/inlake_type/lawl_type, lawd_type, labl_type, laar_type
-    namelist/inlake_path/lawl_path, lawd_path, labl_path, laar_path
-    namelist/inlake_unit/lawl_unit, lawd_unit, labl_unit, laar_unit
+    namelist/inlake_type/lawl_type, lawd_type, labl_type, laar_type, labk_type, labt_type
+    namelist/inlake_path/lawl_path, lawd_path, labl_path, laar_path, labk_path, labt_path
+    namelist/inlake_unit/lawl_unit, lawd_unit, labl_unit, laar_unit, labk_unit, labt_unit
     !-------------------------------------------------------------------------------------------
     lawl_type = 0 ; lawd_type = 0 ; labl_type = 0 ; laar_type = 0
+    labk_type = 0 ; labt_type = 0
     lawl_path = "" ; lawd_path = "" ; labl_path = "" ; laar_path = ""
+    labk_path = "" ; labt_path = ""
     lawl_unit = "" ; lawd_unit = "" ; labl_unit = "" ; laar_unit = ""
-    lawlv = 0 ; lawdv = 0 ; lablv = 0 ; laarv = 0
+    labk_unit = "" ; labt_unit = ""
+    lawlv = 0 ; lawdv = 0 ; lablv = 0 ; laarv = 0 ; labkv = 0 ; labtv = 0
 
     if (st_mpi%rank == 0) then
       ! -- Open new read text file (new_rtxt)
@@ -1965,11 +1970,13 @@ module open_file
       call close_file(lake_fnum)
     end if
 
-    allocate(character(0) :: mess_wl, mess_wd, mess_bl, mess_ar)
+    allocate(character(0) :: mess_wl, mess_wd, mess_bl, mess_ar, mess_bk, mess_bt)
     mess_wl = "input lake water level"
     mess_wd = "input lake water depth"
     mess_bl = "input lake bottom level"
     mess_ar = "input lake area"
+    mess_bk = "input lake bed conductivity"
+    mess_bt = "input lake bed thickness"
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
@@ -1978,17 +1985,26 @@ module open_file
         call bcast_file(lawd_type, lawd_path, lawd_unit, mess_wd)
         call bcast_file(labl_type, labl_path, labl_unit, mess_bl)
         call bcast_file(laar_type, laar_path, laar_unit, mess_ar)
+        call bcast_file(labk_type, labk_path, labk_unit, mess_bk)
+        call bcast_file(labt_type, labt_path, labt_unit, mess_bt)
     end if
 #endif
 
+    if ((labk_type > 0) .neqv. (labt_type > 0)) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Specify both lake bed conductivity and thickness in lake file.")
+      end if
+    end if
+
     laket(1) = lawl_type ; laket(2) = lawd_type ; laket(3) = labl_type ; laket(4) = laar_type
-    laken(1) = 0 ; laken(2) = 0 ; laken(3) = 0 ; laken(4) = 0
+    laket(5) = labk_type ; laket(6) = labt_type
+    laken(1) = 0 ; laken(2) = 0 ; laken(3) = 0 ; laken(4) = 0 ; laken(5) = 0 ; laken(6) = 0
 
     allocate(character(0) :: err_mes, path_lake, mess_lake, unit_lake)
     allocate(lak_txt_type(3), lake_mask(3))
     lak_txt_type(:) = [in_type(1:3)]
 
-    do i = 1, 4
+    do i = 1, 6
       lake_totn = 0
       lake_mask(:) = (laket(i) /= lak_txt_type(:))
       if (all(lake_mask) .and. laket(i) /= in_type(4) .and. laket(i) /= in_type(7)) then
@@ -2010,6 +2026,12 @@ module open_file
       case (4)
         path_lake = trim(adjustl(laar_path)) ; mess_lake = mess_ar ; unit_lake = laar_unit
         deallocate(mess_ar)
+      case (5)
+        path_lake = trim(adjustl(labk_path)) ; mess_lake = mess_bk ; unit_lake = labk_unit
+        deallocate(mess_bk)
+      case (6)
+        path_lake = trim(adjustl(labt_path)) ; mess_lake = mess_bt ; unit_lake = labt_unit
+        deallocate(mess_bt)
       case default
         path_lake = ""
       end select
@@ -2214,12 +2236,39 @@ module open_file
         else
           st_laar%fnum = laken(i)
         end if
+      case (5)
+        st_labk%multi = lake_multi ; st_labk%totn = lake_totn
+        st_labk%etime = lake_etime ; st_step_flag%labk = lake_stepflag
+        st_labk%inttype = intla_type
+#ifdef MPI_MSG
+        labkv = lake_view
+#endif
+        if (laket(i) == in_type(7)) then
+          st_labk%fnum = intla_num ; st_labk%intpath = trim(adjustl(intla_path))
+          st_labk%intstep = intla_step ; st_labk%intfnum = laken(i)
+        else
+          st_labk%fnum = laken(i)
+        end if
+      case (6)
+        st_labt%multi = lake_multi ; st_labt%totn = lake_totn
+        st_labt%etime = lake_etime ; st_step_flag%labt = lake_stepflag
+        st_labt%inttype = intla_type
+#ifdef MPI_MSG
+        labtv = lake_view
+#endif
+        if (laket(i) == in_type(7)) then
+          st_labt%fnum = intla_num ; st_labt%intpath = trim(adjustl(intla_path))
+          st_labt%intstep = intla_step ; st_labt%intfnum = laken(i)
+        else
+          st_labt%fnum = laken(i)
+        end if
       end select
 
     end do
 
     st_lakf_type%wlev = lawl_type ; st_lakf_type%wdep = lawd_type
     st_lakf_type%blev = labl_type ; st_lakf_type%area = laar_type
+    st_lakf_type%bedk = labk_type ; st_lakf_type%bedt = labt_type
 
     deallocate(lak_txt_type)
     deallocate(lake_mask)

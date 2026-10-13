@@ -630,11 +630,11 @@ module read_input
     ! -- local
     integer(I4) :: ierr
     integer(I4) :: krpos_type, stor_type, abyd_type, surfw_type, rbed_type, rech_dreg_type
-    integer(I4) :: rech_hort_type, rech_hort_form, rech_dunn_type
+    integer(I4) :: rech_hort_type, rech_hort_form, rech_dunn_type, lbed_type
     real(DP) :: abyd_ratio, krlin_head, rech_dreg_hmin, rech_dreg_hwid
     real(DP) :: rech_hort_rwid, rech_dunn_hwid, rech_hmin, rech_hwid
     namelist/set_scheme/krpos_type, stor_type, abyd_type, surfw_type, abyd_ratio, krlin_head,&
-                        rbed_type, rech_dreg_type, rech_dreg_hmin, rech_dreg_hwid,&
+                        rbed_type, lbed_type, rech_dreg_type, rech_dreg_hmin, rech_dreg_hwid,&
                         rech_hort_type, rech_hort_form, rech_hort_rwid, rech_dunn_type,&
                         rech_dunn_hwid, rech_hmin, rech_hwid
     !-------------------------------------------------------------------------------------------
@@ -647,6 +647,7 @@ module read_input
     rech_hort_type = st_schm%rech_hort_type ; rech_hort_form = st_schm%rech_hort_form
     rech_hort_rwid = st_schm%rech_hort_rwid ; rech_dunn_type = st_schm%rech_dunn_type
     rech_dunn_hwid = st_schm%rech_dunn_hwid ; rech_hmin = DNOVAL ; rech_hwid = DNOVAL
+    lbed_type = st_schm%lbed_type
     rewind(unit=main_fnum)
     read(unit=main_fnum,nml=set_scheme,iostat=ierr)
     st_schm%krpos_type = krpos_type ; st_schm%stor_type = stor_type
@@ -656,7 +657,7 @@ module read_input
     st_schm%rech_dreg_hmin = rech_dreg_hmin ; st_schm%rech_dreg_hwid = rech_dreg_hwid
     st_schm%rech_hort_type = rech_hort_type ; st_schm%rech_hort_form = rech_hort_form
     st_schm%rech_hort_rwid = rech_hort_rwid ; st_schm%rech_dunn_type = rech_dunn_type
-    st_schm%rech_dunn_hwid = rech_dunn_hwid
+    st_schm%rech_dunn_hwid = rech_dunn_hwid ; st_schm%lbed_type = lbed_type
 
     if (ierr /= 0 .and. find_nml_name("set_scheme", main_name(1:main_namen))) then
       call write_err_stop("While reading scheme section in main file.")
@@ -683,6 +684,8 @@ module read_input
       call write_err_stop("Input a valid value for surface water level type.")
     else if (st_schm%rbed_type < 0 .or. st_schm%rbed_type > 1) then
       call write_err_stop("Input a valid value for river bed type.")
+    else if (st_schm%lbed_type < 0 .or. st_schm%lbed_type > 1) then
+      call write_err_stop("Input a valid value for lake bed type.")
     else if (st_schm%rech_dreg_type < 0 .or. st_schm%rech_dreg_type > 1) then
       call write_err_stop("Input a valid value for recharge downregulation type.")
     else if (st_schm%rech_dreg_type /= 0 .and. st_schm%rech_dreg_hmin >= DZERO) then

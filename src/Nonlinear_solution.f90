@@ -80,7 +80,7 @@ module nonlinear_solution
     integer(I4) :: i
     integer(I4) :: out_iter
     integer(I4) :: max_num, conv_fnum
-    integer(I4) :: back_iter, beta_iter, maxstep_run, stagn_run, cycle_run, wpass_run
+    integer(I4) :: back_iter, beta_iter, maxstep_run, stagn_run, cycle_run, wpass_run, beta_run
     character(VARLEN) :: cxyzn
     real(DP) :: max_var, max_unk, check_val
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var, mass_error_pre, mass_error_min
@@ -88,7 +88,7 @@ module nonlinear_solution
     real(DP) :: res_l1, qext_l1, mass_error
     real(DP) :: res_fact, step_pnorm, step_lmax
     logical :: back_flag, res_flag, maxs_flag, stagn_flag, cycle_flag
-    logical :: head_change_flag, wpass_flag
+    logical :: head_change_flag, wpass_flag, beta_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
     real(DP) :: var_max, unk_max, var_abs_max
@@ -110,11 +110,13 @@ module nonlinear_solution
     18 format(1X,"Accept the non-converged step (noconv_type = 1)")
     19 format(1X,"Stop due to cycling of mass balance error")
     20 format(1X,"Line search passed with the residual-weighted merit.")
+    21 format(1X,"Stop due to maximum number of beta condition failures")
     !-------------------------------------------------------------------------------------------
     conv_fnum = st_out_fnum%conv ; eater = DHALF ; maxstep_run = 0
     head_change_flag = .false.
     stagn_run = 0 ; mass_error_pre = DZERO ; stagn_flag = .false.
     cycle_run = 0 ; mass_error_min = DZERO ; cycle_flag = .false. ; wpass_run = 0
+    beta_run = 0 ; beta_flag = .false.
     res_l1 = DZERO ; qext_l1 = DZERO ; mass_error = DZERO ; check_val = huge(1.00_DP)
     ! -- Set for backtracking (backtr)
       call set_backtr(st_sol, max_step)
@@ -299,6 +301,7 @@ module nonlinear_solution
                           wpass_run < WPASS_RUN_MAX, l2norm_new, l2norm_pre, l2norm_jac,&
                           lambda, gradient, max_step, step_pnorm, step_lmax, st_coef%temp_rhs,&
                           new_func, st_sol)
+        beta_run = beta_run + beta_iter
         if (wpass_flag) then
           wpass_run = wpass_run + 1
         end if
@@ -430,6 +433,9 @@ module nonlinear_solution
           back_flag = .true. ; stagn_flag = .true.
         else if (cycle_run == CYCLE_RUN_MAX .and. .not. back_flag) then
           back_flag = .true. ; cycle_flag = .true.
+        else if (st_ctrl%maxbeta_iter > 0 .and. beta_run > st_ctrl%maxbeta_iter .and.&
+                 .not. back_flag) then
+          back_flag = .true. ; beta_flag = .true.
         end if
       end if
 
@@ -451,6 +457,8 @@ module nonlinear_solution
             write(conv_fnum,17)
           else if (cycle_flag) then
             write(conv_fnum,19)
+          else if (beta_flag) then
+            write(conv_fnum,21)
           else
             write(conv_fnum,13)
           end if

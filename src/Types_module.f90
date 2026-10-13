@@ -43,6 +43,7 @@ module types_module
     integer(I4) :: abyd_type = 0
     integer(I4) :: surfw_type = 2
     integer(I4) :: rbed_type = 0
+    integer(I4) :: lbed_type = 0
     integer(I4) :: rech_dreg_type = 0
     integer(I4) :: rech_hort_type = 0
     integer(I4) :: rech_hort_form = 0
@@ -100,7 +101,7 @@ module types_module
   end type rive_in
 
   type :: lake_in
-    integer(I4) :: wlev, wdep, blev, area
+    integer(I4) :: wlev, wdep, blev, area, bedk, bedt
   end type lake_in
 
   type :: path_in
@@ -197,7 +198,7 @@ module types_module
 
   type :: step_flag
     integer(I4) :: seal, rech, well, prec, evap, riwl, riwd, ribl, ride, riwi, rile, ribk, ribt
-    integer(I4) :: lawl, lawd, labl, laar
+    integer(I4) :: lawl, lawd, labl, laar, labk, labt
   end type step_flag
 
   type :: ftype_out
@@ -251,6 +252,7 @@ module types_module
     integer(I4) :: evap_num = 0, rive_num = 0, lake_num = 0
     integer(I4) :: seal_num
     integer(I4), allocatable :: rech2cals(:), rive2cals(:), lake2cals(:), rive2calc(:)
+    integer(I4), allocatable :: lake2calc(:)
     integer(I4), allocatable :: rech_cflag(:), prec_cflag(:), evap_cflag(:)
     integer(I4), allocatable :: well_index(:), well_conn(:)
     integer(I4), allocatable :: sea2cal(:), sea2sea(:)
@@ -263,6 +265,7 @@ module types_module
     real(DP), allocatable :: rive_head(:), rive_bott(:), rive_area(:)
     real(DP), allocatable :: rive_hydk(:), rive_bedt(:)
     real(DP), allocatable :: lake_head(:), lake_bott(:), lake_area(:)
+    real(DP), allocatable :: lake_hydk(:), lake_bedt(:)
     real(DP), allocatable :: read_seal(:)
     real(SP), allocatable :: read_rech(:), read_well(:)
     real(SP), allocatable :: read_prec(:), read_evap(:)

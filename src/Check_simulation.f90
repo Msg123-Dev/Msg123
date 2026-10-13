@@ -258,7 +258,7 @@ module check_simulation
                 st_step_flag%evap + st_step_flag%riwl + st_step_flag%riwd + st_step_flag%ribl +&
                 st_step_flag%ride + st_step_flag%riwi + st_step_flag%rile + st_step_flag%ribk +&
                 st_step_flag%ribt + st_step_flag%lawl + st_step_flag%lawd + st_step_flag%labl +&
-                st_step_flag%laar
+                st_step_flag%laar + st_step_flag%labk + st_step_flag%labt
 
     if (step_flag > 0) then
       write_flag = 1

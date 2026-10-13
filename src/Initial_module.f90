@@ -59,7 +59,7 @@ module initial_module
   type(well_set), public :: st_well
   type(surfw_set), public :: st_riwl, st_riwd, st_ribl, st_ride, st_riwi, st_rile
   type(surfw_set), public :: st_ribk, st_ribt
-  type(surfw_set), public :: st_lawl, st_lawd, st_labl, st_laar
+  type(surfw_set), public :: st_lawl, st_lawd, st_labl, st_laar, st_labk, st_labt
 
   type(step_flag), public :: st_step_flag
 
@@ -167,7 +167,7 @@ module initial_module
     st_rivf_type%dept = -1 ; st_rivf_type%widt = -1 ; st_rivf_type%leng = -1
     st_rivf_type%bedk = -1 ; st_rivf_type%bedt = -1
     st_lakf_type%wlev = -1 ; st_lakf_type%wdep = -1 ; st_lakf_type%blev = -1
-    st_lakf_type%area = -1
+    st_lakf_type%area = -1 ; st_lakf_type%bedk = -1 ; st_lakf_type%bedt = -1
 
     ! total number of each variable
     st_clas%totn = 0 ; st_retn%totn = 0 ; st_parm%totn = 0 ; st_seal%totn = 0
@@ -175,6 +175,7 @@ module initial_module
     st_riwl%totn = 0 ; st_riwd%totn = 0 ; st_ribl%totn = 0 ; st_ride%totn = 0
     st_riwi%totn = 0 ; st_rile%totn = 0 ; st_ribk%totn = 0 ; st_ribt%totn = 0
     st_lawl%totn = 0 ; st_lawd%totn = 0 ; st_labl%totn = 0 ; st_laar%totn = 0
+    st_labk%totn = 0 ; st_labt%totn = 0
 
     ! end time of each variable
     st_seal%etime = SINFI ; st_rech%etime = SINFI ; st_well%etime = SINFI
@@ -182,7 +183,8 @@ module initial_module
     st_riwd%etime = SINFI ; st_ribl%etime = SINFI ; st_ride%etime = SINFI
     st_riwi%etime = SINFI ; st_rile%etime = SINFI ; st_ribk%etime = SINFI
     st_ribt%etime = SINFI ; st_lawl%etime = SINFI ; st_lawd%etime = SINFI
-    st_labl%etime = SINFI ; st_laar%etime = SINFI
+    st_labl%etime = SINFI ; st_laar%etime = SINFI ; st_labk%etime = SINFI
+    st_labt%etime = SINFI
 
     ! step flag of each variable
     st_step_flag%seal = 0 ; st_step_flag%rech = 0 ; st_step_flag%well = 0
@@ -190,7 +192,8 @@ module initial_module
     st_step_flag%riwd = 0 ; st_step_flag%ribl = 0 ; st_step_flag%ride = 0
     st_step_flag%riwi = 0 ; st_step_flag%rile = 0 ; st_step_flag%ribk = 0
     st_step_flag%ribt = 0 ; st_step_flag%lawl = 0 ; st_step_flag%lawd = 0
-    st_step_flag%labl = 0 ; st_step_flag%laar = 0
+    st_step_flag%labl = 0 ; st_step_flag%laar = 0 ; st_step_flag%labk = 0
+    st_step_flag%labt = 0
 
     ! output time of each variable
     st_out_step%head = SZERO ; st_out_step%rest = SZERO ; st_out_step%srat = SZERO
@@ -225,6 +228,7 @@ module initial_module
     st_schm%krpos_type = 0 ; st_schm%stor_type = 1
     st_schm%abyd_type = 0 ; st_schm%abyd_ratio = DZERO
     st_schm%krlin_head = 2.00E-03_DP ; st_schm%surfw_type = 2 ; st_schm%rbed_type = 0
+    st_schm%lbed_type = 0
     st_schm%rech_dreg_type = 0 ; st_schm%rech_dreg_hmin = DZERO ; st_schm%rech_dreg_hwid = DZERO
     st_schm%rech_hort_type = 0 ; st_schm%rech_hort_form = 0 ; st_schm%rech_hort_rwid = DZERO
     st_schm%rech_dunn_type = 0 ; st_schm%rech_dunn_hwid = DZERO

@@ -1,24 +1,26 @@
 module set_boundary
   ! -- modules
-  use kind_module, only: I4
+  use kind_module, only: I4, DP
   use constval_module, only: SNOVAL, DZERO
   use types_module, only: rlbc_set, bfview_set, bound_fview
   use utility_module, only: st_mpi, write_logf, write_err_stop, get_ilen, conv_i2s
   use initial_module, only: in_type, st_in_type, st_rivf_type, st_lakf_type, st_in_path
-  use initial_module, only: st_in_unit
+  use initial_module, only: st_in_unit, st_schm, st_grid
+  use read_input, only: len_scal, z_base
   use check_condition, only: check_input_nan
-  use set_cell, only: ncals
+  use set_cell, only: ncals, st_conn
+  use make_cell, only: st_geom
   use set_condition, only: st_bcnd, st_hydr
   use assign_boundary, only: assign_surfbv, assign_rilav, st_forc
   use calc_boundary, only: conv_rech2calc, calc_wlbd, calc_blld, calc_blsl, calc_lsurf
 #ifdef MPI_MSG
-  use mpi_utility, only: mpisum_val, bcast_file
+  use mpi_utility, only: mpisum_val, mpimin_val, bcast_file
   use mpi_set, only: cals_r4view, cals_r4hview
 #endif
 
   implicit none
   private
-  public :: set_bound, set_rive_bed, update_rive_wblevel, update_lake_wblevel
+  public :: set_bound, set_rive_bed, set_lake_bed, update_rive_wblevel, update_lake_wblevel
 
   type(rlbc_set), public :: st_rive, st_lake
   logical, public :: rech_reprev = .false.
@@ -56,7 +58,7 @@ module set_boundary
     ! -- local
     integer(I4) :: i
     integer(I4) :: rfv_wl, rfv_wd, rfv_bl, rfv_de, rfv_wi, rfv_le, rfv_bk, rfv_bt
-    integer(I4) :: lfv_wl, lfv_wd, lfv_bl, lfv_ar
+    integer(I4) :: lfv_wl, lfv_wd, lfv_bl, lfv_ar, lfv_bk, lfv_bt
     character(:), allocatable :: num_str, err_mes
     !-------------------------------------------------------------------------------------------
 #ifdef MPI_MSG
@@ -216,11 +218,13 @@ module set_boundary
 #ifdef MPI_MSG
       ! -- Open input lake file (in_lakef)
         call open_in_lakef(st_in_path%lake, cals_r4view, cals_r4hview, lfv_wl, lfv_wd, lfv_bl,&
-                           lfv_ar)
+                           lfv_ar, lfv_bk, lfv_bt)
       lfview%wl = lfv_wl ; lfview%wd = lfv_wd ; lfview%bl = lfv_bl ; lfview%ar = lfv_ar
+      lfview%bk = lfv_bk ; lfview%bt = lfv_bt
 #else
       ! -- Open input lake file (in_lakef)
-        call open_in_lakef(st_in_path%lake, 0, 0, lfv_wl, lfv_wd, lfv_bl, lfv_ar)
+        call open_in_lakef(st_in_path%lake, 0, 0, lfv_wl, lfv_wd, lfv_bl, lfv_ar, lfv_bk,&
+                           lfv_bt)
 #endif
     end if
 
@@ -258,6 +262,12 @@ module set_boundary
     ! -- Set lake area information (laar_info)
       call set_laar_info()
 
+    ! -- Set lake bed conductivity information (labk_info)
+      call set_labk_info()
+
+    ! -- Set lake bed thickness information (labt_info)
+      call set_labt_info()
+
 #ifdef MPI_MSG
     ! -- Sum value for MPI (val)
       call mpisum_val(st_lake%num%ar, "lake area", sum_laarn)
@@ -282,6 +292,9 @@ module set_boundary
     ! -- Set river bed conductivity and thickness (rive_bed)
       call set_rive_bed()
 
+    ! -- Set lake bed conductivity and thickness (lake_bed)
+      call set_lake_bed()
+
     if (st_bcnd%rive_num /= 0) then
       allocate(st_forc%abyd_rive(st_bcnd%rive_num))
       !$omp parallel do private(i)
@@ -303,7 +316,7 @@ module set_boundary
       !$omp end parallel do
       ! -- Set surface&recharge area and area by distance (srabyd)
         call set_srabyd(st_bcnd%lake_num, st_forc%lake_bott, st_forc%lake_area,&
-                        st_bcnd%lake2cals, st_forc%abyd_lake)
+                        st_bcnd%lake2cals, st_forc%abyd_lake, st_forc%lake_bedt)
     end if
 
     ! -- Set charge area by distance (chabyd)
@@ -921,14 +934,7 @@ module set_boundary
   ! set_rive_bed -- Set river bed conductivity and thickness
   !*********************************************************************************************
     ! -- modules
-    use kind_module, only: DP
-    use initial_module, only: st_schm, st_grid
-    use read_input, only: len_scal, z_base
-    use set_cell, only: st_conn
-    use make_cell, only: st_geom
-#ifdef MPI_MSG
-    use mpi_utility, only: mpimin_val
-#endif
+
     ! -- inout
 
     ! -- local
@@ -1163,6 +1169,193 @@ module set_boundary
     end if
 
   end subroutine set_laar_info
+
+  subroutine set_labk_info()
+  !*********************************************************************************************
+  ! set_labk_info -- Set lake bed conductivity information
+  !*********************************************************************************************
+    ! -- modules
+    use initial_module, only: st_labk
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i
+    !-------------------------------------------------------------------------------------------
+    if (st_lakf_type%bedk > 0) then
+      allocate(st_lake%cflag%bk(ncals))
+      allocate(st_lake%calc%bk(ncals))
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        st_lake%cflag%bk(i) = 0
+        st_lake%calc%bk(i) = SNOVAL
+      end do
+      !$omp end parallel do
+      ! -- Assign lake bed conductivity value
+        call assign_rilav(st_lakf_type%bedk, 0, st_labk, st_lake%num%bk, st_lake%cflag%bk,&
+                          st_lake%calc%bk)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_lake%calc%bk, "lake bed conductivity")
+    end if
+
+  end subroutine set_labk_info
+
+  subroutine set_labt_info()
+  !*********************************************************************************************
+  ! set_labt_info -- Set lake bed thickness information
+  !*********************************************************************************************
+    ! -- modules
+    use initial_module, only: st_labt
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i
+    !-------------------------------------------------------------------------------------------
+    if (st_lakf_type%bedt > 0) then
+      allocate(st_lake%cflag%bt(ncals))
+      allocate(st_lake%calc%bt(ncals))
+      !$omp parallel do private(i)
+      do i = 1, ncals
+        st_lake%cflag%bt(i) = 0
+        st_lake%calc%bt(i) = SNOVAL
+      end do
+      !$omp end parallel do
+      ! -- Assign lake bed thickness value
+        call assign_rilav(st_lakf_type%bedt, 0, st_labt, st_lake%num%bt, st_lake%cflag%bt,&
+                          st_lake%calc%bt)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_lake%calc%bt, "lake bed thickness")
+    end if
+
+  end subroutine set_labt_info
+
+  subroutine set_lake_bed()
+  !*********************************************************************************************
+  ! set_lake_bed -- Set lake bed conductivity and thickness
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i, s, c, miss_num, bad_num, sum_missn, sum_badn
+    integer(I4) :: low_num, sum_lown, low_ij, min_ij
+    real(DP) :: bed_bot, low_z(2), sum_z(2)
+    character(200) :: low_mes
+    logical :: bed_flag
+    character(:), allocatable :: num_str, err_mes
+    !-------------------------------------------------------------------------------------------
+    if (allocated(st_forc%lake_hydk)) then
+      deallocate(st_forc%lake_hydk)
+    end if
+    if (allocated(st_forc%lake_bedt)) then
+      deallocate(st_forc%lake_bedt)
+    end if
+    allocate(st_forc%lake_hydk(st_bcnd%lake_num), st_forc%lake_bedt(st_bcnd%lake_num))
+    !$omp parallel do private(i)
+    do i = 1, st_bcnd%lake_num
+      st_forc%lake_hydk(i) = st_hydr%hydf_surf(st_bcnd%lake2cals(i))
+      st_forc%lake_bedt(i) = DZERO
+    end do
+    !$omp end parallel do
+
+    if (st_lakf_type%bedk > 0) then
+      bed_flag = allocated(st_lake%cflag%bk) .and. allocated(st_lake%cflag%bt)
+      miss_num = 0 ; bad_num = 0
+      !$omp parallel do private(i, s) reduction(+:miss_num, bad_num)
+      do i = 1, st_bcnd%lake_num
+        s = st_bcnd%lake2cals(i)
+        if (.not. bed_flag) then
+          miss_num = miss_num + 1
+        else if (st_lake%cflag%bk(s) /= 1 .or. st_lake%cflag%bt(s) /= 1) then
+          miss_num = miss_num + 1
+        else if (st_lake%calc%bk(s) < DZERO .or. st_lake%calc%bt(s) <= DZERO) then
+          bad_num = bad_num + 1
+        else
+          st_forc%lake_hydk(i) = st_lake%calc%bk(s)
+          st_forc%lake_bedt(i) = st_lake%calc%bt(s)
+        end if
+      end do
+      !$omp end parallel do
+#ifdef MPI_MSG
+      ! -- Sum value for MPI (val)
+        call mpisum_val(miss_num, "lake cell without lake bed", sum_missn)
+        call mpisum_val(bad_num, "lake cell with invalid lake bed", sum_badn)
+#else
+      sum_missn = miss_num ; sum_badn = bad_num
+#endif
+      if (st_mpi%rank == 0) then
+        if (sum_badn > 0) then
+          call write_err_stop("Input a non-negative lake bed conductivity and a positive "//&
+                              "lake bed thickness.")
+        else if (sum_missn > 0) then
+          allocate(character(get_ilen(sum_missn)) :: num_str)
+          allocate(character(0) :: err_mes)
+          call conv_i2s(sum_missn, num_str)
+          if (st_schm%lbed_type == 0) then
+            err_mes = "Lake bed conductivity or thickness is missing at "//num_str//&
+                      " lake cells."
+            call write_err_stop(err_mes)
+          else
+            err_mes = "Used aquifer conductance at "//num_str//" lake cells without lake bed."
+            call write_logf(err_mes)
+          end if
+          deallocate(num_str, err_mes)
+        end if
+      end if
+    end if
+
+    if (allocated(st_bcnd%lake2calc)) then
+      deallocate(st_bcnd%lake2calc)
+    end if
+    allocate(st_bcnd%lake2calc(st_bcnd%lake_num))
+    !$omp parallel do private(i)
+    do i = 1, st_bcnd%lake_num
+      st_bcnd%lake2calc(i) = st_bcnd%lake2cals(i)
+    end do
+    !$omp end parallel do
+
+    if (st_lakf_type%bedk > 0) then
+      low_num = 0 ; low_ij = huge(low_ij) ; low_z(:) = DZERO
+      do i = 1, st_bcnd%lake_num
+        s = st_bcnd%lake2cals(i) ; c = s
+        if (st_forc%lake_bedt(i) > DZERO) then
+          bed_bot = st_forc%lake_bott(i) - st_forc%lake_bedt(i)
+          do while (bed_bot <= st_geom%cell_bot(c) .and. st_geom%cell_down(c) > 0)
+            c = st_geom%cell_down(c)
+          end do
+          if (bed_bot <= st_geom%cell_bot(c)) then
+            low_num = low_num + 1
+            if (st_conn%loc2glo_ij(s) < low_ij) then
+              low_ij = st_conn%loc2glo_ij(s)
+              low_z(1) = bed_bot*len_scal + z_base
+              low_z(2) = st_geom%cell_bot(c)*len_scal + z_base
+            end if
+          end if
+        end if
+        st_bcnd%lake2calc(i) = c
+      end do
+#ifdef MPI_MSG
+      ! -- Minimum value for MPI (val)
+        call mpimin_val(low_ij, "lake bed below the cells", min_ij)
+      if (low_ij /= min_ij) then
+        low_z(:) = DZERO
+      end if
+      ! -- Sum value for MPI (val)
+        call mpisum_val(low_num, "lake bed below the cells", sum_lown)
+        call mpisum_val(low_z, "lake bed below the cells", sum_z)
+#else
+      sum_lown = low_num ; min_ij = low_ij ; sum_z(:) = low_z(:)
+#endif
+      if (st_mpi%rank == 0 .and. sum_lown > 0) then
+        write(low_mes,'(a,i0,a,2(i0,a),2(g0.6,a))') "Lake bed bottom is below the lowest "//&
+          "cell at ", sum_lown, " lake cells, first at (", mod(min_ij-1, st_grid%nx)+1, ",",&
+          (min_ij-1)/st_grid%nx+1, "): bed bottom ", sum_z(1), " m, cell bottom ", sum_z(2),&
+          " m."
+        call write_err_stop(trim(low_mes))
+      end if
+    end if
+
+  end subroutine set_lake_bed
 
   subroutine set_rive_bott()
   !*********************************************************************************************

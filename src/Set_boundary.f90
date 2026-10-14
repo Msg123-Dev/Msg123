@@ -8,7 +8,7 @@ module set_boundary
   use initial_module, only: st_in_unit, st_schm, st_grid
   use read_input, only: len_scal, z_base
   use check_condition, only: check_input_nan
-  use set_cell, only: ncals, st_conn
+  use set_cell, only: ncals, st_conn, check_col_part
   use make_cell, only: st_geom
   use set_condition, only: st_bcnd, st_hydr
   use assign_boundary, only: assign_surfbv, assign_rilav, st_forc
@@ -294,6 +294,11 @@ module set_boundary
 
     ! -- Set lake bed conductivity and thickness (lake_bed)
       call set_lake_bed()
+
+    if (st_schm%rech_root_type /= 0) then
+      ! -- Set recharge root cells (rech_root)
+        call set_rech_root()
+    end if
 
     if (st_bcnd%rive_num /= 0) then
       allocate(st_forc%abyd_rive(st_bcnd%rive_num))
@@ -1016,6 +1021,8 @@ module set_boundary
     !$omp end parallel do
 
     if (st_rivf_type%bedk > 0) then
+      ! -- Check the column partition (col_part)
+        call check_col_part()
       low_num = 0 ; low_ij = huge(low_ij) ; low_z(:) = DZERO
       do i = 1, st_bcnd%rive_num
         s = st_bcnd%rive2cals(i) ; c = s
@@ -1315,6 +1322,8 @@ module set_boundary
     !$omp end parallel do
 
     if (st_lakf_type%bedk > 0) then
+      ! -- Check the column partition (col_part)
+        call check_col_part()
       low_num = 0 ; low_ij = huge(low_ij) ; low_z(:) = DZERO
       do i = 1, st_bcnd%lake_num
         s = st_bcnd%lake2cals(i) ; c = s
@@ -1356,6 +1365,83 @@ module set_boundary
     end if
 
   end subroutine set_lake_bed
+
+  subroutine set_rech_root()
+  !*********************************************************************************************
+  ! set_rech_root -- Set recharge root cells
+  !*********************************************************************************************
+    ! -- modules
+    use constval_module, only: DONE
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i, s, c, k, neg_num, bad_num, sum_negn, sum_badn, bad_ij, min_ij
+    real(DP), parameter :: RFRA_TOL = 1.00E-05_DP
+    real(DP) :: sum_rfra, bad_sum, sum_bads
+    character(200) :: bad_mes
+    !-------------------------------------------------------------------------------------------
+    ! -- Check the column partition (col_part)
+      call check_col_part()
+
+    if (allocated(st_bcnd%root_num)) then
+      deallocate(st_bcnd%root_num)
+    end if
+    allocate(st_bcnd%root_num(ncals))
+    neg_num = 0
+    !$omp parallel do private(s, c, k) reduction(+:neg_num)
+    do s = 1, ncals
+      st_bcnd%root_num(s) = 0 ; c = s ; k = 0
+      do while (c > 0)
+        k = k + 1
+        if (st_hydr%read_rfra(c) < DZERO) then
+          neg_num = neg_num + 1
+        else if (st_hydr%read_rfra(c) > DZERO) then
+          st_bcnd%root_num(s) = k
+        end if
+        c = st_geom%cell_down(c)
+      end do
+    end do
+    !$omp end parallel do
+
+    bad_num = 0 ; bad_ij = huge(bad_ij) ; bad_sum = DZERO
+    do i = 1, st_bcnd%rech_num
+      s = st_bcnd%rech2cals(i) ; c = s ; sum_rfra = DZERO
+      do k = 1, st_bcnd%root_num(s)
+        sum_rfra = sum_rfra + st_hydr%read_rfra(c) ; c = st_geom%cell_down(c)
+      end do
+      if (abs(sum_rfra-DONE) > RFRA_TOL) then
+        bad_num = bad_num + 1
+        if (st_conn%loc2glo_ij(s) < bad_ij) then
+          bad_ij = st_conn%loc2glo_ij(s) ; bad_sum = sum_rfra
+        end if
+      end if
+    end do
+#ifdef MPI_MSG
+    ! -- Sum value for MPI (val)
+      call mpisum_val(neg_num, "negative root fraction", sum_negn)
+    ! -- Minimum value for MPI (val)
+      call mpimin_val(bad_ij, "root fraction sum", min_ij)
+    if (bad_ij /= min_ij) then
+      bad_sum = DZERO
+    end if
+    ! -- Sum value for MPI (val)
+      call mpisum_val(bad_num, "root fraction sum", sum_badn)
+      call mpisum_val(bad_sum, "root fraction sum", sum_bads)
+#else
+    sum_negn = neg_num ; sum_badn = bad_num ; min_ij = bad_ij ; sum_bads = bad_sum
+#endif
+    if (st_mpi%rank == 0) then
+      if (sum_negn > 0) then
+        call write_err_stop("Input a non-negative root fraction.")
+      else if (sum_badn > 0) then
+        write(bad_mes,'(a,i0,a,2(i0,a),g0.6,a)') "Root fraction does not sum to one at ",&
+          sum_badn, " columns, first at (", mod(min_ij-1, st_grid%nx)+1, ",",&
+          (min_ij-1)/st_grid%nx+1, "): sum ", sum_bads, "."
+        call write_err_stop(trim(bad_mes))
+      end if
+    end if
+
+  end subroutine set_rech_root
 
   subroutine set_rive_bott()
   !*********************************************************************************************

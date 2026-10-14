@@ -146,16 +146,15 @@ module assign_calc
       end do
     end if
 #else
-    !$omp parallel sections
-    !$omp section
     call close_file(st_retn%fnum)
-    !$omp section
-    call close_file(st_retn_fnum%vana)
-    !$omp section
-    call close_file(st_retn_fnum%vann)
-    !$omp section
-    call close_file(st_retn_fnum%resi)
-    !$omp end parallel sections
+    if (retn_ftype == in_type(0)) then
+      do i = 1, 3
+        if (ret_ftype(i) == in_type(3) .or. ret_ftype(i) == in_type(4) .or.&
+            ret_ftype(i) == in_type(5) .or. ret_ftype(i) == in_type(6)) then
+          call close_file(ret_fnum(i))
+        end if
+      end do
+    end if
 #endif
 
     if (retn_ftype == in_type(0)) then
@@ -198,16 +197,19 @@ module assign_calc
     !$omp end parallel do
 
     if (parm_ftype == in_type(0)) then
-      allocate(par_fnum(5), par_ftype(5))
+      allocate(par_fnum(6), par_ftype(6))
       allocate(par_val(ncalc))
       par_fnum(1) = st_parm_fnum%pakx ; par_fnum(2) = st_parm_fnum%paky
       par_fnum(3) = st_parm_fnum%pakz ; par_fnum(4) = st_parm_fnum%pass
-      par_fnum(5) = st_parm_fnum%pats
+      par_fnum(5) = st_parm_fnum%pats ; par_fnum(6) = st_parm_fnum%rfra
       par_ftype(1) = st_parf_type%pakx ; par_ftype(2) = st_parf_type%paky
       par_ftype(3) = st_parf_type%pakz ; par_ftype(4) = st_parf_type%pass
-      par_ftype(5) = st_parf_type%pats
+      par_ftype(5) = st_parf_type%pats ; par_ftype(6) = st_parf_type%rfra
+      if (par_ftype(6) > 0) then
+        allocate(st_hydr%read_rfra(ncalc))
+      end if
 
-      do i = 1, 5
+      do i = 1, 6
         !$omp parallel do private(j)
         do j = 1, ncalc
           par_val(j) = SNOVAL
@@ -250,6 +252,14 @@ module assign_calc
             st_hydr%read_pors(j) = par_val(j)
           end do
           !$omp end parallel do
+        case (6)
+          if (par_ftype(i) > 0) then
+            !$omp parallel do private(j)
+            do j = 1, ncalc
+              st_hydr%read_rfra(j) = par_val(j)
+            end do
+            !$omp end parallel do
+          end if
         end select
       end do
       deallocate(par_val)
@@ -305,7 +315,7 @@ module assign_calc
       call close_file(st_parm%fnum)
     end if
     if (parm_ftype == in_type(0)) then
-      do i = 1, 5
+      do i = 1, 6
         if (par_ftype(i) == in_type(3) .or. par_ftype(i) == in_type(5)) then
           if (st_mpi%rank == 0) then
             call close_file(par_fnum(i))
@@ -316,20 +326,15 @@ module assign_calc
       end do
     end if
 #else
-    !$omp parallel sections
-    !$omp section
     call close_file(st_parm%fnum)
-    !$omp section
-    call close_file(st_parm_fnum%pakx)
-    !$omp section
-    call close_file(st_parm_fnum%paky)
-    !$omp section
-    call close_file(st_parm_fnum%pakz)
-    !$omp section
-    call close_file(st_parm_fnum%pass)
-    !$omp section
-    call close_file(st_parm_fnum%pats)
-    !$omp end parallel sections
+    if (parm_ftype == in_type(0)) then
+      do i = 1, 6
+        if (par_ftype(i) == in_type(3) .or. par_ftype(i) == in_type(4) .or.&
+            par_ftype(i) == in_type(5) .or. par_ftype(i) == in_type(6)) then
+          call close_file(par_fnum(i))
+        end if
+      end do
+    end if
 #endif
 
     if (parm_ftype == in_type(0)) then
@@ -346,6 +351,10 @@ module assign_calc
       call check_input_nan(st_hydr%read_spst, "specific storage")
     ! -- Check input nan (input_nan)
       call check_input_nan(st_hydr%read_pors, "porosity")
+    if (allocated(st_hydr%read_rfra)) then
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_hydr%read_rfra, "root fraction")
+    end if
 
   end subroutine assign_parmv
 

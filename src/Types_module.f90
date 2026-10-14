@@ -48,6 +48,7 @@ module types_module
     integer(I4) :: rech_hort_type = 0
     integer(I4) :: rech_hort_form = 0
     integer(I4) :: rech_dunn_type = 0
+    integer(I4) :: rech_root_type = 0
     real(DP) :: abyd_ratio = 0.00_DP
     real(DP) :: krlin_head = 2.00E-03_DP
     real(DP) :: rech_dreg_hmin = 0.00_DP
@@ -89,7 +90,7 @@ module types_module
   end type retn_in
 
   type :: parm_in
-    integer(I4) :: pakx, paky, pakz, pass, pats
+    integer(I4) :: pakx, paky, pakz, pass, pats, rfra
   end type parm_in
 
   type :: geog_in
@@ -115,7 +116,7 @@ module types_module
   end type retn_path
 
   type :: parm_path
-    character(:), allocatable :: pakx, paky, pakz, pass, pats
+    character(:), allocatable :: pakx, paky, pakz, pass, pats, rfra
   end type parm_path
 
   type :: geog_path
@@ -127,7 +128,7 @@ module types_module
   end type retn_fnum
 
   type :: parm_fnum
-    integer(I4) :: pakx, paky, pakz, pass, pats
+    integer(I4) :: pakx, paky, pakz, pass, pats, rfra
   end type parm_fnum
 
   type :: geog_fnum
@@ -235,7 +236,7 @@ module types_module
   type :: hydr_set
     real(SP), allocatable :: read_vana(:), read_vann(:), read_resi(:)
     real(SP), allocatable :: read_hydx(:), read_hydy(:), read_hydz(:)
-    real(SP), allocatable :: read_spst(:), read_pors(:)
+    real(SP), allocatable :: read_spst(:), read_pors(:), read_rfra(:)
     real(DP), allocatable :: read_init(:)
     real(DP), allocatable :: surf_bott(:), surf_reli(:), surf_parm(:)
     real(DP), allocatable :: sat_hydf(:), hydf_surf(:), abyd_surf(:), abyd_well(:)
@@ -252,7 +253,7 @@ module types_module
     integer(I4) :: evap_num = 0, rive_num = 0, lake_num = 0
     integer(I4) :: seal_num
     integer(I4), allocatable :: rech2cals(:), rive2cals(:), lake2cals(:), rive2calc(:)
-    integer(I4), allocatable :: lake2calc(:)
+    integer(I4), allocatable :: lake2calc(:), root_num(:)
     integer(I4), allocatable :: rech_cflag(:), prec_cflag(:), evap_cflag(:)
     integer(I4), allocatable :: well_index(:), well_conn(:)
     integer(I4), allocatable :: sea2cal(:), sea2sea(:)

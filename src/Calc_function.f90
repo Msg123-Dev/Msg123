@@ -47,7 +47,7 @@ module calc_function
     !-------------------------------------------------------------------------------------------
     allocate(stof(ncalc), conf(ncalc), welf(ncalc), seaf(ncalc))
     allocate(funcvs(ncalc))
-    allocate(recf(ncals), surf(ncals), rivf(ncalc), lakf(ncalc))
+    allocate(recf(ncalc), surf(ncals), rivf(ncalc), lakf(ncalc))
     allocate(stor_work(ncalc))
     allocate(conn_flow(ncalc))
     allocate(scal_work(ncalc))
@@ -77,11 +77,12 @@ module calc_function
     do i = 1, ncalc
       stof(i) = DZERO ; conf(i) = DZERO ; welf(i) = DZERO ; seaf(i) = DZERO
       funcvs(i) = DZERO ; funcv(i) = DZERO ; rivf(i) = DZERO ; lakf(i) = DZERO
+      recf(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i)
     do i = 1, ncals
-      recf(i) = DZERO ; surf(i) = DZERO
+      surf(i) = DZERO
     end do
     !$omp end do
     !$omp end parallel
@@ -140,6 +141,13 @@ module calc_function
       funcvs(i) = rivf(i) + lakf(i)
     end do
     !$omp end parallel do
+    if (st_schm%rech_root_type /= 0) then
+      !$omp parallel do private(i)
+      do i = ncals+1, ncalc
+        funcvs(i) = funcvs(i) + recf(i)
+      end do
+      !$omp end parallel do
+    end if
 
     !$omp parallel do private(i)
     do i = 1, ncalc
@@ -164,6 +172,13 @@ module calc_function
         scal_work(i) = scal_work(i) + abs(rivf(i)) + abs(lakf(i))
       end do
       !$omp end parallel do
+      if (st_schm%rech_root_type /= 0) then
+        !$omp parallel do private(i)
+        do i = ncals+1, ncalc
+          scal_work(i) = scal_work(i) + abs(recf(i))
+        end do
+        !$omp end parallel do
+      end if
       !$omp parallel do private(i)
       do i = 1, ncalc
         fscal(i) = scal_work(i)
@@ -251,6 +266,13 @@ module calc_function
         recm(i) = recm(i)*st_time%delt ; surm(i) = surm(i)*st_time%delt
       end do
       !$omp end do
+      if (st_schm%rech_root_type /= 0) then
+        !$omp do private(i)
+        do i = ncals+1, ncalc
+          recm(i) = recm(i)*st_time%delt
+        end do
+        !$omp end do
+      end if
       !$omp end parallel
     end if
 
@@ -375,15 +397,38 @@ module calc_function
     real(DP), intent(in) :: infrech(:)
     real(DP), intent(inout) :: recfunc(:)
     ! -- local
-    integer(I4) :: i, s
-    real(DP) :: rech_fact
+    integer(I4) :: i, s, c, k
+    real(DP) :: rech_fact, sum_rfra, dist_rech, rest_rech
     logical :: rej_flag
     !-------------------------------------------------------------------------------------------
     rej_flag = st_schm%rech_hort_type /= 0 .or. st_schm%rech_dunn_type /= 0
-    !$omp parallel do private(i, s, rech_fact)
+    !$omp parallel do private(i, s, c, k, rech_fact, sum_rfra, dist_rech, rest_rech)
     do i = 1, st_bcnd%rech_num
       s = st_bcnd%rech2cals(i)
-      if (st_schm%rech_dreg_type == 1 .and. st_forc%calc_rech(i) < DZERO) then
+      if (st_schm%rech_root_type /= 0 .and. st_forc%calc_rech(i) < DZERO) then
+        c = s ; sum_rfra = DZERO
+        do k = 1, st_bcnd%root_num(s)
+          sum_rfra = sum_rfra + st_hydr%read_rfra(c) ; c = st_geom%cell_down(c)
+        end do
+        c = s ; rest_rech = DZERO
+        do k = 1, st_bcnd%root_num(s)
+          if (st_schm%rech_root_type == 2) then
+            dist_rech = merge(DONE, rest_rech, k == 1)
+          else
+            dist_rech = st_hydr%read_rfra(c)/sum_rfra + rest_rech
+          end if
+          rech_fact = DONE
+          if (st_schm%rech_dreg_type == 1) then
+            call calc_rech_fact(infrech(c)-st_geom%cell_top(c), st_schm%rech_dreg_hmin,&
+                                st_schm%rech_dreg_hwid, rech_fact)
+          end if
+          recfunc(c) = st_forc%calc_rech(i)*dist_rech*rech_fact
+          if (st_schm%rech_root_type /= 1) then
+            rest_rech = dist_rech*(DONE-rech_fact)
+          end if
+          c = st_geom%cell_down(c)
+        end do
+      else if (st_schm%rech_dreg_type == 1 .and. st_forc%calc_rech(i) < DZERO) then
         call calc_rech_fact(infrech(s)-st_geom%cell_top(s), st_schm%rech_dreg_hmin,&
                             st_schm%rech_dreg_hwid, rech_fact)
         recfunc(s) = st_forc%calc_rech(i)*rech_fact

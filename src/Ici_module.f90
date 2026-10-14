@@ -70,12 +70,16 @@ module ici_module
   ! set_mapt -- Set mapping table
   !*********************************************************************************************
     ! -- module
+    use set_cell, only: check_col_part
     use ici_api, only: ici_init_time
     ! -- inout
 
     ! -- local
 
     !-------------------------------------------------------------------------------------------
+    ! -- Check the column partition (col_part)
+      call check_col_part()
+
     call palm_TimeStart('Setup')
 
     ! -- Define grid (grid)

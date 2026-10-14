@@ -538,7 +538,7 @@ module read_input
       call write_err_stop("Input a larger than -1 value for Picard iteration.")
     else if (st_ctrl%tstep_type < 0) then
       call write_err_stop("Input a non-negative value for time step type.")
-    else if (st_ctrl%tstep_type > 2) then
+    else if (st_ctrl%tstep_type > 1) then
       call write_err_stop("Input a valid value for time step type.")
     else if (st_ctrl%precon_type < 0) then
       call write_err_stop("Input a non-negative value for preconditoner type.")

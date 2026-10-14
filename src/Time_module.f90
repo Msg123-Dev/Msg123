@@ -134,6 +134,7 @@ module time_module
     integer(I4), allocatable :: calc2calc(:)
     real(DP), save :: resi_time
     real(DP), allocatable :: cell_srat(:)
+    logical :: outcut_flag
     !-------------------------------------------------------------------------------------------
     if (st_time%current_t == DZERO) then
       timestep_num = 0 ; boundstep = 0
@@ -207,7 +208,8 @@ module time_module
           delt_old1 = st_time%delt
         end if
         timestep_num = timestep_num + 1
-        if (delt_uncut > DZERO) then
+        outcut_flag = delt_uncut > DZERO
+        if (outcut_flag) then
           st_time%delt = delt_uncut ; delt_uncut = DZERO
         end if
         delt_old1 = st_time%delt
@@ -240,6 +242,10 @@ module time_module
             ! -- Apply heuristic time stepping (heuri)
               call apply_heuri(st_time%out_iter)
           end select
+        end if
+        if (st_ctrl%dstor_max > DZERO .and. .not. outcut_flag) then
+          ! -- Apply storage change time stepping (dstor)
+            call apply_dstor(st_sol%stor_new, st_sol%stor_old)
         end if
 
         ! -- Set value exchange (valexc)
@@ -1959,6 +1965,43 @@ module time_module
     end if
 
   end subroutine apply_heuri
+
+  subroutine apply_dstor(stor_new, stor_old)
+  !*********************************************************************************************
+  ! apply_dstor -- Apply storage change time stepping
+  !*********************************************************************************************
+    ! -- modules
+    use constval_module, only: DHALF
+#ifdef MPI_MSG
+    use mpi_utility, only: mpimax_val
+#endif
+    ! -- inout
+    real(DP), intent(in) :: stor_new(:), stor_old(:)
+    ! -- local
+    integer(I4) :: i
+    real(DP), parameter :: DSTOR_EPS = 1.00E-05_DP
+    real(DP) :: dstor_step, delt_stor
+#ifdef MPI_MSG
+    real(DP) :: max_val
+#endif
+    !-------------------------------------------------------------------------------------------
+    dstor_step = DZERO
+    !$omp parallel do private(i) reduction(max:dstor_step)
+    do i = 1, ncalc
+      dstor_step = max(dstor_step, abs(stor_new(i) - stor_old(i)))
+    end do
+    !$omp end parallel do
+#ifdef MPI_MSG
+    if (st_mpi%totn /= 1) then
+      ! -- Max value for MPI (val)
+        call mpimax_val(dstor_step, "storage change", max_val)
+      dstor_step = max_val
+    end if
+#endif
+    delt_stor = DHALF*delt_old1*(DONE + st_ctrl%dstor_max/(dstor_step + DSTOR_EPS))
+    st_time%delt = min(st_time%delt, delt_stor)
+
+  end subroutine apply_dstor
 
   subroutine set_date(inttime, ndate, restime)
   !*********************************************************************************************

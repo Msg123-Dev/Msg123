@@ -32,7 +32,7 @@ module types_module
     integer(I4) :: nlevel, maxvcy_iter, amg_nlevel, max_sweep
     integer(I4) :: noclas_flag = 0
     real(DP) :: criteria, errtol, newper, newper_inv, res_abs_tol, res_rel_tol
-    real(DP) :: dilu_shift, dsat_max
+    real(DP) :: dilu_shift, dsat_max, dstor_max
     real(DP) :: picard_btol, picard_bfact, picard_blim
     real(SP) :: jac_omega, amg_theta
   end type ctrl_set

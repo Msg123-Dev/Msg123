@@ -41,7 +41,7 @@ module make_linearsystem
     allocate(st_coef%stor_per(ncalc))
     allocate(st_coef%stod(ncalc), st_coef%cond(nreg_num), st_coef%sead(ncalc))
     allocate(st_coef%dmats(ncalc))
-    allocate(st_coef%rivd(ncalc), st_coef%lakd(ncalc), st_coef%surd(ncals), st_coef%recd(ncals))
+    allocate(st_coef%rivd(ncalc), st_coef%lakd(ncalc), st_coef%surd(ncals), st_coef%recd(ncalc))
     allocate(st_coef%deri_dcon(tot_ind), st_coef%rel_hyd(tot_ind), st_coef%deri_lucon(tot_ind))
     allocate(st_coef%deri_con1(tot_ind), st_coef%deri_con2(tot_ind))
     allocate(st_coef%over_riv(st_bcnd%rive_num), st_coef%deri_r(st_bcnd%rive_num))
@@ -126,6 +126,7 @@ module make_linearsystem
     do i = 1, ncalc
       st_coef%dstor_dpsi(i) = DZERO ; st_coef%rivd(i) = DZERO ; st_coef%lakd(i) = DZERO
       st_coef%stod(i) = DZERO ; st_coef%sead(i) = DZERO ; st_coef%dmats(i) = DZERO
+      st_coef%recd(i) = DZERO
     end do
     !$omp end parallel do
     !$omp parallel do private(i)
@@ -136,7 +137,7 @@ module make_linearsystem
     !$omp end parallel do
     !$omp parallel do private(i)
     do i = 1, ncals
-      st_coef%surd(i) = DZERO ; st_coef%recd(i) = DZERO
+      st_coef%surd(i) = DZERO
     end do
     !$omp end parallel do
 
@@ -200,7 +201,7 @@ module make_linearsystem
     if (st_schm%rech_dreg_type == 1 .or. st_schm%rech_hort_type == 2 .or.&
         st_schm%rech_dunn_type == 2) then
       ! -- Set recharge boundary dmat (rechbound)
-        call set_rechbound(st_sol, st_coef%recd)
+        call set_rechbound(st_sol, st_coef%recd, lumat)
     end if
 
     !$omp parallel
@@ -222,6 +223,13 @@ module make_linearsystem
       st_coef%dmats(i) = st_coef%rivd(i) + st_coef%lakd(i)
     end do
     !$omp end do
+    if (st_schm%rech_root_type /= 0 .and. st_schm%rech_dreg_type == 1) then
+      !$omp do private(i)
+      do i = ncals+1, ncalc
+        st_coef%dmats(i) = st_coef%dmats(i) + st_coef%recd(i)
+      end do
+      !$omp end do
+    end if
 
     !$omp do private(i)
     do i = 1, ncalc
@@ -670,25 +678,57 @@ module make_linearsystem
 
   end subroutine set_seabound
 
-  subroutine set_rechbound(st_sol, dmat_rec)
+  subroutine set_rechbound(st_sol, dmat_rec, lumat_rec)
   !*********************************************************************************************
   ! set_rechbound -- Set recharge boundary to dmat
   !*********************************************************************************************
     ! -- modules
     use calc_function, only: calc_rech_fact, calc_rech_rej
     ! -- inout
-    real(DP), intent(inout) :: dmat_rec(:)
+    real(DP), intent(inout) :: dmat_rec(:), lumat_rec(:)
     type(sol_set), intent(in) :: st_sol
     ! -- local
-    integer(I4) :: i, s
-    real(DP) :: rech_fact, drech_fact, rech_val
+    integer(I4) :: i, s, c, k, ind, up_cell
+    real(DP) :: rech_fact, drech_fact, rech_val, sum_rfra, dist_rech, rest_rech
+    real(DP) :: up_dist, up_drech
     logical :: rej_flag
     !-------------------------------------------------------------------------------------------
     rej_flag = st_schm%rech_hort_type == 2 .or. st_schm%rech_dunn_type == 2
-    !$omp parallel do private(i, s, rech_fact, drech_fact, rech_val)
+    !$omp parallel do private(i, s, c, k, ind, up_cell, rech_fact, drech_fact, rech_val)&
+    !$omp&            private(sum_rfra, dist_rech, rest_rech, up_dist, up_drech)
     do i = 1, st_bcnd%rech_num
       s = st_bcnd%rech2cals(i)
-      if (st_schm%rech_dreg_type == 1 .and. st_forc%calc_rech(i) < DZERO) then
+      if (st_schm%rech_root_type /= 0 .and. st_schm%rech_dreg_type == 1 .and.&
+          st_forc%calc_rech(i) < DZERO) then
+        c = s ; sum_rfra = DZERO
+        do k = 1, st_bcnd%root_num(s)
+          sum_rfra = sum_rfra + st_hydr%read_rfra(c) ; c = st_geom%cell_down(c)
+        end do
+        c = s ; up_cell = 0 ; rest_rech = DZERO ; up_dist = DZERO ; up_drech = DZERO
+        do k = 1, st_bcnd%root_num(s)
+          if (st_schm%rech_root_type == 2) then
+            dist_rech = merge(DONE, rest_rech, k == 1)
+          else
+            dist_rech = st_hydr%read_rfra(c)/sum_rfra + rest_rech
+          end if
+          call calc_rech_fact(st_sol%head_new(c)-st_geom%cell_top(c), st_schm%rech_dreg_hmin,&
+                              st_schm%rech_dreg_hwid, rech_fact, drech_fact)
+          dmat_rec(c) = st_forc%calc_rech(i)*dist_rech*drech_fact
+          if (st_time%form_switch == 1 .and. up_cell > 0 .and. st_schm%rech_root_type /= 1) then
+            do ind = crs_index(1)%offind(c-1)+1, crs_index(1)%offind(c)
+              if (crs_index(1)%offrow(ind) == up_cell) then
+                lumat_rec(ind) = lumat_rec(ind)&
+                                 - st_forc%calc_rech(i)*rech_fact*up_dist*up_drech
+              end if
+            end do
+          end if
+          up_cell = c ; up_dist = dist_rech ; up_drech = drech_fact
+          if (st_schm%rech_root_type /= 1) then
+            rest_rech = dist_rech*(DONE-rech_fact)
+          end if
+          c = st_geom%cell_down(c)
+        end do
+      else if (st_schm%rech_dreg_type == 1 .and. st_forc%calc_rech(i) < DZERO) then
         call calc_rech_fact(st_sol%head_new(s)-st_geom%cell_top(s), st_schm%rech_dreg_hmin,&
                             st_schm%rech_dreg_hwid, rech_fact, drech_fact)
         dmat_rec(s) = st_forc%calc_rech(i)*drech_fact

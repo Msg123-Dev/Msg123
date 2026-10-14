@@ -14,7 +14,7 @@ module set_cell
 
   implicit none
   private
-  public :: set_cell_info, get_cals_grid, get_calc_grid
+  public :: set_cell_info, get_cals_grid, get_calc_grid, check_col_part
   integer(I4), public :: amg_setflag
   integer(I4), public :: ncalc, ncals, ncell, nsurf, no_ncalc, no_ncals
   integer(I4), public :: seal_snum, seal_cnum, neib_mpi_totn, neib_ncals, neib_ncalc
@@ -2868,5 +2868,22 @@ module set_cell
     end if
 
   end subroutine get_neib_cnum
+
+  subroutine check_col_part()
+  !*********************************************************************************************
+  ! check_col_part -- Check the column partition for walks down a cell column
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+
+    ! -- local
+
+    !-------------------------------------------------------------------------------------------
+    if (div_reg_3d .and. st_mpi%totn /= 1 .and. st_mpi%rank == 0) then
+      call write_err_stop("Walking down a cell column needs the 2D column partition.")
+    end if
+
+  end subroutine check_col_part
 
 end module set_cell

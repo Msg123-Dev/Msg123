@@ -161,7 +161,7 @@ module initial_module
 
     st_retf_type%vana = -1 ; st_retf_type%vann = -1 ; st_retf_type%resi = -1
     st_parf_type%pakx = -1 ; st_parf_type%paky = -1 ; st_parf_type%pakz = -1
-    st_parf_type%pass = -1 ; st_parf_type%pats = -1
+    st_parf_type%pass = -1 ; st_parf_type%pats = -1 ; st_parf_type%rfra = -1
     st_geof_type%geoz = -1 ; st_geof_type%geor = -1 ; st_geof_type%geoa = -1
     st_rivf_type%wlev = -1 ; st_rivf_type%wdep = -1 ; st_rivf_type%blev = -1
     st_rivf_type%dept = -1 ; st_rivf_type%widt = -1 ; st_rivf_type%leng = -1
@@ -231,7 +231,7 @@ module initial_module
     st_schm%lbed_type = 0
     st_schm%rech_dreg_type = 0 ; st_schm%rech_dreg_hmin = DZERO ; st_schm%rech_dreg_hwid = DZERO
     st_schm%rech_hort_type = 0 ; st_schm%rech_hort_form = 0 ; st_schm%rech_hort_rwid = DZERO
-    st_schm%rech_dunn_type = 0 ; st_schm%rech_dunn_hwid = DZERO
+    st_schm%rech_dunn_type = 0 ; st_schm%rech_dunn_hwid = DZERO ; st_schm%rech_root_type = 0
 
     ! time unit
     unit_list = ["SEC", "MIN", "HOU", "DAY", "YEA"]

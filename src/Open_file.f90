@@ -171,7 +171,7 @@ module open_file
   ! open_in_parmf -- Open input parameter file
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_parf_type, st_parm_path, st_parm_fnum, st_parm
+    use initial_module, only: st_schm, st_parf_type, st_parm_path, st_parm_fnum, st_parm
     ! -- inout
     integer(I4), intent(in) :: parm_type
     character(*), intent(in) :: parm_path
@@ -179,15 +179,16 @@ module open_file
     ! -- local
     integer(I4) :: i, ierr
     integer(I4) :: parm_num, temp_view
-    integer(I4) :: parm_ftype(5)
-    integer(I4) :: pakx_type, paky_type, pakz_type, pass_type, pats_type
-    character(CHALEN) :: in_kxpath, in_kypath, in_kzpath, in_sspath, in_tspath
-    character(:), allocatable :: mess_kx, mess_ky, mess_kz, mess_ss, mess_ts
+    integer(I4) :: parm_ftype(6)
+    integer(I4) :: pakx_type, paky_type, pakz_type, pass_type, pats_type, rfra_type
+    character(CHALEN) :: in_kxpath, in_kypath, in_kzpath, in_sspath, in_tspath, in_rfpath
+    character(:), allocatable :: mess_kx, mess_ky, mess_kz, mess_ss, mess_ts, mess_rf
     character(:), allocatable :: path_parm, mess_parm
-    namelist/inparm_type/pakx_type, paky_type, pakz_type, pass_type, pats_type
-    namelist/inparm_path/in_kxpath, in_kypath, in_kzpath, in_sspath, in_tspath
+    namelist/inparm_type/pakx_type, paky_type, pakz_type, pass_type, pats_type, rfra_type
+    namelist/inparm_path/in_kxpath, in_kypath, in_kzpath, in_sspath, in_tspath, in_rfpath
     !-------------------------------------------------------------------------------------------
     in_kxpath = "" ; in_kypath = "" ; in_kzpath = "" ; in_sspath = "" ; in_tspath = ""
+    in_rfpath = "" ; rfra_type = -1
     if (st_mpi%rank == 0) then
       ! -- Open new read text file (new_rtxt)
         call open_new_rtxt(1, 1, parm_path, "input parameter", st_parm%fnum)
@@ -200,7 +201,17 @@ module open_file
         if (ierr /= 0) then
           call write_err_stop("While reading file path section in parameter file.")
         end if
+        if (st_schm%rech_root_type /= 0 .and. rfra_type <= 0) then
+          call write_err_stop("Input root fraction file to use rech_root_type.")
+        else if (st_schm%rech_root_type == 0 .and. rfra_type > 0) then
+          call write_err_stop("Set rech_root_type to use root fraction file.")
+        else if (rfra_type > 0 .and. rfra_type /= in_type(5) .and. rfra_type /= in_type(6)) then
+          call write_err_stop("Input a valid value (5 or 6) for root fraction file type.")
+        end if
       else if (parm_type == in_type(1)) then
+        if (st_schm%rech_root_type /= 0) then
+          call write_err_stop("Use parameter files (not classification) to give root fraction.")
+        end if
         read(unit=st_parm%fnum,fmt=*,iostat=ierr) st_parm%totn
         if (ierr /= 0) then
           call write_err_stop("While reading parameter number in classification file.")
@@ -220,12 +231,13 @@ module open_file
       temp_view = view_calc
     end if
 
-    allocate(character(0) :: mess_kx, mess_ky, mess_kz, mess_ss, mess_ts)
+    allocate(character(0) :: mess_kx, mess_ky, mess_kz, mess_ss, mess_ts, mess_rf)
     mess_kx = "input saturated hydraulic conductivity in x direction"
     mess_ky = "input saturated hydraulic conductivity in y direction"
     mess_kz = "input saturated hydraulic conductivity in z direction"
     mess_ss = "input specific storage"
     mess_ts = "input porosity"
+    mess_rf = "input root fraction"
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
@@ -238,25 +250,27 @@ module open_file
           call bcast_file(pakz_type, in_kzpath, mess_kz)
           call bcast_file(pass_type, in_sspath, mess_ss)
           call bcast_file(pats_type, in_tspath, mess_ts)
+          call bcast_file(rfra_type, in_rfpath, mess_rf)
       end if
     end if
 #endif
 
     if (parm_type == in_type(0)) then
       parm_ftype(1) = pakx_type ; parm_ftype(2) = paky_type ; parm_ftype(3) = pakz_type
-      parm_ftype(4) = pass_type ; parm_ftype(5) = pats_type
+      parm_ftype(4) = pass_type ; parm_ftype(5) = pats_type ; parm_ftype(6) = rfra_type
       st_parf_type%pakx = pakx_type ; st_parf_type%paky = paky_type
       st_parf_type%pakz = pakz_type ; st_parf_type%pass = pass_type
-      st_parf_type%pats = pats_type
+      st_parf_type%pats = pats_type ; st_parf_type%rfra = rfra_type
       st_parm_path%pakx = trim(adjustl(in_kxpath))
       st_parm_path%paky = trim(adjustl(in_kypath))
       st_parm_path%pakz = trim(adjustl(in_kzpath))
       st_parm_path%pass = trim(adjustl(in_sspath))
       st_parm_path%pats = trim(adjustl(in_tspath))
+      st_parm_path%rfra = trim(adjustl(in_rfpath))
 
       allocate(character(0) :: path_parm, mess_parm)
 
-      do i = 1, 5
+      do i = 1, 6
         parm_num = 0
         select case (i)
         case (1)
@@ -274,6 +288,9 @@ module open_file
         case (5)
           path_parm = trim(adjustl(in_tspath)) ; mess_parm = mess_ts
           deallocate(mess_ts)
+        case (6)
+          path_parm = trim(adjustl(in_rfpath)) ; mess_parm = mess_rf
+          deallocate(mess_rf)
         end select
 
         if (parm_ftype(i) == in_type(3) .or. parm_ftype(i) == in_type(5)) then
@@ -312,6 +329,8 @@ module open_file
           st_parm_fnum%pass = parm_num
         case (5)
           st_parm_fnum%pats = parm_num
+        case (6)
+          st_parm_fnum%rfra = parm_num
         end select
 
       end do

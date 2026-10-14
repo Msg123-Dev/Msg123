@@ -1876,13 +1876,16 @@ module set_condition
   ! set_well2index -- Set well index
   !*********************************************************************************************
     ! -- modules
-
+    use set_cell, only: check_col_part
     ! -- inout
     integer(I4), intent(in) :: wnum
     ! -- local
     integer(I4) :: i, k, index_count, c_num
     integer(I4), allocatable :: temp_wconn(:)
     !-------------------------------------------------------------------------------------------
+    ! -- Check the column partition (col_part)
+      call check_col_part()
+
     allocate(temp_wconn(st_grid%nz*wnum), st_bcnd%well_index(0:wnum))
     st_bcnd%well_index(0) = 0
     !$omp parallel

@@ -5,6 +5,7 @@ module calc_output
   use types_module, only: sol_set
   use initial_module, only: st_schm
   use set_cell, only: ncalc, ncals
+  use make_cell, only: st_geom
   use set_condition, only: st_hydr, st_bcnd
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
@@ -27,7 +28,7 @@ module calc_output
   !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_grid
-    use set_cell, only: st_conn, get_cals_grid
+    use set_cell, only: st_conn, get_cals_grid, check_col_part
     use allocate_output, only: wtable
     ! -- inout
     real(DP), intent(in) :: hyd_head(:), deg_satu(:)
@@ -35,6 +36,9 @@ module calc_output
     integer(I4) :: i, k, nijk, c_num
     integer(I4) :: i_num, j_num
     !-------------------------------------------------------------------------------------------
+    ! -- Check the column partition (col_part)
+      call check_col_part()
+
     !$omp parallel do private(i, k, i_num, j_num, c_num, nijk)
     do i = 1, ncals
       call get_cals_grid(i, i_num, j_num)
@@ -65,22 +69,22 @@ module calc_output
 
     type(sol_set), intent(inout) :: st_sol
     ! -- local
-    integer(I4) :: i, s, c
+    integer(I4) :: i, s, c, k
     real(DP), allocatable :: ms_st(:), ms_co(:), ms_se(:), ms_we(:)
     real(DP), allocatable :: ms_re(:), ms_su(:), ms_ri(:), ms_la(:)
     !-------------------------------------------------------------------------------------------
     allocate(ms_st(ncalc), ms_co(ncalc), ms_se(ncalc), ms_we(ncalc))
-    allocate(ms_re(ncals), ms_su(ncals), ms_ri(ncalc), ms_la(ncalc))
+    allocate(ms_re(ncalc), ms_su(ncals), ms_ri(ncalc), ms_la(ncalc))
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc
       ms_st(i) = DZERO ; ms_co(i) = DZERO ; ms_se(i) = DZERO ; ms_we(i) = DZERO
-      ms_ri(i) = DZERO ; ms_la(i) = DZERO
+      ms_ri(i) = DZERO ; ms_la(i) = DZERO ; ms_re(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i)
     do i = 1, ncals
-      ms_re(i) = DZERO ; ms_su(i) = DZERO
+      ms_su(i) = DZERO
     end do
     !$omp end do
     !$omp end parallel
@@ -124,6 +128,16 @@ module calc_output
       end if
     end do
     !$omp end do
+    if (st_schm%rech_root_type /= 0) then
+      !$omp do private(i, s, c, k)
+      do i = 1, st_bcnd%rech_num
+        s = st_bcnd%rech2cals(i) ; c = s
+        do k = 2, st_bcnd%root_num(s)
+          c = st_geom%cell_down(c) ; st_msloc%rec(s) = st_msloc%rec(s) + ms_re(c)
+        end do
+      end do
+      !$omp end do
+    end if
     !$omp end parallel
 
     deallocate(ms_re, ms_we, ms_st, ms_co, ms_su, ms_ri, ms_la)
@@ -212,7 +226,6 @@ module calc_output
   !*********************************************************************************************
     ! -- modules
     use constval_module, only: DHALF
-    use make_cell, only: st_geom
     use calc_parameter, only: calc_hyd_upwind
     use allocate_solution, only: dir_conn, dir_seal, crs_index
     use allocate_output, only: pointv, facev
@@ -551,13 +564,17 @@ module calc_output
     ! -- inout
     type(sol_set), intent(in) :: st_sol
     ! -- local
-    integer(I4) :: i, s
+    integer(I4) :: i, s, c, k
     real(DP), allocatable :: rechr(:), temp_rech(:)
     !-------------------------------------------------------------------------------------------
-    allocate(rechr(ncals), temp_rech(ncals))
+    allocate(rechr(ncalc), temp_rech(ncals))
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      rechr(i) = DZERO
+    end do
+    !$omp end parallel do
     !$omp parallel do private(i)
     do i = 1, ncals
-      rechr(i) = DZERO
       temp_rech(i) = res_rech(i)
     end do
     !$omp end parallel do
@@ -565,9 +582,15 @@ module calc_output
     ! -- Function recharge term (rechterm)
       call func_rechterm(st_sol%head_new, rechr)
 
-    !$omp parallel do private(i, s)
+    !$omp parallel do private(i, s, c, k)
     do i = 1, st_bcnd%rech_num
       s = st_bcnd%rech2cals(i)
+      if (st_schm%rech_root_type /= 0) then
+        c = s
+        do k = 2, st_bcnd%root_num(s)
+          c = st_geom%cell_down(c) ; rechr(s) = rechr(s) + rechr(c)
+        end do
+      end if
       rechr(s) = st_forc%read_rech(i)*st_hydr%rech_area(s) - rechr(s)
     end do
     !$omp end parallel do

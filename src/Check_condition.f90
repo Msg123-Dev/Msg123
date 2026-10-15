@@ -272,7 +272,7 @@ module check_condition
     integer(I4) :: ierr
     integer(I4) :: seal_fnum, intse_num
     integer(I4), allocatable :: type_txt(:), type_bin(:)
-    real(SP) :: intse_step, intse_end
+    real(SP) :: intse_step, intse_end, temp_etime
     character(:), allocatable :: err_mes
     character(CHALEN) :: intsep
     !-------------------------------------------------------------------------------------------
@@ -318,7 +318,8 @@ module check_condition
       else if (seal_ftype == in_type(3) .or. seal_ftype == in_type(5)) then
         read(unit=st_seal%fnum,fmt=*,iostat=ierr) st_seal%etime
       else if (any(seal_ftype == type_bin(:))) then
-        read(unit=st_seal%fnum,fmt=*,iostat=ierr) st_seal%etime
+        read(unit=st_seal%fnum,iostat=ierr) temp_etime
+        st_seal%etime = temp_etime
       end if
     else if (seal_ftype == in_type(1) .or. seal_ftype == in_type(2)) then
       read(unit=st_seal%fnum,fmt=*,iostat=ierr) st_seal%totn

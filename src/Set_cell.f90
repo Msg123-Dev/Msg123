@@ -5,7 +5,7 @@ module set_cell
   use types_module, only: conn_set, gmap_set
   use utility_module, only: st_mpi, iquick_sort, iquick_sort2, open_new_rtxt, write_err_stop
   use utility_module, only: gmap_init, gmap_put, gmap_get, gmap_free
-  use initial_module, only: st_sim, st_grid, st_clas, in_type, st_ctrl
+  use initial_module, only: st_sim, st_grid, st_clas, in_type, st_ctrl, st_in_type, st_in_unit
   use read_module, only: read_2d_calcreg, read_3d_calcreg
 #ifdef MPI_MSG
   use mpi_utility, only: mpisum_val, mpimax_val, mpiexscan_val, bcast_val, scatterv_val
@@ -66,7 +66,7 @@ module set_cell
     ! -- local
     integer(I4) :: i, j, n, nxy, nc_unknow, mpi_ncals, mpi_ncalc, calg_num
     integer(I4) :: sta_calc, end_calc, i_num, j_num, k_num, pro_nreg, loc_num
-    integer(I4) :: sea_ftype, sea_ptn, sea_nclas, sea_null
+    integer(I4) :: sea_ftype, sea_ptn, sea_nclas, sea_null, sea_head
     integer(I4), allocatable :: cur_nreg(:), sp_i(:), sp_j(:), sp_k(:), sea_hit(:), pre_sea(:)
     real(SP), allocatable :: sp_v(:), sea_clas_val(:), read_seaval(:)
     character(CHALEN) :: sea_path
@@ -143,9 +143,13 @@ module set_cell
       call set_read_range()
 
     sea_ftype = 0 ; sea_ptn = 0 ; sea_nclas = 0 ; sea_path = repeat(' ', CHALEN)
+    sea_head = 0
     if (st_mpi%rank == 0) then
       ! -- Read sea level file set (seal_set)
         call read_seal_set(sea_ftype, sea_path)
+      if (sea_ftype == st_in_type%seal .and. len_trim(adjustl(st_in_unit%seal)) /= 0) then
+        sea_head = 1
+      end if
       if (sea_ftype == in_type(1)) then
         ! -- Read sea level class file (seal_clasf)
           call read_seal_clasf(sea_nclas, sea_clas_name, sea_clas_val)
@@ -158,6 +162,7 @@ module set_cell
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
       call bcast_val(sea_ftype, "sea input type")
+      call bcast_val(sea_head, "sea input header")
       call bcast_file(sea_path, "sea input path")
       if (sea_ftype == in_type(1)) then
         call bcast_val(sea_nclas, "sea class count")
@@ -210,7 +215,8 @@ module set_cell
 
 #ifdef MPI_MSG
       else if (sea_ftype == in_type(4) .or. sea_ftype == in_type(6)) then
-        call read_dist_seaval(sea_ftype, trim(sea_path), read_sta, read_num, read_seaval)
+        call read_dist_seaval(sea_ftype, trim(sea_path), sea_head, read_sta, read_num,&
+                              read_seaval)
       else
         if (st_mpi%rank == 0) then
           allocate(glo_seaval(st_grid%nxyz))

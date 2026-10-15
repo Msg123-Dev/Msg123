@@ -9,7 +9,7 @@ module mpi_read
   private
   public :: open_mpi_read_file, open_mpi_write_file
   public :: set_int4_fview, set_real4_fview, set_real8_fview
-  public :: read_mpi_restf, read_mpi_head, read_mpi_file
+  public :: read_mpi_restf, read_mpi_head, read_mpi_file, read_dist_file
   public :: skip_mpi_file, skip_mpi_file_int, close_mpi_file
   public :: read_mpi_calcreg, read_dist_seaval
 
@@ -23,6 +23,12 @@ module mpi_read
     module procedure read_mpi_i4
     module procedure read_mpi_r4
     module procedure read_mpi_r8
+  end interface
+
+  interface read_dist_file
+    module procedure read_dist_i4
+    module procedure read_dist_r4
+    module procedure read_dist_r8
   end interface
 
   ! -- local
@@ -515,6 +521,173 @@ module mpi_read
 
   end subroutine read_mpi_r8
 
+  subroutine read_dist_i4(ftype, int_ftype, fileh, loc_num, glob_num, l2g_num, read_out)
+  !*********************************************************************************************
+  ! read_dist_i4 -- Read int4 distributed file
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    integer(I4), intent(in) :: ftype, int_ftype, fileh, loc_num, glob_num
+    integer(I4), intent(in) :: l2g_num(:)
+    integer(I4), intent(out) :: read_out(:)
+    ! -- local
+    integer(I4) :: ierr, dist_view
+    logical :: head_flag
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    head_flag = (ftype /= in_type(7) .and. int_ftype /= 0)
+    ! -- Set distributed view (dist_view)
+      call set_dist_view(loc_num, glob_num, l2g_num, MPI_INTEGER, 4, head_flag, dist_view)
+    ! -- Set int4 file view (int4_fview)
+      call set_int4_fview(fileh, dist_view, "distributed input")
+    call MPI_TYPE_FREE(dist_view, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Free distributed view.")
+      end if
+    end if
+
+    ! -- Read int4 mpi file (mpi_i4)
+      call read_mpi_i4(ftype, int_ftype, fileh, loc_num, read_out)
+
+  end subroutine read_dist_i4
+
+  subroutine read_dist_r4(ftype, int_ftype, fileh, loc_num, glob_num, l2g_num, read_out)
+  !*********************************************************************************************
+  ! read_dist_r4 -- Read real4 distributed file
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    integer(I4), intent(in) :: ftype, int_ftype, fileh, loc_num, glob_num
+    integer(I4), intent(in) :: l2g_num(:)
+    real(SP), intent(out) :: read_out(:)
+    ! -- local
+    integer(I4) :: ierr, dist_view
+    logical :: head_flag
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    head_flag = (ftype /= in_type(7) .and. int_ftype /= 0)
+    ! -- Set distributed view (dist_view)
+      call set_dist_view(loc_num, glob_num, l2g_num, MPI_REAL4, 4, head_flag, dist_view)
+    ! -- Set real4 file view (real4_fview)
+      call set_real4_fview(fileh, dist_view, "distributed input")
+    call MPI_TYPE_FREE(dist_view, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Free distributed view.")
+      end if
+    end if
+
+    ! -- Read real4 mpi file (mpi_r4)
+      call read_mpi_r4(ftype, int_ftype, fileh, loc_num, read_out)
+
+  end subroutine read_dist_r4
+
+  subroutine read_dist_r8(ftype, int_ftype, fileh, loc_num, glob_num, l2g_num, read_out)
+  !*********************************************************************************************
+  ! read_dist_r8 -- Read real8 distributed file
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    integer(I4), intent(in) :: ftype, int_ftype, fileh, loc_num, glob_num
+    integer(I4), intent(in) :: l2g_num(:)
+    real(DP), intent(out) :: read_out(:)
+    ! -- local
+    integer(I4) :: ierr, dist_view
+    logical :: head_flag
+    !-------------------------------------------------------------------------------------------
+    ierr = 0
+    head_flag = (ftype /= in_type(7) .and. int_ftype /= 0)
+    ! -- Set distributed view (dist_view)
+      call set_dist_view(loc_num, glob_num, l2g_num, MPI_REAL8, 8, head_flag, dist_view)
+    ! -- Set real8 file view (real8_fview)
+      call set_real8_fview(fileh, dist_view, "distributed input")
+    call MPI_TYPE_FREE(dist_view, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Free distributed view.")
+      end if
+    end if
+
+    ! -- Read real8 mpi file (mpi_r8)
+      call read_mpi_r8(ftype, int_ftype, fileh, loc_num, read_out)
+
+  end subroutine read_dist_r8
+
+  subroutine set_dist_view(loc_num, glob_num, l2g_num, val_type, val_byte, head_flag, view_out)
+  !*********************************************************************************************
+  ! set_dist_view -- Set distributed view
+  !*********************************************************************************************
+    ! -- module
+
+    ! -- inout
+    integer(I4), intent(in) :: loc_num, glob_num, val_type, val_byte
+    integer(I4), intent(in) :: l2g_num(:)
+    logical, intent(in) :: head_flag
+    integer(I4), intent(out) :: view_out
+    ! -- local
+    integer(I4) :: i, ierr, tmptype, head_num, dist_num
+    integer(I4), allocatable :: dist_block(:), dist_type(:)
+    integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
+    integer(KIND=MPI_ADDRESS_KIND), allocatable :: dist_dis(:)
+    !-------------------------------------------------------------------------------------------
+    ierr = 0 ; head_num = 0
+    if (head_flag) then
+      head_num = 1
+    end if
+    dist_num = loc_num + head_num
+
+    allocate(dist_block(dist_num), dist_dis(dist_num), dist_type(dist_num))
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, dist_num
+      dist_block(i) = 1
+      dist_type(i) = val_type
+      dist_dis(i) = 0_MPI_ADDRESS_KIND
+    end do
+    !$omp end do
+
+    !$omp do private(i)
+    do i = 1, loc_num
+      dist_dis(i+head_num) = int(l2g_num(i)-1+head_num, kind=MPI_ADDRESS_KIND)*val_byte
+    end do
+    !$omp end do
+    !$omp end parallel
+
+    call MPI_TYPE_CREATE_STRUCT(dist_num, dist_block, dist_dis, dist_type, tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Create struct datatype for distributed view.")
+      end if
+    end if
+    lb = 0_MPI_ADDRESS_KIND
+    extent = int(glob_num+head_num, kind=MPI_ADDRESS_KIND)*val_byte
+    call MPI_TYPE_CREATE_RESIZED(tmptype, lb, extent, view_out, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Resize struct datatype for distributed view.")
+      end if
+    end if
+    call MPI_TYPE_COMMIT(view_out, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Commit struct datatype for distributed view.")
+      end if
+    end if
+    call MPI_TYPE_FREE(tmptype, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Free struct datatype for distributed view.")
+      end if
+    end if
+
+    deallocate(dist_block, dist_dis, dist_type)
+
+  end subroutine set_dist_view
+
   subroutine skip_mpi_file(ftype, fnum, fview, err_mes, fmulti, fetime)
   !*********************************************************************************************
   ! skip_mpi_file -- Skip mpi file
@@ -860,7 +1033,7 @@ module mpi_read
   end subroutine read_mpi_calcreg
 
 
-  subroutine read_dist_seaval(seal_ftype, seal_path, read_sta, read_num, read_seaval)
+  subroutine read_dist_seaval(seal_ftype, seal_path, head_num, read_sta, read_num, read_seaval)
   !*********************************************************************************************
   ! read_dist_seaval -- Read this rank's read-range sea levels
   !*********************************************************************************************
@@ -869,13 +1042,13 @@ module mpi_read
     ! -- inout
     integer(I4), intent(in) :: seal_ftype
     character(*), intent(in) :: seal_path
-    integer(I4), intent(in) :: read_sta, read_num
+    integer(I4), intent(in) :: head_num, read_sta, read_num
     real(SP), intent(out) :: read_seaval(:)
     ! -- local
-    integer(I4) :: nxy, i, g, ij, ierr, mpi_fh
+    integer(I4) :: nxy, i, g, ij, ierr, mpi_fh, col_sta, tail_num, wrap_num
     integer(KIND=MPI_OFFSET_KIND) :: off
     integer(I4) :: istat(MPI_STATUS_SIZE)
-    real(SP), allocatable :: col_full(:)
+    real(SP), allocatable :: tail_val(:), wrap_val(:)
     !-------------------------------------------------------------------------------------------
     nxy = st_grid%nx*st_grid%ny
     ierr = 0
@@ -883,19 +1056,30 @@ module mpi_read
 
     if (seal_ftype == in_type(6)) then
       ! -- 3d: value(g) at byte (g-1)*4, so the read range is a contiguous slab
-      off = int(read_sta-1, MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
+      off = int(read_sta-1+head_num, MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
       call MPI_FILE_READ_AT_ALL(mpi_fh, off, read_seaval, read_num, MPI_REAL4, istat, ierr)
     else
-      ! -- 2d: each rank reads the whole nxy surface field, then maps each read cell by column
-      allocate(col_full(nxy))
-      off = 0_MPI_OFFSET_KIND
-      call MPI_FILE_READ_AT_ALL(mpi_fh, off, col_full, nxy, MPI_REAL4, istat, ierr)
+      ! -- 2d: read only the columns of the read range (col_sta to nxy, then from 1)
+      col_sta = 1
+      if (read_num > 0) then
+        col_sta = mod(read_sta-1, nxy) + 1
+      end if
+      tail_num = min(read_num, nxy-col_sta+1) ; wrap_num = min(read_num, nxy) - tail_num
+      allocate(tail_val(max(tail_num,1)), wrap_val(max(wrap_num,1)))
+      off = int(col_sta-1+head_num, MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
+      call MPI_FILE_READ_AT_ALL(mpi_fh, off, tail_val, tail_num, MPI_REAL4, istat, ierr)
+      off = int(head_num, MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
+      call MPI_FILE_READ_AT_ALL(mpi_fh, off, wrap_val, wrap_num, MPI_REAL4, istat, ierr)
       do i = 1, read_num
         g = read_sta + i - 1
         ij = mod(g-1, nxy) + 1
-        read_seaval(i) = col_full(ij)
+        if (ij >= col_sta) then
+          read_seaval(i) = tail_val(ij-col_sta+1)
+        else
+          read_seaval(i) = wrap_val(ij)
+        end if
       end do
-      deallocate(col_full)
+      deallocate(tail_val, wrap_val)
     end if
 
     call MPI_FILE_CLOSE(mpi_fh, ierr)

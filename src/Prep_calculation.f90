@@ -198,7 +198,7 @@ module prep_calculation
     use assign_calc, only: assign_initv
 #ifdef MPI_MSG
 !    use mpi_utility, only: bcast_path_unit
-    use mpi_set, only: cals_r4hview, calc_r4hview, rest_view
+    use mpi_set, only: rest_view
 #endif
     ! -- inout
 
@@ -214,19 +214,7 @@ module prep_calculation
           call bcast_file(st_in_path%init, st_in_unit%init, "initial")
       end if
 
-      if (st_in_type%init == in_type(4)) then
-        if (len_trim(adjustl(st_in_unit%init)) == 0) then
-          init_view = cals_r4view
-        else
-          init_view = cals_r4hview
-        end if
-      else if (st_in_type%init == in_type(6)) then
-        if (len_trim(adjustl(st_in_unit%init)) == 0) then
-          init_view = calc_r4view
-        else
-          init_view = calc_r4hview
-        end if
-      else if (st_in_type%init == in_type(0)) then
+      if (st_in_type%init == in_type(0)) then
         init_view = rest_view
       else
         init_view = 0
@@ -258,7 +246,7 @@ module prep_calculation
     use assign_calc, only: assign_massv
 #ifdef MPI_MSG
 !    use mpi_utility, only: bcast_file_path
-    use mpi_set, only: cals_i4view, calc_i4view
+    use mpi_set, only: calc_i4view
 #endif
     ! -- inout
 
@@ -277,10 +265,7 @@ module prep_calculation
           call bcast_file(st_in_path%mass, "input massbalance")
       end if
 
-      if (st_in_type%mass == in_type(4)) then
-        ! -- Open input massbalance file for output (in_massf)
-          call open_in_massf(st_in_type%mass, st_in_path%mass, cals_i4view)
-      else if (st_in_type%mass == in_type(6)) then
+      if (st_in_type%mass == in_type(6)) then
         ! -- Open input massbalance file for output (in_massf)
           call open_in_massf(st_in_type%mass, st_in_path%mass, calc_i4view)
       else

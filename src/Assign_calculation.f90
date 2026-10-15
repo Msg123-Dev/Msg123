@@ -488,7 +488,7 @@ module assign_calc
     character(*), intent(in) :: init_unit
     ! -- local
     integer(I4) :: i, ierr
-    integer(I4) :: init_fnum
+    integer(I4) :: init_fnum, init_inttype
     real(DP) :: temp_end
 #ifdef MPI_MSG
     integer(I4) :: j, k, xn, yn, zn, xyzn
@@ -530,7 +530,7 @@ module assign_calc
     !$omp end parallel do
 
     else if (init_ftype /= in_type(7)) then
-      init_fnum = st_init%fnum
+      init_fnum = st_init%fnum ; init_inttype = 0
       if (len_trim(adjustl(init_unit)) /= 0) then
         if (init_ftype == in_type(3) .or. init_ftype == in_type(5)) then
           if (st_mpi%rank == 0) then
@@ -540,6 +540,7 @@ module assign_calc
             end if
           end if
         else if (init_ftype == in_type(4) .or. init_ftype == in_type(6)) then
+          init_inttype = init_ftype
 #ifdef MPI_MSG
           ! -- Read mpi header (mpi_head)
             call read_mpi_head(init_fnum, ierr, temp_end)
@@ -559,9 +560,10 @@ module assign_calc
 #endif
       end if
       if (init_ftype == in_type(3) .or. init_ftype == in_type(4)) then
-        call set_2dfile2calc(init_fnum, init_ftype, 0, ncals, DNOVAL, st_hydr%read_init)
+        call set_2dfile2calc(init_fnum, init_ftype, init_inttype, ncals, DNOVAL,&
+                             st_hydr%read_init)
       else if (init_ftype == in_type(5) .or. init_ftype == in_type(6)) then
-        call set_3dfile2calc(init_fnum, init_ftype, 0, DNOVAL, st_hydr%read_init)
+        call set_3dfile2calc(init_fnum, init_ftype, init_inttype, DNOVAL, st_hydr%read_init)
       end if
       !$omp parallel do private(i)
       do i = 1, ncalc

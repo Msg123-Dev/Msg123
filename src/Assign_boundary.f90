@@ -112,7 +112,7 @@ module assign_boundary
           intse_type = st_intse%type
           temp_ftype = intse_type
         else
-          intse_type = 0
+          intse_type = st_intse%type
           temp_ftype = seal_ftype
         end if
 
@@ -285,10 +285,11 @@ module assign_boundary
           call set_point2well(st_well%fnum, num_well)
       else if (any(well_ftype == type_2d)) then
         ! -- Set well from 2d file (2dwell)
-          call set_2dwell(st_well%fnum, well_ftype, 0, weks_ftype, weke_ftype, num_well)
+          call set_2dwell(st_well%fnum, well_ftype, intwe_type, weks_ftype, weke_ftype,&
+                          num_well)
       else if (any(well_ftype == type_3d)) then
         ! -- Set well value from 3d text file (3dfile2well)
-          call set_3dfile2well(st_well%fnum, well_ftype, 0, num_well, well2calc)
+          call set_3dfile2well(st_well%fnum, well_ftype, intwe_type, num_well, well2calc)
       else if (well_ftype == in_type(7)) then
         if (any(intwe_type == type_2d)) then
           ! -- Set well from 2d file (2dwell)

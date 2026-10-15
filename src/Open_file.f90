@@ -143,8 +143,10 @@ module open_file
 #ifdef MPI_MSG
           ! -- Open mpi read file (mpi_read_file)
             call open_mpi_read_file(1, 1, path_retn, mess_retn, retn_num)
-          ! -- Set real4 file view (real4_fview)
-            call set_real4_fview(retn_num, temp_view, mess_retn)
+          if (retn_ftype(i) == in_type(6)) then
+            ! -- Set real4 file view (real4_fview)
+              call set_real4_fview(retn_num, temp_view, mess_retn)
+          end if
 #else
           ! -- Open new read binary file (new_rbin)
             call open_new_rbin(1, 1, path_retn, mess_retn, retn_num)
@@ -310,8 +312,10 @@ module open_file
 #ifdef MPI_MSG
           ! -- Open mpi read file (mpi_read_file)
             call open_mpi_read_file(1, 1, path_parm, mess_parm, parm_num)
-          ! -- Set real4 file view (real4_fview)
-            call set_real4_fview(parm_num, temp_view, mess_parm)
+          if (parm_ftype(i) == in_type(6)) then
+            ! -- Set real4 file view (real4_fview)
+              call set_real4_fview(parm_num, temp_view, mess_parm)
+          end if
 #else
           ! -- Open new read binary file (new_rbin)
             call open_new_rbin(1, 1, path_parm, mess_parm, parm_num)
@@ -496,8 +500,10 @@ module open_file
 #ifdef MPI_MSG
       ! -- Open mpi read file (mpi_read_file)
         call open_mpi_read_file(1, 1, init_path, err_mes, st_init%fnum)
-      ! -- Set real8 file view (real8_fview)
-        call set_real8_fview(st_init%fnum, temp_view, err_mes)
+      if (init_type == in_type(0)) then
+        ! -- Set real8 file view (real8_fview)
+          call set_real8_fview(st_init%fnum, temp_view, err_mes)
+      end if
 #else
       ! -- Open new read binary file (new_rbin)
         call open_new_rbin(1, 1, init_path, err_mes, st_init%fnum)
@@ -2328,8 +2334,10 @@ module open_file
 #ifdef MPI_MSG
       ! -- Open mpi read file (mpi_read_file)
         call open_mpi_read_file(1, 1, in_mass_path, "input massbalance", inmas_fnum)
-      ! -- Set int4 file view (int4_fview)
-        call set_int4_fview(inmas_fnum, temp_view, "input massbalance")
+      if (in_mass_type == in_type(6)) then
+        ! -- Set int4 file view (int4_fview)
+          call set_int4_fview(inmas_fnum, temp_view, "input massbalance")
+      end if
 #else
       ! -- Open new read binary file (new_rbin)
         call open_new_rbin(1, 1, in_mass_path, "input massbalance", inmas_fnum)

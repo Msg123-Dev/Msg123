@@ -3,16 +3,14 @@ module set_condition
   use kind_module, only: I4, SP, DP
   use constval_module, only: SZERO, SNOVAL, DZERO, DONE
   use types_module, only: hydr_set, bcnd_set
-  use utility_module, only: st_mpi
+  use utility_module, only: st_mpi, gmap_get, gmap_free
   use initial_module, only: in_type, st_grid, st_well, st_schm, st_clas
   use read_module, only: read_2dtxt, read_2dbin, read_3dtxt, read_3dbin, flat_2dto2d
   use read_module, only: flat_2dto3d, flat_3dto3d
   use set_cell, only: ncalc, ncals, neib_ncalc, st_conn
   use make_cell, only: st_geom
 #ifdef MPI_MSG
-  use utility_module, only: get_ilen, conv_i2s
-  use mpi_utility, only: mpimax_val
-  use mpi_read, only: read_mpi_file
+  use mpi_read, only: read_mpi_file, read_dist_file
   use mpi_set, only: scatter_xyval, scatter_xyzval
 #endif
 
@@ -942,12 +940,10 @@ module set_condition
     integer(I4) :: gridx, gridy, gridz, gridxyz
     integer(I4), allocatable :: array_flat(:)
     integer(I4), allocatable :: array_read(:,:)
-#ifdef MPI_MSG
-    integer(I4) :: s
-    integer(I4), allocatable :: array_surf(:), array_temp(:)
-    character(:), allocatable :: str_fnum
-#else
     integer(I4) :: dummy
+#ifdef MPI_MSG
+    integer(I4) :: col_num
+    integer(I4), allocatable :: col_glo(:), calc_col(:), col_val(:)
 #endif
     !-------------------------------------------------------------------------------------------
     cnum = size(val_out(:))
@@ -984,38 +980,19 @@ module set_condition
 
     else if (ftype == in_type(4) .or. int_ft == in_type(4)) then
 #ifdef MPI_MSG
-      allocate(array_surf(snum), array_temp(gridxyz), array_flat(gridxyz))
-      !$omp parallel
-      !$omp do private(i)
-      do i = 1, snum
-        array_surf(i) = no_val
-      end do
-      !$omp end do
-      !$omp do private(i)
-      do i = 1, gridxyz
-        array_temp(i) = no_val
-        array_flat(i) = no_val
-      end do
-      !$omp end do
-      !$omp end parallel
-      call read_mpi_file(ftype, int_ft, fnum, snum, array_surf)
-      !$omp parallel do private(i, j, k, s)
-      do i = 1, snum
-        s = 0 ; s = st_conn%loc2glo_ij(i)
-        if (s /= 0) then
-          do k = 1, gridz
-            j = gridx*gridy*(k-1) + s
-            array_temp(j) = array_surf(i)
-          end do
-        end if
+      dummy = snum
+      ! -- Get calculation column (calc_col)
+        call get_calc_col(cnum, col_num, col_glo, calc_col)
+      allocate(col_val(col_num))
+      !$omp parallel do private(i)
+      do i = 1, col_num
+        col_val(i) = no_val
       end do
       !$omp end parallel do
-      allocate(character(get_ilen(fnum)) :: str_fnum)
-      call conv_i2s(fnum, str_fnum)
-      ! -- MAX value for MPI (val)
-        call mpimax_val(array_temp, "file number "//str_fnum, array_flat)
-      deallocate(array_surf, array_temp, str_fnum)
-      call set_calci4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
+      ! -- Read distributed file (dist_file)
+        call read_dist_file(ftype, int_ft, fnum, col_num, gridx*gridy, col_glo, col_val)
+      call set_calci4(cnum, calc_col, no_val, col_val, val_out)
+      deallocate(col_glo, calc_col, col_val)
 #else
       dummy = snum
       allocate(array_read(gridx,gridy), array_flat(gridxyz))
@@ -1074,12 +1051,11 @@ module set_condition
     integer(I4) :: gridx, gridy, gridz, gridxyz
     real(SP), allocatable :: array_flat(:)
     real(SP), allocatable :: array_read(:,:)
-#ifdef MPI_MSG
-    integer(I4) :: k, s
-    real(SP), allocatable :: array_surf(:), array_temp(:)
-    character(:), allocatable :: str_fnum
-#else
     integer(I4) :: dummy
+#ifdef MPI_MSG
+    integer(I4) :: col_num
+    integer(I4), allocatable :: col_glo(:), calc_col(:)
+    real(SP), allocatable :: col_val(:)
 #endif
     !-------------------------------------------------------------------------------------------
     cnum = size(val_out(:))
@@ -1111,38 +1087,19 @@ module set_condition
 
     else if (ftype == in_type(4) .or. int_ft == in_type(4)) then
 #ifdef MPI_MSG
-      allocate(array_surf(snum), array_temp(gridxyz), array_flat(gridxyz))
-      !$omp parallel
-      !$omp do private(i)
-      do i = 1, snum
-        array_surf(i) = no_val
-      end do
-      !$omp end do
-      !$omp do private(i)
-      do i = 1, gridxyz
-        array_temp(i) = no_val
-        array_flat(i) = no_val
-      end do
-      !$omp end do
-      !$omp end parallel
-      call read_mpi_file(ftype, int_ft, fnum, snum, array_surf)
-      !$omp parallel do private(i, j, k, s)
-      do i = 1, snum
-        s = 0 ; s = st_conn%loc2glo_ij(i)
-        if (s /= 0) then
-          do j = 1, gridz
-            k = gridx*gridy*(j-1) + s
-            array_temp(k) = array_surf(i)
-          end do
-        end if
+      dummy = snum
+      ! -- Get calculation column (calc_col)
+        call get_calc_col(cnum, col_num, col_glo, calc_col)
+      allocate(col_val(col_num))
+      !$omp parallel do private(i)
+      do i = 1, col_num
+        col_val(i) = no_val
       end do
       !$omp end parallel do
-      allocate(character(get_ilen(fnum)) :: str_fnum)
-      call conv_i2s(fnum, str_fnum)
-      ! -- MAX value for MPI (val)
-        call mpimax_val(array_temp, "file number "//str_fnum, array_flat)
-      deallocate(array_surf, array_temp, str_fnum)
-      call set_calcr4(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
+      ! -- Read distributed file (dist_file)
+        call read_dist_file(ftype, int_ft, fnum, col_num, gridx*gridy, col_glo, col_val)
+      call set_calcr4(cnum, calc_col, no_val, col_val, val_out)
+      deallocate(col_glo, calc_col, col_val)
 #else
       dummy = snum
       allocate(array_read(gridx,gridy), array_flat(gridxyz))
@@ -1196,12 +1153,11 @@ module set_condition
     integer(I4) :: gridx, gridy, gridz, gridxyz
     real(DP), allocatable :: array_flat(:)
     real(DP), allocatable :: array_read(:,:)
-#ifdef MPI_MSG
-    integer(I4) :: k, s
-    real(DP), allocatable :: array_surf(:), array_temp(:)
-    character(:), allocatable :: str_fnum
-#else
     integer(I4) :: dummy
+#ifdef MPI_MSG
+    integer(I4) :: col_num
+    integer(I4), allocatable :: col_glo(:), calc_col(:)
+    real(DP), allocatable :: col_val(:)
 #endif
     !-------------------------------------------------------------------------------------------
     cnum = size(val_out(:))
@@ -1233,38 +1189,19 @@ module set_condition
 
     else if (ftype == in_type(4) .or. int_ft == in_type(4)) then
 #ifdef MPI_MSG
-      allocate(array_surf(snum), array_temp(gridxyz), array_flat(gridxyz))
-      !$omp parallel
-      !$omp do private(i)
-      do i = 1, snum
-        array_surf(i) = no_val
-      end do
-      !$omp end do
-      !$omp do private(i)
-      do i = 1, gridxyz
-        array_temp(i) = no_val
-        array_flat(i) = no_val
-      end do
-      !$omp end do
-      !$omp end parallel
-      call read_mpi_file(ftype, int_ft, fnum, snum, array_surf)
-      !$omp parallel do private(i, j, k, s)
-      do i = 1, snum
-        s = 0 ; s = st_conn%loc2glo_ij(i)
-        if (s /= 0) then
-          do j = 1, gridz
-            k = gridx*gridy*(j-1) + s
-            array_temp(k) = array_surf(i)
-          end do
-        end if
+      dummy = snum
+      ! -- Get calculation column (calc_col)
+        call get_calc_col(cnum, col_num, col_glo, calc_col)
+      allocate(col_val(col_num))
+      !$omp parallel do private(i)
+      do i = 1, col_num
+        col_val(i) = no_val
       end do
       !$omp end parallel do
-      allocate(character(get_ilen(fnum)) :: str_fnum)
-      call conv_i2s(fnum, str_fnum)
-      ! -- MAX value for MPI (val)
-        call mpimax_val(array_temp, "file number "//str_fnum, array_flat)
-      deallocate(array_surf, array_temp, str_fnum)
-      call set_calcr8(cnum, st_conn%loc2glo_ijk, no_val, array_flat, val_out)
+      ! -- Read distributed file (dist_file)
+        call read_dist_file(ftype, int_ft, fnum, col_num, gridx*gridy, col_glo, col_val)
+      call set_calcr8(cnum, calc_col, no_val, col_val, val_out)
+      deallocate(col_glo, calc_col, col_val)
 #else
       dummy = snum
       allocate(array_read(gridx,gridy), array_flat(gridxyz))
@@ -1513,7 +1450,8 @@ module set_condition
 
     else if (ftype == in_type(6) .or. int_ft == in_type(6)) then
 #ifdef MPI_MSG
-      call read_mpi_file(ftype, int_ft, fnum, cnum, val_out)
+      ! -- Read distributed file (dist_file)
+        call read_dist_file(ftype, int_ft, fnum, cnum, gridxyz, st_conn%loc2glo_ijk, val_out)
 #else
       allocate(array_read(gridx,gridy,gridz), array_flat(gridxyz))
       !$omp parallel
@@ -1980,7 +1918,6 @@ module set_condition
   !*********************************************************************************************
     ! -- modules
     use constval_module, only: FACE
-    use utility_module, only: gmap_get, gmap_free
     use initial_module, only: st_sim, st_out_type
     use set_cell, only: get_calc_grid, seal_cnum
 #ifdef MPI_MSG
@@ -2934,5 +2871,59 @@ module set_condition
     !$omp end parallel do
 
   end subroutine set_calcr8
+
+#ifdef MPI_MSG
+  subroutine get_calc_col(cnum, col_num, col_glo, calc_col)
+  !*********************************************************************************************
+  ! get_calc_col -- Get columns of calculation cells
+  !*********************************************************************************************
+    ! -- modules
+    use types_module, only: gmap_set
+    use utility_module, only: iquick_sort, gmap_init, gmap_put
+    ! -- inout
+    integer(I4), intent(in) :: cnum
+    integer(I4), intent(out) :: col_num
+    integer(I4), allocatable, intent(out) :: col_glo(:), calc_col(:)
+    ! -- local
+    integer(I4) :: i, nxy
+    integer(I4), allocatable :: col_sort(:)
+    type(gmap_set) :: col_map
+    !-------------------------------------------------------------------------------------------
+    nxy = st_grid%nx*st_grid%ny
+    allocate(calc_col(cnum), col_sort(cnum))
+    !$omp parallel do private(i)
+    do i = 1, cnum
+      col_sort(i) = mod(st_conn%loc2glo_ijk(i)-1, nxy) + 1
+    end do
+    !$omp end parallel do
+    if (cnum > 1) then
+      call iquick_sort(col_sort, 1, cnum)
+    end if
+
+    col_num = 0
+    do i = 1, cnum
+      if (i == 1) then
+        col_num = 1
+      else if (col_sort(i) /= col_sort(col_num)) then
+        col_num = col_num + 1 ; col_sort(col_num) = col_sort(i)
+      end if
+    end do
+
+    allocate(col_glo(col_num))
+    call gmap_init(col_map, col_num)
+    do i = 1, col_num
+      col_glo(i) = col_sort(i)
+      call gmap_put(col_map, col_glo(i), i)
+    end do
+    !$omp parallel do private(i)
+    do i = 1, cnum
+      calc_col(i) = gmap_get(col_map, mod(st_conn%loc2glo_ijk(i)-1, nxy) + 1)
+    end do
+    !$omp end parallel do
+    call gmap_free(col_map)
+    deallocate(col_sort)
+
+  end subroutine get_calc_col
+#endif
 
 end module set_condition

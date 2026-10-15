@@ -399,6 +399,10 @@ module set_boundary
       ! -- Open input sea level file (in_sealf)
         call open_in_sealf(st_in_type%seal, st_in_path%seal, st_in_unit%seal, bfview%seal,&
                            surf_r4view, cell_r4view)
+      if ((st_in_type%seal == in_type(4) .or. st_in_type%seal == in_type(6)) .and.&
+          len_trim(adjustl(st_in_unit%seal)) /= 0) then
+        st_intse%type = st_in_type%seal
+      end if
 #else
       ! -- Open input sea level file (in_sealf)
         call open_in_sealf(st_in_type%seal, st_in_path%seal, st_in_unit%seal)
@@ -537,6 +541,10 @@ module set_boundary
       ! -- Open input well file (in_wellf)
         call open_in_wellf(st_in_type%well, st_in_path%well, st_in_unit%well, bfview%well,&
                            cals_r4view, calc_r4view)
+      if ((st_in_type%well == in_type(4) .or. st_in_type%well == in_type(6)) .and.&
+          len_trim(adjustl(st_in_unit%well)) /= 0) then
+        st_intwe%type = st_in_type%well
+      end if
 #else
       ! -- Open input well file (in_wellf)
         call open_in_wellf(st_in_type%well, st_in_path%well, st_in_unit%well)
@@ -615,6 +623,9 @@ module set_boundary
 
       ! -- Open input precipitation file (in_precf)
         call open_in_precf(st_in_type%prec, st_in_path%prec, st_in_unit%prec, bfview%prec)
+      if (st_in_type%prec == in_type(4) .and. len_trim(adjustl(st_in_unit%prec)) /= 0) then
+        st_intpr%type = st_in_type%prec
+      end if
 #else
       ! -- Open input precipitation file (in_precf)
         call open_in_precf(st_in_type%prec, st_in_path%prec, st_in_unit%prec)
@@ -679,6 +690,9 @@ module set_boundary
 
       ! -- Open input evapotranspiration file (in_evapf)
         call open_in_evapf(st_in_type%evap, st_in_path%evap, st_in_unit%evap, bfview%evap)
+      if (st_in_type%evap == in_type(4) .and. len_trim(adjustl(st_in_unit%evap)) /= 0) then
+        st_intev%type = st_in_type%evap
+      end if
 #else
       ! -- Open input evapotranspiration file (in_evapf)
         call open_in_evapf(st_in_type%evap, st_in_path%evap, st_in_unit%evap)

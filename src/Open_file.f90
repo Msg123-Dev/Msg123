@@ -656,7 +656,7 @@ module open_file
           end if
         else if (any(bin_seal_mask)) then
           call skip_mpi_file_int(intse_fnum, vname, st_seal%multi, intse_step, intse_end,&
-                                 st_seal%fnum, st_seal%etime)
+                                 st_seal%fnum, temp_view, st_seal%etime)
         end if
 #else
         call skip_file_int(intse_type, intse_fnum, st_seal%fnum, vname, st_seal%multi,&
@@ -857,7 +857,7 @@ module open_file
           end if
         else if (intre_type == in_type(4)) then
           call skip_mpi_file_int(intre_fnum, vname, st_rech%multi, intre_step, intre_end,&
-                                 st_rech%fnum, st_rech%etime)
+                                 st_rech%fnum, temp_view, st_rech%etime)
         end if
 #else
         call skip_file_int(intre_type, intre_fnum, st_rech%fnum, vname, st_rech%multi,&
@@ -1036,7 +1036,7 @@ module open_file
           end if
         else if (any(bin_well_mask)) then
           call skip_mpi_file_int(intwe_fnum, vname, st_well%multi, intwe_step, intwe_end,&
-                                 st_well%fnum, st_well%etime)
+                                 st_well%fnum, temp_view, st_well%etime)
         end if
 #else
         call skip_file_int(intwe_type, intwe_fnum, st_well%fnum, vname, st_well%multi,&
@@ -1313,7 +1313,7 @@ module open_file
           end if
         else if (intpr_type == in_type(4)) then
           call skip_mpi_file_int(intpr_fnum, vname, st_prec%multi, intpr_step, intpr_end,&
-                                 st_prec%fnum, st_prec%etime)
+                                 st_prec%fnum, temp_view, st_prec%etime)
         end if
 #else
         call skip_file_int(intpr_type, intpr_fnum, st_prec%fnum, vname, st_prec%multi,&
@@ -1490,7 +1490,7 @@ module open_file
           end if
         else if (intev_type == in_type(4)) then
           call skip_mpi_file_int(intev_fnum, vname, st_evap%multi, intev_step, intev_end,&
-                                 st_evap%fnum, st_evap%etime)
+                                 st_evap%fnum, temp_view, st_evap%etime)
         end if
 #else
         call skip_file_int(intev_type, intev_fnum, st_evap%fnum, vname, st_evap%multi,&
@@ -1781,7 +1781,7 @@ module open_file
             end if
           else if (intri_type == in_type(4)) then
             call skip_mpi_file_int(riven(i), mess_rive, rive_multi, intri_step, intri_end,&
-                                   intri_num, rive_etime)
+                                   intri_num, rive_view, rive_etime)
           end if
 #else
           call skip_file_int(intri_type, riven(i), intri_num, mess_rive, rive_multi,&
@@ -2170,7 +2170,7 @@ module open_file
             end if
           else if (intla_type == in_type(4)) then
             call skip_mpi_file_int(laken(i), mess_lake, lake_multi, intla_step, intla_end,&
-                                   intla_num, lake_etime)
+                                   intla_num, lake_view, lake_etime)
           end if
 #else
           call skip_file_int(intla_type, laken(i), intla_num, mess_lake, lake_multi,&

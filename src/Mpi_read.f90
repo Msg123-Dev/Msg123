@@ -778,14 +778,14 @@ module mpi_read
 
   end subroutine skip_mpi_file
 
-  subroutine skip_mpi_file_int(bnum, err_mes, fmulti, fstep, finend, fnum, fetime)
+  subroutine skip_mpi_file_int(bnum, err_mes, fmulti, fstep, finend, fnum, fview, fetime)
   !*********************************************************************************************
   ! skip_mpi_file_int -- Skip mpi time interval list file
   !*********************************************************************************************
     ! -- module
     use constval_module, only: CHALEN
     ! -- inout
-    integer(I4), intent(in) :: bnum
+    integer(I4), intent(in) :: bnum, fview
     character(*), intent(in) :: err_mes
     integer(I4), intent(inout) :: fnum
     real(DP), intent(in) :: fmulti, fstep, finend
@@ -816,6 +816,8 @@ module mpi_read
         end if
         ! -- Open time interval mpi file (int_mpi)
           call open_int_mpi(trim(adjustl(intpath)), err_mes, fnum)
+        ! -- Set real4 file view (real4_fview)
+          call set_real4_fview(fnum, fview, err_mes)
         count_num = count_num + 1
       else
         time_flag = 1
@@ -946,7 +948,7 @@ module mpi_read
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         allocate(character(0) :: err_mes)
-        err_mes = "Open input"//int_name//" time interval file."
+        err_mes = "Open input "//int_name//" time interval file."
         call write_err_stop(err_mes)
         deallocate(err_mes)
       end if

@@ -8,7 +8,7 @@ module time_module
   use initial_module, only: st_rech, st_prec, st_evap, st_well, st_riwl, st_riwd, st_ribl
   use initial_module, only: st_ride, st_riwi, st_rile, st_ribk, st_ribt, st_lawl, st_lawd
   use initial_module, only: st_labl, st_laar, st_step_flag, st_schm, st_out_step
-  use initial_module, only: st_labk, st_labt
+  use initial_module, only: st_labk, st_labt, st_rfra
   use open_file, only: st_intre, st_intpr, st_intev
   use check_condition, only: st_out_fnum
   use set_cell, only: ncalc, ncals
@@ -958,6 +958,36 @@ module time_module
       end if
     end if
 
+    if (st_step_flag%rfra == 1) then
+      bound_name = "root fraction"
+      if (st_in_type%rfra /= in_type(7)) then
+        ! -- Read next time (next)
+          call read_next(st_in_type%rfra, st_rfra%fnum, st_rfra%multi, bound_name,&
+                         st_rfra%totn, st_step_flag%rfra, ierr, st_rfra%etime)
+      else if (st_in_type%rfra == in_type(7)) then
+        ! -- Read next time for time interval file (intn)
+          call read_intn(st_rfra%inttype, st_rfra%intfnum, st_rfra%multi, st_rfra%intstep,&
+                         bound_name, st_rfra%fnum, st_step_flag%rfra, ierr, st_rfra%etime)
+#ifdef MPI_MSG
+        if (ierr == 0 .and. any(st_rfra%inttype == type_bin(:))) then
+          ! -- Set real4 file view (real4_fview)
+            call set_real4_fview(st_rfra%fnum, bfview%rfra, bound_name)
+        end if
+#endif
+      end if
+
+      if (ierr /= 0) then
+        if (st_mpi%rank == 0) then
+          write(str_time,'(f0.3)') st_time%now_time
+          err_mes = "Read final time step "//bound_name//" file at "//trim(str_time)//&
+                    trim(st_sim%cal_unit)
+          call write_logf(err_mes)
+        end if
+        st_step_flag%rfra = 0
+        st_rfra%etime = st_sim%end_time
+      end if
+    end if
+
     if (allocated(bound_name)) then
       deallocate(bound_name)
     end if
@@ -978,7 +1008,7 @@ module time_module
     min_step = min(st_rech%etime, st_well%etime, st_seal%etime, st_prec%etime, st_evap%etime,&
                    st_riwl%etime, st_riwd%etime, st_ribl%etime, st_ride%etime, st_riwi%etime,&
                    st_rile%etime, st_ribk%etime, st_ribt%etime, st_lawl%etime, st_lawd%etime,&
-                   st_labl%etime, st_laar%etime, st_labk%etime, st_labt%etime)
+                   st_labl%etime, st_laar%etime, st_labk%etime, st_labt%etime, st_rfra%etime)
     if (min_step <= st_time%current_t) then
       min_step = st_sim%end_time
     end if
@@ -1020,15 +1050,16 @@ module time_module
     use check_condition, only: check_input_nan
     use set_condition, only: set_srabyd, set_chabyd, set_wellconn
     use assign_boundary, only: assign_sealv, assign_surfbv, assign_wellv, assign_rilav
+    use assign_boundary, only: assign_rfrav
     use calc_boundary, only: calc_reprev, conv_rech2calc, count_rivecalc, count_lakecalc
     use calc_boundary, only: calc_rivea
     use set_boundary, only: set_rive_bed, update_rive_wblevel, update_lake_wblevel, rech_reprev
-    use set_boundary, only: set_lake_bed
+    use set_boundary, only: set_lake_bed, set_rech_root
     ! -- inout
 
     ! -- local
     integer(I4) :: i
-    integer(I4) :: prec_stepflag, evap_stepflag, rive_stepflag, lake_stepflag
+    integer(I4) :: prec_stepflag, evap_stepflag, rive_stepflag, lake_stepflag, root_stepflag
     integer(I4) :: rive_aflag
     real(DP), allocatable :: temp_area(:)
     !-------------------------------------------------------------------------------------------
@@ -1045,6 +1076,8 @@ module time_module
     else if (st_seal%etime == next_time) then
       st_step_flag%seal = 1
     end if
+
+    root_stepflag = 0
 
     if (st_step_flag%rech == 1) then
       allocate(st_bcnd%rech_cflag(ncals), st_forc%read_rech(ncals))
@@ -1063,7 +1096,7 @@ module time_module
 
       call conv_rech2calc(st_bcnd%rech_num)
 
-      st_step_flag%rech = 0
+      st_step_flag%rech = 0 ; root_stepflag = root_stepflag + 1
     else if (st_rech%etime == next_time) then
       st_step_flag%rech = 1
     end if
@@ -1139,6 +1172,18 @@ module time_module
       ! -- Calculate recharge from precipitation and evapotranspiration (reprev)
         call calc_reprev(st_bcnd%rech_num)
       call conv_rech2calc(st_bcnd%rech_num)
+      root_stepflag = root_stepflag + 1
+    end if
+
+    if (st_step_flag%rfra == 1) then
+      ! -- Assign root fraction value (rfrav)
+        call assign_rfrav(st_in_type%rfra)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_hydr%read_rfra, "root fraction", st_time%now_time)
+
+      st_step_flag%rfra = 0 ; root_stepflag = root_stepflag + 1
+    else if (st_rfra%etime == next_time) then
+      st_step_flag%rfra = 1
     end if
 
     rive_stepflag = 0 ; rive_aflag = 0
@@ -1523,6 +1568,11 @@ module time_module
         call set_chabyd()
     end if
 
+    if (root_stepflag > 0 .and. st_schm%rech_root_type /= 0) then
+      ! -- Set recharge root cells (rech_root)
+        call set_rech_root(st_time%now_time)
+    end if
+
   end subroutine set_nextvar
 
   subroutine set_vwell_head(st_sol)
@@ -1768,7 +1818,7 @@ module time_module
               st_step_flag%evap + st_step_flag%riwl + st_step_flag%riwd + st_step_flag%ribl +&
               st_step_flag%ride + st_step_flag%riwi + st_step_flag%rile + st_step_flag%ribk +&
               st_step_flag%ribt + st_step_flag%lawl + st_step_flag%lawd + st_step_flag%labl +&
-              st_step_flag%laar + st_step_flag%labk + st_step_flag%labt
+              st_step_flag%laar + st_step_flag%labk + st_step_flag%labt + st_step_flag%rfra
 
     conv_fnum = st_out_fnum%conv
     cond_format = '(1x,a,es18.11," ('//trim(st_sim%cal_unit)//')")'
@@ -1829,6 +1879,9 @@ module time_module
     end if
     if (st_step_flag%labt == 1) then
       write(conv_fnum,cond_format) "Changed lake bed thickness at ", st_time%now_time
+    end if
+    if (st_step_flag%rfra == 1) then
+      write(conv_fnum,cond_format) "Changed root fraction at ", st_time%now_time
     end if
 
   end subroutine write_bound_change
@@ -1920,6 +1973,10 @@ module time_module
     !$omp section
     if (st_step_flag%labt == 1) then
       st_step_flag%labt = 0
+    end if
+    !$omp section
+    if (st_step_flag%rfra == 1) then
+      st_step_flag%rfra = 0
     end if
     !$omp end parallel sections
 
@@ -2088,7 +2145,7 @@ module time_module
                 st_step_flag%evap + st_step_flag%riwl + st_step_flag%riwd + st_step_flag%ribl +&
                 st_step_flag%ride + st_step_flag%riwi + st_step_flag%rile + st_step_flag%ribk +&
                 st_step_flag%ribt + st_step_flag%lawl + st_step_flag%lawd + st_step_flag%labl +&
-                st_step_flag%laar + st_step_flag%labk + st_step_flag%labt
+                st_step_flag%laar + st_step_flag%labk + st_step_flag%labt + st_step_flag%rfra
 
     if (step_val < DZERO) then
       out_flag = .false.

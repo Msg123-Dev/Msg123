@@ -7,7 +7,7 @@ module assign_boundary
   use initial_module, only: in_type
   use read_module, only: read_clasf
   use read_input, only: len_scal_inv, z_base
-  use set_cell, only: ncals
+  use set_cell, only: ncals, ncalc
   use set_condition, only: set_clas2calc, set_2dfile2cals
 #ifdef MPI_MSG
   use mpi_read, only: close_mpi_file
@@ -16,7 +16,7 @@ module assign_boundary
 
   implicit none
   private
-  public :: assign_sealv, assign_surfbv, assign_wellv, assign_rilav
+  public :: assign_sealv, assign_surfbv, assign_wellv, assign_rilav, assign_rfrav
   type(forc_set), public :: st_forc
 
   ! -- local
@@ -256,7 +256,6 @@ module assign_boundary
     ! -- modules
     use initial_module, only: st_well
     use open_file, only: st_intwe
-    use set_cell, only: ncalc
     use set_condition, only: set_point2well, set_2dwell, set_3dfile2well, set_well2index
     use set_condition, only: set_well3d2index, set_wellprop
     ! -- inout
@@ -477,5 +476,43 @@ module assign_boundary
     end if
 
   end subroutine assign_rilav
+
+  subroutine assign_rfrav(rfra_ftype)
+  !*********************************************************************************************
+  ! assign_rfrav -- Assign root fraction value
+  !*********************************************************************************************
+    ! -- modules
+    use initial_module, only: st_rfra
+    use set_condition, only: set_3dfile2calc, st_hydr
+    ! -- inout
+    integer(I4), intent(in) :: rfra_ftype
+    ! -- local
+    integer(I4) :: i
+    !-------------------------------------------------------------------------------------------
+    if (.not. allocated(st_hydr%read_rfra)) then
+      allocate(st_hydr%read_rfra(ncalc))
+    end if
+    !$omp parallel do private(i)
+    do i = 1, ncalc
+      st_hydr%read_rfra(i) = SNOVAL
+    end do
+    !$omp end parallel do
+
+    call set_3dfile2calc(st_rfra%fnum, rfra_ftype, st_rfra%inttype, SNOVAL, st_hydr%read_rfra)
+    if (rfra_ftype == in_type(7)) then
+      if (st_rfra%inttype == in_type(5)) then
+        if (st_mpi%rank == 0) then
+          call close_file(st_rfra%fnum)
+        end if
+      else if (st_rfra%inttype == in_type(6)) then
+#ifdef MPI_MSG
+        call close_mpi_file(st_rfra%fnum)
+#else
+        call close_file(st_rfra%fnum)
+#endif
+      end if
+    end if
+
+  end subroutine assign_rfrav
 
 end module assign_boundary

@@ -15,7 +15,7 @@ module open_file
   implicit none
   private
   public :: open_in_retnf, open_in_parmf, open_in_geogf, open_in_initf
-  public :: open_in_sealf, open_in_rechf, open_in_wellf, open_in_wlayf
+  public :: open_in_sealf, open_in_rechf, open_in_wellf, open_in_wlayf, open_in_rfraf
   public :: open_in_precf, open_in_evapf, open_in_rivef, open_in_lakef, open_in_massf
   public :: open_out_convf, open_out_binf, open_out_massf
   integer(I4), public :: wells_fnum, welle_fnum, inmas_fnum
@@ -174,6 +174,7 @@ module open_file
   !*********************************************************************************************
     ! -- modules
     use initial_module, only: st_schm, st_parf_type, st_parm_path, st_parm_fnum, st_parm
+    use initial_module, only: st_in_type
     ! -- inout
     integer(I4), intent(in) :: parm_type
     character(*), intent(in) :: parm_path
@@ -203,16 +204,21 @@ module open_file
         if (ierr /= 0) then
           call write_err_stop("While reading file path section in parameter file.")
         end if
-        if (st_schm%rech_root_type /= 0 .and. rfra_type <= 0) then
+        if (rfra_type > 0 .and. st_in_type%rfra > 0) then
+          call write_err_stop("Give root fraction in either the parameter file or the "//&
+                              "timeseries input file.")
+        else if (st_schm%rech_root_type /= 0 .and. max(rfra_type, st_in_type%rfra) <= 0) then
           call write_err_stop("Input root fraction file to use rech_root_type.")
-        else if (st_schm%rech_root_type == 0 .and. rfra_type > 0) then
+        else if (st_schm%rech_root_type == 0 .and. max(rfra_type, st_in_type%rfra) > 0) then
           call write_err_stop("Set rech_root_type to use root fraction file.")
         else if (rfra_type > 0 .and. rfra_type /= in_type(5) .and. rfra_type /= in_type(6)) then
           call write_err_stop("Input a valid value (5 or 6) for root fraction file type.")
         end if
       else if (parm_type == in_type(1)) then
-        if (st_schm%rech_root_type /= 0) then
+        if (st_schm%rech_root_type /= 0 .and. st_in_type%rfra <= 0) then
           call write_err_stop("Use parameter files (not classification) to give root fraction.")
+        else if (st_schm%rech_root_type == 0 .and. st_in_type%rfra > 0) then
+          call write_err_stop("Set rech_root_type to use root fraction file.")
         end if
         read(unit=st_parm%fnum,fmt=*,iostat=ierr) st_parm%totn
         if (ierr /= 0) then
@@ -1531,6 +1537,169 @@ module open_file
 
   end subroutine open_in_evapf
 
+  subroutine open_in_rfraf(rfra_type, rfra_path, rfra_unit, rfra_view)
+  !*********************************************************************************************
+  ! open_in_rfraf -- Open input root fraction file
+  !*********************************************************************************************
+    ! -- modules
+    use initial_module, only: st_rfra
+    ! -- inout
+    integer(I4), intent(in) :: rfra_type
+    character(*), intent(inout) :: rfra_path, rfra_unit
+    integer(I4), intent(in), optional :: rfra_view
+    ! -- local
+    integer(I4) :: ierr
+    integer(I4) :: temp_view
+    integer(I4) :: intrf_fnum, intrf_type
+    real(DP) :: intrf_step, intrf_end
+    character(CHALEN) :: intrfp
+    character(:), allocatable :: vname, err_mes
+    !-------------------------------------------------------------------------------------------
+    temp_view = 0
+    if (present(rfra_view)) then
+      temp_view = rfra_view
+    end if
+
+    allocate(character(0) :: vname)
+    vname = "root fraction"
+    intrf_fnum = 0 ; intrf_type = 0 ; intrf_step = DZERO
+
+    if (rfra_type == in_type(5)) then
+      if (st_mpi%rank == 0) then
+        ! -- Open new read text file (new_rtxt)
+          call open_new_rtxt(1, 1, rfra_path, "input "//vname, st_rfra%fnum)
+      end if
+    else if (rfra_type == in_type(6)) then
+#ifdef MPI_MSG
+      ! -- Open mpi read file (mpi_read_file)
+        call open_mpi_read_file(1, 1, rfra_path, "input "//vname, st_rfra%fnum)
+      ! -- Set real4 file view (real4_fview)
+        call set_real4_fview(st_rfra%fnum, temp_view, "input "//vname)
+#else
+      ! -- Open new read binary file (new_rbin)
+        call open_new_rbin(1, 1, rfra_path, "input "//vname, st_rfra%fnum)
+#endif
+      if (len_trim(adjustl(rfra_unit)) /= 0) then
+        intrf_type = rfra_type
+      end if
+    else if (rfra_type == in_type(7)) then
+      allocate(character(0) :: err_mes)
+      err_mes = vname//" time interval"
+      if (st_mpi%rank == 0) then
+        ! -- Open new read text file (new_rtxt)
+          call open_new_rtxt(1, 1, rfra_path, "input "//vname, intrf_fnum)
+        read(unit=intrf_fnum,fmt=*,iostat=ierr) intrf_type, intrf_step, intrf_end
+        if (ierr /= 0) then
+          call write_err_stop("While reading list file in "//vname//" file.")
+        end if
+        read(unit=intrf_fnum,fmt='(a)',iostat=ierr) intrfp
+        if (ierr /= 0) then
+          call write_err_stop("While reading list file in "//vname//" file.")
+        end if
+      end if
+#ifdef MPI_MSG
+      if (st_mpi%totn /= 1) then
+        ! -- Bcast extra setting (extr_set)
+          call bcast_extr_set(intrf_type, intrf_step, intrf_end, intrfp, err_mes)
+      end if
+#endif
+      if (intrf_type == in_type(5)) then
+        if (st_mpi%rank == 0) then
+          ! -- Open new read text file (new_rtxt)
+            call open_new_rtxt(1, 1, trim(adjustl(intrfp)), "input "//err_mes, st_rfra%fnum)
+        end if
+      else if (intrf_type == in_type(6)) then
+#ifdef MPI_MSG
+        ! -- Open mpi read file (mpi_read_file)
+          call open_mpi_read_file(1, 1, trim(adjustl(intrfp)), "input "//err_mes, st_rfra%fnum)
+        ! -- Set real4 file view (real4_fview)
+          call set_real4_fview(st_rfra%fnum, temp_view, "input "//err_mes)
+#else
+        ! -- Open new read binary file (new_rbin)
+          call open_new_rbin(1, 1, trim(adjustl(intrfp)), "input "//err_mes, st_rfra%fnum)
+#endif
+      else
+        if (st_mpi%rank == 0) then
+          call write_err_stop("Specified wrong number in "//err_mes//" file.")
+        end if
+      end if
+      deallocate(err_mes)
+    end if
+
+    if (len_trim(adjustl(rfra_unit)) == 0) then
+      if (st_mpi%rank == 0) then
+        call write_logf("Not specified "//vname//" time unit. Same value is used in simulation")
+      end if
+      st_rfra%multi = SINFI ; st_rfra%etime = SINFI
+    else
+      ! -- Convert unit (unit)
+        call conv_unit(st_mpi%rank, rfra_unit, "input "//vname, st_sim%sta_date, st_rfra%multi)
+    end if
+
+    st_rfra%totn = st_grid%nxyz
+
+    if (st_rfra%multi /= SINFI) then
+      if (rfra_type == in_type(5)) then
+        if (st_mpi%rank == 0) then
+          call skip_file(rfra_type, st_rfra%fnum, vname, st_rfra%multi, st_rfra%totn,&
+                         st_rfra%etime)
+        end if
+#ifdef MPI_MSG
+        if (st_mpi%totn /= 1) then
+          ! -- Bcast scalar value (val)
+            call bcast_val(st_rfra%totn, vname//" total number")
+        end if
+#endif
+      else if (rfra_type == in_type(6)) then
+#ifdef MPI_MSG
+        call skip_mpi_file(rfra_type, st_rfra%fnum, temp_view, vname, st_rfra%multi,&
+                           st_rfra%etime)
+#else
+        call skip_file(rfra_type, st_rfra%fnum, vname, st_rfra%multi, st_rfra%totn,&
+                       st_rfra%etime)
+#endif
+      else if (rfra_type == in_type(7)) then
+#ifdef MPI_MSG
+        if (intrf_type == in_type(5)) then
+          if (st_mpi%rank == 0) then
+            call skip_file_int(intrf_type, intrf_fnum, st_rfra%fnum, vname, st_rfra%multi,&
+                               intrf_step, intrf_end, st_rfra%etime)
+          end if
+          if (st_mpi%totn /= 1) then
+            ! -- Bcast scalar value (val)
+              call bcast_val(st_rfra%fnum, vname//" file number")
+          end if
+        else if (intrf_type == in_type(6)) then
+          call skip_mpi_file_int(intrf_fnum, vname, st_rfra%multi, intrf_step, intrf_end,&
+                                 st_rfra%fnum, temp_view, st_rfra%etime)
+        end if
+#else
+        call skip_file_int(intrf_type, intrf_fnum, st_rfra%fnum, vname, st_rfra%multi,&
+                           intrf_step, intrf_end, st_rfra%etime)
+#endif
+      end if
+#ifdef MPI_MSG
+      if (st_mpi%totn /= 1) then
+        ! -- Bcast scalar value (val)
+          call bcast_val(st_rfra%etime, vname//" end time value")
+      end if
+#endif
+    end if
+
+    if (st_rfra%etime > st_sim%end_time) then
+      st_rfra%etime = st_sim%end_time
+    end if
+
+    ! -- Check the unused time series (steady_etime)
+      call check_steady_etime(st_rfra%etime, vname)
+
+    st_rfra%inttype = intrf_type ; st_rfra%intfnum = intrf_fnum ; st_rfra%intstep = intrf_step
+    st_step_flag%rfra = 0
+
+    deallocate(vname)
+
+  end subroutine open_in_rfraf
+
   subroutine open_in_rivef(rive_path, nohv, hv, wlv, wdv, blv, dev, wiv, lev, bkv, btv)
   !*********************************************************************************************
   ! open_in_rivef -- Read input river file
@@ -1772,7 +1941,7 @@ module open_file
 #ifdef MPI_MSG
           if (intri_type == in_type(3)) then
             if (st_mpi%rank == 0) then
-              call skip_file_int(intri_type, riven(i), intri_num, mess_rive, rive_multi,&
+              call skip_file_int(intri_type, riven(i), intri_num, mess_rive(7:), rive_multi,&
                                  intri_step, intri_end, rive_etime)
             end if
             if (st_mpi%totn /= 1) then
@@ -1780,11 +1949,11 @@ module open_file
                 call bcast_val(intri_num, mess_rive//" file number")
             end if
           else if (intri_type == in_type(4)) then
-            call skip_mpi_file_int(riven(i), mess_rive, rive_multi, intri_step, intri_end,&
+            call skip_mpi_file_int(riven(i), mess_rive(7:), rive_multi, intri_step, intri_end,&
                                    intri_num, rive_view, rive_etime)
           end if
 #else
-          call skip_file_int(intri_type, riven(i), intri_num, mess_rive, rive_multi,&
+          call skip_file_int(intri_type, riven(i), intri_num, mess_rive(7:), rive_multi,&
                              intri_step, intri_end, rive_etime)
 #endif
         end if
@@ -2161,7 +2330,7 @@ module open_file
 #ifdef MPI_MSG
           if (intla_type == in_type(3)) then
             if (st_mpi%rank == 0) then
-              call skip_file_int(intla_type, laken(i), intla_num, mess_lake, lake_multi,&
+              call skip_file_int(intla_type, laken(i), intla_num, mess_lake(7:), lake_multi,&
                                  intla_step, intla_end, lake_etime)
             end if
             if (st_mpi%totn /= 1) then
@@ -2169,11 +2338,11 @@ module open_file
                 call bcast_val(intla_num, mess_lake//" file number")
             end if
           else if (intla_type == in_type(4)) then
-            call skip_mpi_file_int(laken(i), mess_lake, lake_multi, intla_step, intla_end,&
+            call skip_mpi_file_int(laken(i), mess_lake(7:), lake_multi, intla_step, intla_end,&
                                    intla_num, lake_view, lake_etime)
           end if
 #else
-          call skip_file_int(intla_type, laken(i), intla_num, mess_lake, lake_multi,&
+          call skip_file_int(intla_type, laken(i), intla_num, mess_lake(7:), lake_multi,&
                              intla_step, intla_end, lake_etime)
 #endif
         end if

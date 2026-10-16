@@ -88,7 +88,7 @@ module calc_function
     !$omp end parallel
 
     ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, DZERO, infx, snew, rperm, stnew)
+      call calc_srat_rperm(ncalc, infx, snew, rperm, stnew)
 
     if (st_sim%sim_type >= 0) then
       ! -- Function storage change (stochn)
@@ -215,7 +215,7 @@ module calc_function
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
     ! -- Calculate saturation and relative permeability (srat_rperm)
-      call calc_srat_rperm(ncalc, DZERO, hnew, snew, rperm, stor_work)
+      call calc_srat_rperm(ncalc, hnew, snew, rperm, stor_work)
 
     if (st_sim%sim_type >= 0) then
       ! -- Function storage change (stochn)

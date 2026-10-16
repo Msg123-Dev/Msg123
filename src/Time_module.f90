@@ -154,7 +154,7 @@ module time_module
       end do
       !$omp end parallel do
       ! -- Calculate saturation and relative permeability (srat_rperm)
-        call calc_srat_rperm(ncalc, DZERO, st_forc%read_head, cell_srat, st_sol%rel_perm,&
+        call calc_srat_rperm(ncalc, st_forc%read_head, cell_srat, st_sol%rel_perm,&
                              st_sol%stor_old)
       !$omp parallel
       !$omp do private(i)

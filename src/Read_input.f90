@@ -505,7 +505,7 @@ module read_input
     res_abs_tol = st_ctrl%res_abs_tol ; res_rel_tol = st_ctrl%res_rel_tol
     dilu_shift = st_ctrl%dilu_shift ; dsat_max = st_ctrl%dsat_max
     expd_type = st_ctrl%expd_type ; conv_type = st_ctrl%conv_type
-    datum_type = st_ctrl%datum_type ; deri_type = st_ctrl%deri_type
+    datum_type = st_ctrl%datum_type ; deri_type = 1
     picard_btr = st_ctrl%picard_btr ; picard_btol = st_ctrl%picard_btol
     picard_bfact = st_ctrl%picard_bfact ; picard_blim = st_ctrl%picard_blim
     incr_iter = st_ctrl%incr_iter ; decr_iter = st_ctrl%decr_iter
@@ -518,7 +518,7 @@ module read_input
     st_ctrl%res_abs_tol = res_abs_tol ; st_ctrl%res_rel_tol = res_rel_tol
     st_ctrl%dilu_shift = dilu_shift ; st_ctrl%dsat_max = dsat_max
     st_ctrl%expd_type = expd_type ; st_ctrl%conv_type = conv_type
-    st_ctrl%datum_type = datum_type ; st_ctrl%deri_type = deri_type
+    st_ctrl%datum_type = datum_type
     st_ctrl%picard_btr = picard_btr ; st_ctrl%picard_btol = picard_btol
     st_ctrl%picard_bfact = picard_bfact ; st_ctrl%picard_blim = picard_blim
     st_ctrl%noconv_type = noconv_type
@@ -574,7 +574,7 @@ module read_input
       call write_err_stop("Input a valid value for non-convergence type.")
     else if (datum_type < 0 .or. datum_type > 1) then
       call write_err_stop("Input a valid value for datum type.")
-    else if (deri_type < 0 .or. deri_type > 1) then
+    else if (deri_type /= 1) then
       call write_err_stop("Input a valid value for derivative type.")
     else if (conv_type == 1 .and. res_abs_tol <= DZERO .and. res_rel_tol <= DZERO) then
       call write_err_stop("Input a residual tolerance for conv_type=1, or set conv_type=0.")

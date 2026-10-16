@@ -28,10 +28,10 @@ module types_module
   type :: ctrl_set
     integer(I4) :: tstep_type, maxout_iter, picard_iter, maxinn_iter, precon_type, expd_type
     integer(I4) :: incr_iter, decr_iter, maxbeta_iter
-    integer(I4) :: conv_type, noconv_type, datum_type, deri_type, picard_btr, outstep_type
+    integer(I4) :: conv_type, noconv_type, datum_type, picard_btr, outstep_type
     integer(I4) :: nlevel, maxvcy_iter, amg_nlevel, max_sweep
     integer(I4) :: noclas_flag = 0
-    real(DP) :: criteria, errtol, newper, newper_inv, res_abs_tol, res_rel_tol
+    real(DP) :: criteria, errtol, res_abs_tol, res_rel_tol
     real(DP) :: dilu_shift, dsat_max, dstor_max
     real(DP) :: picard_btol, picard_bfact, picard_blim
     real(SP) :: jac_omega, amg_theta
@@ -321,19 +321,18 @@ module types_module
   end type amgt_set
 
   type :: coef_set
-    real(DP), allocatable :: per_relp(:), stor_per(:), dkr_dpsi(:)
-    real(DP), allocatable :: dstor_dpsi(:)
+    real(DP), allocatable :: dkr_dpsi(:), dstor_dpsi(:)
     real(DP), allocatable :: temp_rhs(:)
     real(DP), allocatable :: stod(:), cond(:), sead(:), dmats(:)
     real(DP), allocatable :: rivd(:), lakd(:), surd(:), recd(:)
     real(DP), allocatable :: deri_dcon(:), rel_hyd(:), deri_lucon(:), deri_con1(:), deri_con2(:)
     real(DP), allocatable :: over_riv(:), deri_r(:), deri_ks_riv(:), delh_r(:)
-    real(DP), allocatable :: per_riv(:), rel_riv(:), tran_riv(:), dkr_riv(:)
+    real(DP), allocatable :: rel_riv(:), tran_riv(:), dkr_riv(:)
     real(DP), allocatable :: over_lak(:), deri_l(:), deri_ks_lak(:), delh_l(:)
-    real(DP), allocatable :: per_lak(:), rel_lak(:), tran_lak(:), dkr_lak(:)
+    real(DP), allocatable :: rel_lak(:), tran_lak(:), dkr_lak(:)
     real(DP), allocatable :: over_sur(:), deri_s(:), deri_ks_sur(:), delh_s(:), tran_sur(:)
     real(DP), allocatable :: deri_sea(:), deri_ks_sea(:), delh_sea(:)
-    real(DP), allocatable :: per_sea(:), rel_sea(:), tran_sea(:)
+    real(DP), allocatable :: rel_sea(:), tran_sea(:)
   end type coef_set
 
   type :: gmap_set

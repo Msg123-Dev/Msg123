@@ -82,7 +82,7 @@ module types_module
   type :: ftype_in
     integer(I4) :: grid, retn, parm, geog, init
     integer(I4) :: seal, rech, well, weks, weke, rive, lake
-    integer(I4) :: prec, evap, wtab, mass
+    integer(I4) :: prec, evap, wtab, mass, rfra
   end type ftype_in
 
   type :: retn_in
@@ -108,7 +108,7 @@ module types_module
   type :: path_in
     character(:), allocatable :: grid, retn, parm, geog, init
     character(:), allocatable :: seal, rech, well, weks, weke, rive, lake
-    character(:), allocatable :: prec, evap, mass
+    character(:), allocatable :: prec, evap, mass, rfra
   end type path_in
 
   type :: retn_path
@@ -136,7 +136,7 @@ module types_module
   end type geog_fnum
 
   type :: unit_in
-    character(:), allocatable :: init, seal, rech, well, prec, evap
+    character(:), allocatable :: init, seal, rech, well, prec, evap, rfra
   end type unit_in
 
   type :: clas_set
@@ -199,7 +199,7 @@ module types_module
 
   type :: step_flag
     integer(I4) :: seal, rech, well, prec, evap, riwl, riwd, ribl, ride, riwi, rile, ribk, ribt
-    integer(I4) :: lawl, lawd, labl, laar, labk, labt
+    integer(I4) :: lawl, lawd, labl, laar, labk, labt, rfra
   end type step_flag
 
   type :: ftype_out
@@ -296,7 +296,7 @@ module types_module
   end type bfview_set
 
   type :: bound_fview
-    integer(I4) :: seal = 0, rech = 0, well = 0, prec = 0, evap = 0
+    integer(I4) :: seal = 0, rech = 0, well = 0, prec = 0, evap = 0, rfra = 0
   end type bound_fview
 
   type :: sol_set

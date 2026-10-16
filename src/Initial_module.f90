@@ -60,6 +60,7 @@ module initial_module
   type(surfw_set), public :: st_riwl, st_riwd, st_ribl, st_ride, st_riwi, st_rile
   type(surfw_set), public :: st_ribk, st_ribt
   type(surfw_set), public :: st_lawl, st_lawd, st_labl, st_laar, st_labk, st_labt
+  type(surfw_set), public :: st_rfra
 
   type(step_flag), public :: st_step_flag
 
@@ -157,7 +158,7 @@ module initial_module
     st_in_type%rech = -1 ; st_in_type%well = -1 ; st_in_type%weks = -1
     st_in_type%weke = -1 ; st_in_type%rive = -1 ; st_in_type%lake = -1
     st_in_type%prec = -1 ; st_in_type%evap = -1 ; st_in_type%wtab = -1
-    st_in_type%mass = -1
+    st_in_type%mass = -1 ; st_in_type%rfra = -1
 
     st_retf_type%vana = -1 ; st_retf_type%vann = -1 ; st_retf_type%resi = -1
     st_parf_type%pakx = -1 ; st_parf_type%paky = -1 ; st_parf_type%pakz = -1
@@ -175,7 +176,7 @@ module initial_module
     st_riwl%totn = 0 ; st_riwd%totn = 0 ; st_ribl%totn = 0 ; st_ride%totn = 0
     st_riwi%totn = 0 ; st_rile%totn = 0 ; st_ribk%totn = 0 ; st_ribt%totn = 0
     st_lawl%totn = 0 ; st_lawd%totn = 0 ; st_labl%totn = 0 ; st_laar%totn = 0
-    st_labk%totn = 0 ; st_labt%totn = 0
+    st_labk%totn = 0 ; st_labt%totn = 0 ; st_rfra%totn = 0
 
     ! end time of each variable
     st_seal%etime = SINFI ; st_rech%etime = SINFI ; st_well%etime = SINFI
@@ -184,7 +185,7 @@ module initial_module
     st_riwi%etime = SINFI ; st_rile%etime = SINFI ; st_ribk%etime = SINFI
     st_ribt%etime = SINFI ; st_lawl%etime = SINFI ; st_lawd%etime = SINFI
     st_labl%etime = SINFI ; st_laar%etime = SINFI ; st_labk%etime = SINFI
-    st_labt%etime = SINFI
+    st_labt%etime = SINFI ; st_rfra%etime = SINFI
 
     ! step flag of each variable
     st_step_flag%seal = 0 ; st_step_flag%rech = 0 ; st_step_flag%well = 0
@@ -193,7 +194,7 @@ module initial_module
     st_step_flag%riwi = 0 ; st_step_flag%rile = 0 ; st_step_flag%ribk = 0
     st_step_flag%ribt = 0 ; st_step_flag%lawl = 0 ; st_step_flag%lawd = 0
     st_step_flag%labl = 0 ; st_step_flag%laar = 0 ; st_step_flag%labk = 0
-    st_step_flag%labt = 0
+    st_step_flag%labt = 0 ; st_step_flag%rfra = 0
 
     ! output time of each variable
     st_out_step%head = SZERO ; st_out_step%rest = SZERO ; st_out_step%srat = SZERO
@@ -262,6 +263,7 @@ module initial_module
     st_in_path%prec = repeat(' ', CHALEN)
     st_in_path%evap = repeat(' ', CHALEN)
     st_in_path%mass = repeat(' ', CHALEN)
+    st_in_path%rfra = repeat(' ', CHALEN)
 
     st_in_unit%init = repeat(' ', TIMELEN)
     st_in_unit%seal = repeat(' ', TIMELEN)
@@ -269,6 +271,7 @@ module initial_module
     st_in_unit%well = repeat(' ', TIMELEN)
     st_in_unit%prec = repeat(' ', TIMELEN)
     st_in_unit%evap = repeat(' ', TIMELEN)
+    st_in_unit%rfra = repeat(' ', TIMELEN)
 
     st_out_path%conv = repeat(' ', CHALEN)
     st_out_path%head = repeat(' ', CHALEN)

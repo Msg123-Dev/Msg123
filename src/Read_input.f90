@@ -1114,36 +1114,37 @@ module read_input
     integer(I4) :: ierr
     integer(I4) :: tinp_fnum
     integer(I4) :: seal_type, rech_type, well_type, weks_type, weke_type
-    integer(I4) :: rive_type, lake_type, prec_type, evap_type
+    integer(I4) :: rive_type, lake_type, prec_type, evap_type, rfra_type
     integer(I4), allocatable :: all_tinp_type(:)
     character(CHALEN) :: seal_path, rech_path, well_path, weks_path, weke_path
-    character(CHALEN) :: rive_path, lake_path, prec_path, evap_path
-    character(TIMELEN) :: seal_unit, rech_unit, well_unit, prec_unit, evap_unit
+    character(CHALEN) :: rive_path, lake_path, prec_path, evap_path, rfra_path
+    character(TIMELEN) :: seal_unit, rech_unit, well_unit, prec_unit, evap_unit, rfra_unit
     namelist/tinp_type/seal_type, rech_type, well_type, weks_type, weke_type,&
-                       rive_type, lake_type, prec_type, evap_type
+                       rive_type, lake_type, prec_type, evap_type, rfra_type
     namelist/tinp_path/seal_path, rech_path, well_path, weks_path, weke_path,&
-                       rive_path, lake_path, prec_path, evap_path
-    namelist/tinp_unit/seal_unit, rech_unit, well_unit, prec_unit, evap_unit
+                       rive_path, lake_path, prec_path, evap_path, rfra_path
+    namelist/tinp_unit/seal_unit, rech_unit, well_unit, prec_unit, evap_unit, rfra_unit
     !-------------------------------------------------------------------------------------------
     ! -- Open new read text file (new_rtxt)
       call open_new_rtxt(1, 1, file_path, "timeseries input", tinp_fnum)
 
     ierr = 0
     seal_type = -1 ; rech_type = -1 ; well_type = -1 ; weks_type = -1 ; weke_type = -1
-    rive_type = -1 ; lake_type = -1 ; prec_type = -1 ; evap_type = -1
+    rive_type = -1 ; lake_type = -1 ; prec_type = -1 ; evap_type = -1 ; rfra_type = -1
     read(unit=tinp_fnum,nml=tinp_type,iostat=ierr)
     if (ierr /= 0) then
       call write_err_stop("While reading file type section in timeseries input file.")
     end if
 
     seal_path = "" ; rech_path = "" ; well_path = "" ; weks_path = "" ; weke_path = ""
-    rive_path = "" ; lake_path = "" ; prec_path = "" ; evap_path = ""
+    rive_path = "" ; lake_path = "" ; prec_path = "" ; evap_path = "" ; rfra_path = ""
     read(unit=tinp_fnum,nml=tinp_path,iostat=ierr)
     if (ierr /= 0) then
       call write_err_stop("While reading file path section in timeseries input file.")
     end if
 
     seal_unit = "" ; rech_unit = "" ; well_unit = "" ; prec_unit = "" ; evap_unit = ""
+    rfra_unit = ""
     read(unit=tinp_fnum,nml=tinp_unit,iostat=ierr)
     if (ierr /= 0) then
       call write_err_stop("While reading file unit section in timeseries input file.")
@@ -1272,6 +1273,18 @@ module read_input
     st_in_type%evap = evap_type ; st_in_path%evap = trim(adjustl(evap_path))
     st_in_unit%evap = evap_unit
 
+    deallocate(all_tinp_type)
+
+    allocate(all_tinp_type(3))
+    all_tinp_type(:) = [in_type(5:7)]
+    if (rfra_type > 0) then
+      ! -- Check timeseries input file (tinp)
+        call check_tinp(rfra_type, all_tinp_type, trim(adjustl(rfra_path)), "root fraction",&
+                        rfra_unit)
+    end if
+
+    st_in_type%rfra = rfra_type ; st_in_path%rfra = trim(adjustl(rfra_path))
+    st_in_unit%rfra = rfra_unit
     deallocate(all_tinp_type)
 
   end subroutine read_tinp_list

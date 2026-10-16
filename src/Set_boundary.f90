@@ -15,12 +15,13 @@ module set_boundary
   use calc_boundary, only: conv_rech2calc, calc_wlbd, calc_blld, calc_blsl, calc_lsurf
 #ifdef MPI_MSG
   use mpi_utility, only: mpisum_val, mpimin_val, bcast_file
-  use mpi_set, only: cals_r4view, cals_r4hview
+  use mpi_set, only: cals_r4view, cals_r4hview, calc_r4view, calc_r4hview
 #endif
 
   implicit none
   private
   public :: set_bound, set_rive_bed, set_lake_bed, update_rive_wblevel, update_lake_wblevel
+  public :: set_rech_root
 
   type(rlbc_set), public :: st_rive, st_lake
   logical, public :: rech_reprev = .false.
@@ -82,6 +83,9 @@ module set_boundary
 
     ! -- Set evapotranspiration information (evap_info)
       call set_evap_info()
+
+    ! -- Set root fraction information (rfra_info)
+      call set_rfra_info()
 
     if (.not. allocated(st_forc%read_rech) .and. allocated(st_forc%read_prec) .and.&
         allocated(st_forc%read_evap)) then
@@ -503,7 +507,7 @@ module set_boundary
     use open_file, only: open_in_wellf, open_in_wlayf, st_intwe
     use assign_boundary, only: assign_wellv
 #ifdef MPI_MSG
-    use mpi_set, only: cals_i4view, calc_r4view, calc_r4hview
+    use mpi_set, only: cals_i4view
 #endif
     ! -- inout
 
@@ -719,6 +723,52 @@ module set_boundary
     deallocate(all_evap_type, all_evap_mask)
 
   end subroutine set_evap_info
+
+  subroutine set_rfra_info()
+  !*********************************************************************************************
+  ! set_rfra_info -- Set root fraction information
+  !*********************************************************************************************
+    ! -- modules
+    use open_file, only: open_in_rfraf
+    use assign_boundary, only: assign_rfrav
+    ! -- inout
+
+    ! -- local
+    integer(I4), allocatable :: all_rfra_type(:)
+    logical, allocatable :: all_rfra_mask(:)
+    !-------------------------------------------------------------------------------------------
+    allocate(all_rfra_type(3), all_rfra_mask(3))
+    all_rfra_type(:) = [in_type(5:7)]
+    all_rfra_mask(:) = (st_in_type%rfra == all_rfra_type(:))
+
+    if (any(all_rfra_mask)) then
+#ifdef MPI_MSG
+      if (st_mpi%totn /= 1) then
+        ! -- Bcast file (file)
+          call bcast_file(st_in_path%rfra, st_in_unit%rfra, "root fraction")
+      end if
+
+      if (st_in_type%rfra == in_type(6) .and. len_trim(adjustl(st_in_unit%rfra)) /= 0) then
+        bfview%rfra = calc_r4hview
+      else
+        bfview%rfra = calc_r4view
+      end if
+
+      ! -- Open input root fraction file (in_rfraf)
+        call open_in_rfraf(st_in_type%rfra, st_in_path%rfra, st_in_unit%rfra, bfview%rfra)
+#else
+      ! -- Open input root fraction file (in_rfraf)
+        call open_in_rfraf(st_in_type%rfra, st_in_path%rfra, st_in_unit%rfra)
+#endif
+      ! -- Assign root fraction value (rfrav)
+        call assign_rfrav(st_in_type%rfra)
+      ! -- Check input nan (input_nan)
+        call check_input_nan(st_hydr%read_rfra, "root fraction")
+    end if
+
+    deallocate(all_rfra_type, all_rfra_mask)
+
+  end subroutine set_rfra_info
 
   subroutine set_riwl_info()
   !*********************************************************************************************
@@ -1380,18 +1430,20 @@ module set_boundary
 
   end subroutine set_lake_bed
 
-  subroutine set_rech_root()
+  subroutine set_rech_root(in_time)
   !*********************************************************************************************
   ! set_rech_root -- Set recharge root cells
   !*********************************************************************************************
     ! -- modules
     use constval_module, only: DONE
+    use initial_module, only: st_sim
     ! -- inout
-
+    real(DP), intent(in), optional :: in_time
     ! -- local
     integer(I4) :: i, s, c, k, neg_num, bad_num, sum_negn, sum_badn, bad_ij, min_ij
     real(DP), parameter :: RFRA_TOL = 1.00E-05_DP
     real(DP) :: sum_rfra, bad_sum, sum_bads
+    character(32) :: str_time
     character(200) :: bad_mes
     !-------------------------------------------------------------------------------------------
     ! -- Check the column partition (col_part)
@@ -1445,12 +1497,17 @@ module set_boundary
     sum_negn = neg_num ; sum_badn = bad_num ; min_ij = bad_ij ; sum_bads = bad_sum
 #endif
     if (st_mpi%rank == 0) then
+      str_time = ""
+      if (present(in_time)) then
+        write(str_time,'(f0.3)') in_time
+        str_time = " at "//trim(str_time)//trim(st_sim%cal_unit)
+      end if
       if (sum_negn > 0) then
-        call write_err_stop("Input a non-negative root fraction.")
+        call write_err_stop("Input a non-negative root fraction"//trim(str_time)//".")
       else if (sum_badn > 0) then
         write(bad_mes,'(a,i0,a,2(i0,a),g0.6,a)') "Root fraction does not sum to one at ",&
           sum_badn, " columns, first at (", mod(min_ij-1, st_grid%nx)+1, ",",&
-          (min_ij-1)/st_grid%nx+1, "): sum ", sum_bads, "."
+          (min_ij-1)/st_grid%nx+1, "): sum ", sum_bads, trim(str_time)//"."
         call write_err_stop(trim(bad_mes))
       end if
     end if

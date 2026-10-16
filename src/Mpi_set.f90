@@ -1770,6 +1770,13 @@ module mpi_set
       end if
     end if
 
+    call MPI_BCAST(st_in_type%rfra, 1, MPI_INTEGER, 0, st_mpi%comm, ierr)
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Broadcast input root fraction file type.")
+      end if
+    end if
+
   end subroutine bcast_bound_ftype
 
   subroutine senrec_neib_i4(nbtot, nbnum, sind, rind, sitem, ritem, inv, outv)

@@ -12,7 +12,7 @@ module calc_parameter
 
   contains
 
-  subroutine calc_srat_rperm(num, pertur, pres, srat, rperm, stor, dkr_dpsi, dstor_dpsi)
+  subroutine calc_srat_rperm(num, pres, srat, rperm, stor, dkr_dpsi, dstor_dpsi)
   !*********************************************************************************************
   ! calc_srat_rperm -- Calculate saturation and relative permeability
   !*********************************************************************************************
@@ -23,44 +23,43 @@ module calc_parameter
     use set_condition, only: st_hydr
     ! -- inout
     integer(I4), intent(in) :: num
-    real(DP), intent(in) :: pertur
     real(DP), intent(in) :: pres(:)
-    real(DP), intent(out) :: rperm(:)
     real(DP), intent(out), optional :: srat(:)
+    real(DP), intent(out), optional :: rperm(:)
     real(DP), intent(out), optional :: stor(:)
     real(DP), intent(out), optional :: dkr_dpsi(:)
     real(DP), intent(out), optional :: dstor_dpsi(:)
     ! -- local
     integer(I4) :: i
     real(DP) :: retm, beta, theta, kr, se, stor_val, srat_val
-    real(DP) :: per_phead, phead0, kr_phead, dkr
+    real(DP) :: phead, phead0, kr_phead, dkr
     real(DP) :: pors_val, resi_val, dtheta_dpsi
     real(DP) :: kr_lin, kr_grad
     !-------------------------------------------------------------------------------------------
     phead0 = -st_schm%krlin_head
 
-    !$omp parallel do private(i, pors_val, resi_val, retm, per_phead, kr_lin, kr_grad, dkr) &
+    !$omp parallel do private(i, pors_val, resi_val, retm, phead, kr_lin, kr_grad, dkr) &
     !$omp             private(beta, se, theta, srat_val, stor_val, dtheta_dpsi, kr_phead, kr)
     do i = 1, num
       pors_val = st_hydr%read_pors(i) ; resi_val = st_hydr%read_resi(i)
       retm = DONE - DONE/st_hydr%read_vann(i)
-      per_phead = pres(i) - st_geom%cell_top(i) + pertur
+      phead = pres(i) - st_geom%cell_top(i)
       ! -- Storage and saturation ratio at the cell top
-      if (per_phead < DZERO) then
-        beta = abs(per_phead*st_hydr%read_vana(i))**st_hydr%read_vann(i)
+      if (phead < DZERO) then
+        beta = abs(phead*st_hydr%read_vana(i))**st_hydr%read_vann(i)
         se = (DONE+beta)**(-retm)
         theta = resi_val + (pors_val-resi_val)*se
         srat_val = theta/pors_val
         if (st_schm%stor_type == 1) then
-          stor_val = theta + st_hydr%read_spst(i)*per_phead*srat_val
+          stor_val = theta + st_hydr%read_spst(i)*phead*srat_val
         else
           stor_val = theta
         end if
         if (present(dstor_dpsi)) then
           dtheta_dpsi = (pors_val-resi_val)*se*retm*st_hydr%read_vann(i)*beta&
-                        /(abs(per_phead)*(DONE+beta))
+                        /(abs(phead)*(DONE+beta))
           if (st_schm%stor_type == 1) then
-            dstor_dpsi(i) = dtheta_dpsi*(DONE+st_hydr%read_spst(i)*per_phead/pors_val)&
+            dstor_dpsi(i) = dtheta_dpsi*(DONE+st_hydr%read_spst(i)*phead/pors_val)&
                             + st_hydr%read_spst(i)*srat_val
           else
             dstor_dpsi(i) = dtheta_dpsi
@@ -68,7 +67,7 @@ module calc_parameter
         end if
       else
         srat_val = DONE
-        stor_val = pors_val + st_hydr%read_spst(i)*per_phead
+        stor_val = pors_val + st_hydr%read_spst(i)*phead
         if (present(dstor_dpsi)) then
           dstor_dpsi(i) = st_hydr%read_spst(i)
         end if
@@ -76,9 +75,9 @@ module calc_parameter
 
       ! -- Relative permeability at the head position given by krpos_type
       if (st_schm%krpos_type == 1) then
-        kr_phead = pres(i) - st_geom%cell_cent(i) + pertur
+        kr_phead = pres(i) - st_geom%cell_cent(i)
       else
-        kr_phead = per_phead
+        kr_phead = phead
       end if
       if (kr_phead >= DZERO) then
         kr = DONE ; dkr = DZERO
@@ -91,7 +90,9 @@ module calc_parameter
         call calc_kr_vgm(kr_phead, st_hydr%read_vana(i), st_hydr%read_vann(i), retm, kr, dkr)
       end if
 
-      rperm(i) = kr
+      if (present(rperm)) then
+        rperm(i) = kr
+      end if
       if (present(dkr_dpsi)) then
         dkr_dpsi(i) = dkr
       end if

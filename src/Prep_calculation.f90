@@ -26,8 +26,8 @@ module prep_calculation
   ! prepare_calc -- Prepare calculation
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: SZERO, DONE, NEWPER_BASE
-    use initial_module, only: st_sim, st_ctrl, st_grid, st_schm
+    use constval_module, only: SZERO
+    use initial_module, only: st_sim, st_grid, st_schm
     use read_input, only: read_grid_file, len_scal_inv
     use check_condition, only: check_outf_cond
     use make_cell, only: make_cell_info
@@ -75,7 +75,6 @@ module prep_calculation
       call check_outf_cond()
 
     st_time%current_t = SZERO ; st_time%delt = DZERO ; st_time%delt_inv = DZERO
-    st_ctrl%newper = NEWPER_BASE*len_scal_inv ; st_ctrl%newper_inv = DONE/st_ctrl%newper
     st_schm%krlin_head = st_schm%krlin_head*len_scal_inv
     st_schm%rech_dreg_hmin = st_schm%rech_dreg_hmin*len_scal_inv
     st_schm%rech_dreg_hwid = st_schm%rech_dreg_hwid*len_scal_inv

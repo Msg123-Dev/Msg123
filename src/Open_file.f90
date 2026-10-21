@@ -5,7 +5,7 @@ module open_file
   use utility_module, only: st_mpi, open_new_rtxt, open_new_rbin, open_new_wtxt, close_file
   use utility_module, only: write_logf, write_err_stop, conv_unit
   use initial_module, only: in_type, st_sim, st_grid, st_step_flag
-  use read_module, only: skip_file, skip_file_int
+  use read_module, only: skip_file, skip_file_int, read_totn_line
 #ifdef MPI_MSG
   use mpi_utility, only: bcast_val, bcast_file, bcast_extr_set
   use mpi_read, only: open_mpi_read_file, set_int4_fview, set_real4_fview, skip_mpi_file
@@ -698,7 +698,7 @@ module open_file
     else
       if (seal_type == in_type(1) .or. seal_type == in_type(2)) then
         if (st_mpi%rank == 0) then
-          read(unit=st_seal%fnum,fmt=*,iostat=ierr) st_seal%totn
+          call read_totn_line(st_seal%fnum, vname, st_seal%totn, ierr)
           if (ierr /= 0) then
             call write_err_stop("While reading the total number in "//vname//" file.")
           end if
@@ -1077,7 +1077,7 @@ module open_file
     else
       if (well_type == in_type(2)) then
         if (st_mpi%rank == 0) then
-          read(unit=st_well%fnum,fmt=*,iostat=ierr) st_well%totn
+          call read_totn_line(st_well%fnum, vname, st_well%totn, ierr)
           if (ierr /= 0) then
             call write_err_stop("While reading the total number in "//vname//" file.")
           end if
@@ -1966,7 +1966,7 @@ module open_file
       else
         if (rivet(i) == in_type(1) .or. rivet(i) == in_type(2)) then
           if (st_mpi%rank == 0) then
-            read(unit=riven(i),fmt=*,iostat=ierr) rive_totn
+            call read_totn_line(riven(i), mess_rive, rive_totn, ierr)
             if (ierr /= 0) then
               err_mes = "While reading the total number in "//mess_rive//" file."
               call write_err_stop(err_mes)
@@ -2355,7 +2355,7 @@ module open_file
       else
         if (laket(i) == in_type(1) .or. laket(i) == in_type(2)) then
           if (st_mpi%rank == 0) then
-            read(unit=laken(i),fmt=*,iostat=ierr) lake_totn
+            call read_totn_line(laken(i), mess_lake, lake_totn, ierr)
             if (ierr /= 0) then
               err_mes = "While reading the total number in "//mess_lake//" file."
               call write_err_stop(err_mes)

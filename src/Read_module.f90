@@ -3,6 +3,7 @@ module read_module
   use kind_module, only: I4, SP, DP
   use constval_module, only: CHALEN
   use utility_module, only: st_mpi, open_new_rtxt, open_new_rbin, write_logf, write_err_read
+  use utility_module, only: write_err_stop
   use initial_module, only: in_type, st_sim, st_grid, st_init
 #ifdef MPI_MSG
   use mpi_utility, only: bcast_val
@@ -13,7 +14,7 @@ module read_module
   public :: read_clasf, read_2dpointf, read_3dpointf, read_wpointf
   public :: read_2dtxt, read_2dbin, read_3dtxt, read_3dbin
   public :: skip_file, skip_file_int, flat_2dto2d, flat_2dto3d, flat_3dto3d
-  public :: read_next, read_intn, read_2d_calcreg, read_3d_calcreg
+  public :: read_next, read_intn, read_2d_calcreg, read_3d_calcreg, read_totn_line
 
   interface read_clasf
     module procedure read_clasf_r4
@@ -598,7 +599,7 @@ module read_module
   ! skip_file -- Skip input file
   !*********************************************************************************************
     ! -- modules
-    use utility_module, only: write_err_stop
+
     ! -- inout
     integer(I4), intent(in) :: ftype, fnum
     character(*), intent(in) :: fname
@@ -619,7 +620,7 @@ module read_module
     time_flag = 0
     do while (time_flag == 0)
       if (ftype == in_type(1) .or. ftype == in_type(2)) then
-        read(unit=fnum,fmt=*,iostat=ierr) file_totn, fetime
+        call read_totn_line(fnum, fname, file_totn, ierr, fetime)
         if (ierr /= 0) then
           call write_err_read(fnum)
         end if
@@ -721,6 +722,43 @@ module read_module
     deallocate(type_txt, type_bin, err_mes)
 
   end subroutine skip_file_int
+
+  subroutine read_totn_line(fnum, fname, totn, ierr, etime)
+  !*********************************************************************************************
+  ! read_totn_line -- Read total number line of classification and point file
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(in) :: fnum
+    character(*), intent(in) :: fname
+    integer(I4), intent(out) :: totn, ierr
+    real(DP), intent(inout), optional :: etime
+    ! -- local
+    integer(I4) :: lead_ierr
+    real(DP) :: lead_val(3)
+    character(CHALEN) :: totn_line
+    !-------------------------------------------------------------------------------------------
+    ierr = 0 ; totn_line = ""
+    do while (ierr == 0 .and. verify(totn_line, " "//achar(9)) == 0)
+      read(unit=fnum,fmt='(a)',iostat=ierr) totn_line
+    end do
+
+    if (ierr == 0) then
+      if (present(etime)) then
+        read(totn_line,*,iostat=ierr) totn, etime
+      else
+        read(totn_line,*,iostat=ierr) totn
+      end if
+      lead_val(:) = huge(1.00_DP)
+      read(totn_line,*,iostat=lead_ierr) lead_val(:)
+      if (lead_ierr == 0 .and. lead_val(3) /= huge(1.00_DP)) then
+        call write_err_stop("The total number line is missing in "//trim(adjustl(fname))//&
+                            " file.")
+      end if
+    end if
+
+  end subroutine read_totn_line
 
   subroutine skip_clas_point(fnum, targn)
   !*********************************************************************************************
@@ -1090,7 +1128,7 @@ module read_module
     err_mes = "Read final step in "//mess//" file."
     if (ftype == in_type(1) .or. ftype == in_type(2)) then
       if (st_mpi%rank == 0) then
-        read(unit=fnum,fmt=*,iostat=ierr) nx_totn, etime
+        call read_totn_line(fnum, mess, nx_totn, ierr, etime)
         if (ierr /= 0) then
           call write_logf(err_mes)
           flag = 0 ; etime = st_sim%end_time

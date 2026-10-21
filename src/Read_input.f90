@@ -977,7 +977,6 @@ module read_input
       call check_grid_loc(nx, ny, nz)
 
     allocate(character(64) :: err_mes)
-    err_mes = ""
 
     if (grid_check == 0) then
       call write_success("Read grid file", file_num)

@@ -8,7 +8,7 @@ module check_condition
   use initial_module, only: in_type, out_type, st_grid, st_in_type, st_seal, st_out_type
   use initial_module, only: st_sim, st_in_path, st_in_unit
   use initial_module, only: st_out_path, st_out_unit, st_out_time, st_out_step
-  use read_module, only: read_clasf, read_3dpointf
+  use read_module, only: read_clasf, read_3dpointf, read_totn_line
   use open_file, only: open_out_binf
   use read_input, only: len_scal, len_scal_inv
 #ifdef MPI_MSG
@@ -314,7 +314,8 @@ module check_condition
 
     if (len_trim(adjustl(seal_unit)) /= 0) then
       if (seal_ftype == in_type(1) .or. seal_ftype == in_type(2)) then
-        read(unit=st_seal%fnum,fmt=*,iostat=ierr) st_seal%totn, st_seal%etime
+        call read_totn_line(st_seal%fnum, "input sea level for check", st_seal%totn, ierr,&
+                            st_seal%etime)
       else if (seal_ftype == in_type(3) .or. seal_ftype == in_type(5)) then
         read(unit=st_seal%fnum,fmt=*,iostat=ierr) st_seal%etime
       else if (any(seal_ftype == type_bin(:))) then
@@ -322,7 +323,7 @@ module check_condition
         st_seal%etime = temp_etime
       end if
     else if (seal_ftype == in_type(1) .or. seal_ftype == in_type(2)) then
-      read(unit=st_seal%fnum,fmt=*,iostat=ierr) st_seal%totn
+      call read_totn_line(st_seal%fnum, "input sea level for check", st_seal%totn, ierr)
     end if
 
     if (ierr /= 0) then

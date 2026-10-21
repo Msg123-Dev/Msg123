@@ -1072,8 +1072,9 @@ module time_module
       end if
 
       st_step_flag%seal = 0
+    end if
 
-    else if (st_seal%etime == next_time) then
+    if (st_seal%etime == next_time) then
       st_step_flag%seal = 1
     end if
 
@@ -1097,7 +1098,8 @@ module time_module
       call conv_rech2calc(st_bcnd%rech_num)
 
       st_step_flag%rech = 0 ; root_stepflag = root_stepflag + 1
-    else if (st_rech%etime == next_time) then
+    end if
+    if (st_rech%etime == next_time) then
       st_step_flag%rech = 1
     end if
 
@@ -1114,8 +1116,9 @@ module time_module
         ! -- Set well connectivity (wellconn)
           call set_wellconn(st_bcnd%well_num, st_hydr%read_hydx, st_hydr%read_hydy)
       end if
+    end if
 
-    else if (st_well%etime == next_time) then
+    if (st_well%etime == next_time) then
       st_step_flag%well = 1
     end if
 
@@ -1139,7 +1142,8 @@ module time_module
       deallocate(st_bcnd%prec_cflag)
 
       st_step_flag%prec = 0
-    else if (st_prec%etime == next_time) then
+    end if
+    if (st_prec%etime == next_time) then
       st_step_flag%prec = 1
     end if
 
@@ -1163,7 +1167,8 @@ module time_module
       deallocate(st_bcnd%evap_cflag)
 
       st_step_flag%evap = 0
-    else if (st_evap%etime == next_time) then
+    end if
+    if (st_evap%etime == next_time) then
       st_step_flag%evap = 1
     end if
 
@@ -1182,7 +1187,8 @@ module time_module
         call check_input_nan(st_hydr%read_rfra, "root fraction", st_time%now_time)
 
       st_step_flag%rfra = 0 ; root_stepflag = root_stepflag + 1
-    else if (st_rfra%etime == next_time) then
+    end if
+    if (st_rfra%etime == next_time) then
       st_step_flag%rfra = 1
     end if
 
@@ -1203,7 +1209,8 @@ module time_module
         call check_input_nan(st_rive%calc%wl, "river water level", st_time%now_time)
 
       st_step_flag%riwl = 0 ; rive_stepflag = rive_stepflag + 1
-    else if (st_riwl%etime == next_time) then
+    end if
+    if (st_riwl%etime == next_time) then
       st_step_flag%riwl = 1
     end if
 
@@ -1222,7 +1229,8 @@ module time_module
         call check_input_nan(st_rive%calc%bl, "river bottom level", st_time%now_time)
 
       st_step_flag%ribl = 0 ; rive_stepflag = rive_stepflag + 1
-    else if (st_ribl%etime == next_time) then
+    end if
+    if (st_ribl%etime == next_time) then
       st_step_flag%ribl = 1
     end if
 
@@ -1243,7 +1251,8 @@ module time_module
         call check_input_nan(st_rive%calc%de, "river depth", st_time%now_time)
 
       st_step_flag%ride = 0 ; rive_stepflag = rive_stepflag + 1
-    else if (st_ride%etime == next_time) then
+    end if
+    if (st_ride%etime == next_time) then
       st_step_flag%ride = 1
     end if
 
@@ -1264,7 +1273,8 @@ module time_module
         call check_input_nan(st_rive%calc%wd, "river water depth", st_time%now_time)
 
       st_step_flag%riwd = 0 ; rive_stepflag = rive_stepflag + 1
-    else if (st_riwd%etime == next_time) then
+    end if
+    if (st_riwd%etime == next_time) then
       st_step_flag%riwd = 1
     end if
 
@@ -1285,7 +1295,8 @@ module time_module
         call check_input_nan(st_rive%calc%wi, "river width", st_time%now_time)
 
       st_step_flag%riwi = 0 ; rive_aflag = rive_aflag + 1 ; rive_stepflag = rive_stepflag + 1
-    else if (st_riwi%etime == next_time) then
+    end if
+    if (st_riwi%etime == next_time) then
       st_step_flag%riwi = 1
     end if
 
@@ -1306,7 +1317,8 @@ module time_module
         call check_input_nan(st_rive%calc%le, "river length", st_time%now_time)
 
       st_step_flag%rile = 0 ; rive_aflag = rive_aflag + 1 ; rive_stepflag = rive_stepflag + 1
-    else if (st_rile%etime == next_time) then
+    end if
+    if (st_rile%etime == next_time) then
       st_step_flag%rile = 1
     end if
 
@@ -1327,7 +1339,8 @@ module time_module
         call check_input_nan(st_rive%calc%bk, "river bed conductivity", st_time%now_time)
 
       st_step_flag%ribk = 0 ; rive_stepflag = rive_stepflag + 1
-    else if (st_ribk%etime == next_time) then
+    end if
+    if (st_ribk%etime == next_time) then
       st_step_flag%ribk = 1
     end if
 
@@ -1348,7 +1361,8 @@ module time_module
         call check_input_nan(st_rive%calc%bt, "river bed thickness", st_time%now_time)
 
       st_step_flag%ribt = 0 ; rive_stepflag = rive_stepflag + 1
-    else if (st_ribt%etime == next_time) then
+    end if
+    if (st_ribt%etime == next_time) then
       st_step_flag%ribt = 1
     end if
 
@@ -1416,7 +1430,8 @@ module time_module
         call check_input_nan(st_lake%calc%wl, "lake water level", st_time%now_time)
 
       st_step_flag%lawl = 0 ; lake_stepflag = lake_stepflag + 1
-    else if (st_lawl%etime == next_time) then
+    end if
+    if (st_lawl%etime == next_time) then
       st_step_flag%lawl = 1
     end if
 
@@ -1435,7 +1450,8 @@ module time_module
         call check_input_nan(st_lake%calc%bl, "lake bottom level", st_time%now_time)
 
       st_step_flag%labl = 0 ; lake_stepflag = lake_stepflag + 1
-    else if (st_labl%etime == next_time) then
+    end if
+    if (st_labl%etime == next_time) then
       st_step_flag%labl = 1
     end if
 
@@ -1456,7 +1472,8 @@ module time_module
         call check_input_nan(st_lake%calc%wd, "lake water depth", st_time%now_time)
 
       st_step_flag%lawd = 0 ; lake_stepflag = lake_stepflag + 1
-    else if (st_lawd%etime == next_time) then
+    end if
+    if (st_lawd%etime == next_time) then
       st_step_flag%lawd = 1
     end if
 
@@ -1477,7 +1494,8 @@ module time_module
         call check_input_nan(st_lake%calc%ar, "lake area", st_time%now_time)
 
       st_step_flag%laar = 0 ; lake_stepflag = lake_stepflag + 1
-    else if (st_laar%etime == next_time) then
+    end if
+    if (st_laar%etime == next_time) then
       st_step_flag%laar = 1
     end if
 
@@ -1498,7 +1516,8 @@ module time_module
         call check_input_nan(st_lake%calc%bk, "lake bed conductivity", st_time%now_time)
 
       st_step_flag%labk = 0 ; lake_stepflag = lake_stepflag + 1
-    else if (st_labk%etime == next_time) then
+    end if
+    if (st_labk%etime == next_time) then
       st_step_flag%labk = 1
     end if
 
@@ -1519,7 +1538,8 @@ module time_module
         call check_input_nan(st_lake%calc%bt, "lake bed thickness", st_time%now_time)
 
       st_step_flag%labt = 0 ; lake_stepflag = lake_stepflag + 1
-    else if (st_labt%etime == next_time) then
+    end if
+    if (st_labt%etime == next_time) then
       st_step_flag%labt = 1
     end if
 

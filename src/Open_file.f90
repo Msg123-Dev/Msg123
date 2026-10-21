@@ -1251,7 +1251,7 @@ module open_file
       if (intpr_type == in_type(3)) then
         if (st_mpi%rank == 0) then
           ! -- Open new read text file (new_rtxt)
-            call open_new_rtxt(1, 1, trim(adjustl(intprp)), "input "//vname, st_prec%fnum)
+            call open_new_rtxt(1, 1, trim(adjustl(intprp)), "input "//err_mes, st_prec%fnum)
         end if
       else if (intpr_type == in_type(4)) then
 #ifdef MPI_MSG

@@ -1,11 +1,13 @@
 module calc_parameter
   ! -- modules
-  use kind_module, only: DP
+  use kind_module, only: I4, SP, DP
   use constval_module, only: DZERO, DONE, DHALF
+  use initial_module, only: st_schm
+  use set_condition, only: st_hydr
 
   implicit none
   private
-  public :: calc_srat_rperm, calc_hyd_geoharm, calc_hyd_upwind
+  public :: calc_srat_rperm, calc_kr_cell, calc_hyd_geoharm, calc_hyd_upwind
   public :: calc_hyd_harm, calc_hyd_geo, calc_hyd_arith
 
   ! -- local
@@ -17,10 +19,7 @@ module calc_parameter
   ! calc_srat_rperm -- Calculate saturation and relative permeability
   !*********************************************************************************************
     ! -- modules
-    use kind_module, only: I4
-    use initial_module, only: st_schm
     use make_cell, only: st_geom
-    use set_condition, only: st_hydr
     ! -- inout
     integer(I4), intent(in) :: num
     real(DP), intent(in) :: pres(:)
@@ -32,13 +31,10 @@ module calc_parameter
     ! -- local
     integer(I4) :: i
     real(DP) :: retm, beta, theta, kr, se, stor_val, srat_val
-    real(DP) :: phead, phead0, kr_phead, dkr
+    real(DP) :: phead, kr_phead, dkr
     real(DP) :: pors_val, resi_val, dtheta_dpsi
-    real(DP) :: kr_lin, kr_grad
     !-------------------------------------------------------------------------------------------
-    phead0 = -st_schm%krlin_head
-
-    !$omp parallel do private(i, pors_val, resi_val, retm, phead, kr_lin, kr_grad, dkr) &
+    !$omp parallel do private(i, pors_val, resi_val, retm, phead, dkr) &
     !$omp             private(beta, se, theta, srat_val, stor_val, dtheta_dpsi, kr_phead, kr)
     do i = 1, num
       pors_val = st_hydr%read_pors(i) ; resi_val = st_hydr%read_resi(i)
@@ -79,16 +75,8 @@ module calc_parameter
       else
         kr_phead = phead
       end if
-      if (kr_phead >= DZERO) then
-        kr = DONE ; dkr = DZERO
-      else if (kr_phead > phead0) then
-        ! -- Relative permeability and its slope at the linear bridge head
-        call calc_kr_vgm(phead0, st_hydr%read_vana(i), st_hydr%read_vann(i), retm, kr_lin, dkr)
-        kr_grad = (DONE-kr_lin)/st_schm%krlin_head
-        kr = kr_lin + (kr_phead-phead0)*kr_grad ; dkr = kr_grad
-      else
-        call calc_kr_vgm(kr_phead, st_hydr%read_vana(i), st_hydr%read_vann(i), retm, kr, dkr)
-      end if
+      ! -- Relative permeability of the cell (kr_cell)
+        call calc_kr_cell(i, kr_phead, kr, dkr)
 
       if (present(rperm)) then
         rperm(i) = kr
@@ -107,12 +95,45 @@ module calc_parameter
 
   end subroutine calc_srat_rperm
 
+  subroutine calc_kr_cell(i, phead, kr, dkr)
+  !*********************************************************************************************
+  ! calc_kr_cell -- Calculate relative permeability of a cell at a pressure head
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(in) :: i
+    real(DP), intent(in) :: phead
+    real(DP), intent(out) :: kr
+    real(DP), intent(out), optional :: dkr
+    ! -- local
+    real(SP) :: vana, vann
+    real(DP) :: retm, phead0, kr_lin, kr_grad, dkr_val
+    !-------------------------------------------------------------------------------------------
+    vana = st_hydr%read_vana(i) ; vann = st_hydr%read_vann(i)
+    retm = DONE - DONE/vann
+    phead0 = -st_schm%krlin_head
+    if (phead >= DZERO) then
+      kr = DONE ; dkr_val = DZERO
+    else if (phead > phead0) then
+      ! -- Relative permeability and its slope at the linear bridge head
+      call calc_kr_vgm(phead0, vana, vann, retm, kr_lin, dkr_val)
+      kr_grad = (DONE-kr_lin)/st_schm%krlin_head
+      kr = kr_lin + (phead-phead0)*kr_grad ; dkr_val = kr_grad
+    else
+      call calc_kr_vgm(phead, vana, vann, retm, kr, dkr_val)
+    end if
+    if (present(dkr)) then
+      dkr = dkr_val
+    end if
+
+  end subroutine calc_kr_cell
+
   subroutine calc_kr_vgm(phead, vana, vann, retm, kr, dkr)
   !*********************************************************************************************
   ! calc_kr_vgm -- Calculate relative permeability by van Genuchten and Mualem
   !*********************************************************************************************
     ! -- modules
-    use kind_module, only: SP
     use constval_module, only: DTWO
     ! -- inout
     real(DP), intent(in) :: phead, retm

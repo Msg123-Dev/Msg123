@@ -760,12 +760,13 @@ module calc_function
   ! func_sealterm -- Function sea level term
   !*********************************************************************************************
     ! -- modules
+    use calc_parameter, only: calc_kr_cell
     ! -- inout
     real(DP), intent(in) :: infseal(:), rperm(:)
     real(DP), intent(inout) :: seafunc(:)
     ! -- local
     integer(I4) :: i, c, s
-    real(DP) :: delhead
+    real(DP) :: delhead, relat
     !-------------------------------------------------------------------------------------------
     !$omp parallel
     !$omp do private(i)
@@ -774,11 +775,17 @@ module calc_function
     end do
     !$omp end do
 
-    !$omp do private(i, c, s, delhead)
+    !$omp do private(i, c, s, delhead, relat)
     do i = 1, st_bcnd%seal_num
       c = st_bcnd%seal2calc(i) ; s = st_bcnd%seal2seal(i)
       delhead = st_forc%read_seal(s) - infseal(c)
-      seal_flow(i) = st_hydr%hydf_seal(i)*rperm(c)*st_hydr%abyd_seal(i)*delhead
+      if (delhead > DZERO) then
+        ! -- Relative permeability of the cell at the sea head (kr_cell)
+          call calc_kr_cell(c, st_forc%read_seal(s)-st_hydr%krpos_seal(i), relat)
+      else
+        relat = rperm(c)
+      end if
+      seal_flow(i) = st_hydr%hydf_seal(i)*relat*st_hydr%abyd_seal(i)*delhead
     end do
     !$omp end do
 

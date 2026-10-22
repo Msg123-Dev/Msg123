@@ -121,6 +121,7 @@ module allocate_solution
     allocate(st_sol%stor_new(nreg_num))
     allocate(st_hydr%abyd_conn(tconn_num), st_hydr%hydf_conn(tconn_num))
     allocate(st_hydr%abyd_seal(st_bcnd%seal_num), st_hydr%hydf_seal(st_bcnd%seal_num))
+    allocate(st_hydr%krpos_seal(st_bcnd%seal_num))
     allocate(st_bcnd%seal2calc(st_bcnd%seal_num), st_bcnd%seal2seal(st_bcnd%seal_num))
     allocate(dir_conn(tconn_num))
     !$omp parallel
@@ -140,6 +141,7 @@ module allocate_solution
     do i = 1, st_bcnd%seal_num
       st_hydr%abyd_seal(i) = DZERO ; st_hydr%hydf_seal(i) = DZERO
       st_hydr%abyd_seal(i) = DZERO ; st_hydr%hydf_seal(i) = DZERO
+      st_hydr%krpos_seal(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i, k)
@@ -154,13 +156,14 @@ module allocate_solution
     !$omp do private(i)
     do i = 1, st_bcnd%seal_num
       st_hydr%abyd_seal(i) = st_hydr%sea_abyd(i) ; st_hydr%hydf_seal(i) = st_hydr%sea_hydf(i)
+      st_hydr%krpos_seal(i) = st_hydr%sea_krpos(i)
       st_bcnd%seal2calc(i) = st_bcnd%sea2cal(i) ; st_bcnd%seal2seal(i) = st_bcnd%sea2sea(i)
     end do
     !$omp end do
     !$omp end parallel
 
     deallocate(st_hydr%area_dis, st_hydr%sat_hydf, conn_dir)
-    deallocate(st_hydr%sea_abyd, st_hydr%sea_hydf)
+    deallocate(st_hydr%sea_abyd, st_hydr%sea_hydf, st_hydr%sea_krpos)
     deallocate(st_bcnd%sea2cal, st_bcnd%sea2sea)
 
     if (st_out_type%velc > 0) then

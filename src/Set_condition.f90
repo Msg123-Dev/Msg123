@@ -1948,6 +1948,7 @@ module set_condition
     allocate(st_hydr%surf_net(ncals), st_hydr%rech_net(ncals))
     allocate(st_hydr%hydf_surf(ncals), st_hydr%abyd_surf(ncals))
     allocate(st_hydr%sea_abyd(seal_cnum*FACE), st_hydr%sea_hydf(seal_cnum*FACE))
+    allocate(st_hydr%sea_krpos(seal_cnum*FACE))
     allocate(left_off(totn_clac*FACE), right_off(totn_clac*FACE))
     allocate(st_geom%cell_down(ncalc))
     off_index(0) = 0
@@ -1978,7 +1979,7 @@ module set_condition
     !$omp end do
     !$omp do private(i)
     do i = 1, seal_cnum*FACE
-      st_hydr%sea_abyd(i) = DZERO ; st_hydr%sea_hydf(i) = DZERO
+      st_hydr%sea_abyd(i) = DZERO ; st_hydr%sea_hydf(i) = DZERO ; st_hydr%sea_krpos(i) = DZERO
     end do
     !$omp end do
     !$omp end parallel
@@ -2160,6 +2161,7 @@ module set_condition
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
             st_hydr%sea_abyd(st_bcnd%seal_num) = reg_fare(i,1)/dis12
             st_hydr%sea_hydf(st_bcnd%seal_num) = hyd_face
+            st_hydr%sea_krpos(st_bcnd%seal_num) = st_geom%cell_top(i)
             if (st_out_type%velc > 0) then
               st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 1
             end if
@@ -2219,6 +2221,11 @@ module set_condition
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
             st_hydr%sea_abyd(st_bcnd%seal_num) = reg_fare(i,2)/dis12
             st_hydr%sea_hydf(st_bcnd%seal_num) = hyd_face
+            if (st_schm%krpos_type == 1) then
+              st_hydr%sea_krpos(st_bcnd%seal_num) = st_geom%cell_cent(i)
+            else
+              st_hydr%sea_krpos(st_bcnd%seal_num) = st_geom%cell_top(i)
+            end if
             if (st_out_type%velc > 0) then
               st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 2
             end if
@@ -2272,6 +2279,11 @@ module set_condition
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
             st_hydr%sea_abyd(st_bcnd%seal_num) = reg_fare(i,3)/dis12
             st_hydr%sea_hydf(st_bcnd%seal_num) = hyd_face
+            if (st_schm%krpos_type == 1) then
+              st_hydr%sea_krpos(st_bcnd%seal_num) = st_geom%cell_cent(i)
+            else
+              st_hydr%sea_krpos(st_bcnd%seal_num) = st_geom%cell_top(i)
+            end if
             if (st_out_type%velc > 0) then
               st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 3
             end if
@@ -2325,6 +2337,11 @@ module set_condition
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
             st_hydr%sea_abyd(st_bcnd%seal_num) = reg_fare(i,4)/dis12
             st_hydr%sea_hydf(st_bcnd%seal_num) = hyd_face
+            if (st_schm%krpos_type == 1) then
+              st_hydr%sea_krpos(st_bcnd%seal_num) = st_geom%cell_cent(i)
+            else
+              st_hydr%sea_krpos(st_bcnd%seal_num) = st_geom%cell_top(i)
+            end if
             if (st_out_type%velc > 0) then
               st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 4
             end if
@@ -2378,6 +2395,11 @@ module set_condition
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
             st_hydr%sea_abyd(st_bcnd%seal_num) = reg_fare(i,5)/dis12
             st_hydr%sea_hydf(st_bcnd%seal_num) = hyd_face
+            if (st_schm%krpos_type == 1) then
+              st_hydr%sea_krpos(st_bcnd%seal_num) = st_geom%cell_cent(i)
+            else
+              st_hydr%sea_krpos(st_bcnd%seal_num) = st_geom%cell_top(i)
+            end if
             if (st_out_type%velc > 0) then
               st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 5
             end if
@@ -2431,6 +2453,7 @@ module set_condition
               call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
             st_hydr%sea_abyd(st_bcnd%seal_num) = reg_fare(i,6)/dis12
             st_hydr%sea_hydf(st_bcnd%seal_num) = hyd_face
+            st_hydr%sea_krpos(st_bcnd%seal_num) = st_geom%cell_bot(i)
             if (st_out_type%velc > 0) then
               st_hydr%sea_dis(st_bcnd%seal_num) = DONE/dis12 ; sea_dir(st_bcnd%seal_num) = 6
             end if

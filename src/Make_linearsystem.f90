@@ -552,7 +552,7 @@ module make_linearsystem
   ! set_seabound -- Set sea boundary to dmat
   !*********************************************************************************************
     ! -- modules
-
+    use calc_parameter, only: calc_kr_cell
     ! -- inout
     real(DP), intent(in) :: dkr_dpsi(:)
     type(sol_set), intent(in) :: st_sol
@@ -561,6 +561,7 @@ module make_linearsystem
     real(DP), intent(out) :: tran_sea(:)
     ! -- local
     integer(I4) :: i, c, s
+    real(DP) :: relat
     !-------------------------------------------------------------------------------------------
     !$omp parallel
     !$omp do private(i)
@@ -569,11 +570,17 @@ module make_linearsystem
       rel_sea(i) = DZERO ; tran_sea(i) = DZERO
     end do
     !$omp end do
-    !$omp do private(i, c, s)
+    !$omp do private(i, c, s, relat)
     do i = 1, st_bcnd%seal_num
       c = st_bcnd%seal2calc(i) ; s = st_bcnd%seal2seal(i)
       delh_sea(i) = st_forc%read_seal(s) - st_sol%head_new(c)
-      rel_sea(i) = st_sol%rel_perm(c)*st_hydr%hydf_seal(i)
+      if (delh_sea(i) > DZERO) then
+        ! -- Relative permeability of the cell at the sea head (kr_cell)
+          call calc_kr_cell(c, st_forc%read_seal(s)-st_hydr%krpos_seal(i), relat)
+      else
+        relat = st_sol%rel_perm(c)
+      end if
+      rel_sea(i) = relat*st_hydr%hydf_seal(i)
       deri_sea(i) = -rel_sea(i)*st_hydr%abyd_seal(i)
     end do
     !$omp end do
@@ -582,7 +589,9 @@ module make_linearsystem
       !$omp do private(i, c)
       do i = 1, st_bcnd%seal_num
         c = st_bcnd%seal2calc(i)
-        deri_ks_sea(i) = dkr_dpsi(c)*st_hydr%hydf_seal(i)*delh_sea(i)*st_hydr%abyd_seal(i)
+        if (delh_sea(i) <= DZERO) then
+          deri_ks_sea(i) = dkr_dpsi(c)*st_hydr%hydf_seal(i)*delh_sea(i)*st_hydr%abyd_seal(i)
+        end if
       end do
       !$omp end do
     end if

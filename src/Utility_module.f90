@@ -17,6 +17,7 @@ module utility_module
   public :: gmap_init, gmap_put, gmap_get, gmap_free
 
   ! -- local
+  integer(I4), allocatable :: wtxt_fnum(:)
 
   contains
 
@@ -146,6 +147,12 @@ module utility_module
     if (.not. is_opened) then
       open(newunit=file_num, file=file_name, form='formatted',&
            access='sequential', status='replace', action='write', iostat=ierr)
+      if (ierr == 0) then
+        if (.not. allocated(wtxt_fnum)) then
+          allocate(wtxt_fnum(0))
+        end if
+        wtxt_fnum = [wtxt_fnum, file_num]
+      end if
     end if
 
     if (ierr == 0) then
@@ -314,12 +321,19 @@ module utility_module
     ! -- inout
     character(*), intent(in) :: err_mes
     ! -- local
-
+#ifdef MPI_MSG
+    integer(I4) :: i, ierr
+#endif
     !-------------------------------------------------------------------------------------------
     write(log_fnum,'(a)') "Error!! "//err_mes
     flush(log_fnum)
 
 #ifdef MPI_MSG
+    if (allocated(wtxt_fnum)) then
+      do i = 1, size(wtxt_fnum)
+        flush(wtxt_fnum(i), iostat=ierr)
+      end do
+    end if
     ! -- Abort process (proc)
       call abort_proc(st_mpi%rank, log_fnum)
 #endif

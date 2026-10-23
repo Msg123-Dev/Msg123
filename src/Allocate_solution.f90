@@ -128,18 +128,17 @@ module allocate_solution
     !$omp do private(i)
     do i = 1, nreg_num
       st_sol%head_new(i) = DZERO ; st_sol%head_pre(i) = DZERO ; st_sol%head_change(i) = DZERO
-      st_sol%srat_new(i) = DZERO ; st_sol%rel_perm(i) = DZERO ; dir_conn(i) = 0
+      st_sol%srat_new(i) = DZERO ; st_sol%rel_perm(i) = DZERO
       st_sol%stor_new(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i)
     do i = 1, tconn_num
-      st_hydr%abyd_conn(i) = DZERO ; st_hydr%hydf_conn(i) = DZERO
+      st_hydr%abyd_conn(i) = DZERO ; st_hydr%hydf_conn(i) = DZERO ; dir_conn(i) = 0
     end do
     !$omp end do
     !$omp do private(i)
     do i = 1, st_bcnd%seal_num
-      st_hydr%abyd_seal(i) = DZERO ; st_hydr%hydf_seal(i) = DZERO
       st_hydr%abyd_seal(i) = DZERO ; st_hydr%hydf_seal(i) = DZERO
       st_hydr%krpos_seal(i) = DZERO
     end do

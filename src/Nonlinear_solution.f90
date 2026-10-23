@@ -331,7 +331,8 @@ module nonlinear_solution
         if ((check_val >= VARMAX .or. max_unk >= XMAX) .and. st_sim%sim_type /= -1) then
           back_flag = .true.
         else if (check_val <= st_ctrl%criteria .and. max_unk < XMAX .and.&
-                 .not. (back_flag .and. st_sim%sim_type /= -1)) then
+                 .not. (back_flag .and. (st_sim%sim_type /= -1 .or.&
+                                         st_ctrl%conv_type == 0))) then
           st_time%conv_flag = .true. ; head_change_flag = .true.
         else if (st_sim%sim_type == -1) then
           back_flag = .false.
@@ -440,7 +441,7 @@ module nonlinear_solution
       end if
 
       ! check outer_loop
-      if (st_time%conv_flag .and. st_sim%sim_type /= -1) then
+      if (st_time%conv_flag .and. (st_sim%sim_type /= -1 .or. st_ctrl%conv_type == 0)) then
         ! -- Calculate surface water level (surfw)
           call calc_surfw(st_sol)
         if (st_out_step%rest == DZERO) then
@@ -468,6 +469,7 @@ module nonlinear_solution
         if (st_mpi%rank == 0) then
           write(conv_fnum,15)
         end if
+        st_time%conv_flag = .false.
         exit outer_loop
       else if (st_time%out_iter == st_ctrl%maxout_iter) then
         if (st_mpi%rank == 0) then

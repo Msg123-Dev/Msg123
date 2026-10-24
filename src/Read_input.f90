@@ -812,8 +812,8 @@ module read_input
     integer(I4) :: i, j, k, ierr
     integer(I4) :: grid_xtype, grid_ytype, grid_ztype
     integer(I4) :: xyz_ftype(3), xyz_fnum(3)
-    real(SP) :: xcorner, ycorner, zcorner
-    real(SP) :: xwidth, ywidth, zwidth
+    real(DP) :: xcorner, ycorner, zcorner
+    real(DP) :: xwidth, ywidth, zwidth
     real(SP), allocatable :: read_xy(:,:), read_z(:,:,:)
     character(1) :: xyz_mess(3)
     character(CHALEN) :: in_xpath, in_ypath, in_zpath
@@ -882,9 +882,12 @@ module read_input
         if (xyz_ftype(i) == in_type(3)) then
           ! -- Open new read text file (new_rtxt)
             call open_new_rtxt(1, 1, xyz_path, "grid "//xyz_mess(i), xyz_fnum(i))
-          if (i == 1 .or. i == 2) then
+          if (i == 1) then
             ! -- Read 2D text file (2dtxt)
-              call read_2dtxt(xyz_fnum(i), nx+1, ny+1, read_xy)
+              call read_2dtxt(xyz_fnum(i), nx+1, ny+1, glob_x)
+          else if (i == 2) then
+            ! -- Read 2D text file (2dtxt)
+              call read_2dtxt(xyz_fnum(i), nx+1, ny+1, glob_y)
           else
             call write_err_stop("Specified wrong file number in gridz type.")
           end if
@@ -902,7 +905,7 @@ module read_input
             call open_new_rtxt(1, 1, xyz_path, "grid "//xyz_mess(i), xyz_fnum(i))
           if (i == 3) then
             ! -- Read 3D text file (3dtxt)
-              call read_3dtxt(xyz_fnum(i), nx+1, ny+1, nz+1, read_z)
+              call read_3dtxt(xyz_fnum(i), nx+1, ny+1, nz+1, glob_z)
           else
             call write_err_stop("Specified wrong file number in gridx or gridy type.")
           end if
@@ -919,14 +922,16 @@ module read_input
         call close_file(xyz_fnum(i))
         deallocate(xyz_path)
 
-        select case (i)
-        case (1)
-          glob_x = real(read_xy, kind=DP)
-        case (2)
-          glob_y = real(read_xy, kind=DP)
-        case (3)
-          glob_z = real(read_z, kind=DP)
-        end select
+        if (xyz_ftype(i) == in_type(4) .or. xyz_ftype(i) == in_type(6)) then
+          select case (i)
+          case (1)
+            glob_x = real(read_xy, kind=DP)
+          case (2)
+            glob_y = real(read_xy, kind=DP)
+          case (3)
+            glob_z = real(read_z, kind=DP)
+          end select
+        end if
       end do
 
       deallocate(read_xy, read_z)
@@ -952,19 +957,19 @@ module read_input
       !$omp parallel
       !$omp do private(i)
       do i = 1, nx+1
-        glob_x(i,:) = real(xcorner + xwidth*(i-1), kind=DP)
+        glob_x(i,:) = xcorner + xwidth*(i-1)
       end do
       !$omp end do
 
       !$omp do private(j)
       do j = 1, ny+1
-        glob_y(:,j) = real(ycorner - ywidth*(j-1), kind=DP)
+        glob_y(:,j) = ycorner - ywidth*(j-1)
       end do
       !$omp end do
 
       !$omp do private(k)
       do k = 1, nz+1
-        glob_z(:,:,k) = real(zcorner + zwidth*(k-1), kind=DP)
+        glob_z(:,:,k) = zcorner + zwidth*(k-1)
       end do
       !$omp end do
       !$omp end parallel

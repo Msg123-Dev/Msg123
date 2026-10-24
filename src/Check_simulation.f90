@@ -110,7 +110,7 @@ module check_simulation
     ! -- local
     integer(I4) :: i, k, viol_num
     real(DP) :: vol_scal, res_val, scal_val, abs_tol, rel_tol, round_val, acc_val
-    logical :: abs_flag, rel_flag, pass_flag, round_flag
+    logical :: abs_flag, rel_flag, pass_flag, round_flag, stor_flag
 #ifdef MPI_MSG
     integer(I4) :: sum_viol
 #endif
@@ -120,7 +120,7 @@ module check_simulation
     if (.not. abs_flag .and. .not. rel_flag) then
       return
     end if
-    round_flag = present(stnew) .and. present(stold) .and. present(hnew)
+    round_flag = present(hnew) ; stor_flag = present(stnew) .and. present(stold)
 
     viol_num = 0 ; vol_scal = len_scal**3 ; acc_val = calc_acc_floor(fscal)
     abs_tol = st_ctrl%res_abs_tol*res_fact ; rel_tol = st_ctrl%res_rel_tol*res_fact
@@ -137,8 +137,11 @@ module check_simulation
       else if (rel_flag .and. res_val <= rel_tol*scal_val) then
         pass_flag = .true.
       else if (round_flag) then
-        round_val = max(abs(stnew(i)), abs(stold(i)))*st_geom%cell_vol(i)*st_time%delt_inv&
-                    + abs(array_var(1)%dmat(i))*abs(hnew(i))
+        round_val = abs(array_var(1)%dmat(i))*abs(hnew(i))
+        if (stor_flag) then
+          round_val = max(abs(stnew(i)), abs(stold(i)))*st_geom%cell_vol(i)*st_time%delt_inv&
+                      + round_val
+        end if
         do k = crs_index(1)%offind(i-1)+1, crs_index(1)%offind(i)
           round_val = round_val + abs(array_var(1)%lumat(k))*abs(hnew(crs_index(1)%offrow(k)))
         end do

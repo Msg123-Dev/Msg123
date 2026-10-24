@@ -166,7 +166,8 @@ module nonlinear_solution
           res_fact = DONE
         end if
         ! -- Check residual convergence (residual)
-          call check_residual(array_var(1)%rhs, func_scal, res_flag, res_fact)
+          call check_residual(array_var(1)%rhs, func_scal, res_flag, res_fact,&
+                              hnew=st_sol%head_new)
         if (st_time%out_iter > 1) then
           res_flag = res_flag .and. head_change_flag
         end if

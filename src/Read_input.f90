@@ -1,8 +1,7 @@
 module read_input
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: VARLEN, CHALEN, TIMELEN, SZERO, SONE, DZERO, DONE,&
-                             DNOVAL
+  use constval_module, only: VARLEN, CHALEN, TIMELEN, SZERO, SONE, DZERO, DONE, DHALF, DNOVAL
   use utility_module, only: get_days, open_new_rtxt, close_file, write_logf, write_success
   use utility_module, only: write_err_stop, conv_lower
   use initial_module, only: in_type, unit_list, st_sim, st_ctrl, st_schm, st_in_type
@@ -1461,7 +1460,7 @@ module read_input
     ! -- local
     integer(I4) :: i, j, k
     integer(I4), allocatable :: gxnum(:,:), gynum(:,:), gznum(:,:,:)
-    real(DP) :: minz, maxz, real_scal, z_range
+    real(DP) :: minz, maxz, z_range
     !-------------------------------------------------------------------------------------------
     grid_check = 0 ; grid_xnum = 0 ; grid_ynum = 0 ; grid_znum = 0
     allocate(gxnum(nx+1,ny+1), gynum(nx+1,ny+1))
@@ -1542,11 +1541,10 @@ module read_input
     if (z_range <= DZERO) then
       call write_err_stop("Input a valid grid elevation range.")
     end if
-    real_scal = log10(z_range)
-    if ((real_scal - int(real_scal)) > SZERO) then
-      len_scal = 10.00_SP**(int(real_scal)+1)
+    if (fraction(z_range) == DHALF) then
+      len_scal = scale(SONE, exponent(z_range)-1)
     else
-      len_scal = 10.00_SP**(int(real_scal))
+      len_scal = scale(SONE, exponent(z_range))
     end if
 
     len_scal_inv = SONE/len_scal

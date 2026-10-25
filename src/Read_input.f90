@@ -337,6 +337,10 @@ module read_input
       call write_err_stop("While reading calculation time section in main file.")
     end if
 
+    if (stime_type < 0 .or. stime_type > 2) then
+      call write_err_stop("Specify correct number for start time type in main file.")
+    end if
+
     if (len_trim(calc_unit) == 0) then
       call write_err_stop("Specify calculation time unit in main file.")
     else
@@ -1091,7 +1095,7 @@ module read_input
       call write_err_stop("Specify initial file path in main file.")
     else if (init_type == in_type(7) .and. init_dept == SNOVAL) then
       call write_err_stop("Specify depth from surface elevation in main file.")
-    else if (init_type == in_type(0) .and. st_sim%res_type == 1) then
+    else if (init_type == in_type(0) .and. st_sim%res_type >= 1) then
       if (all(unit_list(:) /= init_unit)) then
         call write_err_stop("Specify initial unit in main file.")
       end if

@@ -489,7 +489,7 @@ module assign_calc
     ! -- local
     integer(I4) :: i, ierr
     integer(I4) :: init_fnum, init_inttype
-    real(DP) :: temp_end
+    real(DP) :: temp_end, temp_delt
 #ifdef MPI_MSG
     integer(I4) :: j, k, xn, yn, zn, xyzn
     integer(I4) :: nov_num, sum_init
@@ -503,11 +503,11 @@ module assign_calc
     end do
     !$omp end parallel do
 
-    ierr = 0
+    ierr = 0 ; temp_delt = SZERO
     if (init_ftype == in_type(0)) then
 #ifdef MPI_MSG
     ! -- Read mpi restart file (mpi_restf)
-      call read_mpi_restf(st_init%fnum, ncalc, temp_end, st_hydr%read_init)
+      call read_mpi_restf(st_init%fnum, ncalc, temp_end, temp_delt, st_hydr%read_init)
       call close_mpi_file(st_init%fnum)
 #else
       read(unit=st_init%fnum,iostat=ierr) temp_end
@@ -517,6 +517,10 @@ module assign_calc
       read(unit=st_init%fnum,iostat=ierr) (st_hydr%read_init(i), i = 1, ncalc)
       if (ierr /= 0) then
         call write_err_stop("While reading initial value in initial file.")
+      end if
+      read(unit=st_init%fnum,iostat=ierr) temp_delt
+      if (ierr /= 0) then
+        temp_delt = SZERO
       end if
       call close_file(st_init%fnum)
 #endif
@@ -632,6 +636,7 @@ module assign_calc
 #endif
 
     st_init%rest_time = st_init%rest_time*st_init%multi
+    st_init%rest_delt = temp_delt*st_init%multi
 
     ! -- Check input nan (input_nan)
       call check_input_nan(st_hydr%read_init, "initial")

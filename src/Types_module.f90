@@ -161,7 +161,7 @@ module types_module
   type :: init_set
     integer(I4) :: fnum
     real(SP) :: depth
-    real(DP) :: multi, rest_time
+    real(DP) :: multi, rest_time, rest_delt
   end type init_set
 
   type :: seal_set

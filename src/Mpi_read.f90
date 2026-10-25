@@ -193,7 +193,7 @@ module mpi_read
 
   end subroutine set_real8_fview
 
-  subroutine read_mpi_restf(fileh, calc_num, rest_time, calc_init)
+  subroutine read_mpi_restf(fileh, calc_num, rest_time, rest_delt, calc_init)
   !*********************************************************************************************
   ! read_mpi_restf -- Read mpi restart file
   !*********************************************************************************************
@@ -201,7 +201,7 @@ module mpi_read
     use constval_module, only: DZERO
     ! -- inout
     integer(I4), intent(in) :: fileh, calc_num
-    real(DP), intent(out) :: rest_time
+    real(DP), intent(out) :: rest_time, rest_delt
     real(DP), intent(out) :: calc_init(:)
     ! -- local
     integer(I4) :: i, ierr
@@ -209,7 +209,7 @@ module mpi_read
     real(DP), allocatable :: read_rest(:)
     !-------------------------------------------------------------------------------------------
     ierr = 0
-    allocate(istat(MPI_STATUS_SIZE), read_rest(calc_num+1))
+    allocate(istat(MPI_STATUS_SIZE), read_rest(calc_num+2))
     !$omp parallel
     !$omp do private(i)
     do i = 1, MPI_STATUS_SIZE
@@ -217,20 +217,20 @@ module mpi_read
     end do
     !$omp end do
     !$omp do private(i)
-    do i = 1, calc_num+1
+    do i = 1, calc_num+2
       read_rest(i) = DZERO
     end do
     !$omp end do
     !$omp end parallel
 
-    call MPI_FILE_READ_ALL(fileh, read_rest, calc_num+1, MPI_REAL8, istat, ierr)
+    call MPI_FILE_READ_ALL(fileh, read_rest, calc_num+2, MPI_REAL8, istat, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Read restart file in MPI program.")
       end if
     end if
 
-    rest_time = read_rest(1)
+    rest_time = read_rest(1) ; rest_delt = read_rest(calc_num+2)
 
     !$omp parallel do private(i)
     do i = 1, calc_num
@@ -756,7 +756,7 @@ module mpi_read
             call write_err_stop("Set view "//err_mes//" in MPI program.")
           end if
         end if
-      else if (fetime > st_init%rest_time .and. st_sim%res_type == 1) then
+      else if (fetime > st_init%rest_time .and. st_sim%res_type >= 1) then
         time_flag = 1 ; read_head = head_dis*read_count*I4
         call MPI_FILE_SET_VIEW(fnum, read_head, MPI_REAL4, fview, "native", MPI_INFO_NULL, ierr)
         if (ierr /= MPI_SUCCESS) then
@@ -799,7 +799,7 @@ module mpi_read
     do while (time_flag == 0)
       fetime = finend + fstep*count_num
       fetime = fetime*fmulti
-      if (fetime <= st_init%rest_time .and. st_sim%res_type == 1) then
+      if (fetime <= st_init%rest_time .and. st_sim%res_type >= 1) then
         call close_mpi_file(fnum)
         if (st_mpi%rank == 0) then
           read(unit=bnum,fmt='(a)',iostat=ierr) intpath

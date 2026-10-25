@@ -140,7 +140,7 @@ module mpi_write
 
   end subroutine write_mpi_3dbin
 
-  subroutine write_mpi_rest(out_fh, out_time, out_unit, out_val)
+  subroutine write_mpi_rest(out_fh, out_time, out_delt, out_unit, out_val)
   !*********************************************************************************************
   ! write_mpi_rest -- Write mpi restart value
   !*********************************************************************************************
@@ -148,7 +148,7 @@ module mpi_write
     use read_input, only: z_base
     ! -- inout
     integer(I4), intent(in) :: out_fh
-    real(DP), intent(in) :: out_time
+    real(DP), intent(in) :: out_time, out_delt
     real(SP), intent(in) :: out_unit
     real(DP), intent(in) :: out_val(:)
     ! -- local
@@ -160,7 +160,7 @@ module mpi_write
     !-------------------------------------------------------------------------------------------
     sync_time = out_time
     call MPI_BCAST(sync_time, 1, MPI_REAL8, 0, st_mpi%comm, ierr)
-    allocate(istat(MPI_STATUS_SIZE), out_rest(ncalc+1))
+    allocate(istat(MPI_STATUS_SIZE), out_rest(ncalc+2))
     !$omp parallel
     !$omp do private(i)
     do i = 1, MPI_STATUS_SIZE
@@ -173,10 +173,10 @@ module mpi_write
     end do
     !$omp end do
     !$omp end parallel
-    out_rest(1) = sync_time
+    out_rest(1) = sync_time ; out_rest(ncalc+2) = out_delt
 
     ierr = 0 ; head_dis = 0
-    call MPI_FILE_WRITE_AT_ALL(out_fh, head_dis, out_rest, ncalc+1, MPI_REAL8, istat, ierr)
+    call MPI_FILE_WRITE_AT_ALL(out_fh, head_dis, out_rest, ncalc+2, MPI_REAL8, istat, ierr)
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_write(out_fh)

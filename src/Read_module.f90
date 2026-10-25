@@ -645,7 +645,8 @@ module read_module
 
       fetime = fetime*fmulti
 
-      if (fetime <= st_init%rest_time .and. st_sim%res_type >= 1) then
+      if (fetime <= st_init%rest_time .and. st_sim%res_type >= 1 .and.&
+          st_sim%sim_type == 1) then
         if (ftype == in_type(1) .or. ftype == in_type(2)) then
           call skip_clas_point(fnum, file_totn)
         else if (ftype == in_type(3)) then
@@ -695,7 +696,8 @@ module read_module
     do while (time_flag == 0)
       fetime = finend + fstep*count_num
       fetime = fetime*fmulti
-      if (fetime <= st_init%rest_time .and. st_sim%res_type >= 1) then
+      if (fetime <= st_init%rest_time .and. st_sim%res_type >= 1 .and.&
+          st_sim%sim_type == 1) then
         if (any(ftype == type_txt(:))) then
           call close_file(fnum)
           read(unit=bunit,fmt='(a)',iostat=ierr) intpath

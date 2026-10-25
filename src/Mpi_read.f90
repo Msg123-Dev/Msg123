@@ -748,7 +748,7 @@ module mpi_read
         end if
       end if
       fetime = read_etime*fmulti
-      if (st_sim%res_type == 0) then
+      if (st_sim%res_type == 0 .or. st_sim%sim_type /= 1) then
         time_flag = 1
         call MPI_FILE_SET_VIEW(fnum, read_head, MPI_REAL4, fview, "native", MPI_INFO_NULL,ierr)
         if (ierr /= MPI_SUCCESS) then
@@ -799,7 +799,8 @@ module mpi_read
     do while (time_flag == 0)
       fetime = finend + fstep*count_num
       fetime = fetime*fmulti
-      if (fetime <= st_init%rest_time .and. st_sim%res_type >= 1) then
+      if (fetime <= st_init%rest_time .and. st_sim%res_type >= 1 .and.&
+          st_sim%sim_type == 1) then
         call close_mpi_file(fnum)
         if (st_mpi%rank == 0) then
           read(unit=bnum,fmt='(a)',iostat=ierr) intpath

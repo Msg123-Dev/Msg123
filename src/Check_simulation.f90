@@ -13,7 +13,7 @@ module check_simulation
   implicit none
   private
   public :: check_insol, check_abserrmax, check_residual, calc_res_weight
-  public :: check_outtiming, check_lastts
+  public :: check_outtiming, check_lastts, count_step_flag
   integer(I4), public :: write_flag, lasttime_flag
 
   ! -- local
@@ -251,17 +251,13 @@ module check_simulation
   ! check_outtiming -- check output timing
   !*********************************************************************************************
     ! -- modules
-    use initial_module, only: st_step_flag
+
     ! -- inout
 
     ! -- local
     integer(I4) :: step_flag
     !-------------------------------------------------------------------------------------------
-    step_flag = st_step_flag%rech + st_step_flag%well + st_step_flag%seal + st_step_flag%prec +&
-                st_step_flag%evap + st_step_flag%riwl + st_step_flag%riwd + st_step_flag%ribl +&
-                st_step_flag%ride + st_step_flag%riwi + st_step_flag%rile + st_step_flag%ribk +&
-                st_step_flag%ribt + st_step_flag%lawl + st_step_flag%lawd + st_step_flag%labl +&
-                st_step_flag%laar + st_step_flag%labk + st_step_flag%labt + st_step_flag%rfra
+    step_flag = count_step_flag()
 
     if (step_flag > 0) then
       write_flag = 1
@@ -295,5 +291,24 @@ module check_simulation
     end if
 
   end subroutine check_lastts
+
+  function count_step_flag() result(flag_num)
+  !*********************************************************************************************
+  ! count_step_flag -- Count step flags
+  !*********************************************************************************************
+    ! -- modules
+    use initial_module, only: st_step_flag
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: flag_num
+    !-------------------------------------------------------------------------------------------
+    flag_num = st_step_flag%rech + st_step_flag%well + st_step_flag%seal + st_step_flag%prec +&
+               st_step_flag%evap + st_step_flag%riwl + st_step_flag%riwd + st_step_flag%ribl +&
+               st_step_flag%ride + st_step_flag%riwi + st_step_flag%rile + st_step_flag%ribk +&
+               st_step_flag%ribt + st_step_flag%lawl + st_step_flag%lawd + st_step_flag%labl +&
+               st_step_flag%laar + st_step_flag%labk + st_step_flag%labt + st_step_flag%rfra
+
+  end function count_step_flag
 
 end module check_simulation

@@ -16,15 +16,16 @@ module time_module
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
   use set_boundary, only: st_rive, st_lake
+  use check_simulation, only: count_step_flag
 
   implicit none
   private
-  public :: update_tstep, check_outstep, write_outstep_note
+  public :: update_tstep, check_outstep, write_outstep_note, get_rest_delt
 
   ! -- local
   integer(I4) :: timestep_num, boundstep
   real(DP) :: next_time, prev_time, time_tol
-  real(DP) :: delt_old1, delt_uncut
+  real(DP) :: delt_uncut
   real(DP), allocatable :: whead_new(:)
 
   contains
@@ -134,14 +135,15 @@ module time_module
     integer(I4), allocatable :: calc2calc(:)
     real(DP), save :: resi_time
     real(DP), allocatable :: cell_srat(:)
-    logical :: outcut_flag
     !-------------------------------------------------------------------------------------------
     if (st_time%current_t == DZERO) then
       timestep_num = 0 ; boundstep = 0
-      delt_old1 = DZERO ; delt_uncut = DZERO ; resi_time = DZERO
+      delt_uncut = DZERO ; resi_time = DZERO
       time_tol = max(st_sim%min_step, DSMAL, spacing(st_sim%end_time))
       if (st_sim%sim_type == -1) then
         st_time%delt = DNOVAL
+      else if (st_sim%res_type == 1 .and. st_init%rest_delt > DZERO) then
+        st_time%delt = st_init%rest_delt
       else
         st_time%delt = st_sim%ini_step
       end if
@@ -184,7 +186,7 @@ module time_module
       end do
       !$omp end parallel do
 
-      if (st_sim%res_type == 1) then
+      if (st_sim%res_type >= 1) then
         st_time%current_t = st_init%rest_time
       end if
 
@@ -204,15 +206,7 @@ module time_module
 
     else if (st_sim%sim_type >= 0) then
       if (st_time%conv_flag) then
-        if (timestep_num == 0) then
-          delt_old1 = st_time%delt
-        end if
         timestep_num = timestep_num + 1
-        outcut_flag = delt_uncut > DZERO
-        if (outcut_flag) then
-          st_time%delt = delt_uncut ; delt_uncut = DZERO
-        end if
-        delt_old1 = st_time%delt
 
         if (st_mpi%rank == 0) then
           ! -- Write boundary change information
@@ -233,20 +227,10 @@ module time_module
             call conv_unit(st_mpi%rank, st_sim%cal_unit, "main file", st_time%now_date,&
                            st_sim%cal_fact)
           end if
-          st_time%delt = st_time%delt
-        else
-          select case (st_ctrl%tstep_type)
-          case (0)
-            st_time%delt = st_time%delt*st_sim%inc_fact
-          case (1)
-            ! -- Apply heuristic time stepping (heuri)
-              call apply_heuri(st_time%out_iter)
-          end select
         end if
-        if (st_ctrl%dstor_max > DZERO .and. .not. outcut_flag) then
-          ! -- Apply storage change time stepping (dstor)
-            call apply_dstor(st_sol%stor_new, st_sol%stor_old)
-        end if
+        ! -- Get next delta time (next_delt)
+          st_time%delt = get_next_delt(boundstep, st_sol%stor_new, st_sol%stor_old)
+        delt_uncut = DZERO
 
         ! -- Set value exchange (valexc)
           call set_valexc(ncalc, st_sol%head_new, st_sol%head_old)
@@ -279,6 +263,7 @@ module time_module
   ! set_nextet -- Set next end time
   !*********************************************************************************************
     ! -- modules
+    use constval_module, only: DINFI
     use utility_module, only: write_logf
     use initial_module, only: in_type
     use read_module, only: read_next, read_intn
@@ -328,7 +313,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%seal = 0
-        st_seal%etime = st_sim%end_time
+        st_seal%etime = DINFI
       else
         deallocate(st_forc%read_seal)
       end if
@@ -360,7 +345,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%rech = 0
-        st_rech%etime = st_sim%end_time
+        st_rech%etime = DINFI
         ! -- Reset cell value (value)
           call reset_value(st_bcnd%rech_num, st_forc%read_rech)
       else
@@ -394,7 +379,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%well = 0
-        st_well%etime = st_sim%end_time
+        st_well%etime = DINFI
         ! -- Reset cell value (value)
           call reset_value(st_bcnd%well_num, st_forc%read_well)
       else
@@ -432,7 +417,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%prec = 0
-        st_prec%etime = st_sim%end_time
+        st_prec%etime = DINFI
         ! -- Reset cell value (value)
           call reset_value(st_bcnd%prec_num, st_forc%read_prec)
       else
@@ -468,7 +453,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%evap = 0
-        st_evap%etime = st_sim%end_time
+        st_evap%etime = DINFI
         ! -- Reset cell value (value)
           call reset_value(st_bcnd%evap_num, st_forc%read_evap)
       else
@@ -505,7 +490,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%riwl = 0
-        st_riwl%etime = st_sim%end_time
+        st_riwl%etime = DINFI
       else
         deallocate(st_rive%cflag%wl, st_rive%calc%wl)
       end if
@@ -538,7 +523,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%riwd = 0
-        st_riwd%etime = st_sim%end_time
+        st_riwd%etime = DINFI
       else
         if (allocated(st_rive%calc%wd)) then
           deallocate(st_rive%cflag%wd, st_rive%calc%wd)
@@ -573,7 +558,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%ribl = 0
-        st_ribl%etime = st_sim%end_time
+        st_ribl%etime = DINFI
       else
         deallocate(st_rive%cflag%bl, st_rive%calc%bl)
       end if
@@ -606,7 +591,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%ride = 0
-        st_ride%etime = st_sim%end_time
+        st_ride%etime = DINFI
       else
         if (allocated(st_rive%calc%de)) then
           deallocate(st_rive%cflag%de, st_rive%calc%de)
@@ -641,7 +626,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%riwi = 0
-        st_riwi%etime = st_sim%end_time
+        st_riwi%etime = DINFI
       else
         if (allocated(st_rive%calc%wi)) then
           deallocate(st_rive%cflag%wi, st_rive%calc%wi)
@@ -676,7 +661,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%rile = 0
-        st_rile%etime = st_sim%end_time
+        st_rile%etime = DINFI
       else
         if (allocated(st_rive%calc%le)) then
           deallocate(st_rive%cflag%le, st_rive%calc%le)
@@ -710,7 +695,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%ribk = 0
-        st_ribk%etime = st_sim%end_time
+        st_ribk%etime = DINFI
       else
         if (allocated(st_rive%calc%bk)) then
           deallocate(st_rive%cflag%bk, st_rive%calc%bk)
@@ -744,7 +729,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%ribt = 0
-        st_ribt%etime = st_sim%end_time
+        st_ribt%etime = DINFI
       else
         if (allocated(st_rive%calc%bt)) then
           deallocate(st_rive%cflag%bt, st_rive%calc%bt)
@@ -779,7 +764,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%lawl = 0
-        st_lawl%etime = st_sim%end_time
+        st_lawl%etime = DINFI
       else
         deallocate(st_lake%cflag%wl, st_lake%calc%wl)
       end if
@@ -812,7 +797,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%lawd = 0
-        st_lawd%etime = st_sim%end_time
+        st_lawd%etime = DINFI
       else
         if (allocated(st_lake%calc%wd)) then
           deallocate(st_lake%cflag%wd, st_lake%calc%wd)
@@ -847,7 +832,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%labl = 0
-        st_labl%etime = st_sim%end_time
+        st_labl%etime = DINFI
       else
         deallocate(st_lake%cflag%bl, st_lake%calc%bl)
       end if
@@ -880,7 +865,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%laar = 0
-        st_laar%etime = st_sim%end_time
+        st_laar%etime = DINFI
       else
         if (allocated(st_lake%calc%ar)) then
           deallocate(st_lake%cflag%ar, st_lake%calc%ar)
@@ -915,7 +900,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%labk = 0
-        st_labk%etime = st_sim%end_time
+        st_labk%etime = DINFI
       else
         if (allocated(st_lake%calc%bk)) then
           deallocate(st_lake%cflag%bk, st_lake%calc%bk)
@@ -950,7 +935,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%labt = 0
-        st_labt%etime = st_sim%end_time
+        st_labt%etime = DINFI
       else
         if (allocated(st_lake%calc%bt)) then
           deallocate(st_lake%cflag%bt, st_lake%calc%bt)
@@ -984,7 +969,7 @@ module time_module
           call write_logf(err_mes)
         end if
         st_step_flag%rfra = 0
-        st_rfra%etime = st_sim%end_time
+        st_rfra%etime = DINFI
       end if
     end if
 
@@ -1004,11 +989,13 @@ module time_module
 
     ! -- local
     real(DP) :: min_step, min_outtime
+    logical :: endout_flag
     !-------------------------------------------------------------------------------------------
     min_step = min(st_rech%etime, st_well%etime, st_seal%etime, st_prec%etime, st_evap%etime,&
                    st_riwl%etime, st_riwd%etime, st_ribl%etime, st_ride%etime, st_riwi%etime,&
                    st_rile%etime, st_ribk%etime, st_ribt%etime, st_lawl%etime, st_lawd%etime,&
                    st_labl%etime, st_laar%etime, st_labk%etime, st_labt%etime, st_rfra%etime)
+    endout_flag = min_step /= st_sim%end_time
     if (min_step <= st_time%current_t) then
       min_step = st_sim%end_time
     end if
@@ -1035,6 +1022,9 @@ module time_module
       st_time%delt = min_outtime - st_time%current_t
       next_time = min_outtime
     else if (next_time > min_step - time_tol) then
+      if (min_step == st_sim%end_time .and. endout_flag) then
+        delt_uncut = st_time%delt
+      end if
       st_time%delt = min_step - st_time%current_t
       next_time = min_step
     end if
@@ -1834,11 +1824,7 @@ module time_module
     integer(I4) :: conv_fnum
     character(:), allocatable :: cond_format
     !-------------------------------------------------------------------------------------------
-    bchange = st_step_flag%rech + st_step_flag%well + st_step_flag%seal + st_step_flag%prec +&
-              st_step_flag%evap + st_step_flag%riwl + st_step_flag%riwd + st_step_flag%ribl +&
-              st_step_flag%ride + st_step_flag%riwi + st_step_flag%rile + st_step_flag%ribk +&
-              st_step_flag%ribt + st_step_flag%lawl + st_step_flag%lawd + st_step_flag%labl +&
-              st_step_flag%laar + st_step_flag%labk + st_step_flag%labt + st_step_flag%rfra
+    bchange = count_step_flag()
 
     conv_fnum = st_out_fnum%conv
     cond_format = '(1x,a,es18.11," ('//trim(st_sim%cal_unit)//')")'
@@ -2022,64 +2008,6 @@ module time_module
 
   end subroutine reset_value
 
-  subroutine apply_heuri(out_num)
-  !*********************************************************************************************
-  ! apply_heuri -- Apply heuristic time stepping
-  !*********************************************************************************************
-    ! -- modules
-
-    ! -- inout
-    integer(I4), intent(in) :: out_num
-    ! -- local
-
-    !-------------------------------------------------------------------------------------------
-    if (out_num <= st_ctrl%incr_iter) then
-      st_time%delt = delt_old1*st_sim%inc_fact
-    else if (out_num <= st_ctrl%decr_iter) then
-      st_time%delt = delt_old1
-    else
-      st_time%delt = delt_old1*st_sim%dec_fact
-    end if
-
-  end subroutine apply_heuri
-
-  subroutine apply_dstor(stor_new, stor_old)
-  !*********************************************************************************************
-  ! apply_dstor -- Apply storage change time stepping
-  !*********************************************************************************************
-    ! -- modules
-    use constval_module, only: DHALF
-#ifdef MPI_MSG
-    use mpi_utility, only: mpimax_val
-#endif
-    ! -- inout
-    real(DP), intent(in) :: stor_new(:), stor_old(:)
-    ! -- local
-    integer(I4) :: i
-    real(DP), parameter :: DSTOR_EPS = 1.00E-05_DP
-    real(DP) :: dstor_step, delt_stor
-#ifdef MPI_MSG
-    real(DP) :: max_val
-#endif
-    !-------------------------------------------------------------------------------------------
-    dstor_step = DZERO
-    !$omp parallel do private(i) reduction(max:dstor_step)
-    do i = 1, ncalc
-      dstor_step = max(dstor_step, abs(stor_new(i) - stor_old(i)))
-    end do
-    !$omp end parallel do
-#ifdef MPI_MSG
-    if (st_mpi%totn /= 1) then
-      ! -- Max value for MPI (val)
-        call mpimax_val(dstor_step, "storage change", max_val)
-      dstor_step = max_val
-    end if
-#endif
-    delt_stor = DHALF*delt_old1*(DONE + st_ctrl%dstor_max/(dstor_step + DSTOR_EPS))
-    st_time%delt = min(st_time%delt, delt_stor)
-
-  end subroutine apply_dstor
-
   subroutine set_date(inttime, ndate, restime)
   !*********************************************************************************************
   ! set_date -- Set next date
@@ -2161,11 +2089,7 @@ module time_module
     integer(I4) :: step_flag
     logical :: out_flag
     !-------------------------------------------------------------------------------------------
-    step_flag = st_step_flag%rech + st_step_flag%well + st_step_flag%seal + st_step_flag%prec +&
-                st_step_flag%evap + st_step_flag%riwl + st_step_flag%riwd + st_step_flag%ribl +&
-                st_step_flag%ride + st_step_flag%riwi + st_step_flag%rile + st_step_flag%ribk +&
-                st_step_flag%ribt + st_step_flag%lawl + st_step_flag%lawd + st_step_flag%labl +&
-                st_step_flag%laar + st_step_flag%labk + st_step_flag%labt + st_step_flag%rfra
+    step_flag = count_step_flag()
 
     if (step_val < DZERO) then
       out_flag = .false.
@@ -2263,5 +2187,79 @@ module time_module
     end if
 
   end subroutine write_outstep_note
+
+  function get_next_delt(bchange, stor_new, stor_old) result(next_delt)
+  !*********************************************************************************************
+  ! get_next_delt -- Get next delta time
+  !*********************************************************************************************
+    ! -- modules
+    use constval_module, only: DHALF
+#ifdef MPI_MSG
+    use mpi_utility, only: mpimax_val
+#endif
+    ! -- inout
+    integer(I4), intent(in) :: bchange
+    real(DP), intent(in) :: stor_new(:), stor_old(:)
+    ! -- local
+    integer(I4) :: i
+    real(DP), parameter :: DSTOR_EPS = 1.00E-05_DP
+    real(DP) :: next_delt, base_delt, dstor_step, delt_stor
+#ifdef MPI_MSG
+    real(DP) :: max_val
+#endif
+    !-------------------------------------------------------------------------------------------
+    base_delt = st_time%delt
+    if (delt_uncut > DZERO) then
+      base_delt = delt_uncut
+    end if
+
+    next_delt = base_delt
+    if (bchange == 0 .and. st_ctrl%tstep_type == 0) then
+      next_delt = base_delt*st_sim%inc_fact
+    else if (bchange == 0 .and. st_ctrl%tstep_type == 1) then
+      if (st_time%out_iter <= st_ctrl%incr_iter) then
+        next_delt = base_delt*st_sim%inc_fact
+      else if (st_time%out_iter > st_ctrl%decr_iter) then
+        next_delt = base_delt*st_sim%dec_fact
+      end if
+    end if
+
+    if (st_ctrl%dstor_max > DZERO .and. delt_uncut == DZERO) then
+      dstor_step = DZERO
+      !$omp parallel do private(i) reduction(max:dstor_step)
+      do i = 1, ncalc
+        dstor_step = max(dstor_step, abs(stor_new(i) - stor_old(i)))
+      end do
+      !$omp end parallel do
+#ifdef MPI_MSG
+      if (st_mpi%totn /= 1) then
+        ! -- Max value for MPI (val)
+          call mpimax_val(dstor_step, "storage change", max_val)
+        dstor_step = max_val
+      end if
+#endif
+      delt_stor = DHALF*base_delt*(DONE + st_ctrl%dstor_max/(dstor_step + DSTOR_EPS))
+      next_delt = min(next_delt, delt_stor)
+    end if
+
+  end function get_next_delt
+
+  function get_rest_delt(stor_new, stor_old) result(rest_delt)
+  !*********************************************************************************************
+  ! get_rest_delt -- Get delta time for restart file
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(DP), intent(in) :: stor_new(:), stor_old(:)
+    ! -- local
+    real(DP) :: rest_delt
+    !-------------------------------------------------------------------------------------------
+    rest_delt = DZERO
+    if (st_sim%sim_type /= -1) then
+      rest_delt = get_next_delt(count_step_flag(), stor_new, stor_old)/st_sim%cal_fact
+    end if
+
+  end function get_rest_delt
 
 end module time_module

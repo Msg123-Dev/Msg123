@@ -1,7 +1,7 @@
 module read_module
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: CHALEN
+  use constval_module, only: CHALEN, DINFI
   use utility_module, only: st_mpi, open_new_rtxt, open_new_rbin, write_logf, write_err_read
   use utility_module, only: write_err_stop
   use initial_module, only: in_type, st_sim, st_grid, st_init
@@ -645,7 +645,7 @@ module read_module
 
       fetime = fetime*fmulti
 
-      if (fetime <= st_init%rest_time .and. st_sim%res_type == 1) then
+      if (fetime <= st_init%rest_time .and. st_sim%res_type >= 1) then
         if (ftype == in_type(1) .or. ftype == in_type(2)) then
           call skip_clas_point(fnum, file_totn)
         else if (ftype == in_type(3)) then
@@ -695,7 +695,7 @@ module read_module
     do while (time_flag == 0)
       fetime = finend + fstep*count_num
       fetime = fetime*fmulti
-      if (fetime <= st_init%rest_time .and. st_sim%res_type == 1) then
+      if (fetime <= st_init%rest_time .and. st_sim%res_type >= 1) then
         if (any(ftype == type_txt(:))) then
           call close_file(fnum)
           read(unit=bunit,fmt='(a)',iostat=ierr) intpath
@@ -1131,7 +1131,7 @@ module read_module
         call read_totn_line(fnum, mess, nx_totn, ierr, etime)
         if (ierr /= 0) then
           call write_logf(err_mes)
-          flag = 0 ; etime = st_sim%end_time
+          flag = 0 ; etime = DINFI
         else
           etime = etime*multi
         end if
@@ -1148,7 +1148,7 @@ module read_module
         read(unit=fnum,fmt=*,iostat=ierr) etime
         if (ierr /= 0) then
           call write_logf(err_mes)
-          flag = 0 ; etime = st_sim%end_time
+          flag = 0 ; etime = DINFI
         else
           etime = etime*multi
         end if
@@ -1165,7 +1165,7 @@ module read_module
         if (st_mpi%rank == 0) then
           call write_logf(err_mes)
         end if
-        flag = 0 ; etime = st_sim%end_time
+        flag = 0 ; etime = DINFI
       else
         etime = temp_etime*multi
       end if
@@ -1229,7 +1229,7 @@ module read_module
 #endif
 
     if (ierr /= 0) then
-      flag = 0 ; etime = st_sim%end_time
+      flag = 0 ; etime = DINFI
       return
     end if
 

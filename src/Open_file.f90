@@ -712,10 +712,6 @@ module open_file
       end if
     end if
 
-    if (st_seal%etime > st_sim%end_time) then
-      st_seal%etime = st_sim%end_time
-    end if
-
     ! -- Check the unused time series (steady_etime)
       call check_steady_etime(st_seal%etime, vname)
 
@@ -889,10 +885,6 @@ module open_file
           call bcast_val(st_rech%totn, vname//" total number")
 #endif
       end if
-    end if
-
-    if (st_rech%etime > st_sim%end_time) then
-      st_rech%etime = st_sim%end_time
     end if
 
     ! -- Check the unused time series (steady_etime)
@@ -1087,10 +1079,6 @@ module open_file
           call bcast_val(st_well%totn, vname//" total number")
 #endif
       end if
-    end if
-
-    if (st_well%etime > st_sim%end_time) then
-      st_well%etime = st_sim%end_time
     end if
 
     ! -- Check the unused time series (steady_etime)
@@ -1347,10 +1335,6 @@ module open_file
       end if
     end if
 
-    if (st_prec%etime > st_sim%end_time) then
-      st_prec%etime = st_sim%end_time
-    end if
-
     ! -- Check the unused time series (steady_etime)
       call check_steady_etime(st_prec%etime, vname)
 
@@ -1524,10 +1508,6 @@ module open_file
       end if
     end if
 
-    if (st_evap%etime > st_sim%end_time) then
-      st_evap%etime = st_sim%end_time
-    end if
-
     ! -- Check the unused time series (steady_etime)
       call check_steady_etime(st_evap%etime, vname)
 
@@ -1684,10 +1664,6 @@ module open_file
           call bcast_val(st_rfra%etime, vname//" end time value")
       end if
 #endif
-    end if
-
-    if (st_rfra%etime > st_sim%end_time) then
-      st_rfra%etime = st_sim%end_time
     end if
 
     ! -- Check the unused time series (steady_etime)
@@ -1977,10 +1953,6 @@ module open_file
             call bcast_val(rive_totn, mess_rive//" total number")
 #endif
         end if
-      end if
-
-      if (rive_etime > st_sim%end_time) then
-        rive_etime = st_sim%end_time
       end if
 
       ! -- Check the unused time series (steady_etime)
@@ -2366,10 +2338,6 @@ module open_file
             call bcast_val(lake_totn, mess_lake//" total number")
 #endif
         end if
-      end if
-
-      if (lake_etime > st_sim%end_time) then
-        lake_etime = st_sim%end_time
       end if
 
       ! -- Check the unused time series (steady_etime)

@@ -39,7 +39,7 @@ module write_output
     use calc_output, only: calc_cell_mas, calc_rivr_off, calc_lakr_off, calc_sufr_off
     use calc_output, only: calc_dunr_off, calc_horr_off, calc_seal_res, calc_rech_res
     use calc_output, only: calc_well_res
-    use time_module, only: check_outstep
+    use time_module, only: check_outstep, get_rest_delt
 #ifdef MPI_MSG
     use mpi_write, only: write_mpi_rest, set_senrec_wtab
 #endif
@@ -49,6 +49,7 @@ module write_output
     ! -- local
     integer(I4) :: rest_fnum
     integer(I4) :: header_flag = 0, allocate_flag = 0
+    real(DP) :: rest_delt
     !-------------------------------------------------------------------------------------------
     ! -- Check output timing (outtiming)
       call check_outtiming()
@@ -133,13 +134,14 @@ module write_output
 
       if (lasttime_flag == 1) then
         rest_fnum = st_out_fnum%rest
+        rest_delt = get_rest_delt(st_sol%stor_new, st_sol%stor_old)
 #ifdef MPI_MSG
         ! -- Write mpi restart file (mpi_rest)
-          call write_mpi_rest(rest_fnum, st_time%now_time, len_scal, st_sol%head_new)
+          call write_mpi_rest(rest_fnum, st_time%now_time, rest_delt, len_scal, st_sol%head_new)
           call close_mpi_file(rest_fnum)
 #else
         ! -- Write restart file (out_restf)
-          call write_out_restf(rest_fnum, st_time%now_time, st_sol)
+          call write_out_restf(rest_fnum, st_time%now_time, rest_delt, st_sol)
 #endif
       end if
 
@@ -426,7 +428,7 @@ module write_output
 
   end subroutine write_out_sratf
 
-  subroutine write_out_restf(fnum_rest, time_out, st_sol)
+  subroutine write_out_restf(fnum_rest, time_out, delt_out, st_sol)
   !*********************************************************************************************
   ! write_out_restf -- Write restart file
   !*********************************************************************************************
@@ -434,7 +436,7 @@ module write_output
 
     ! -- inout
     integer(I4), intent(in) :: fnum_rest
-    real(DP), intent(in) :: time_out
+    real(DP), intent(in) :: time_out, delt_out
     type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i
@@ -442,6 +444,7 @@ module write_output
     rewind(fnum_rest)
     write(fnum_rest) time_out
     write(fnum_rest) (st_sol%head_new(i)*len_scal + z_base, i = 1, ncalc)
+    write(fnum_rest) delt_out
     call close_file(fnum_rest)
 
   end subroutine write_out_restf

@@ -177,10 +177,10 @@ module nonlinear_solution
             call calc_surfw(st_sol)
           if (st_out_step%rest == DZERO) then
             ! -- Write restart file (rest)
-              call write_rest(st_sol%head_new)
+              call write_rest(st_sol)
           else if (check_outstep(st_out_step%rest)) then
             ! -- Write restart file (rest)
-              call write_rest(st_sol%head_new)
+              call write_rest(st_sol)
           end if
           exit outer_loop
         end if
@@ -447,10 +447,10 @@ module nonlinear_solution
           call calc_surfw(st_sol)
         if (st_out_step%rest == DZERO) then
           ! -- Write restart file (rest)
-            call write_rest(st_sol%head_new)
+            call write_rest(st_sol)
         else if (check_outstep(st_out_step%rest)) then
           ! -- Write restart file (rest)
-            call write_rest(st_sol%head_new)
+            call write_rest(st_sol)
         end if
         exit outer_loop
       else if (back_flag .and. st_sim%sim_type /= -1) then
@@ -501,10 +501,10 @@ module nonlinear_solution
           call calc_surfw(st_sol)
         if (st_out_step%rest == DZERO) then
           ! -- Write restart file (rest)
-            call write_rest(st_sol%head_new)
+            call write_rest(st_sol)
         else if (check_outstep(st_out_step%rest)) then
           ! -- Write restart file (rest)
-            call write_rest(st_sol%head_new)
+            call write_rest(st_sol)
         end if
       else if (st_sim%sim_type == -1) then
         call write_err_stop("Steady state calculation didn't converge.")
@@ -1104,28 +1104,32 @@ module nonlinear_solution
 
   end subroutine calc_funcl2norm
 
-  subroutine write_rest(rest_head)
+  subroutine write_rest(st_sol)
   !*********************************************************************************************
   ! write_rest -- Write restart file
   !*********************************************************************************************
     ! -- modules
+    use time_module, only: get_rest_delt
 #ifdef MPI_MSG
     use mpi_write, only: write_mpi_rest
 #endif
     ! -- inout
-    real(DP), intent(in) :: rest_head(:)
+    type(sol_set), intent(in) :: st_sol
     ! -- local
     integer(I4) :: i, rest_fnum
+    real(DP) :: rest_delt
     !-------------------------------------------------------------------------------------------
     rest_fnum = st_out_fnum%rest
+    rest_delt = get_rest_delt(st_sol%stor_new, st_sol%stor_old)
 #ifdef MPI_MSG
     i = 0
     ! -- Write mpi restart value (mpi_rest)
-      call write_mpi_rest(rest_fnum, st_time%now_time, len_scal, rest_head)
+      call write_mpi_rest(rest_fnum, st_time%now_time, rest_delt, len_scal, st_sol%head_new)
 #else
     rewind(rest_fnum)
     write(rest_fnum) real(st_time%now_time, kind=DP)
-    write(rest_fnum) (rest_head(i)*len_scal + z_base, i = 1, ncalc)
+    write(rest_fnum) (st_sol%head_new(i)*len_scal + z_base, i = 1, ncalc)
+    write(rest_fnum) rest_delt
 #endif
 
   end subroutine write_rest

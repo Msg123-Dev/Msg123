@@ -86,7 +86,7 @@ module nonlinear_solution
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var, mass_error_pre, mass_error_min
     real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
     real(DP) :: res_l1, qext_l1, mass_error
-    real(DP) :: res_fact, step_pnorm, step_lmax
+    real(DP) :: res_fact, step_pnorm, step_lmax, step_change
     logical :: back_flag, res_flag, maxs_flag, stagn_flag, cycle_flag
     logical :: head_change_flag, wpass_flag, beta_flag
 #ifdef MPI_MSG
@@ -297,6 +297,7 @@ module nonlinear_solution
 
       if (st_time%form_switch == 1 .and.&
           (.not. st_time%conv_flag .or. st_ctrl%conv_type == 1)) then
+        step_change = check_val
         ! -- Run backtracking (backtr)
           call run_backtr(back_iter, back_flag, beta_iter, maxs_flag, wpass_flag,&
                           wpass_run < WPASS_RUN_MAX, l2norm_new, l2norm_pre, l2norm_jac,&
@@ -333,7 +334,8 @@ module nonlinear_solution
           back_flag = .true.
         else if (check_val <= st_ctrl%criteria .and. max_unk < XMAX .and.&
                  .not. (back_flag .and. (st_sim%sim_type /= -1 .or.&
-                                         st_ctrl%conv_type == 0))) then
+                                         st_ctrl%conv_type == 0 .or.&
+                                         step_change > st_ctrl%criteria))) then
           st_time%conv_flag = .true. ; head_change_flag = .true.
         else if (st_sim%sim_type == -1) then
           back_flag = .false.

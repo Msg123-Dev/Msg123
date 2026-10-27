@@ -1009,71 +1009,6 @@ module nonlinear_solution
 
   end subroutine run_backtr
 
-  function calc_merit(wmode, l2_val, func_val) result(merit)
-  !*********************************************************************************************
-  ! calc_merit -- Calculate merit function of backtracking
-  !*********************************************************************************************
-    ! -- modules
-
-    ! -- inout
-    real(DP), intent(in) :: l2_val, func_val(:)
-    logical, intent(in) :: wmode
-    ! -- local
-    integer(I4) :: i
-    real(DP) :: merit
-#ifdef MPI_MSG
-    real(DP) :: sum_l2
-#endif
-    !-------------------------------------------------------------------------------------------
-    if (.not. wmode) then
-      merit = DHALF*l2_val
-      return
-    end if
-
-    merit = DZERO
-    !$omp parallel do private(i) reduction(+:merit)
-    do i = 1, ncalc
-      merit = merit + (res_wgt(i)*func_val(i))**2
-    end do
-    !$omp end parallel do
-#ifdef MPI_MSG
-    if (st_mpi%totn /= 1) then
-      ! -- Sum value for MPI (val)
-        call mpisum_val(merit, "weighted function l2-norm", sum_l2)
-      merit = sum_l2
-    end if
-#endif
-    merit = DHALF*merit
-
-  end function calc_merit
-
-  function get_cnum(calc_num) result(char_cell)
-  !*********************************************************************************************
-  ! get_cnum -- Get cell number
-  !*********************************************************************************************
-    ! -- modules
-    use utility_module, only: get_ilen, conv_i2s
-    use set_cell, only: get_calc_grid
-    ! -- inout
-    integer(I4), intent(in) :: calc_num
-    ! -- local
-    integer(I4) :: i_num, j_num, k_num
-    character(:), allocatable :: cx_num, cy_num, cz_num
-    character(:), allocatable :: char_cell
-    !-------------------------------------------------------------------------------------------
-    ! -- Get calculation number from grid number (calc_grid)
-      call get_calc_grid(calc_num, i_num, j_num, k_num)
-
-    allocate(character(get_ilen(i_num)) :: cx_num)
-    allocate(character(get_ilen(j_num)) :: cy_num)
-    allocate(character(get_ilen(k_num)) :: cz_num)
-
-    call conv_i2s(i_num, cx_num) ; call conv_i2s(j_num, cy_num) ; call conv_i2s(k_num, cz_num)
-
-    char_cell = "("//cx_num//","//cy_num//","//cz_num//")"
-
-  end function get_cnum
-
   subroutine calc_funcl2norm(in_lam, backi, l2_new, new_f, st_sol)
   !*********************************************************************************************
   ! calc_funcl2norm -- Calculate function and l2norm2
@@ -1146,5 +1081,70 @@ module nonlinear_solution
 #endif
 
   end subroutine write_rest
+
+  function calc_merit(wmode, l2_val, func_val) result(merit)
+  !*********************************************************************************************
+  ! calc_merit -- Calculate merit function of backtracking
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(DP), intent(in) :: l2_val, func_val(:)
+    logical, intent(in) :: wmode
+    ! -- local
+    integer(I4) :: i
+    real(DP) :: merit
+#ifdef MPI_MSG
+    real(DP) :: sum_l2
+#endif
+    !-------------------------------------------------------------------------------------------
+    if (.not. wmode) then
+      merit = DHALF*l2_val
+      return
+    end if
+
+    merit = DZERO
+    !$omp parallel do private(i) reduction(+:merit)
+    do i = 1, ncalc
+      merit = merit + (res_wgt(i)*func_val(i))**2
+    end do
+    !$omp end parallel do
+#ifdef MPI_MSG
+    if (st_mpi%totn /= 1) then
+      ! -- Sum value for MPI (val)
+        call mpisum_val(merit, "weighted function l2-norm", sum_l2)
+      merit = sum_l2
+    end if
+#endif
+    merit = DHALF*merit
+
+  end function calc_merit
+
+  function get_cnum(calc_num) result(char_cell)
+  !*********************************************************************************************
+  ! get_cnum -- Get cell number
+  !*********************************************************************************************
+    ! -- modules
+    use utility_module, only: get_ilen, conv_i2s
+    use set_cell, only: get_calc_grid
+    ! -- inout
+    integer(I4), intent(in) :: calc_num
+    ! -- local
+    integer(I4) :: i_num, j_num, k_num
+    character(:), allocatable :: cx_num, cy_num, cz_num
+    character(:), allocatable :: char_cell
+    !-------------------------------------------------------------------------------------------
+    ! -- Get calculation number from grid number (calc_grid)
+      call get_calc_grid(calc_num, i_num, j_num, k_num)
+
+    allocate(character(get_ilen(i_num)) :: cx_num)
+    allocate(character(get_ilen(j_num)) :: cy_num)
+    allocate(character(get_ilen(k_num)) :: cz_num)
+
+    call conv_i2s(i_num, cx_num) ; call conv_i2s(j_num, cy_num) ; call conv_i2s(k_num, cz_num)
+
+    char_cell = "("//cx_num//","//cy_num//","//cz_num//")"
+
+  end function get_cnum
 
 end module nonlinear_solution

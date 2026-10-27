@@ -2660,25 +2660,6 @@ module set_cell
 
   end subroutine get_hash_info
 
-  function get_hash_size(table_num) result(hash_size)
-  !*********************************************************************************************
-  ! get_hash_size -- Get hash table size
-  !*********************************************************************************************
-    ! -- modules
-
-    ! -- inout
-    integer(I4), intent(in) :: table_num
-    ! -- local
-    integer(I4) :: hash_size
-    !-------------------------------------------------------------------------------------------
-    hash_size = table_num*2 + (table_num/2) + 3
-
-    if (mod(table_num, 2) == 0) then
-      hash_size = hash_size + 1
-    end if
-
-  end function get_hash_size
-
   subroutine set_clas_flag(clas_k, sta_num, ran_num, flag)
   !*********************************************************************************************
   ! set_clas_flag -- Set clas flag
@@ -2891,5 +2872,24 @@ module set_cell
     end if
 
   end subroutine check_col_part
+
+  function get_hash_size(table_num) result(hash_size)
+  !*********************************************************************************************
+  ! get_hash_size -- Get hash table size
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(in) :: table_num
+    ! -- local
+    integer(I4) :: hash_size
+    !-------------------------------------------------------------------------------------------
+    hash_size = table_num*2 + (table_num/2) + 3
+
+    if (mod(table_num, 2) == 0) then
+      hash_size = hash_size + 1
+    end if
+
+  end function get_hash_size
 
 end module set_cell

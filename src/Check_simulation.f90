@@ -210,42 +210,6 @@ module check_simulation
 
   end subroutine calc_res_weight
 
-  function calc_acc_floor(fscal) result(acc_val)
-  !*********************************************************************************************
-  ! calc_acc_floor -- Calculate the floor of the residual scale relative to the largest cell
-  !*********************************************************************************************
-    ! -- modules
-#ifdef MPI_MSG
-    use mpi_utility, only: mpimax_val
-#endif
-    ! -- inout
-    real(DP), intent(in) :: fscal(:)
-    ! -- local
-    integer(I4) :: i
-    real(DP), parameter :: ACC_REL = 1.00E-09_DP
-    real(DP) :: smax
-    real(DP) :: acc_val
-#ifdef MPI_MSG
-    real(DP) :: all_max
-#endif
-    !-------------------------------------------------------------------------------------------
-    smax = DZERO
-    !$omp parallel do private(i) reduction(max:smax)
-    do i = 1, ncalc
-      smax = max(smax, fscal(i))
-    end do
-    !$omp end parallel do
-#ifdef MPI_MSG
-    if (st_mpi%totn /= 1) then
-      ! -- Max value for MPI (val)
-        call mpimax_val(smax, "residual scale maximum", all_max)
-      smax = all_max
-    end if
-#endif
-    acc_val = ACC_REL*smax*len_scal**3
-
-  end function calc_acc_floor
-
   subroutine check_outtiming()
   !*********************************************************************************************
   ! check_outtiming -- check output timing
@@ -291,6 +255,42 @@ module check_simulation
     end if
 
   end subroutine check_lastts
+
+  function calc_acc_floor(fscal) result(acc_val)
+  !*********************************************************************************************
+  ! calc_acc_floor -- Calculate the floor of the residual scale relative to the largest cell
+  !*********************************************************************************************
+    ! -- modules
+#ifdef MPI_MSG
+    use mpi_utility, only: mpimax_val
+#endif
+    ! -- inout
+    real(DP), intent(in) :: fscal(:)
+    ! -- local
+    integer(I4) :: i
+    real(DP), parameter :: ACC_REL = 1.00E-09_DP
+    real(DP) :: smax
+    real(DP) :: acc_val
+#ifdef MPI_MSG
+    real(DP) :: all_max
+#endif
+    !-------------------------------------------------------------------------------------------
+    smax = DZERO
+    !$omp parallel do private(i) reduction(max:smax)
+    do i = 1, ncalc
+      smax = max(smax, fscal(i))
+    end do
+    !$omp end parallel do
+#ifdef MPI_MSG
+    if (st_mpi%totn /= 1) then
+      ! -- Max value for MPI (val)
+        call mpimax_val(smax, "residual scale maximum", all_max)
+      smax = all_max
+    end if
+#endif
+    acc_val = ACC_REL*smax*len_scal**3
+
+  end function calc_acc_floor
 
   function count_step_flag() result(flag_num)
   !*********************************************************************************************

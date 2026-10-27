@@ -38,27 +38,6 @@ module utility_module
 
   end subroutine get_file_stat
 
-  function get_days(nyear, nmonth) result(days)
-  !*********************************************************************************************
-  ! get_days -- Get the number of days
-  !*********************************************************************************************
-    ! -- modules
-
-    ! -- inout
-    integer(I4), intent(in) :: nyear, nmonth
-    ! -- local
-    integer(I4) :: days
-    integer(I4) :: mon(12) = [31,28,31,30,31,30,31,31,30,31,30,31]
-    !-------------------------------------------------------------------------------------------
-    days = mon(nmonth)
-    if (nmonth == 2) then
-      if (mod(nyear,400) == 0 .or. (mod(nyear,100) /= 0 .and. mod(nyear,4) == 0)) then
-        days = 29
-      end if
-    end if
-
-  end function get_days
-
   subroutine open_new_rtxt(stop_flag, write_flag, file_name, err_mes, file_num, file_ierr)
   !*********************************************************************************************
   ! open_new_rtxt -- Open new read text file
@@ -397,29 +376,6 @@ module utility_module
 
   end subroutine conv_unit
 
-  function get_ilen(num) result(num_digit)
-  !*********************************************************************************************
-  ! get_ilen -- Get the length of an integer
-  !*********************************************************************************************
-    ! -- modules
-
-    ! -- inout
-    integer(I4), intent(in) :: num
-    ! -- local
-    integer(I4) :: num_digit
-    !-------------------------------------------------------------------------------------------
-    if (num /= 0) then
-      if (num < 0) then
-        num_digit = int(log10(dble(abs(num)))) + 2
-      else
-        num_digit = int(log10(dble(num))) + 1
-      end if
-    else
-      num_digit = 1
-    end if
-
-  end function get_ilen
-
   subroutine conv_i2s(num, str)
   !*********************************************************************************************
   ! conv_i2s -- Convert integer to string
@@ -434,28 +390,6 @@ module utility_module
     write(str,'(I0)') num
 
   end subroutine conv_i2s
-
-  function conv_lower(in_char) result(low_char)
-  !*********************************************************************************************
-  ! conv_lower -- Convert a character string to lower case
-  !*********************************************************************************************
-    ! -- modules
-
-    ! -- inout
-    character(*), intent(in) :: in_char
-    ! -- local
-    integer(I4) :: i, char_num
-    character(len(in_char)) :: low_char
-    !-------------------------------------------------------------------------------------------
-    low_char(:) = in_char(:)
-    do i = 1, len(in_char)
-      char_num = iachar(low_char(i:i))
-      if (char_num >= iachar("A") .and. char_num <= iachar("Z")) then
-        low_char(i:i) = achar(char_num + 32)
-      end if
-    end do
-
-  end function conv_lower
 
   recursive subroutine iquick_sort(in_x, first, last)
   !*********************************************************************************************
@@ -589,6 +523,90 @@ module utility_module
 
   end subroutine gmap_put
 
+  subroutine gmap_free(g_map)
+  !*********************************************************************************************
+  ! gmap_free -- global to local map free
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    type(gmap_set), intent(inout) :: g_map
+    ! -- local
+
+    !-------------------------------------------------------------------------------------------
+    if (allocated(g_map%table_key)) then
+      deallocate(g_map%table_key, g_map%table_val)
+    end if
+    g_map%table_num = 0
+
+  end subroutine gmap_free
+
+  function get_days(nyear, nmonth) result(days)
+  !*********************************************************************************************
+  ! get_days -- Get the number of days
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(in) :: nyear, nmonth
+    ! -- local
+    integer(I4) :: days
+    integer(I4) :: mon(12) = [31,28,31,30,31,30,31,31,30,31,30,31]
+    !-------------------------------------------------------------------------------------------
+    days = mon(nmonth)
+    if (nmonth == 2) then
+      if (mod(nyear,400) == 0 .or. (mod(nyear,100) /= 0 .and. mod(nyear,4) == 0)) then
+        days = 29
+      end if
+    end if
+
+  end function get_days
+
+  function get_ilen(num) result(num_digit)
+  !*********************************************************************************************
+  ! get_ilen -- Get the length of an integer
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(in) :: num
+    ! -- local
+    integer(I4) :: num_digit
+    !-------------------------------------------------------------------------------------------
+    if (num /= 0) then
+      if (num < 0) then
+        num_digit = int(log10(dble(abs(num)))) + 2
+      else
+        num_digit = int(log10(dble(num))) + 1
+      end if
+    else
+      num_digit = 1
+    end if
+
+  end function get_ilen
+
+  function conv_lower(in_char) result(low_char)
+  !*********************************************************************************************
+  ! conv_lower -- Convert a character string to lower case
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    character(*), intent(in) :: in_char
+    ! -- local
+    integer(I4) :: i, char_num
+    character(len(in_char)) :: low_char
+    !-------------------------------------------------------------------------------------------
+    low_char(:) = in_char(:)
+    do i = 1, len(in_char)
+      char_num = iachar(low_char(i:i))
+      if (char_num >= iachar("A") .and. char_num <= iachar("Z")) then
+        low_char(i:i) = achar(char_num + 32)
+      end if
+    end do
+
+  end function conv_lower
+
   function gmap_get(g_map, map_key) result(map_val)
   !*********************************************************************************************
   ! gmap_get -- global to local map get
@@ -614,23 +632,5 @@ module utility_module
     end if
 
   end function gmap_get
-
-  subroutine gmap_free(g_map)
-  !*********************************************************************************************
-  ! gmap_free -- global to local map free
-  !*********************************************************************************************
-    ! -- modules
-
-    ! -- inout
-    type(gmap_set), intent(inout) :: g_map
-    ! -- local
-
-    !-------------------------------------------------------------------------------------------
-    if (allocated(g_map%table_key)) then
-      deallocate(g_map%table_key, g_map%table_val)
-    end if
-    g_map%table_num = 0
-
-  end subroutine gmap_free
 
 end module utility_module

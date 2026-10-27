@@ -2054,55 +2054,6 @@ module time_module
 
   end subroutine set_date
 
-  function get_nextout(step_val) result(next_outtime)
-  !*********************************************************************************************
-  ! get_nextout -- Get next output time
-  !*********************************************************************************************
-    ! -- modules
-
-    ! -- inout
-    real(DP), intent(in) :: step_val
-    ! -- local
-    real(DP) :: next_outtime, outstep_num
-    !-------------------------------------------------------------------------------------------
-    next_outtime = st_sim%end_time
-    if (step_val > DZERO) then
-      outstep_num = aint(st_time%current_t/step_val) + DONE
-      next_outtime = outstep_num*step_val
-      do while (next_outtime <= st_time%current_t + time_tol)
-        outstep_num = outstep_num + DONE
-        next_outtime = outstep_num*step_val
-      end do
-    end if
-
-  end function get_nextout
-
-  function check_outstep(step_val) result(out_flag)
-  !*********************************************************************************************
-  ! check_outstep -- Check output step
-  !*********************************************************************************************
-    ! -- modules
-
-    ! -- inout
-    real(DP), intent(in) :: step_val
-    ! -- local
-    integer(I4) :: step_flag
-    logical :: out_flag
-    !-------------------------------------------------------------------------------------------
-    step_flag = count_step_flag()
-
-    if (step_val < DZERO) then
-      out_flag = .false.
-    else if (st_sim%sim_type == 1 .and. step_flag > 0) then
-      out_flag = .true.
-    else if (st_sim%sim_type == 1 .and. st_ctrl%outstep_type == 0) then
-      out_flag = .false.
-    else
-      out_flag = abs(st_time%current_t - anint(st_time%current_t/step_val)*step_val) <= time_tol
-    end if
-
-  end function check_outstep
-
   subroutine write_outstep_note()
   !*********************************************************************************************
   ! write_outstep_note -- Write a note on output steps in log file
@@ -2187,6 +2138,55 @@ module time_module
     end if
 
   end subroutine write_outstep_note
+
+  function get_nextout(step_val) result(next_outtime)
+  !*********************************************************************************************
+  ! get_nextout -- Get next output time
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(DP), intent(in) :: step_val
+    ! -- local
+    real(DP) :: next_outtime, outstep_num
+    !-------------------------------------------------------------------------------------------
+    next_outtime = st_sim%end_time
+    if (step_val > DZERO) then
+      outstep_num = aint(st_time%current_t/step_val) + DONE
+      next_outtime = outstep_num*step_val
+      do while (next_outtime <= st_time%current_t + time_tol)
+        outstep_num = outstep_num + DONE
+        next_outtime = outstep_num*step_val
+      end do
+    end if
+
+  end function get_nextout
+
+  function check_outstep(step_val) result(out_flag)
+  !*********************************************************************************************
+  ! check_outstep -- Check output step
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(DP), intent(in) :: step_val
+    ! -- local
+    integer(I4) :: step_flag
+    logical :: out_flag
+    !-------------------------------------------------------------------------------------------
+    step_flag = count_step_flag()
+
+    if (step_val < DZERO) then
+      out_flag = .false.
+    else if (st_sim%sim_type == 1 .and. step_flag > 0) then
+      out_flag = .true.
+    else if (st_sim%sim_type == 1 .and. st_ctrl%outstep_type == 0) then
+      out_flag = .false.
+    else
+      out_flag = abs(st_time%current_t - anint(st_time%current_t/step_val)*step_val) <= time_tol
+    end if
+
+  end function check_outstep
 
   function get_next_delt(bchange, stor_new, stor_old) result(next_delt)
   !*********************************************************************************************

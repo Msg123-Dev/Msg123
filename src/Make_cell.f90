@@ -221,34 +221,6 @@ module make_cell
 
   end subroutine make_face_area
 
-  function fa_2tri(x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4) result(triarea)
-  !*********************************************************************************************
-  ! fa_2tri -- Calculate face area using cross product with two triangle
-  !*********************************************************************************************
-    ! -- modules
-
-    ! -- inout
-    real(DP), intent(in) :: x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4
-    ! -- local
-    real(DP) :: triarea, triarea1, triarea2
-    real(DP) :: vec3d1(3), vec3d2(3)
-    !-------------------------------------------------------------------------------------------
-    vec3d1(1) = x1 - x2 ; vec3d1(2) = y1 - y2 ; vec3d1(3) = z1 - z2
-    vec3d2(1) = x3 - x2 ; vec3d2(2) = y3 - y2 ; vec3d2(3) = z3 - z2
-    triarea1 = (vec3d1(2)*vec3d2(3) - vec3d1(3)*vec3d2(2))**2&
-             + (vec3d1(3)*vec3d2(1) - vec3d1(1)*vec3d2(3))**2&
-             + (vec3d1(1)*vec3d2(2) - vec3d1(2)*vec3d2(1))**2
-
-    vec3d1(1) = x1 - x4 ; vec3d1(2) = y1 - y4 ; vec3d1(3) = z1 - z4
-    vec3d2(1) = x3 - x4 ; vec3d2(2) = y3 - y4 ; vec3d2(3) = z3 - z4
-    triarea2 = (vec3d1(2)*vec3d2(3) - vec3d1(3)*vec3d2(2))**2&
-             + (vec3d1(3)*vec3d2(1) - vec3d1(1)*vec3d2(3))**2&
-             + (vec3d1(1)*vec3d2(2) - vec3d1(2)*vec3d2(1))**2
-
-    triarea = (sqrt(triarea1)+sqrt(triarea2))*DHALF
-
-  end function fa_2tri
-
   subroutine make_cell_vol()
   !*********************************************************************************************
   ! meke_cell_vol -- Make cell volume
@@ -301,29 +273,6 @@ module make_cell
     deallocate(cp_x, cp_y, cp_z)
 
   end subroutine make_cell_vol
-
-  function vol(x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4) result(trivol)
-  !*********************************************************************************************
-  ! vol -- Calculate cell vol using cross product with a focus on cell center
-  !*********************************************************************************************
-    ! -- modules
-
-    ! -- inout
-    real(DP), intent(in) :: x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4
-    ! -- local
-    real(DP) :: trivol
-    real(DP) :: vec3d1(3), vec3d2(3), vec3d3(3), cropro12(3)
-    !-------------------------------------------------------------------------------------------
-    vec3d1(1) = x2 - x3 ; vec3d1(2) = y2 - y3 ; vec3d1(3) = z2 - z3
-    vec3d2(1) = x4 - x3 ; vec3d2(2) = y4 - y3 ; vec3d2(3) = z4 - z3
-    vec3d3(1) = x1 - x3 ; vec3d3(2) = y1 - y3 ; vec3d3(3) = z1 - z3
-    cropro12(1) = vec3d1(2)*vec3d2(3) - vec3d1(3)*vec3d2(2)
-    cropro12(2) = vec3d1(3)*vec3d2(1) - vec3d1(1)*vec3d2(3)
-    cropro12(3) = vec3d1(1)*vec3d2(2) - vec3d1(2)*vec3d2(1)
-
-    trivol = abs(dot_product(cropro12(1:3), vec3d3(1:3)))/(6.00_DP)
-
-  end function vol
 
   subroutine make_cell_surfelev()
   !*********************************************************************************************
@@ -397,6 +346,57 @@ module make_cell
     !$omp end parallel
 
   end subroutine make_rech_area
+
+  function fa_2tri(x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4) result(triarea)
+  !*********************************************************************************************
+  ! fa_2tri -- Calculate face area using cross product with two triangle
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(DP), intent(in) :: x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4
+    ! -- local
+    real(DP) :: triarea, triarea1, triarea2
+    real(DP) :: vec3d1(3), vec3d2(3)
+    !-------------------------------------------------------------------------------------------
+    vec3d1(1) = x1 - x2 ; vec3d1(2) = y1 - y2 ; vec3d1(3) = z1 - z2
+    vec3d2(1) = x3 - x2 ; vec3d2(2) = y3 - y2 ; vec3d2(3) = z3 - z2
+    triarea1 = (vec3d1(2)*vec3d2(3) - vec3d1(3)*vec3d2(2))**2&
+             + (vec3d1(3)*vec3d2(1) - vec3d1(1)*vec3d2(3))**2&
+             + (vec3d1(1)*vec3d2(2) - vec3d1(2)*vec3d2(1))**2
+
+    vec3d1(1) = x1 - x4 ; vec3d1(2) = y1 - y4 ; vec3d1(3) = z1 - z4
+    vec3d2(1) = x3 - x4 ; vec3d2(2) = y3 - y4 ; vec3d2(3) = z3 - z4
+    triarea2 = (vec3d1(2)*vec3d2(3) - vec3d1(3)*vec3d2(2))**2&
+             + (vec3d1(3)*vec3d2(1) - vec3d1(1)*vec3d2(3))**2&
+             + (vec3d1(1)*vec3d2(2) - vec3d1(2)*vec3d2(1))**2
+
+    triarea = (sqrt(triarea1)+sqrt(triarea2))*DHALF
+
+  end function fa_2tri
+
+  function vol(x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4) result(trivol)
+  !*********************************************************************************************
+  ! vol -- Calculate cell vol using cross product with a focus on cell center
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(DP), intent(in) :: x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4
+    ! -- local
+    real(DP) :: trivol
+    real(DP) :: vec3d1(3), vec3d2(3), vec3d3(3), cropro12(3)
+    !-------------------------------------------------------------------------------------------
+    vec3d1(1) = x2 - x3 ; vec3d1(2) = y2 - y3 ; vec3d1(3) = z2 - z3
+    vec3d2(1) = x4 - x3 ; vec3d2(2) = y4 - y3 ; vec3d2(3) = z4 - z3
+    vec3d3(1) = x1 - x3 ; vec3d3(2) = y1 - y3 ; vec3d3(3) = z1 - z3
+    cropro12(1) = vec3d1(2)*vec3d2(3) - vec3d1(3)*vec3d2(2)
+    cropro12(2) = vec3d1(3)*vec3d2(1) - vec3d1(1)*vec3d2(3)
+    cropro12(3) = vec3d1(1)*vec3d2(2) - vec3d1(2)*vec3d2(1)
+
+    trivol = abs(dot_product(cropro12(1:3), vec3d3(1:3)))/(6.00_DP)
+
+  end function vol
 
   function rarea(x1, x2, x3, x4, y1, y2, y3, y4) result(r_area)
   !*********************************************************************************************

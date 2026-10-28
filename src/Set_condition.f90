@@ -1818,7 +1818,7 @@ module set_condition
     ! -- inout
     integer(I4), intent(in) :: wnum
     ! -- local
-    integer(I4) :: i, k, index_count, c_num
+    integer(I4) :: i, k, index_count, c_num, l_num
     integer(I4), allocatable :: temp_wconn(:)
     !-------------------------------------------------------------------------------------------
     ! -- Check the column partition (col_part)
@@ -1842,9 +1842,12 @@ module set_condition
     index_count = 0
     do i = 1, wnum
       do k = st_well%ks(i), st_well%ke(i)
-        index_count = index_count + 1
         c_num = st_grid%nx*st_grid%ny*(k-1) + st_well%ij(i)
-        temp_wconn(index_count) = findloc(st_conn%loc2glo_ijk(:), value = c_num, dim = 1)
+        l_num = 0 ; l_num = findloc(st_conn%loc2glo_ijk(:ncalc), value = c_num, dim = 1)
+        if (l_num /= 0) then
+          index_count = index_count + 1
+          temp_wconn(index_count) = l_num
+        end if
       end do
       st_bcnd%well_index(i) = index_count
     end do
@@ -1903,10 +1906,13 @@ module set_condition
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i, surf_calc, bott_calc)
     do i = 1, wnum
-      surf_calc = st_bcnd%well_conn(st_bcnd%well_index(i-1)+1)
-      bott_calc = st_bcnd%well_conn(st_bcnd%well_index(i))
-      wtop(i) = st_geom%cell_top(surf_calc)
-      wbott(i) = st_geom%cell_bot(bott_calc)
+      wtop(i) = DZERO ; wbott(i) = DZERO
+      if (st_bcnd%well_index(i) > st_bcnd%well_index(i-1)) then
+        surf_calc = st_bcnd%well_conn(st_bcnd%well_index(i-1)+1)
+        bott_calc = st_bcnd%well_conn(st_bcnd%well_index(i))
+        wtop(i) = st_geom%cell_top(surf_calc)
+        wbott(i) = st_geom%cell_bot(bott_calc)
+      end if
     end do
     !$omp end parallel do
 
@@ -2522,7 +2528,7 @@ module set_condition
     allocate(st_hydr%abyd_well(st_bcnd%well_index(wnum)))
     !$omp parallel
     !$omp do private(i)
-    do i = 1, wnum
+    do i = 1, st_bcnd%well_index(wnum)
       st_hydr%abyd_well(i) = DZERO
     end do
     !$omp end do

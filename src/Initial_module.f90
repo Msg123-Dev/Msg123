@@ -90,15 +90,15 @@ module initial_module
 
     !-------------------------------------------------------------------------------------------
     st_mpi%totn = 1 ; st_mpi%rank = 0 ; st_mpi%comm = 0
-    if (st_mpi%rank == 0) then
-      ! -- Initialize log file (log)
-        call init_log(in_stime)
-    end if
-
 #ifdef MPI_MSG
     ! -- Initialize mpi (mpi)
       call init_mpi(log_fnum, st_mpi)
 #endif
+
+    if (st_mpi%rank == 0) then
+      ! -- Initialize log file (log)
+        call init_log(in_stime)
+    end if
 
 #ifdef ICI
     ! -- Initialize ici (ici)

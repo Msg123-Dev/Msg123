@@ -3,6 +3,7 @@ module mpi_write
   use kind_module, only: I4, SP, DP
   use constval_module, only: SNOVAL, DZERO, DONE
   use utility_module, only: st_mpi, write_err_write, write_err_stop
+  use mpi_utility, only: mpimax_val
   use initial_module, only: st_grid
   use set_cell, only: get_calc_grid, ncalc, ncals, neib_mpi_totn, st_conn
   use mpi
@@ -34,7 +35,7 @@ module mpi_write
     real(DP), intent(in) :: out_val(:)
     real(DP), intent(in), optional :: out_base
     ! -- local
-    integer(I4) :: i, s, ierr
+    integer(I4) :: i, s, ierr, max_ierr
     integer(I4) :: all_ncals
     integer(I4), allocatable :: istat(:)
     real(SP), allocatable :: vari_sp(:)
@@ -69,6 +70,9 @@ module mpi_write
 
     ierr = 0
     call MPI_FILE_WRITE(out_fh, vari_sp, all_ncals, MPI_REAL4, istat, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "write mpi file error", max_ierr)
+    ierr = max_ierr
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_write(out_fh)
@@ -94,7 +98,7 @@ module mpi_write
     real(DP), intent(in) :: out_val(:)
     real(DP), intent(in), optional :: out_base
     ! -- local
-    integer(I4) :: i, c, ierr
+    integer(I4) :: i, c, ierr, max_ierr
     integer(I4) :: all_ncalc
     integer(I4), allocatable :: istat(:)
     real(SP), allocatable :: vari_sp(:)
@@ -129,6 +133,9 @@ module mpi_write
 
     ierr = 0
     call MPI_FILE_WRITE(out_fh, vari_sp, all_ncalc, MPI_REAL4, istat, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "write mpi file error", max_ierr)
+    ierr = max_ierr
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_write(out_fh)
@@ -152,7 +159,7 @@ module mpi_write
     real(SP), intent(in) :: out_unit
     real(DP), intent(in) :: out_val(:)
     ! -- local
-    integer(I4) :: i, ierr
+    integer(I4) :: i, ierr, max_ierr
     integer(I4), allocatable :: istat(:)
     real(DP) :: sync_time
     real(DP), allocatable :: out_rest(:)
@@ -177,6 +184,9 @@ module mpi_write
 
     ierr = 0 ; head_dis = 0
     call MPI_FILE_WRITE_AT_ALL(out_fh, head_dis, out_rest, ncalc+2, MPI_REAL8, istat, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "write restart file error", max_ierr)
+    ierr = max_ierr
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_write(out_fh)

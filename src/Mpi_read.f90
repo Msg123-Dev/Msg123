@@ -2,6 +2,7 @@ module mpi_read
   ! -- modules
   use kind_module, only: I4, SP, DP
   use utility_module, only: st_mpi, write_err_read, write_err_stop
+  use mpi_utility, only: mpimax_val
   use initial_module, only: in_type, st_sim, st_grid, st_init
   use mpi
 
@@ -43,7 +44,7 @@ module mpi_read
     ! -- module
     use mpi_initfin, only: abort_proc
     use utility_module, only: log_fnum, write_success
-    use mpi_utility, only: mpisum_val, mpimax_val
+    use mpi_utility, only: mpisum_val
     ! -- inout
     integer(I4), intent(in) :: stop_flag, write_flag
     character(*), intent(in) :: mpi_path, err_mes
@@ -102,12 +103,15 @@ module mpi_read
     character(*), intent(in) :: mpi_path, err_mes
     integer(I4), intent(out) :: mpi_fh
     ! -- local
-    integer(I4) :: ierr
+    integer(I4) :: ierr, max_ierr
     integer(KIND=MPI_OFFSET_KIND) :: offset
     !-------------------------------------------------------------------------------------------
     ierr = 0
     call MPI_FILE_OPEN(st_mpi%comm, mpi_path, MPI_MODE_CREATE + MPI_MODE_WRONLY, MPI_INFO_NULL,&
                        mpi_fh, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "open "//err_mes//" file error", max_ierr)
+    ierr = max_ierr
 
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
@@ -117,6 +121,15 @@ module mpi_read
 
     offset = 0
     call MPI_FILE_SET_SIZE(mpi_fh, offset, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "set size "//err_mes//" file error", max_ierr)
+    ierr = max_ierr
+
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_stop("Set size "//err_mes//" file.")
+      end if
+    end if
 
   end subroutine open_mpi_write_file
 
@@ -130,12 +143,15 @@ module mpi_read
     integer(I4), intent(in) :: fileh, file_view
     character(*), intent(in) :: err_mes
     ! -- local
-    integer(I4) :: ierr
+    integer(I4) :: ierr, max_ierr
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; head_dis = 0
     call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_INTEGER, file_view, "native", MPI_INFO_NULL,&
                            ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "set view "//err_mes//" file error", max_ierr)
+    ierr = max_ierr
 
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
@@ -155,11 +171,14 @@ module mpi_read
     integer(I4), intent(in) :: fileh, file_view
     character(*), intent(in) :: err_mes
     ! -- local
-    integer(I4) :: ierr
+    integer(I4) :: ierr, max_ierr
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; head_dis = 0
     call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_REAL4, file_view, "native", MPI_INFO_NULL, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "set view "//err_mes//" file error", max_ierr)
+    ierr = max_ierr
 
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
@@ -179,11 +198,14 @@ module mpi_read
     integer(I4), intent(in) :: fileh, file_view
     character(*), intent(in) :: err_mes
     ! -- local
-    integer(I4) :: ierr
+    integer(I4) :: ierr, max_ierr
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------------
     ierr = 0 ; head_dis = 0
     call MPI_FILE_SET_VIEW(fileh, head_dis, MPI_REAL8, file_view, "native", MPI_INFO_NULL, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "set view "//err_mes//" file error", max_ierr)
+    ierr = max_ierr
 
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
@@ -204,7 +226,7 @@ module mpi_read
     real(DP), intent(out) :: rest_time, rest_delt
     real(DP), intent(out) :: calc_init(:)
     ! -- local
-    integer(I4) :: i, ierr
+    integer(I4) :: i, ierr, max_ierr
     integer(I4), allocatable :: istat(:)
     real(DP), allocatable :: read_rest(:)
     !-------------------------------------------------------------------------------------------
@@ -224,6 +246,9 @@ module mpi_read
     !$omp end parallel
 
     call MPI_FILE_READ_ALL(fileh, read_rest, calc_num+2, MPI_REAL8, istat, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "read restart file error", max_ierr)
+    ierr = max_ierr
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_stop("Read restart file in MPI program.")
@@ -253,7 +278,7 @@ module mpi_read
     integer(I4), intent(out) :: ierr
     integer(I4), intent(out) :: head_out
     ! -- local
-    integer(I4) :: i
+    integer(I4) :: i, max_ierr
     integer(I4), allocatable :: istat(:)
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------------
@@ -265,8 +290,19 @@ module mpi_read
     !$omp end parallel do
 
     call MPI_FILE_GET_POSITION(fileh, head_dis, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "get position of header error", max_ierr)
+    ierr = max_ierr
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_read(fileh)
+      end if
+    end if
 
     call MPI_FILE_READ_AT_ALL(fileh, head_dis, head_out, 1, MPI_INTEGER, istat, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "read header error", max_ierr)
+    ierr = max_ierr
 
     deallocate(istat)
 
@@ -283,7 +319,7 @@ module mpi_read
     integer(I4), intent(out) :: ierr
     real(SP), intent(out) :: head_out
     ! -- local
-    integer(I4) :: i
+    integer(I4) :: i, max_ierr
     integer(I4), allocatable :: istat(:)
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------------
@@ -295,8 +331,19 @@ module mpi_read
     !$omp end parallel do
 
     call MPI_FILE_GET_POSITION(fileh, head_dis, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "get position of header error", max_ierr)
+    ierr = max_ierr
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_read(fileh)
+      end if
+    end if
 
     call MPI_FILE_READ_AT_ALL(fileh, head_dis, head_out, 1, MPI_REAL4, istat, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "read header error", max_ierr)
+    ierr = max_ierr
 
     deallocate(istat)
 
@@ -313,7 +360,7 @@ module mpi_read
     integer(I4), intent(out) :: ierr
     real(DP), intent(out) :: head_out
     ! -- local
-    integer(I4) :: i
+    integer(I4) :: i, max_ierr
     integer(I4), allocatable :: istat(:)
     integer(KIND=MPI_OFFSET_KIND) :: head_dis
     !-------------------------------------------------------------------------------------------
@@ -325,8 +372,19 @@ module mpi_read
     !$omp end parallel do
 
     call MPI_FILE_GET_POSITION(fileh, head_dis, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "get position of header error", max_ierr)
+    ierr = max_ierr
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_read(fileh)
+      end if
+    end if
 
     call MPI_FILE_READ_AT_ALL(fileh, head_dis, head_out, 1, MPI_REAL8, istat, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "read header error", max_ierr)
+    ierr = max_ierr
 
     deallocate(istat)
 
@@ -342,7 +400,7 @@ module mpi_read
     integer(I4), intent(in) :: ftype, int_ftype, fileh, read_num
     integer(I4), intent(out) :: read_out(:)
     ! -- local
-    integer(I4) :: i, ierr, mpi_rnum
+    integer(I4) :: i, ierr, max_ierr, mpi_rnum
     integer(I4), allocatable :: istat(:)
     integer(I4), allocatable :: read_val(:)
     !-------------------------------------------------------------------------------------------
@@ -371,6 +429,9 @@ module mpi_read
     !$omp end parallel
 
     call MPI_FILE_READ_ALL(fileh, read_val, mpi_rnum, MPI_INTEGER, istat, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "read mpi file error", max_ierr)
+    ierr = max_ierr
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_read(fileh)
@@ -405,7 +466,7 @@ module mpi_read
     integer(I4), intent(in) :: ftype, int_ftype, fileh, read_num
     real(SP), intent(out) :: read_out(:)
     ! -- local
-    integer(I4) :: i, ierr, mpi_rnum
+    integer(I4) :: i, ierr, max_ierr, mpi_rnum
     integer(I4), allocatable :: istat(:)
     real(SP), allocatable :: read_val(:)
     !-------------------------------------------------------------------------------------------
@@ -434,6 +495,9 @@ module mpi_read
     !$omp end parallel
 
     call MPI_FILE_READ_ALL(fileh, read_val, mpi_rnum, MPI_REAL4, istat, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "read mpi file error", max_ierr)
+    ierr = max_ierr
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_read(fileh)
@@ -468,7 +532,7 @@ module mpi_read
     integer(I4), intent(in) :: ftype, int_ftype, fileh, read_num
     real(DP), intent(out) :: read_out(:)
     ! -- local
-    integer(I4) :: i, ierr, mpi_rnum
+    integer(I4) :: i, ierr, max_ierr, mpi_rnum
     integer(I4), allocatable :: istat(:)
     real(DP), allocatable :: read_val(:)
     !-------------------------------------------------------------------------------------------
@@ -497,6 +561,9 @@ module mpi_read
     !$omp end parallel
 
     call MPI_FILE_READ_ALL(fileh, read_val, mpi_rnum, MPI_REAL8, istat, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "read mpi file error", max_ierr)
+    ierr = max_ierr
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
         call write_err_read(fileh)
@@ -700,7 +767,7 @@ module mpi_read
     real(DP), intent(in) :: fmulti
     real(DP), intent(out) :: fetime
     ! -- local
-    integer(I4) :: i, ierr, time_flag, read_count
+    integer(I4) :: i, ierr, max_ierr, time_flag, read_count
     integer(I4), allocatable :: istat(:)
     integer(KIND=MPI_OFFSET_KIND) :: head_dis, read_head
     real(SP) :: read_etime
@@ -720,6 +787,9 @@ module mpi_read
     if (ftype == in_type(4)) then
       call set_2dgrid_view(err_mes)
       call MPI_FILE_SET_VIEW(fnum, head_dis, MPI_REAL4, gview2d, "native", MPI_INFO_NULL, ierr)
+      ! -- Max value for MPI (val)
+        call mpimax_val(ierr, "set view "//err_mes//" error", max_ierr)
+      ierr = max_ierr
       if (ierr /= MPI_SUCCESS) then
         if (st_mpi%rank == 0) then
           call write_err_stop("Set view "//err_mes//" in MPI program.")
@@ -729,6 +799,9 @@ module mpi_read
     else if (ftype == in_type(6)) then
       call set_3dgrid_view(err_mes)
       call MPI_FILE_SET_VIEW(fnum, head_dis, MPI_REAL4, gview3d, "native", MPI_INFO_NULL, ierr)
+      ! -- Max value for MPI (val)
+        call mpimax_val(ierr, "set view "//err_mes//" error", max_ierr)
+      ierr = max_ierr
       if (ierr /= MPI_SUCCESS) then
         if (st_mpi%rank == 0) then
           call write_err_stop("Set view "//err_mes//" in MPI program.")
@@ -742,6 +815,9 @@ module mpi_read
     time_flag = 0 ; read_head = 0
     do while (time_flag == 0)
       call MPI_FILE_READ_ALL(fnum, read_etime, 1, MPI_REAL4, istat, ierr)
+      ! -- Max value for MPI (val)
+        call mpimax_val(ierr, "read "//err_mes//" error", max_ierr)
+      ierr = max_ierr
       if (ierr /= MPI_SUCCESS) then
         if (st_mpi%rank == 0) then
           call write_err_read(fnum)
@@ -751,6 +827,9 @@ module mpi_read
       if (st_sim%res_type == 0 .or. st_sim%sim_type /= 1) then
         time_flag = 1
         call MPI_FILE_SET_VIEW(fnum, read_head, MPI_REAL4, fview, "native", MPI_INFO_NULL,ierr)
+        ! -- Max value for MPI (val)
+          call mpimax_val(ierr, "set view "//err_mes//" error", max_ierr)
+        ierr = max_ierr
         if (ierr /= MPI_SUCCESS) then
           if (st_mpi%rank == 0) then
             call write_err_stop("Set view "//err_mes//" in MPI program.")
@@ -759,6 +838,9 @@ module mpi_read
       else if (fetime > st_init%rest_time .and. st_sim%res_type >= 1) then
         time_flag = 1 ; read_head = head_dis*read_count*I4
         call MPI_FILE_SET_VIEW(fnum, read_head, MPI_REAL4, fview, "native", MPI_INFO_NULL, ierr)
+        ! -- Max value for MPI (val)
+          call mpimax_val(ierr, "set view "//err_mes//" error", max_ierr)
+        ierr = max_ierr
         if (ierr /= MPI_SUCCESS) then
           if (st_mpi%rank == 0) then
             call write_err_stop("Set view "//err_mes//" in MPI program.")
@@ -766,6 +848,9 @@ module mpi_read
         end if
       else
         call MPI_FILE_GET_POSITION(fnum, head_dis, ierr)
+        ! -- Max value for MPI (val)
+          call mpimax_val(ierr, "get position "//err_mes//" error", max_ierr)
+        ierr = max_ierr
         if (ierr /= MPI_SUCCESS) then
           if (st_mpi%rank == 0) then
             call write_err_stop("Get position "//err_mes//" in MPI program.")
@@ -941,10 +1026,13 @@ module mpi_read
     character(*), intent(in) :: int_path, int_name
     integer(I4), intent(out) :: int_unit
     ! -- local
-    integer(I4) :: ierr, mpi_fh
+    integer(I4) :: ierr, max_ierr, mpi_fh
     character(:), allocatable :: err_mes
     !-------------------------------------------------------------------------------------------
     call MPI_FILE_OPEN(st_mpi%comm, int_path, MPI_MODE_RDONLY, MPI_INFO_NULL, mpi_fh, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "open "//int_name//" time interval file error", max_ierr)
+    ierr = max_ierr
 
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
@@ -968,9 +1056,12 @@ module mpi_read
     ! -- inout
     integer(I4), intent(inout) :: fileh
     ! -- local
-    integer(I4) :: ierr
+    integer(I4) :: ierr, max_ierr
     !-------------------------------------------------------------------------------------------
     call MPI_FILE_CLOSE(fileh, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "close mpi file error", max_ierr)
+    ierr = max_ierr
 
     if (ierr /= MPI_SUCCESS) then
       if (st_mpi%rank == 0) then
@@ -992,7 +1083,7 @@ module mpi_read
     integer(I4), intent(out) :: part_reg(:)
     integer(I4), intent(out) :: totreg_out
     ! -- local
-    integer(I4) :: nxy, i, k, ierr, mpi_fh, loc_max, all_max
+    integer(I4) :: nxy, i, k, ierr, max_ierr, mpi_fh, loc_max, all_max
     integer(I4), allocatable :: lay_buf(:)
     integer(KIND=MPI_OFFSET_KIND) :: off
     integer(I4) :: istat(MPI_STATUS_SIZE)
@@ -1005,6 +1096,14 @@ module mpi_read
 
     off = int(part_sta-1, MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
     call MPI_FILE_READ_AT_ALL(mpi_fh, off, part_reg, part_num, MPI_INTEGER, istat, ierr)
+    ! -- Max value for MPI (val)
+      call mpimax_val(ierr, "read calculation region file error", max_ierr)
+    ierr = max_ierr
+    if (ierr /= MPI_SUCCESS) then
+      if (st_mpi%rank == 0) then
+        call write_err_read(mpi_fh)
+      end if
+    end if
 
     loc_max = 0
     do i = 1, part_num
@@ -1019,6 +1118,14 @@ module mpi_read
         off = (int(k-1, MPI_OFFSET_KIND)*int(nxy, MPI_OFFSET_KIND) &
                + int(part_sta-1, MPI_OFFSET_KIND)) * 4_MPI_OFFSET_KIND
         call MPI_FILE_READ_AT_ALL(mpi_fh, off, lay_buf, part_num, MPI_INTEGER, istat, ierr)
+        ! -- Max value for MPI (val)
+          call mpimax_val(ierr, "read calculation region file error", max_ierr)
+        ierr = max_ierr
+        if (ierr /= MPI_SUCCESS) then
+          if (st_mpi%rank == 0) then
+            call write_err_read(mpi_fh)
+          end if
+        end if
         do i = 1, part_num
           if (lay_buf(i) > loc_max) then
             loc_max = lay_buf(i)
@@ -1028,7 +1135,7 @@ module mpi_read
       deallocate(lay_buf)
     end if
 
-    call MPI_FILE_CLOSE(mpi_fh, ierr)
+    call close_mpi_file(mpi_fh)
 
     call MPI_ALLREDUCE(loc_max, all_max, 1, MPI_INTEGER, MPI_MAX, st_mpi%comm, ierr)
     totreg_out = all_max
@@ -1048,7 +1155,7 @@ module mpi_read
     integer(I4), intent(in) :: head_num, read_sta, read_num
     real(SP), intent(out) :: read_seaval(:)
     ! -- local
-    integer(I4) :: nxy, i, g, ij, ierr, mpi_fh, col_sta, tail_num, wrap_num
+    integer(I4) :: nxy, i, g, ij, ierr, max_ierr, mpi_fh, col_sta, tail_num, wrap_num
     integer(KIND=MPI_OFFSET_KIND) :: off
     integer(I4) :: istat(MPI_STATUS_SIZE)
     real(SP), allocatable :: tail_val(:), wrap_val(:)
@@ -1061,6 +1168,14 @@ module mpi_read
       ! -- 3d: value(g) at byte (g-1)*4, so the read range is a contiguous slab
       off = int(read_sta-1+head_num, MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
       call MPI_FILE_READ_AT_ALL(mpi_fh, off, read_seaval, read_num, MPI_REAL4, istat, ierr)
+      ! -- Max value for MPI (val)
+        call mpimax_val(ierr, "read sea level distributed file error", max_ierr)
+      ierr = max_ierr
+      if (ierr /= MPI_SUCCESS) then
+        if (st_mpi%rank == 0) then
+          call write_err_read(mpi_fh)
+        end if
+      end if
     else
       ! -- 2d: read only the columns of the read range (col_sta to nxy, then from 1)
       col_sta = 1
@@ -1071,8 +1186,24 @@ module mpi_read
       allocate(tail_val(max(tail_num,1)), wrap_val(max(wrap_num,1)))
       off = int(col_sta-1+head_num, MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
       call MPI_FILE_READ_AT_ALL(mpi_fh, off, tail_val, tail_num, MPI_REAL4, istat, ierr)
+      ! -- Max value for MPI (val)
+        call mpimax_val(ierr, "read sea level distributed file error", max_ierr)
+      ierr = max_ierr
+      if (ierr /= MPI_SUCCESS) then
+        if (st_mpi%rank == 0) then
+          call write_err_read(mpi_fh)
+        end if
+      end if
       off = int(head_num, MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
       call MPI_FILE_READ_AT_ALL(mpi_fh, off, wrap_val, wrap_num, MPI_REAL4, istat, ierr)
+      ! -- Max value for MPI (val)
+        call mpimax_val(ierr, "read sea level distributed file error", max_ierr)
+      ierr = max_ierr
+      if (ierr /= MPI_SUCCESS) then
+        if (st_mpi%rank == 0) then
+          call write_err_read(mpi_fh)
+        end if
+      end if
       do i = 1, read_num
         g = read_sta + i - 1
         ij = mod(g-1, nxy) + 1
@@ -1085,7 +1216,7 @@ module mpi_read
       deallocate(tail_val, wrap_val)
     end if
 
-    call MPI_FILE_CLOSE(mpi_fh, ierr)
+    call close_mpi_file(mpi_fh)
 
   end subroutine read_dist_seaval
 

@@ -1,11 +1,12 @@
 module utility_module
   ! -- modules
+  use, intrinsic :: iso_fortran_env, only: error_unit
   use kind_module, only: I4, DP
   use types_module, only: mpi_set, gmap_set
 
   implicit none
   private
-  integer(I4), public :: log_fnum = 0
+  integer(I4), public :: log_fnum = error_unit
   type(mpi_set), public :: st_mpi
   public :: get_file_stat, get_days
   public :: open_new_rtxt, open_new_rbin, open_new_wtxt, open_new_wbin

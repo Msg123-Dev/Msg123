@@ -5,7 +5,7 @@ module mpi_write
   use utility_module, only: st_mpi, write_err_write, write_err_stop
   use mpi_utility, only: mpimax_val
   use initial_module, only: st_grid
-  use set_cell, only: get_calc_grid, ncalc, ncals, neib_mpi_totn, st_conn
+  use set_cell, only: get_calc_grid, ncalc, ncals, neib_mpi_totn, neib_ncalc, st_conn
   use mpi
 
   implicit none
@@ -411,7 +411,7 @@ module mpi_write
     ! -- inout
     real(DP), intent(in) :: hnew(:), snew(:)
     ! -- local
-    integer(I4) :: i, j, k, ierr, nxyz, loc_n, loc_r, i_num, j_num
+    integer(I4) :: i, j, k, ierr, nxyz, loc_n, loc_r, i_num, j_num, mpi_ncalc
     integer(I4) :: wtab_sendn, wtab_recvn, sum_sendn, sum_recvn
     integer(I4) :: isend_sta, isend_end, irecv_sta, irecv_end
     integer(I4) :: send_len, recv_len
@@ -424,6 +424,7 @@ module mpi_write
     !-------------------------------------------------------------------------------------------
     wtab_sendn = send_wtab_cind(neib_wtab_stotn)
     wtab_recvn = recv_wtab_cind(neib_wtab_rtotn)
+    mpi_ncalc = ncalc + neib_ncalc
     allocate(send_flag(wtab_sendn), recv_flag(wtab_recvn))
     allocate(flag_send(neib_mpi_totn), req_flag_recv(neib_mpi_totn))
     allocate(head_send(neib_mpi_totn), req_head_recv(neib_mpi_totn))
@@ -559,7 +560,7 @@ module mpi_write
       call get_cals_grid(i, i_num, j_num)
       wtab: do k = st_grid%nz, 1, -1
         nxyz = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
-        loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:), value = nxyz, dim = 1)
+        loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:mpi_ncalc), value = nxyz, dim = 1)
         if (loc_n /= 0) then
           loc_r = 0 ; loc_r = findloc(recv_wtab_citem(:), value = loc_n, dim = 1)
           if (loc_r == 0) then
@@ -595,10 +596,11 @@ module mpi_write
     ! -- inout
     integer(I4), intent(out) :: flag_send(:)
     ! -- local
-    integer(I4) :: i, j, k, c_num, isend, nxyz, loc_n, loc_r
+    integer(I4) :: i, j, k, c_num, isend, nxyz, loc_n, loc_r, mpi_ncalc
     integer(I4) :: is_sta, is_end
     integer(I4) :: i_num, j_num, k_num
     !-------------------------------------------------------------------------------------------
+    mpi_ncalc = ncalc + neib_ncalc
     !$omp parallel do private(i, j, k, c_num, isend, nxyz, loc_n, loc_r, is_sta, is_end,&
     !$omp&                    i_num, j_num, k_num)
     do i = 1, neib_wtab_stotn
@@ -608,7 +610,7 @@ module mpi_write
         call get_calc_grid(c_num, i_num, j_num, k_num)
         sr_flag: do k = st_grid%nz, k_num, -1
           nxyz = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
-          loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:), value = nxyz, dim = 1)
+          loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:mpi_ncalc), value = nxyz, dim = 1)
           if (loc_n /= 0) then
             loc_r = 0 ; loc_r = findloc(recv_wtab_citem(:), value = loc_n, dim = 1)
             if (loc_r /= 0) then
@@ -638,10 +640,11 @@ module mpi_write
     real(DP), intent(in) :: r_head(:), r_srat(:)
     real(DP), intent(out) :: s_head(:), s_srat(:)
     ! -- local
-    integer(I4) :: i, j, k, c_num, isend, nxyz, loc_n, loc_r
+    integer(I4) :: i, j, k, c_num, isend, nxyz, loc_n, loc_r, mpi_ncalc
     integer(I4) :: is_sta, is_end
     integer(I4) :: i_num, j_num, k_num
     !-------------------------------------------------------------------------------------------
+    mpi_ncalc = ncalc + neib_ncalc
     !$omp parallel do private(i, j, k, c_num, isend, nxyz, loc_n, loc_r, is_sta, is_end,&
     !$omp&                    i_num, j_num, k_num)
     do i = 1, neib_wtab_stotn
@@ -651,7 +654,7 @@ module mpi_write
         call get_calc_grid(c_num, i_num, j_num, k_num)
         unsat: do k = st_grid%nz, k_num, -1
           nxyz = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
-          loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:), value = nxyz, dim = 1)
+          loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:mpi_ncalc), value = nxyz, dim = 1)
           if (loc_n /= 0) then
             loc_r = 0 ; loc_r = findloc(recv_wtab_citem(:), value = loc_n, dim = 1)
             if (loc_r == 0) then

@@ -405,6 +405,10 @@ module set_cell
     nc_unknow = ncalc
 #endif
 
+    if (nc_unknow == 0 .and. st_mpi%rank == 0) then
+      call write_err_stop("There is no calculation cell.")
+    end if
+
 #ifdef MPI_MSG
     allocate(loc2unk_ij(ncals), loc2unk_ijk(ncalc))
 

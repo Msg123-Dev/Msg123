@@ -686,6 +686,10 @@ module set_cell
       end if
     end if
 
+    if (totnreg < 1) then
+      call write_err_stop("There is no calculation cell.")
+    end if
+
   end subroutine set_own_reg
 #endif
 
@@ -1001,6 +1005,10 @@ module set_cell
     end if
 
     deallocate(type_2d, type_3d)
+
+    if (totnreg < 1) then
+      call write_err_stop("There is no calculation cell.")
+    end if
 
   end subroutine set_glob_reg
 #endif

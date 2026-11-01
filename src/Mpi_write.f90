@@ -26,8 +26,7 @@ module mpi_write
   ! write_mpi_2dbin -- Write MPI 2d binary
   !*********************************************************************************************
     ! -- module
-    use mpi_set, only: write_2d_ind
-    use set_cell, only: no_ncals, seal_snum
+    use mpi_set, only: write_2d_ind, write_2d_num
     ! -- inout
     integer(I4), intent(in) :: out_fh, out_totn
     integer(I4), intent(in) :: calc_num(:)
@@ -45,7 +44,7 @@ module mpi_write
     if (present(out_base)) then
       base_val = out_base
     end if
-    all_ncals = ncals + no_ncals + seal_snum + 1
+    all_ncals = write_2d_num
     allocate(istat(MPI_STATUS_SIZE))
     allocate(vari_sp(all_ncals))
     !$omp parallel

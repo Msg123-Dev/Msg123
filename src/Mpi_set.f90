@@ -22,7 +22,7 @@ module mpi_set
   integer(I4), public :: cals_r4view, cals_r4hview, calc_r4view, calc_r4hview
   integer(I4), public :: surf_r4view, surf_r4hview, cell_r4view, cell_r4hview
   integer(I4), public :: rest_view
-  integer(I4), public :: write_2dview, write_3dview
+  integer(I4), public :: write_2dview, write_3dview, write_2d_num
   integer(I4), allocatable, public :: write_2d_ind(:), write_3d_ind(:)
 
   interface scatter_xyval
@@ -1306,14 +1306,17 @@ module mpi_set
   ! set_write_fview -- Set write file view
   !*********************************************************************************************
     ! -- module
-
+    use mpi_utility, only: alltoall_val, alltoallv_val
     ! -- inout
     integer(I4), intent(in) :: cals, calc
     integer(I4), intent(in) :: l2g_ij(:), l2g_ijk(:)
     integer(I4), intent(in) :: sort_ns(:), sort_nc(:)
     ! -- local
-    integer(I4) :: i, j, ierr, tmptype
-    integer(I4) :: loc_cals, loc_calc
+    integer(I4) :: i, j, k, ierr, tmptype
+    integer(I4) :: loc_cals, loc_calc, nxy, base_num, rem_num, home_sta, home_num, home_rank
+    integer(I4) :: add_num
+    integer(I4), allocatable :: send_count(:), recv_count(:), pos_send(:), pos_recv(:)
+    integer(I4), allocatable :: cover_home(:), sort_all(:)
     integer(I4), allocatable :: xyblock(:), xytype(:)
     integer(I4), allocatable :: xyzblock(:), xyztype(:)
     integer(KIND=MPI_ADDRESS_KIND) :: lb, extent
@@ -1321,7 +1324,57 @@ module mpi_set
     !-------------------------------------------------------------------------------------------
     ierr = 0
 
-    loc_cals = size(sort_ns(:)) + 1
+    nxy = st_grid%nx*st_grid%ny
+    base_num = nxy/st_mpi%totn ; rem_num = mod(nxy, st_mpi%totn)
+    home_num = base_num
+    if (st_mpi%rank < rem_num) then
+      home_num = base_num + 1
+    end if
+    home_sta = st_mpi%rank*base_num + min(st_mpi%rank, rem_num) + 1
+    allocate(send_count(st_mpi%totn), recv_count(st_mpi%totn), pos_send(size(sort_ns(:))+1))
+    do i = 1, st_mpi%totn
+      send_count(i) = 0
+    end do
+    do i = 1, size(sort_ns(:))
+      if (sort_ns(i) <= rem_num*(base_num+1)) then
+        home_rank = (sort_ns(i)-1)/(base_num+1)
+      else
+        home_rank = rem_num + (sort_ns(i)-1-rem_num*(base_num+1))/base_num
+      end if
+      send_count(home_rank+1) = send_count(home_rank+1) + 1 ; pos_send(i) = sort_ns(i)
+    end do
+    ! -- AlltoAll value for MPI (val)
+      call alltoall_val(send_count, "2d output cover count", recv_count)
+    allocate(pos_recv(sum(recv_count(:))+1), cover_home(max(home_num,1)))
+    ! -- AlltoAll variable value for MPI (val)
+      call alltoallv_val(pos_send, send_count, recv_count, "2d output cover position", pos_recv)
+    do i = 1, home_num
+      cover_home(i) = 0
+    end do
+    do i = 1, sum(recv_count(:))
+      cover_home(pos_recv(i)-home_sta+1) = 1
+    end do
+    add_num = count(cover_home(1:home_num) == 0)
+    allocate(sort_all(size(sort_ns(:))+add_num))
+    j = 0 ; k = 1
+    do i = 1, home_num
+      if (cover_home(i) == 0) then
+        do while (k <= size(sort_ns(:)))
+          if (sort_ns(k) > home_sta+i-1) then
+            exit
+          end if
+          j = j + 1 ; sort_all(j) = sort_ns(k) ; k = k + 1
+        end do
+        j = j + 1 ; sort_all(j) = home_sta + i - 1
+      end if
+    end do
+    do while (k <= size(sort_ns(:)))
+      j = j + 1 ; sort_all(j) = sort_ns(k) ; k = k + 1
+    end do
+    deallocate(send_count, recv_count, pos_send, pos_recv, cover_home)
+
+    loc_cals = size(sort_all(:)) + 1
+    write_2d_num = loc_cals
     allocate(xyblock(loc_cals), xydis(loc_cals), xytype(loc_cals))
     allocate(write_2d_ind(cals))
     xydis(1) = 0_MPI_ADDRESS_KIND
@@ -1335,14 +1388,17 @@ module mpi_set
 
     !$omp do private(i)
     do i = 1, loc_cals-1
-      xydis(i+1) = int(sort_ns(i)*4, kind=MPI_ADDRESS_KIND)
+      xydis(i+1) = int(sort_all(i)*4, kind=MPI_ADDRESS_KIND)
     end do
     !$omp end do
     !$omp end parallel
 
     j = 1
     do i = 1, loc_cals-1
-      if (j <= cals .and. sort_ns(i) == l2g_ij(j)) then
+      if (j > cals) then
+        exit
+      end if
+      if (sort_all(i) == l2g_ij(j)) then
         write_2d_ind(j) = i ; j = j + 1
       end if
     end do
@@ -1374,7 +1430,7 @@ module mpi_set
       end if
     end if
 
-    deallocate(xyblock, xydis, xytype)
+    deallocate(xyblock, xydis, xytype, sort_all)
 
     loc_calc = size(sort_nc(:)) + 1
     allocate(xyzblock(loc_calc), xyzdis(loc_calc), xyztype(loc_calc))
@@ -1397,7 +1453,10 @@ module mpi_set
 
     j = 1
     do i = 1, loc_calc-1
-      if (j <= calc .and. sort_nc(i) == l2g_ijk(j)) then
+      if (j > calc) then
+        exit
+      end if
+      if (sort_nc(i) == l2g_ijk(j)) then
         write_3d_ind(j) = i ; j = j + 1
       end if
     end do

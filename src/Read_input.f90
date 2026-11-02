@@ -9,7 +9,7 @@ module read_input
 
   implicit none
   private
-  public :: read_main_file, read_grid_file, add_nml_name
+  public :: read_main_file, read_grid_file, add_nml_name, diag13_outside
   real(SP), public :: len_scal, len_scal_inv
   real(DP), public :: z_base
   real(DP), allocatable, public :: glob_x(:,:), glob_y(:,:), glob_z(:,:,:)
@@ -17,7 +17,7 @@ module read_input
   ! -- local
   integer(I4) :: main_fnum, main_namen
   integer(I4) :: sdate(6), edate(6)
-  integer(I4) :: grid_check, grid_xnum, grid_ynum, grid_znum
+  integer(I4) :: grid_check, grid_xnum, grid_ynum, grid_znum, grid_tnum
   integer(I4) :: nml_addn = 0
   integer(I4), parameter :: MAIN_MAXN = 32, ADD_MAXN = 1
   integer(I4), parameter :: NML_MUSTN = 9, NML_OPTN = 7
@@ -1001,6 +1001,10 @@ module read_input
         write(err_mes,'(a,i0,a)') "Z direction is reversed at ", grid_znum, " point."
         call write_logf(trim(err_mes))
       end if
+      if (grid_tnum /= 0) then
+        write(err_mes,'(a,i0,a)') "Plan of cell is twisted at ", grid_tnum, " column."
+        call write_logf(trim(err_mes))
+      end if
       call write_err_stop("Check the direction in grid file.")
     end if
 
@@ -1470,8 +1474,9 @@ module read_input
     integer(I4) :: i, j, k
     integer(I4), allocatable :: gxnum(:,:), gynum(:,:), gznum(:,:,:)
     real(DP) :: minz, maxz, z_range
+    real(DP) :: x1, x2, x3, x4, y1, y2, y3, y4
     !-------------------------------------------------------------------------------------------
-    grid_check = 0 ; grid_xnum = 0 ; grid_ynum = 0 ; grid_znum = 0
+    grid_check = 0 ; grid_xnum = 0 ; grid_ynum = 0 ; grid_znum = 0 ; grid_tnum = 0
     allocate(gxnum(nx+1,ny+1), gynum(nx+1,ny+1))
     allocate(gznum(nx+1,ny+1,nz+1))
     !$omp parallel
@@ -1519,6 +1524,19 @@ module read_input
     !$omp end do
     !$omp end parallel
 
+    !$omp parallel do private(i, j, x1, x2, x3, x4, y1, y2, y3, y4) reduction(+:grid_tnum)
+    do j = 1, ny
+      do i = 1, nx
+        x1 = glob_x(i,j) ; x2 = glob_x(i+1,j) ; x3 = glob_x(i+1,j+1) ; x4 = glob_x(i,j+1)
+        y1 = glob_y(i,j) ; y2 = glob_y(i+1,j) ; y3 = glob_y(i+1,j+1) ; y4 = glob_y(i,j+1)
+        if (diag13_outside(x1, x2, x3, x4, y1, y2, y3, y4) .and. &
+            diag13_outside(x2, x3, x4, x1, y2, y3, y4, y1)) then
+          grid_tnum = grid_tnum + 1
+        end if
+      end do
+    end do
+    !$omp end parallel do
+
     minz = -DNOVAL ; maxz = DNOVAL
     !$omp parallel do private(i, j, k) reduction(min:minz) reduction(max:maxz)
     do k = 1, nz+1
@@ -1538,7 +1556,7 @@ module read_input
     grid_xnum = sum(gxnum) ; grid_ynum = sum(gynum) ; grid_znum = sum(gznum)
     deallocate(gxnum, gynum, gznum)
 
-    grid_check = grid_xnum + grid_ynum + grid_znum
+    grid_check = grid_xnum + grid_ynum + grid_znum + grid_tnum
 
     if (st_ctrl%datum_type == 1) then
       z_base = minz
@@ -1573,6 +1591,24 @@ module read_input
     !$omp end parallel
 
   end subroutine check_grid_loc
+
+  function diag13_outside(x1, x2, x3, x4, y1, y2, y3, y4) result(outside)
+  !*********************************************************************************************
+  ! diag13_outside -- Check whether diagonal 1-3 runs outside the plan quadrilateral
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(DP), intent(in) :: x1, x2, x3, x4, y1, y2, y3, y4
+    ! -- local
+    logical :: outside
+    real(DP) :: a123, a134
+    !-------------------------------------------------------------------------------------------
+    a123 = (x2-x1)*(y3-y1) - (y2-y1)*(x3-x1)
+    a134 = (x3-x1)*(y4-y1) - (y3-y1)*(x4-x1)
+    outside = a123*a134 < DZERO
+
+  end function diag13_outside
 
   subroutine check_tinp(tinp_type, all_type, tinp_path, tinp_name, tinp_unit)
   !*********************************************************************************************

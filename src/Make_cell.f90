@@ -3,7 +3,7 @@ module make_cell
   use kind_module, only: I4, DP
   use constval_module, only: FACE, DZERO, DHALF
   use types_module, only: geom_set
-  use read_input, only: glob_x, glob_y, glob_z
+  use read_input, only: glob_x, glob_y, glob_z, diag13_outside
   use set_cell, only: get_calc_grid, ncalc, ncals
 
   implicit none
@@ -209,8 +209,13 @@ module make_cell
       z5 = glob_z(xn,yn,zn+1) ; z6 = glob_z(xn+1,yn,zn+1)
       z7 = glob_z(xn+1,yn+1,zn+1) ; z8 = glob_z(xn,yn+1,zn+1)
 
-      st_geom%face_area(i,1) = fa_2tri(x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4)
-      st_geom%face_area(i,6) = fa_2tri(x1, x2, x3, x4, y1, y2, y3, y4, z5, z6, z7, z8)
+      if (diag13_outside(x1, x2, x3, x4, y1, y2, y3, y4)) then
+        st_geom%face_area(i,1) = fa_2tri(x2, x3, x4, x1, y2, y3, y4, y1, z2, z3, z4, z1)
+        st_geom%face_area(i,6) = fa_2tri(x2, x3, x4, x1, y2, y3, y4, y1, z6, z7, z8, z5)
+      else
+        st_geom%face_area(i,1) = fa_2tri(x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4)
+        st_geom%face_area(i,6) = fa_2tri(x1, x2, x3, x4, y1, y2, y3, y4, z5, z6, z7, z8)
+      end if
       st_geom%face_area(i,3) = fa_2tri(x1, x1, x4, x4, y1, y1, y4, y4, z1, z5, z8, z4)
       st_geom%face_area(i,4) = fa_2tri(x2, x2, x3, x3, y2, y2, y3, y3, z2, z6, z7, z3)
       st_geom%face_area(i,2) = fa_2tri(x1, x2, x2, x1, y1, y2, y2, y1, z1, z2, z6, z5)
@@ -231,7 +236,7 @@ module make_cell
 
     ! -- local
     integer(I4) :: i, xn, yn, zn
-    real(DP) :: cx, cy, cz
+    real(DP) :: cx, cy, cz, side_vol
     real(DP) :: x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4, z5, z6, z7, z8
     !-------------------------------------------------------------------------------------------
     allocate(st_geom%cell_vol(ncalc))
@@ -242,8 +247,8 @@ module make_cell
     end do
     !$omp end do
     ! make cell volume
-    !$omp do private(i, xn, yn, zn, cx, cy, cz, x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3,&
-    !$omp&           z4, z5, z6, z7, z8)
+    !$omp do private(i, xn, yn, zn, cx, cy, cz, side_vol, x1, x2, x3, x4, y1, y2, y3, y4, z1,&
+    !$omp&           z2, z3, z4, z5, z6, z7, z8)
     do i = 1, ncalc
       call get_calc_grid(i, xn, yn, zn)
       cx = cp_x(i) ; cy = cp_y(i) ; cz = cp_z(i)
@@ -254,18 +259,27 @@ module make_cell
       z5 = glob_z(xn,yn,zn+1) ; z6 = glob_z(xn+1,yn,zn+1)
       z7 = glob_z(xn+1,yn+1,zn+1) ; z8 = glob_z(xn,yn+1,zn+1)
 
-      st_geom%cell_vol(i) = abs(vol(cx, x4, x4, x1, cy, y4, y4, y1, cz, z8, z4, z1) + &
-                            vol(cx, x1, x1, x4, cy, y1, y1, y4, cz, z1, z5, z8) + &
-                            vol(cx, x2, x3, x3, cy, y2, y3, y3, cz, z2, z3, z7) + &
-                            vol(cx, x3, x2, x2, cy, y3, y2, y2, cz, z7, z6, z2) + &
-                            vol(cx, x2, x1, x1, cy, y2, y1, y1, cz, z6, z5, z1) + &
-                            vol(cx, x1, x2, x2, cy, y1, y2, y2, cz, z1, z2, z6) + &
-                            vol(cx, x4, x4, x3, cy, y4, y4, y3, cz, z4, z8, z7) + &
-                            vol(cx, x3, x3, x4, cy, y3, y3, y4, cz, z7, z3, z4) + &
-                            vol(cx, x1, x4, x3, cy, y1, y4, y3, cz, z1, z4, z3) + &
-                            vol(cx, x3, x2, x1, cy, y3, y2, y1, cz, z3, z2, z1) + &
-                            vol(cx, x3, x4, x1, cy, y3, y4, y1, cz, z7, z8, z5) + &
-                            vol(cx, x1, x2, x3, cy, y1, y2, y3, cz, z5, z6, z7))
+      side_vol = vol(cx, x4, x4, x1, cy, y4, y4, y1, cz, z8, z4, z1) + &
+                 vol(cx, x1, x1, x4, cy, y1, y1, y4, cz, z1, z5, z8) + &
+                 vol(cx, x2, x3, x3, cy, y2, y3, y3, cz, z2, z3, z7) + &
+                 vol(cx, x3, x2, x2, cy, y3, y2, y2, cz, z7, z6, z2) + &
+                 vol(cx, x2, x1, x1, cy, y2, y1, y1, cz, z6, z5, z1) + &
+                 vol(cx, x1, x2, x2, cy, y1, y2, y2, cz, z1, z2, z6) + &
+                 vol(cx, x4, x4, x3, cy, y4, y4, y3, cz, z4, z8, z7) + &
+                 vol(cx, x3, x3, x4, cy, y3, y3, y4, cz, z7, z3, z4)
+      if (diag13_outside(x1, x2, x3, x4, y1, y2, y3, y4)) then
+        st_geom%cell_vol(i) = abs(side_vol + &
+                                  vol(cx, x4, x3, x2, cy, y4, y3, y2, cz, z4, z3, z2) + &
+                                  vol(cx, x2, x1, x4, cy, y2, y1, y4, cz, z2, z1, z4) + &
+                                  vol(cx, x2, x3, x4, cy, y2, y3, y4, cz, z6, z7, z8) + &
+                                  vol(cx, x4, x1, x2, cy, y4, y1, y2, cz, z8, z5, z6))
+      else
+        st_geom%cell_vol(i) = abs(side_vol + &
+                                  vol(cx, x1, x4, x3, cy, y1, y4, y3, cz, z1, z4, z3) + &
+                                  vol(cx, x3, x2, x1, cy, y3, y2, y1, cz, z3, z2, z1) + &
+                                  vol(cx, x3, x4, x1, cy, y3, y4, y1, cz, z7, z8, z5) + &
+                                  vol(cx, x1, x2, x3, cy, y1, y2, y3, cz, z5, z6, z7))
+      end if
     end do
     !$omp end do
     !$omp end parallel
@@ -340,7 +354,11 @@ module make_cell
       x4 = glob_x(xn,yn+1) ; y1 = glob_y(xn,yn) ; y2 = glob_y(xn+1,yn)
       y3 = glob_y(xn+1,yn+1) ; y4 = glob_y(xn,yn+1)
 
-      st_geom%area_r(i) = rarea(x1, x2, x3, x4, y1, y2, y3, y4)
+      if (diag13_outside(x1, x2, x3, x4, y1, y2, y3, y4)) then
+        st_geom%area_r(i) = rarea(x2, x3, x4, x1, y2, y3, y4, y1)
+      else
+        st_geom%area_r(i) = rarea(x1, x2, x3, x4, y1, y2, y3, y4)
+      end if
     end do
     !$omp end do
     !$omp end parallel

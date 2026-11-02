@@ -278,7 +278,7 @@ module mpi_solve
           do k = off_sta, off_end
             offr = crs_index(1)%offrow(k) ; off_left = 0
             off_left = left_offr(k)
-            if (off_left /= 0 .and. fix_flag(offr) == 1) then
+            if (off_left /= 0 .and. fix_flag(offr) == 1 .and. offr_flag(k) == 0) then
               offr_flag(k) = 1
               d_invk = DONE/pre_d(offr)
               temp_pred(i) = temp_pred(i)&
@@ -355,7 +355,7 @@ module mpi_solve
           do k = off_sta, off_end
             offr = crs_index(1)%offrow(k) ; off_left = 0
             off_left = left_offr(k)
-            if (off_left /= 0 .and. fix_flag(offr) == 1) then
+            if (off_left /= 0 .and. fix_flag(offr) == 1 .and. offr_flag(k) == 0) then
               offr_flag(k) = 1 ; temp_outx(i) = temp_outx(i) - inlumat(k)*outx(offr)
             else if (off_left == 0 .and. offr_flag(k) == 0) then
               offr_flag(k) = 1
@@ -399,7 +399,7 @@ module mpi_solve
           do k = off_sta, off_end
             offr = crs_index(1)%offrow(k) ; off_right = 0
             off_right = right_offr(k)
-            if (off_right /= 0 .and. fix_flag(offr) == 1) then
+            if (off_right /= 0 .and. fix_flag(offr) == 1 .and. offr_flag(k) == 0) then
               offr_flag(k) = 1 ; temp_outx(i) = temp_outx(i) + inlumat(k)*outx(offr)
             else if (off_right == 0 .and. offr_flag(k) == 0) then
               offr_flag(k) = 1

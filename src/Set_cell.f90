@@ -1916,21 +1916,17 @@ module set_cell
       do i = 1, neib_ncalc
         temp_sort(i) = neib_gloc(i)
         sort_recv_num(i) = 0 ; send2recv(i) = 0
-        loc_send_num(i) = neib_locc(i)
+        loc_send_num(i) = 0
       end do
       !$omp end do
       !$omp end parallel
 
       call iquick_sort(temp_sort, 1, neib_ncalc)
-      !$omp parallel
-      !$omp do private(i, recv_loc)
       do i = 1, neib_ncalc
         recv_loc = findloc(neib_gloc(1:neib_ncalc), value = temp_sort(i), dim = 1)
-        neib_gloc(recv_loc) = 0
+        neib_gloc(recv_loc) = 0 ; loc_send_num(i) = recv_loc
         sort_recv_num(i) = neib_locc(recv_loc) ; sort_mpi_num(i) = temp_mpi_num(recv_loc)
       end do
-      !$omp end do
-      !$omp end parallel
       deallocate(neib_gloc)
 
       do i = 1, neib_mpi_totn
@@ -1943,12 +1939,15 @@ module set_cell
         recv_num(:) = pack(sort_recv_num(:), sort_mpi_num(:) == neib_mpi_num)
         send_num(:) = pack(neib_locc(:), temp_mpi_num(:) == neib_mpi_num)
         do j = 1, end_send-sta_send
-          k = sta_send + j ; recv_citem(k) = ncalc + k
-          send_loc = findloc(loc_send_num(:), value = recv_num(j), dim = 1)
-          send2recv(send_loc) = k ; send_citem(k) = send_num(j)
-          loc_send_num(send_loc) = 0
+          k = sta_send + j ; recv_citem(k) = ncalc + k ; send_citem(k) = send_num(j)
           if (calc2recv(recv_num(j)) == 0) then
             calc2recv(recv_num(j)) = ncalc + k
+          end if
+        end do
+        j = 0
+        do send_loc = 1, neib_ncalc
+          if (sort_mpi_num(send_loc) == neib_mpi_num) then
+            j = j + 1 ; send2recv(loc_send_num(send_loc)) = sta_send + j
           end if
         end do
         deallocate(recv_num, send_num)

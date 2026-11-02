@@ -254,18 +254,18 @@ module make_cell
       z5 = glob_z(xn,yn,zn+1) ; z6 = glob_z(xn+1,yn,zn+1)
       z7 = glob_z(xn+1,yn+1,zn+1) ; z8 = glob_z(xn,yn+1,zn+1)
 
-      st_geom%cell_vol(i) = vol(cx, x1, x4, x4, cy, y1, y4, y4, cz, z1, z4, z8) + &
-                            vol(cx, x4, x1, x1, cy, y4, y1, y1, cz, z8, z5, z1) + &
+      st_geom%cell_vol(i) = abs(vol(cx, x4, x4, x1, cy, y4, y4, y1, cz, z8, z4, z1) + &
+                            vol(cx, x1, x1, x4, cy, y1, y1, y4, cz, z1, z5, z8) + &
                             vol(cx, x2, x3, x3, cy, y2, y3, y3, cz, z2, z3, z7) + &
                             vol(cx, x3, x2, x2, cy, y3, y2, y2, cz, z7, z6, z2) + &
-                            vol(cx, x1, x1, x2, cy, y1, y1, y2, cz, z1, z5, z6) + &
-                            vol(cx, x2, x2, x1, cy, y2, y2, y1, cz, z6, z2, z1) + &
+                            vol(cx, x2, x1, x1, cy, y2, y1, y1, cz, z6, z5, z1) + &
+                            vol(cx, x1, x2, x2, cy, y1, y2, y2, cz, z1, z2, z6) + &
                             vol(cx, x4, x4, x3, cy, y4, y4, y3, cz, z4, z8, z7) + &
                             vol(cx, x3, x3, x4, cy, y3, y3, y4, cz, z7, z3, z4) + &
                             vol(cx, x1, x4, x3, cy, y1, y4, y3, cz, z1, z4, z3) + &
                             vol(cx, x3, x2, x1, cy, y3, y2, y1, cz, z3, z2, z1) + &
-                            vol(cx, x1, x4, x3, cy, y1, y4, y3, cz, z5, z8, z7) + &
-                            vol(cx, x3, x2, x1, cy, y3, y2, y1, cz, z7, z6, z5)
+                            vol(cx, x3, x4, x1, cy, y3, y4, y1, cz, z7, z8, z5) + &
+                            vol(cx, x1, x2, x3, cy, y1, y2, y3, cz, z5, z6, z7))
     end do
     !$omp end do
     !$omp end parallel
@@ -377,7 +377,7 @@ module make_cell
 
   function vol(x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4) result(trivol)
   !*********************************************************************************************
-  ! vol -- Calculate cell vol using cross product with a focus on cell center
+  ! vol -- Calculate signed cell vol using cross product with a focus on cell center
   !*********************************************************************************************
     ! -- modules
 
@@ -394,7 +394,7 @@ module make_cell
     cropro12(2) = vec3d1(3)*vec3d2(1) - vec3d1(1)*vec3d2(3)
     cropro12(3) = vec3d1(1)*vec3d2(2) - vec3d1(2)*vec3d2(1)
 
-    trivol = abs(dot_product(cropro12(1:3), vec3d3(1:3)))/(6.00_DP)
+    trivol = dot_product(cropro12(1:3), vec3d3(1:3))/(6.00_DP)
 
   end function vol
 

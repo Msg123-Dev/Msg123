@@ -32,9 +32,9 @@ module calc_parameter
     integer(I4) :: i
     real(DP) :: retm, beta, theta, kr, se, stor_val, srat_val
     real(DP) :: phead, kr_phead, dkr
-    real(DP) :: pors_val, resi_val, dtheta_dpsi
+    real(DP) :: pors_val, resi_val, dtheta_dpsi, dstor_val
     !-------------------------------------------------------------------------------------------
-    !$omp parallel do private(i, pors_val, resi_val, retm, phead, dkr) &
+    !$omp parallel do private(i, pors_val, resi_val, retm, phead, dkr, dstor_val) &
     !$omp             private(beta, se, theta, srat_val, stor_val, dtheta_dpsi, kr_phead, kr)
     do i = 1, num
       pors_val = st_hydr%read_pors(i) ; resi_val = st_hydr%read_resi(i)
@@ -69,6 +69,15 @@ module calc_parameter
         end if
       end if
 
+      ! -- Storage averaged over the cell thickness given by stor_avg_type
+      if (st_schm%stor_avg_type == 1 .and. st_geom%cell_top(i) > st_geom%cell_bot(i)) then
+        call calc_stor_avg(i, phead, st_geom%cell_top(i)-st_geom%cell_bot(i), stor_val,&
+                           dstor_val)
+        if (present(dstor_dpsi)) then
+          dstor_dpsi(i) = dstor_val
+        end if
+      end if
+
       ! -- Relative permeability at the head position given by krpos_type
       if (st_schm%krpos_type == 1) then
         kr_phead = pres(i) - st_geom%cell_cent(i)
@@ -94,6 +103,99 @@ module calc_parameter
     !$omp end parallel do
 
   end subroutine calc_srat_rperm
+
+  subroutine calc_stor_avg(i, ptop, thick, stor, dstor)
+  !*********************************************************************************************
+  ! calc_stor_avg -- Calculate storage averaged over the cell thickness
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(in) :: i
+    real(DP), intent(in) :: ptop, thick
+    real(DP), intent(inout) :: stor
+    real(DP), intent(out) :: dstor
+    ! -- local
+    integer(I4), parameter :: GAUS_NUM = 16
+    integer(I4) :: k
+    real(DP), parameter :: GAUS_NODE(GAUS_NUM) = [&
+      -9.8940093499164994E-01_DP, -9.4457502307323260E-01_DP, -8.6563120238783164E-01_DP,&
+      -7.5540440835500311E-01_DP, -6.1787624440264377E-01_DP, -4.5801677765722737E-01_DP,&
+      -2.8160355077925892E-01_DP, -9.5012509837637441E-02_DP, 9.5012509837637441E-02_DP,&
+      2.8160355077925892E-01_DP, 4.5801677765722737E-01_DP, 6.1787624440264377E-01_DP,&
+      7.5540440835500311E-01_DP, 8.6563120238783164E-01_DP, 9.4457502307323260E-01_DP,&
+      9.8940093499164994E-01_DP]
+    real(DP), parameter :: GAUS_WGHT(GAUS_NUM) = [&
+      2.7152459411754055E-02_DP, 6.2253523938647609E-02_DP, 9.5158511682492994E-02_DP,&
+      1.2462897125553395E-01_DP, 1.4959598881657665E-01_DP, 1.6915651939500262E-01_DP,&
+      1.8260341504492361E-01_DP, 1.8945061045506859E-01_DP, 1.8945061045506859E-01_DP,&
+      1.8260341504492361E-01_DP, 1.6915651939500262E-01_DP, 1.4959598881657665E-01_DP,&
+      1.2462897125553395E-01_DP, 9.5158511682492994E-02_DP, 6.2253523938647609E-02_DP,&
+      2.7152459411754055E-02_DP]
+    real(SP) :: vana, vann, spst
+    real(DP) :: pors_val, resi_val, retm, pbot, punsat, thick_uns, beta, se, theta, elog
+    real(DP) :: stor_bot, stor_sum, slog_arg, slog_rat, slog_bot, slog_mid, slog_half, gsum
+    !-------------------------------------------------------------------------------------------
+    vana = st_hydr%read_vana(i) ; vann = st_hydr%read_vann(i) ; spst = st_hydr%read_spst(i)
+    pors_val = st_hydr%read_pors(i) ; resi_val = st_hydr%read_resi(i)
+    retm = DONE - DONE/vann
+    pbot = ptop + thick
+    if (ptop >= DZERO) then
+      ! -- Saturated over the whole thickness
+      stor = pors_val + spst*DHALF*(ptop+pbot) ; dstor = spst
+    else
+      ! -- Storage at the cell bottom and its difference from the top
+      if (pbot >= DZERO) then
+        stor_bot = pors_val + spst*pbot
+      else
+        beta = abs(pbot*vana)**vann
+        se = (DONE+beta)**(-retm)
+        theta = resi_val + (pors_val-resi_val)*se
+        if (st_schm%stor_type == 1) then
+          stor_bot = theta + spst*pbot*(theta/pors_val)
+        else
+          stor_bot = theta
+        end if
+      end if
+      dstor = (stor_bot-stor)/thick
+
+      ! -- Saturated part and residual part
+      if (pbot > DZERO) then
+        punsat = DZERO ; thick_uns = -ptop
+        stor_sum = pors_val*pbot + spst*DHALF*pbot*pbot
+      else
+        punsat = pbot ; thick_uns = thick
+        stor_sum = DZERO
+      end if
+      stor_sum = stor_sum + resi_val*thick_uns
+      if (st_schm%stor_type == 1) then
+        stor_sum = stor_sum + spst*(resi_val/pors_val)*DHALF*thick_uns*(punsat+ptop)
+      end if
+
+      ! -- Effective saturation part by Gauss-Legendre in log(1 - vana*phead)
+      slog_rat = vana*thick_uns/(DONE-vana*punsat) ; slog_arg = DONE + slog_rat
+      if (slog_arg > DONE) then
+        slog_half = DHALF*log(slog_arg)*(slog_rat/(slog_arg-DONE))
+      else
+        slog_half = DHALF*slog_rat
+      end if
+      slog_bot = log(DONE-vana*punsat) ; slog_mid = slog_bot + slog_half
+      gsum = DZERO
+      do k = 1, GAUS_NUM
+        elog = exp(slog_mid+slog_half*GAUS_NODE(k))
+        beta = (elog-DONE)**vann
+        se = (DONE+beta)**(-retm)
+        if (st_schm%stor_type == 1) then
+          gsum = gsum + GAUS_WGHT(k)*se*elog*(DONE+spst*(DONE-elog)/(vana*pors_val))
+        else
+          gsum = gsum + GAUS_WGHT(k)*se*elog
+        end if
+      end do
+      stor_sum = stor_sum + (pors_val-resi_val)*slog_half*gsum/vana
+      stor = stor_sum/thick
+    end if
+
+  end subroutine calc_stor_avg
 
   subroutine calc_kr_cell(i, phead, kr, dkr)
   !*********************************************************************************************

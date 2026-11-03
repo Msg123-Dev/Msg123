@@ -225,7 +225,7 @@ module initial_module
     st_ctrl%jac_omega = 0.67_SP ; st_ctrl%amg_theta = 0.05_SP
 
     ! input scheme file
-    st_schm%krpos_type = 0 ; st_schm%stor_type = 1
+    st_schm%krpos_type = 0 ; st_schm%stor_type = 1 ; st_schm%stor_avg_type = 0
     st_schm%abyd_type = 0 ; st_schm%abyd_ratio = DZERO
     st_schm%krlin_head = 2.00E-03_DP ; st_schm%surfw_type = 2 ; st_schm%rbed_type = 0
     st_schm%lbed_type = 0

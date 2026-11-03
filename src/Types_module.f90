@@ -40,6 +40,7 @@ module types_module
   type :: schm_set
     integer(I4) :: krpos_type = 0
     integer(I4) :: stor_type = 1
+    integer(I4) :: stor_avg_type = 0
     integer(I4) :: abyd_type = 0
     integer(I4) :: surfw_type = 2
     integer(I4) :: rbed_type = 0

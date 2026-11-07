@@ -71,8 +71,8 @@ module calc_parameter
 
       ! -- Storage averaged over the cell thickness given by stor_avg_type
       if (st_schm%stor_avg_type == 1 .and. st_geom%cell_top(i) > st_geom%cell_bot(i)) then
-        call calc_stor_avg(i, phead, st_geom%cell_top(i)-st_geom%cell_bot(i), stor_val,&
-                           dstor_val)
+        call calc_stor_avg(i, phead, st_geom%cell_top(i)-st_geom%cell_bot(i), present(stor),&
+                           stor_val, dstor_val)
         if (present(dstor_dpsi)) then
           dstor_dpsi(i) = dstor_val
         end if
@@ -104,7 +104,7 @@ module calc_parameter
 
   end subroutine calc_srat_rperm
 
-  subroutine calc_stor_avg(i, ptop, thick, stor, dstor)
+  subroutine calc_stor_avg(i, ptop, thick, stor_flag, stor, dstor)
   !*********************************************************************************************
   ! calc_stor_avg -- Calculate storage averaged over the cell thickness
   !*********************************************************************************************
@@ -115,6 +115,7 @@ module calc_parameter
     real(DP), intent(in) :: ptop, thick
     real(DP), intent(inout) :: stor
     real(DP), intent(out) :: dstor
+    logical, intent(in) :: stor_flag
     ! -- local
     integer(I4), parameter :: GAUS_NUM = 16
     integer(I4) :: k
@@ -158,6 +159,9 @@ module calc_parameter
         end if
       end if
       dstor = (stor_bot-stor)/thick
+      if (.not. stor_flag) then
+        return
+      end if
 
       ! -- Saturated part and residual part
       if (pbot > DZERO) then

@@ -1,6 +1,6 @@
 module calc_parameter
   ! -- modules
-  use kind_module, only: I4, SP, DP
+  use kind_module, only: I4, I8, SP, DP
   use constval_module, only: DZERO, DONE, DHALF
   use initial_module, only: st_schm
   use set_condition, only: st_hydr
@@ -11,6 +11,8 @@ module calc_parameter
   public :: calc_hyd_harm, calc_hyd_geo, calc_hyd_arith
 
   ! -- local
+  integer(I8), allocatable :: stor_bits(:)
+  real(DP), allocatable :: stor_keep(:)
 
   contains
 
@@ -33,8 +35,13 @@ module calc_parameter
     real(DP) :: retm, beta, theta, kr, se, stor_val, srat_val
     real(DP) :: phead, kr_phead, dkr
     real(DP) :: pors_val, resi_val, dtheta_dpsi, dstor_val
+    logical :: stor_hit
     !-------------------------------------------------------------------------------------------
-    !$omp parallel do private(i, pors_val, resi_val, retm, phead, dkr, dstor_val) &
+    if (st_schm%stor_avg_type == 1 .and. .not. allocated(stor_keep)) then
+      allocate(stor_bits(num), stor_keep(num))
+      stor_bits(:) = -1_I8 ; stor_keep(:) = DZERO
+    end if
+    !$omp parallel do private(i, pors_val, resi_val, retm, phead, dkr, dstor_val, stor_hit) &
     !$omp             private(beta, se, theta, srat_val, stor_val, dtheta_dpsi, kr_phead, kr)
     do i = 1, num
       pors_val = st_hydr%read_pors(i) ; resi_val = st_hydr%read_resi(i)
@@ -71,8 +78,14 @@ module calc_parameter
 
       ! -- Storage averaged over the cell thickness given by stor_avg_type
       if (st_schm%stor_avg_type == 1 .and. st_geom%cell_top(i) > st_geom%cell_bot(i)) then
-        call calc_stor_avg(i, phead, st_geom%cell_top(i)-st_geom%cell_bot(i), present(stor),&
-                           stor_val, dstor_val)
+        stor_hit = present(stor) .and. stor_bits(i) == transfer(pres(i), 0_I8)
+        call calc_stor_avg(i, phead, st_geom%cell_top(i)-st_geom%cell_bot(i),&
+                           present(stor) .and. .not. stor_hit, stor_val, dstor_val)
+        if (stor_hit) then
+          stor_val = stor_keep(i)
+        else if (present(stor)) then
+          stor_bits(i) = transfer(pres(i), 0_I8) ; stor_keep(i) = stor_val
+        end if
         if (present(dstor_dpsi)) then
           dstor_dpsi(i) = dstor_val
         end if

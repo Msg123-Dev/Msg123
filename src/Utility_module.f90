@@ -15,7 +15,7 @@ module utility_module
   public :: write_err_read, write_err_write, write_err_close, write_err_stop
   public :: conv_unit, get_ilen, conv_i2s, conv_lower
   public :: iquick_sort, iquick_sort2
-  public :: gmap_init, gmap_put, gmap_get, gmap_free
+  public :: gmap_init, gmap_put, gmap_get, gmap_free, get_hash_start
 
   ! -- local
   integer(I4), allocatable :: wtxt_fnum(:)
@@ -514,7 +514,7 @@ module utility_module
     ! -- local
     integer(I4) :: slot
     !-------------------------------------------------------------------------------------------
-    slot = mod(map_key - 1, g_map%table_num) + 1
+    slot = get_hash_start(map_key, g_map%table_num)
 
     do while (g_map%table_key(slot) /= 0 .and. g_map%table_key(slot) /= map_key)
       slot = mod(slot, g_map%table_num) + 1
@@ -620,7 +620,7 @@ module utility_module
     ! -- local
     integer(I4) :: map_val, slot
     !-------------------------------------------------------------------------------------------
-    slot = mod(map_key - 1, g_map%table_num) + 1
+    slot = get_hash_start(map_key, g_map%table_num)
 
     do while (g_map%table_key(slot) /= 0 .and. g_map%table_key(slot) /= map_key)
       slot = mod(slot, g_map%table_num) + 1
@@ -633,5 +633,21 @@ module utility_module
     end if
 
   end function gmap_get
+
+  function get_hash_start(hash_key, table_num) result(slot)
+  !*********************************************************************************************
+  ! get_hash_start -- Get the slot where a hash key search starts
+  !*********************************************************************************************
+    ! -- modules
+    use kind_module, only: I8
+    ! -- inout
+    integer(I4), intent(in) :: hash_key, table_num
+    ! -- local
+    integer(I8), parameter :: HASH_MULT = 2654435761_I8
+    integer(I4) :: slot
+    !-------------------------------------------------------------------------------------------
+    slot = int(mod(int(hash_key, I8)*HASH_MULT, int(table_num, I8)), I4) + 1
+
+  end function get_hash_start
 
 end module utility_module

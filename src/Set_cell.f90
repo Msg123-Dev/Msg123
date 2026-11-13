@@ -4,7 +4,7 @@ module set_cell
   use constval_module, only: FACE, SNOVAL, VARLEN
   use types_module, only: conn_set, gmap_set
   use utility_module, only: st_mpi, iquick_sort, iquick_sort2, open_new_rtxt, write_err_stop
-  use utility_module, only: gmap_init, gmap_put, gmap_get, gmap_free
+  use utility_module, only: gmap_init, gmap_put, gmap_get, gmap_free, get_hash_start
   use initial_module, only: st_sim, st_grid, st_clas, in_type, st_ctrl, st_in_type, st_in_unit
   use read_module, only: read_2d_calcreg, read_3d_calcreg
 #ifdef MPI_MSG
@@ -2632,7 +2632,7 @@ module set_cell
     ! -- local
     integer(I4) :: slot
     !-------------------------------------------------------------------------------------------
-    slot = mod(hash_key - 1, neib_hash) + 1
+    slot = get_hash_start(hash_key, neib_hash)
 
     do while (neib_hash_key(slot) /= 0 .and. neib_hash_key(slot) /= hash_key)
       slot = mod(slot, neib_hash) + 1
@@ -2657,7 +2657,7 @@ module set_cell
     ! -- local
     integer(I4) :: slot
     !-------------------------------------------------------------------------------------------
-    slot = mod(hash_key - 1, neib_hash) + 1
+    slot = get_hash_start(hash_key, neib_hash)
 
     do while (neib_hash_key(slot) /= 0 .and. neib_hash_key(slot) /= hash_key)
       slot = mod(slot, neib_hash) + 1

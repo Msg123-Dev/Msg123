@@ -640,7 +640,7 @@ module ici_module
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncals
-      wtab_depth(:) = DZERO
+      wtab_depth(i) = DZERO
     end do
     !$omp end do
 

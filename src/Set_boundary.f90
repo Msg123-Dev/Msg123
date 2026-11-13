@@ -335,7 +335,7 @@ module set_boundary
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc
-      st_forc%read_head(:) = DZERO
+      st_forc%read_head(i) = DZERO
     end do
     !$omp end do
 

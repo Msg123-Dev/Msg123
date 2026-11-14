@@ -41,7 +41,8 @@ module calc_parameter
       allocate(stor_bits(num), stor_keep(num))
       stor_bits(:) = -1_I8 ; stor_keep(:) = DZERO
     end if
-    !$omp parallel do private(i, pors_val, resi_val, retm, phead, dkr, dstor_val, stor_hit) &
+    !$omp parallel do schedule(dynamic, 1024) &
+    !$omp             private(i, pors_val, resi_val, retm, phead, dkr, dstor_val, stor_hit) &
     !$omp             private(beta, se, theta, srat_val, stor_val, dtheta_dpsi, kr_phead, kr)
     do i = 1, num
       pors_val = st_hydr%read_pors(i) ; resi_val = st_hydr%read_resi(i)

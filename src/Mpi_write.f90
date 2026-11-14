@@ -319,7 +319,7 @@ module mpi_write
   !*********************************************************************************************
     ! -- module
     use set_cell, only: send_cind, send_citem, neib_num
-    use allocate_solution, only: nreg_num, dir_conn, crs_index
+    use allocate_solution, only: st_matrix
     ! -- inout
 
     ! -- local
@@ -330,7 +330,8 @@ module mpi_write
     integer(I4), allocatable :: temp_send_cind(:), temp_recv_cind(:)
     integer(I4), allocatable :: temp_send_citem(:), temp_recv_citem(:)
     !-------------------------------------------------------------------------------------------
-    temp_item_num = crs_index(1)%offind(nreg_num) - crs_index(1)%offind(ncalc)
+    temp_item_num = st_matrix%crs_index(1)%offind(st_matrix%nreg_num)&
+                    - st_matrix%crs_index(1)%offind(ncalc)
     allocate(temp_wtab_snum(neib_mpi_totn), temp_wtab_rnum(neib_mpi_totn))
     allocate(temp_send_cind(0:neib_mpi_totn), temp_recv_cind(0:neib_mpi_totn))
     allocate(temp_send_citem(temp_item_num), temp_recv_citem(temp_item_num))
@@ -353,15 +354,16 @@ module mpi_write
     do i = 1, neib_mpi_totn
       do j = send_cind(i-1)+1, send_cind(i)
         jj = send_citem(j)
-        sta_ind = crs_index(1)%offind(jj-1) ; end_ind = crs_index(1)%offind(jj)
+        sta_ind = st_matrix%crs_index(1)%offind(jj-1)
+        end_ind = st_matrix%crs_index(1)%offind(jj)
         do k = 1, end_ind-sta_ind
-          ind = sta_ind + k ; temp_neib_num = crs_index(1)%offrow(ind)
-          if (dir_conn(ind) == 1 .and. temp_neib_num > ncalc) then
+          ind = sta_ind + k ; temp_neib_num = st_matrix%crs_index(1)%offrow(ind)
+          if (st_matrix%dir_conn(ind) == 1 .and. temp_neib_num > ncalc) then
             temp_snum = temp_snum + 1 ; temp_send_citem(temp_snum) = jj
             if (temp_wtab_snum(i) == -1) then
               temp_wtab_snum(i) = neib_num(i)
             end if
-          else if (dir_conn(ind) == 6 .and. temp_neib_num > ncalc) then
+          else if (st_matrix%dir_conn(ind) == 6 .and. temp_neib_num > ncalc) then
             temp_rnum = temp_rnum + 1 ; temp_recv_citem(temp_rnum) = temp_neib_num
             if (temp_wtab_rnum(i) == -1) then
               temp_wtab_rnum(i) = neib_num(i)

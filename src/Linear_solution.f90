@@ -6,7 +6,7 @@ module linear_solution
   use utility_module, only: st_mpi
   use initial_module, only: st_ctrl
   use prep_calculation, only: st_time
-  use allocate_solution, only: nreg_num, dir_conn, crs_index, array_var
+  use allocate_solution, only: st_matrix
   use check_simulation, only: check_insol
   use calc_simulation, only: calc_l2norm2, calc_resi
 #ifdef MPI_MSG
@@ -34,13 +34,14 @@ module linear_solution
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(st_kryl%resi(nreg_num))
-    allocate(st_kryl%d(nreg_num), st_kryl%z(nreg_num), st_kryl%p(nreg_num))
-    allocate(st_kryl%q(nreg_num), st_kryl%v(nreg_num))
-    allocate(st_kryl%rs(nreg_num), st_kryl%t(nreg_num))
+    allocate(st_kryl%resi(st_matrix%nreg_num))
+    allocate(st_kryl%d(st_matrix%nreg_num), st_kryl%z(st_matrix%nreg_num),&
+             st_kryl%p(st_matrix%nreg_num))
+    allocate(st_kryl%q(st_matrix%nreg_num), st_kryl%v(st_matrix%nreg_num))
+    allocate(st_kryl%rs(st_matrix%nreg_num), st_kryl%t(st_matrix%nreg_num))
 
     !$omp parallel do private(i)
-    do i = 1, nreg_num
+    do i = 1, st_matrix%nreg_num
       st_kryl%resi(i) = DZERO
       st_kryl%d(i) = DZERO ; st_kryl%z(i) = DZERO ; st_kryl%p(i) = DZERO
       st_kryl%q(i) = DZERO ; st_kryl%v(i) = DZERO
@@ -61,16 +62,16 @@ module linear_solution
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    allocate(st_amgt%tmp_diag(nreg_num), st_amgt%tmp_x(nreg_num))
-    allocate(st_amgt%tmp_rhs(nreg_num), st_amgt%tmp_resi(nreg_num))
-    allocate(st_amgt%tmp_rhs_coa(nreg_num), st_amgt%tmp_corr(nreg_num))
+    allocate(st_amgt%tmp_diag(st_matrix%nreg_num), st_amgt%tmp_x(st_matrix%nreg_num))
+    allocate(st_amgt%tmp_rhs(st_matrix%nreg_num), st_amgt%tmp_resi(st_matrix%nreg_num))
+    allocate(st_amgt%tmp_rhs_coa(st_matrix%nreg_num), st_amgt%tmp_corr(st_matrix%nreg_num))
     allocate(st_amgt%tmp_lumat(tconn_num))
-    allocate(st_amgt%save_rhs(nreg_num), st_amgt%dilu_d(nreg_num))
-    allocate(st_amgt%smth_resi(nreg_num), st_amgt%smth_corr(nreg_num))
+    allocate(st_amgt%save_rhs(st_matrix%nreg_num), st_amgt%dilu_d(st_matrix%nreg_num))
+    allocate(st_amgt%smth_resi(st_matrix%nreg_num), st_amgt%smth_corr(st_matrix%nreg_num))
 
     !$omp parallel
     !$omp do private(i)
-    do i = 1, nreg_num
+    do i = 1, st_matrix%nreg_num
       st_amgt%tmp_diag(i) = DZERO ; st_amgt%tmp_x(i) = DZERO
       st_amgt%tmp_rhs(i) = DZERO ; st_amgt%tmp_resi(i) = DZERO
       st_amgt%tmp_rhs_coa(i) = DZERO ; st_amgt%tmp_corr(i) = DZERO
@@ -93,7 +94,6 @@ module linear_solution
   ! solve_lnralg -- Solve linear algebra
   !*********************************************************************************************
     ! -- module
-    use allocate_solution, only: nreg_num
     ! -- inout
     real(DP), intent(in) :: init_norm
     real(DP), intent(inout) :: inx(:)
@@ -104,7 +104,7 @@ module linear_solution
     integer(I4) :: n
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(n)
-    do n = 1, nreg_num
+    do n = 1, st_matrix%nreg_num
       st_kryl%resi(n) = DZERO
     end do
     !$omp end parallel do
@@ -142,8 +142,8 @@ module linear_solution
     real(DP) :: send_val(3), recv_val(3)
 #endif
     !-------------------------------------------------------------------------------------------
-    d_size = crs_index(level)%unknow
-    lu_size = crs_index(level)%lunum
+    d_size = st_matrix%crs_index(level)%unknow
+    lu_size = st_matrix%crs_index(level)%lunum
     reg_size = size(inx)
 
     sk = DZERO ; sk0 = DINFI ; sk2 = DZERO ; alpha = DZERO ; beta = DZERO
@@ -151,7 +151,7 @@ module linear_solution
     !$omp do private(n)
     do n = 1, reg_size
       st_kryl%z(n) = DZERO ; st_kryl%p(n) = DZERO
-      st_kryl%d(n) = array_var(level)%dmat(n)
+      st_kryl%d(n) = st_matrix%array_var(level)%dmat(n)
     end do
     !$omp end do
     !$omp do private(n)
@@ -162,21 +162,25 @@ module linear_solution
     !$omp end parallel
 
     ! -- Calculate residual (resi)
-      call calc_resi(level, d_size, array_var(level)%dmat, array_var(level)%lumat, inx,&
-                     array_var(level)%rhs, st_kryl%resi)
+      call calc_resi(level, d_size, st_matrix%array_var(level)%dmat,&
+                     st_matrix%array_var(level)%lumat, inx, st_matrix%array_var(level)%rhs,&
+                     st_kryl%resi)
 
     if (st_ctrl%precon_type == 0) then
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1 .and. level == 1) then
         ! -- Preconditon mpi incomplete lu diagonal (mpi_dilu)
-          call precon_mpi_dilu(array_var(level)%dmat, array_var(level)%lumat, st_kryl%d)
+          call precon_mpi_dilu(st_matrix%array_var(level)%dmat,&
+                               st_matrix%array_var(level)%lumat, st_kryl%d)
       else
         ! -- Preconditon incomplete lu diagonal (dilu)
-          call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, st_kryl%d)
+          call precon_dilu(level, d_size, st_matrix%array_var(level)%dmat,&
+                           st_matrix%array_var(level)%lumat, st_kryl%d)
       end if
 #else
       ! -- Preconditon incomplete lu diagonal (dilu)
-        call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, st_kryl%d)
+        call precon_dilu(level, d_size, st_matrix%array_var(level)%dmat,&
+                         st_matrix%array_var(level)%lumat, st_kryl%d)
 #endif
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
@@ -198,14 +202,17 @@ module linear_solution
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1 .and. level == 1) then
           ! -- Solve mpi ilu factorization (ilu)
-            call solve_mpi_ilu(st_kryl%resi, st_kryl%d, array_var(level)%lumat, st_kryl%z)
+            call solve_mpi_ilu(st_kryl%resi, st_kryl%d,&
+                               st_matrix%array_var(level)%lumat, st_kryl%z)
         else
           ! -- Solve ilu factorization (ilu)
-            call solve_ilu(level, d_size, st_kryl%resi, st_kryl%d, array_var(level)%lumat, st_kryl%z)
+            call solve_ilu(level, d_size, st_kryl%resi, st_kryl%d,&
+                           st_matrix%array_var(level)%lumat, st_kryl%z)
         end if
 #else
         ! -- Solve ilu factorization (ilu)
-          call solve_ilu(level, d_size, st_kryl%resi, st_kryl%d, array_var(level)%lumat, st_kryl%z)
+          call solve_ilu(level, d_size, st_kryl%resi, st_kryl%d,&
+                         st_matrix%array_var(level)%lumat, st_kryl%z)
 #endif
       else if (st_ctrl%precon_type == 1) then
         ! -- Loop cycle for amg (amg)
@@ -257,7 +264,8 @@ module linear_solution
       end if
 #endif
       ! -- Calculate matrix-vector multiplication (matvec)
-        call calc_matvec(level, d_size, st_kryl%p, array_var(level)%dmat, array_var(level)%lumat, st_kryl%q)
+        call calc_matvec(level, d_size, st_kryl%p, st_matrix%array_var(level)%dmat,&
+                         st_matrix%array_var(level)%lumat, st_kryl%q)
 
       sk2 = DZERO ; guard_nrm(1) = DZERO ; guard_nrm(2) = DZERO
       !$omp parallel do private(n) reduction(+:sk2, guard_nrm)
@@ -342,8 +350,8 @@ module linear_solution
     real(DP) :: sum_sk, sum_rnorm
 #endif
     !-------------------------------------------------------------------------------------------
-    d_size = crs_index(level)%unknow
-    lu_size = crs_index(level)%lunum
+    d_size = st_matrix%crs_index(level)%unknow
+    lu_size = st_matrix%crs_index(level)%lunum
     reg_size = size(inx)
 
     sk = DZERO ; sk0 = DINFI ; sk2 = DZERO ; alpha = DZERO ; beta = DZERO
@@ -353,7 +361,7 @@ module linear_solution
     !$omp do private(n)
     do n = 1, reg_size
       st_kryl%z(n) = DZERO ; st_kryl%p(n) = DZERO
-      st_kryl%d(n) = array_var(level)%dmat(n)
+      st_kryl%d(n) = st_matrix%array_var(level)%dmat(n)
     end do
     !$omp end do
     !$omp do private(n)
@@ -364,21 +372,25 @@ module linear_solution
     !$omp end parallel
 
     ! -- Calculate residual (resi)
-      call calc_resi(level, d_size, array_var(level)%dmat, array_var(level)%lumat, inx,&
-                     array_var(level)%rhs, st_kryl%resi)
+      call calc_resi(level, d_size, st_matrix%array_var(level)%dmat,&
+                     st_matrix%array_var(level)%lumat, inx, st_matrix%array_var(level)%rhs,&
+                     st_kryl%resi)
 
     if (st_ctrl%precon_type == 0) then
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1 .and. level == 1) then
         ! -- Preconditon mpi incomplete lu diagonal (mpi_dilu)
-          call precon_mpi_dilu(array_var(level)%dmat, array_var(level)%lumat, st_kryl%d)
+          call precon_mpi_dilu(st_matrix%array_var(level)%dmat,&
+                               st_matrix%array_var(level)%lumat, st_kryl%d)
       else
         ! -- Preconditon incomplete lu diagonal (dilu)
-          call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, st_kryl%d)
+          call precon_dilu(level, d_size, st_matrix%array_var(level)%dmat,&
+                           st_matrix%array_var(level)%lumat, st_kryl%d)
       end if
 #else
       ! -- Preconditon incomplete lu diagonal (dilu)
-        call precon_dilu(level, d_size, array_var(level)%dmat, array_var(level)%lumat, st_kryl%d)
+        call precon_dilu(level, d_size, st_matrix%array_var(level)%dmat,&
+                         st_matrix%array_var(level)%lumat, st_kryl%d)
 #endif
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
@@ -445,14 +457,17 @@ module linear_solution
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1 .and. level == 1) then
           ! -- Solve mpi ilu factorization (ilu)
-            call solve_mpi_ilu(st_kryl%p, st_kryl%d, array_var(level)%lumat, st_kryl%z)
+            call solve_mpi_ilu(st_kryl%p, st_kryl%d,&
+                               st_matrix%array_var(level)%lumat, st_kryl%z)
         else
           ! -- Solve ilu factorization (ilu)
-            call solve_ilu(level, d_size, st_kryl%p, st_kryl%d, array_var(level)%lumat, st_kryl%z)
+            call solve_ilu(level, d_size, st_kryl%p, st_kryl%d,&
+                           st_matrix%array_var(level)%lumat, st_kryl%z)
         end if
 #else
         ! -- Solve ilu factorization (ilu)
-          call solve_ilu(level, d_size, st_kryl%p, st_kryl%d, array_var(level)%lumat, st_kryl%z)
+          call solve_ilu(level, d_size, st_kryl%p, st_kryl%d,&
+                         st_matrix%array_var(level)%lumat, st_kryl%z)
 #endif
       else if (st_ctrl%precon_type == 1) then
         ! -- Loop cycle for amg (amg)
@@ -467,7 +482,8 @@ module linear_solution
 #endif
 
       ! -- Calculate matrix-vector multiplication (matvec)
-        call calc_matvec(level, d_size, st_kryl%z, array_var(level)%dmat, array_var(level)%lumat, st_kryl%v)
+        call calc_matvec(level, d_size, st_kryl%z, st_matrix%array_var(level)%dmat,&
+                         st_matrix%array_var(level)%lumat, st_kryl%v)
 
       sk2 = DZERO ; guard_nrm(1) = DZERO ; guard_nrm(2) = DZERO
       !$omp parallel do private(n) reduction(+:sk2, guard_nrm)
@@ -525,14 +541,17 @@ module linear_solution
 #ifdef MPI_MSG
           if (st_mpi%totn /= 1 .and. level == 1) then
             ! -- Solve mpi ilu factorization (ilu)
-              call solve_mpi_ilu(st_kryl%resi, st_kryl%d, array_var(level)%lumat, st_kryl%z)
+              call solve_mpi_ilu(st_kryl%resi, st_kryl%d,&
+                                 st_matrix%array_var(level)%lumat, st_kryl%z)
           else
             ! -- Solve ilu factorization (ilu)
-              call solve_ilu(level, d_size, st_kryl%resi, st_kryl%d, array_var(level)%lumat, st_kryl%z)
+              call solve_ilu(level, d_size, st_kryl%resi, st_kryl%d,&
+                             st_matrix%array_var(level)%lumat, st_kryl%z)
           end if
 #else
           ! -- Solve ilu factorization (ilu)
-            call solve_ilu(level, d_size, st_kryl%resi, st_kryl%d, array_var(level)%lumat, st_kryl%z)
+            call solve_ilu(level, d_size, st_kryl%resi, st_kryl%d,&
+                           st_matrix%array_var(level)%lumat, st_kryl%z)
 #endif
         else if (st_ctrl%precon_type == 1) then
         ! -- Loop cycle for amg (amg)
@@ -547,7 +566,8 @@ module linear_solution
 #endif
 
         ! -- Calculate matrix-vector multiplication (matvec)
-          call calc_matvec(level, d_size, st_kryl%z, array_var(level)%dmat, array_var(level)%lumat, st_kryl%t)
+          call calc_matvec(level, d_size, st_kryl%z, st_matrix%array_var(level)%dmat,&
+                           st_matrix%array_var(level)%lumat, st_kryl%t)
 
         ts = DZERO ; tt = DZERO ; guard_nrm(1) = DZERO
         !$omp parallel do private(n) reduction(+:ts, tt, guard_nrm)
@@ -617,7 +637,6 @@ module linear_solution
   ! loop_amg -- Loop cycle for amg
   !*********************************************************************************************
     ! -- module
-    use allocate_solution, only: pro_var, res_var
     ! -- inout
     integer(I4), intent(in) :: alevel
     real(DP), intent(in) :: r(:)
@@ -629,8 +648,9 @@ module linear_solution
     integer(I4) :: v_iter, vlevel, ncoa, nfin
     integer(I4) :: rst, ren, pst, pen
     !-------------------------------------------------------------------------------------------
-    mgd_size = crs_index(alevel)%unknow ; mgreg_size = size(array_var(alevel)%x)
-    lu_max = maxval(crs_index(alevel:st_ctrl%nlevel)%lunum)
+    mgd_size = st_matrix%crs_index(alevel)%unknow
+    mgreg_size = size(st_matrix%array_var(alevel)%x)
+    lu_max = maxval(st_matrix%crs_index(alevel:st_ctrl%nlevel)%lunum)
     if (lu_max > size(st_amgt%tmp_lumat)) then
       deallocate(st_amgt%tmp_lumat)
       allocate(st_amgt%tmp_lumat(lu_max))
@@ -638,13 +658,13 @@ module linear_solution
     !$omp parallel
     !$omp do private(i)
     do i = 1, mgd_size
-      array_var(alevel)%x(i) = DZERO
+      st_matrix%array_var(alevel)%x(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i)
     do i = 1, mgreg_size
-      st_amgt%save_rhs(i) = array_var(alevel)%rhs(i)
-      array_var(alevel)%rhs(i) = r(i)
+      st_amgt%save_rhs(i) = st_matrix%array_var(alevel)%rhs(i)
+      st_matrix%array_var(alevel)%rhs(i) = r(i)
       st_amgt%dilu_d(i) = DZERO
     end do
     !$omp end do
@@ -652,37 +672,40 @@ module linear_solution
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
       ! -- Preconditon mpi incomplete lu diagonal (mpi_dilu)
-        call precon_mpi_dilu(array_var(alevel)%dmat, array_var(alevel)%lumat, st_amgt%dilu_d)
+        call precon_mpi_dilu(st_matrix%array_var(alevel)%dmat,&
+                             st_matrix%array_var(alevel)%lumat, st_amgt%dilu_d)
     else
       ! -- Preconditon incomplete lu diagonal (dilu)
-        call precon_dilu(alevel, mgd_size, array_var(alevel)%dmat, array_var(alevel)%lumat, st_amgt%dilu_d)
+        call precon_dilu(alevel, mgd_size, st_matrix%array_var(alevel)%dmat,&
+                         st_matrix%array_var(alevel)%lumat, st_amgt%dilu_d)
     end if
     if (st_mpi%totn /= 1) then
       call senrec_rvectv(st_amgt%dilu_d)
     end if
 #else
     ! -- Preconditon incomplete lu diagonal (dilu)
-      call precon_dilu(alevel, mgd_size, array_var(alevel)%dmat, array_var(alevel)%lumat, st_amgt%dilu_d)
+      call precon_dilu(alevel, mgd_size, st_matrix%array_var(alevel)%dmat,&
+                       st_matrix%array_var(alevel)%lumat, st_amgt%dilu_d)
 #endif
 
     do v_iter = 1, st_ctrl%maxvcy_iter  ! V-cycle loop
       do vlevel = alevel, st_ctrl%nlevel-1
 
-        d_size = crs_index(vlevel)%unknow
-        lu_size = crs_index(vlevel)%lunum
-        reg_size = size(array_var(vlevel)%x)
+        d_size = st_matrix%crs_index(vlevel)%unknow
+        lu_size = st_matrix%crs_index(vlevel)%lunum
+        reg_size = size(st_matrix%array_var(vlevel)%x)
         !$omp parallel
         !$omp do private(i)
         do i = 1, reg_size
-          st_amgt%tmp_diag(i) = array_var(vlevel)%dmat(i)
-          st_amgt%tmp_x(i) = array_var(vlevel)%x(i)
-          st_amgt%tmp_rhs(i) = array_var(vlevel)%rhs(i)
+          st_amgt%tmp_diag(i) = st_matrix%array_var(vlevel)%dmat(i)
+          st_amgt%tmp_x(i) = st_matrix%array_var(vlevel)%x(i)
+          st_amgt%tmp_rhs(i) = st_matrix%array_var(vlevel)%rhs(i)
           st_amgt%tmp_resi(i) = DZERO
         end do
         !$omp end do
         !$omp do private(i)
         do i = 1, lu_size
-          st_amgt%tmp_lumat(i) = array_var(vlevel)%lumat(i)
+          st_amgt%tmp_lumat(i) = st_matrix%array_var(vlevel)%lumat(i)
         end do
         !$omp end do
         !$omp end parallel
@@ -697,7 +720,7 @@ module linear_solution
         ! -- Smooth by dilu (smooth)
           call smooth_amg(vlevel, d_size, lu_size, reg_size, alevel, st_amgt)
 
-        array_var(vlevel)%x(:) = st_amgt%tmp_x(1:reg_size)
+        st_matrix%array_var(vlevel)%x(:) = st_amgt%tmp_x(1:reg_size)
 
         ! -- Calculate residual
           call calc_resi(vlevel, d_size, st_amgt%tmp_diag(1:reg_size),&
@@ -711,7 +734,7 @@ module linear_solution
         end if
 #endif
 
-        ncoa = crs_index(vlevel+1)%unknow
+        ncoa = st_matrix%crs_index(vlevel+1)%unknow
         !$omp parallel
         !$omp do private(i)
         do i = 1, ncoa
@@ -720,44 +743,44 @@ module linear_solution
         !$omp end do
         !$omp do private(i, j, k, rst, ren)
         do i = 1, ncoa
-          rst = res_var(vlevel+1)%rindex(i-1) + 1
-          ren = res_var(vlevel+1)%rindex(i)
+          rst = st_matrix%res_var(vlevel+1)%rindex(i-1) + 1
+          ren = st_matrix%res_var(vlevel+1)%rindex(i)
           do k = rst, ren
-            j = res_var(vlevel+1)%roffrow(k)
+            j = st_matrix%res_var(vlevel+1)%roffrow(k)
             st_amgt%tmp_rhs_coa(i) = st_amgt%tmp_rhs_coa(i)&
-                                     + res_var(vlevel+1)%rval(k)*st_amgt%tmp_resi(j)
+                                     + st_matrix%res_var(vlevel+1)%rval(k)*st_amgt%tmp_resi(j)
           end do
-          array_var(vlevel+1)%rhs(i) = st_amgt%tmp_rhs_coa(i)
+          st_matrix%array_var(vlevel+1)%rhs(i) = st_amgt%tmp_rhs_coa(i)
         end do
         !$omp end do
 
         !$omp do private(i)
         do i = 1, ncoa
-          array_var(vlevel+1)%x(i) = DZERO
+          st_matrix%array_var(vlevel+1)%x(i) = DZERO
         end do
         !$omp end do
         !$omp end parallel
       end do
 
-      d_size = crs_index(st_ctrl%nlevel)%unknow
-      lu_size = crs_index(st_ctrl%nlevel)%lunum
-      reg_size = size(array_var(st_ctrl%nlevel)%x)
+      d_size = st_matrix%crs_index(st_ctrl%nlevel)%unknow
+      lu_size = st_matrix%crs_index(st_ctrl%nlevel)%lunum
+      reg_size = size(st_matrix%array_var(st_ctrl%nlevel)%x)
 
       !$omp parallel
       !$omp do private(i)
       do i = 1, d_size
-        st_amgt%tmp_diag(i) = array_var(st_ctrl%nlevel)%dmat(i)
+        st_amgt%tmp_diag(i) = st_matrix%array_var(st_ctrl%nlevel)%dmat(i)
       end do
       !$omp end do
       !$omp do private(i)
       do i = 1, lu_size
-        st_amgt%tmp_lumat(i) = array_var(st_ctrl%nlevel)%lumat(i)
+        st_amgt%tmp_lumat(i) = st_matrix%array_var(st_ctrl%nlevel)%lumat(i)
       end do
       !$omp end do
       !$omp do private(i)
       do i = 1, reg_size
-        st_amgt%tmp_x(i) = array_var(st_ctrl%nlevel)%x(i)
-        st_amgt%tmp_rhs(i) = array_var(st_ctrl%nlevel)%rhs(i)
+        st_amgt%tmp_x(i) = st_matrix%array_var(st_ctrl%nlevel)%x(i)
+        st_amgt%tmp_rhs(i) = st_matrix%array_var(st_ctrl%nlevel)%rhs(i)
       end do
       !$omp end do
       if (st_ctrl%nlevel == alevel) then
@@ -798,10 +821,10 @@ module linear_solution
           call senrec_rvectv(st_amgt%tmp_x(1:reg_size))
       end if
 #endif
-      array_var(st_ctrl%nlevel)%x(:) = st_amgt%tmp_x(1:reg_size)
+      st_matrix%array_var(st_ctrl%nlevel)%x(:) = st_amgt%tmp_x(1:reg_size)
 
       do vlevel = st_ctrl%nlevel-1, alevel, -1
-        nfin = crs_index(vlevel)%unknow
+        nfin = st_matrix%crs_index(vlevel)%unknow
         !$omp parallel
         !$omp do private(i)
         do i = 1, nfin
@@ -810,33 +833,35 @@ module linear_solution
         !$omp end do
         !$omp do private(i, j, k, pst, pen)
         do i = 1, nfin
-          pst = pro_var(vlevel+1)%pindex(i-1) + 1
-          pen = pro_var(vlevel+1)%pindex(i)
+          pst = st_matrix%pro_var(vlevel+1)%pindex(i-1) + 1
+          pen = st_matrix%pro_var(vlevel+1)%pindex(i)
           do k = pst, pen
-            j = pro_var(vlevel+1)%poffrow(k)
+            j = st_matrix%pro_var(vlevel+1)%poffrow(k)
             st_amgt%tmp_corr(i) = st_amgt%tmp_corr(i)&
-                                  + pro_var(vlevel+1)%pval(k)*array_var(vlevel+1)%x(j)
+                                  + st_matrix%pro_var(vlevel+1)%pval(k)&
+                                  *st_matrix%array_var(vlevel+1)%x(j)
           end do
-          array_var(vlevel)%x(i) = array_var(vlevel)%x(i) + st_amgt%tmp_corr(i)
+          st_matrix%array_var(vlevel)%x(i) = st_matrix%array_var(vlevel)%x(i)&
+                                             + st_amgt%tmp_corr(i)
         end do
         !$omp end do
         !$omp end parallel
 
-        d_size = crs_index(vlevel)%unknow
-        lu_size = crs_index(vlevel)%lunum
-        reg_size = size(array_var(vlevel)%x)
+        d_size = st_matrix%crs_index(vlevel)%unknow
+        lu_size = st_matrix%crs_index(vlevel)%lunum
+        reg_size = size(st_matrix%array_var(vlevel)%x)
 
         !$omp parallel
         !$omp do private(i)
         do i = 1, reg_size
-          st_amgt%tmp_diag(i) = array_var(vlevel)%dmat(i)
-          st_amgt%tmp_x(i) = array_var(vlevel)%x(i)
-          st_amgt%tmp_rhs(i) = array_var(vlevel)%rhs(i)
+          st_amgt%tmp_diag(i) = st_matrix%array_var(vlevel)%dmat(i)
+          st_amgt%tmp_x(i) = st_matrix%array_var(vlevel)%x(i)
+          st_amgt%tmp_rhs(i) = st_matrix%array_var(vlevel)%rhs(i)
         end do
         !$omp end do
         !$omp do private(i)
         do i = 1, lu_size
-          st_amgt%tmp_lumat(i) = array_var(vlevel)%lumat(i)
+          st_amgt%tmp_lumat(i) = st_matrix%array_var(vlevel)%lumat(i)
         end do
         !$omp end do
         !$omp end parallel
@@ -851,14 +876,14 @@ module linear_solution
         ! -- Smooth by dilu (smooth)
           call smooth_amg(vlevel, d_size, lu_size, reg_size, alevel, st_amgt)
 
-        array_var(vlevel)%x(:) = st_amgt%tmp_x(1:reg_size)
-        array_var(vlevel)%rhs(:) = st_amgt%tmp_rhs(1:reg_size)
+        st_matrix%array_var(vlevel)%x(:) = st_amgt%tmp_x(1:reg_size)
+        st_matrix%array_var(vlevel)%rhs(:) = st_amgt%tmp_rhs(1:reg_size)
 
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1 .and. vlevel == alevel) then
           ! -- Send and Receive real vector value (rvectv)
-            call senrec_rvectv(array_var(vlevel)%x)
-            call senrec_rvectv(array_var(vlevel)%rhs)
+            call senrec_rvectv(st_matrix%array_var(vlevel)%x)
+            call senrec_rvectv(st_matrix%array_var(vlevel)%rhs)
         end if
 #endif
 
@@ -868,12 +893,12 @@ module linear_solution
     !$omp parallel
     !$omp do private(i)
     do i = 1, mgd_size
-      e(i) = array_var(alevel)%x(i)
+      e(i) = st_matrix%array_var(alevel)%x(i)
     end do
     !$omp end do
     !$omp do private(i)
     do i = 1, mgreg_size
-      array_var(alevel)%rhs(i) = st_amgt%save_rhs(i)
+      st_matrix%array_var(alevel)%rhs(i) = st_amgt%save_rhs(i)
     end do
     !$omp end do
     !$omp end parallel
@@ -903,17 +928,17 @@ module linear_solution
     end do
     !$omp end parallel do
     do i = 1, npre
-      off_sta = crs_index(plevel)%offind(i-1) + 1
-      off_end = crs_index(plevel)%offind(i)
+      off_sta = st_matrix%crs_index(plevel)%offind(i-1) + 1
+      off_end = st_matrix%crs_index(plevel)%offind(i)
       do k = off_sta, off_end
-        offr = crs_index(plevel)%offrow(k)
-        if (3 >= dir_conn(k)) then
+        offr = st_matrix%crs_index(plevel)%offrow(k)
+        if (3 >= st_matrix%dir_conn(k)) then
           d_invk = DONE/pre_d(offr)
-          off_sta2 = crs_index(plevel)%offind(offr-1) + 1
-          off_end2 = crs_index(plevel)%offind(offr)
+          off_sta2 = st_matrix%crs_index(plevel)%offind(offr-1) + 1
+          off_end2 = st_matrix%crs_index(plevel)%offind(offr)
           do j = off_sta2, off_end2
-            offr2 = crs_index(plevel)%offrow(j)
-            if (3 < dir_conn(j)) then
+            offr2 = st_matrix%crs_index(plevel)%offrow(j)
+            if (3 < st_matrix%dir_conn(j)) then
               if (offr2 == i) then
                 pre_d(i) = pre_d(i) - pre_inlu(k)*d_invk*pre_inlu(j)
               end if
@@ -1010,10 +1035,10 @@ module linear_solution
 !    !$omp parallel do private(i, k, off_sta, off_end, offr, temp_outx)
     do i = 1, npre
       temp_outx = outx(i)
-      off_sta = crs_index(plevel)%offind(i-1) + 1
-      off_end = crs_index(plevel)%offind(i)
+      off_sta = st_matrix%crs_index(plevel)%offind(i-1) + 1
+      off_end = st_matrix%crs_index(plevel)%offind(i)
       do k = off_sta, off_end
-        offr = crs_index(plevel)%offrow(k)
+        offr = st_matrix%crs_index(plevel)%offrow(k)
         if (offr < i) then
           temp_outx = temp_outx - inlumat(k)*outx(offr)
         end if
@@ -1026,10 +1051,10 @@ module linear_solution
 !    !$omp parallel do private(i, k, off_sta, off_end, offr, temp_outx)
     do i = npre, 1, -1
       temp_outx = DZERO
-      off_sta = crs_index(plevel)%offind(i-1) + 1
-      off_end = crs_index(plevel)%offind(i)
+      off_sta = st_matrix%crs_index(plevel)%offind(i-1) + 1
+      off_end = st_matrix%crs_index(plevel)%offind(i)
       do k = off_sta, off_end
-        offr = crs_index(plevel)%offrow(k)
+        offr = st_matrix%crs_index(plevel)%offrow(k)
         if (offr > i) then
           temp_outx = temp_outx + inlumat(k)*outx(offr)
         end if
@@ -1058,10 +1083,10 @@ module linear_solution
     !$omp parallel do private(i, j, k, off_sta, off_end, temp_vec)
     do i = 1, nmv
       temp_vec = indmat(i)*invec(i)
-      off_sta = crs_index(mvlevel)%offind(i-1) + 1
-      off_end = crs_index(mvlevel)%offind(i)
+      off_sta = st_matrix%crs_index(mvlevel)%offind(i-1) + 1
+      off_end = st_matrix%crs_index(mvlevel)%offind(i)
       do k = off_sta, off_end
-        j = crs_index(mvlevel)%offrow(k)
+        j = st_matrix%crs_index(mvlevel)%offrow(k)
         temp_vec = temp_vec + inlumat(k)*invec(j)
       end do
       outvec(i) = temp_vec

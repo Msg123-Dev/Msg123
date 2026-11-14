@@ -227,7 +227,7 @@ module calc_output
     ! -- modules
     use constval_module, only: DHALF
     use calc_parameter, only: calc_hyd_upwind, calc_kr_cell
-    use allocate_solution, only: dir_conn, dir_seal, crs_index
+    use allocate_solution, only: st_matrix
     use allocate_output, only: pointv, facev
     ! -- inout
 
@@ -241,16 +241,16 @@ module calc_output
     !$omp parallel
     !$omp do private(i, j, k, sta_ind, end_ind, ind, dir, delhead, relat, relp1, relp2)
     do i = 1, ncalc
-      sta_ind = crs_index(1)%offind(i-1) ; end_ind = crs_index(1)%offind(i)
+      sta_ind = st_matrix%crs_index(1)%offind(i-1) ; end_ind = st_matrix%crs_index(1)%offind(i)
       do k = 1, end_ind-sta_ind
-        ind = sta_ind + k ; j = crs_index(1)%offrow(ind)
+        ind = sta_ind + k ; j = st_matrix%crs_index(1)%offrow(ind)
         delhead = st_sol%head_new(j) - st_sol%head_new(i)
         relp1 = st_sol%rel_perm(i) ; relp2 = st_sol%rel_perm(j)
 
         ! -- Calculate hydradulic conductivity by upwind (hyd_upwind)
           call calc_hyd_upwind(-delhead, relp1, relp2, relat)
 
-        dir = dir_conn(ind)
+        dir = st_matrix%dir_conn(ind)
         facev(i,dir) = st_hydr%hydf_conn(ind)*relat*delhead*st_hydr%inv_dis(ind)
       end do
     end do
@@ -266,7 +266,7 @@ module calc_output
 
     !$omp do private(i, c, s, dir, delhead, relat)
     do i = 1, st_bcnd%seal_num
-      c = st_bcnd%seal2calc(i) ; dir = dir_seal(i) ; s = st_bcnd%seal2seal(i)
+      c = st_bcnd%seal2calc(i) ; dir = st_matrix%dir_seal(i) ; s = st_bcnd%seal2seal(i)
       delhead = st_forc%read_seal(s) - st_sol%head_new(c)
       if (delhead > DZERO) then
         ! -- Relative permeability of the cell at the sea head (kr_cell)

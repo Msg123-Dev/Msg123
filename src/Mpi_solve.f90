@@ -7,7 +7,7 @@ module mpi_solve
   use mpi_utility, only: mpisum_val
   use set_cell, only: ncalc, neib_mpi_totn, send_cind, recv_cind, send_citem, recv_citem
   use set_cell, only: neib_num
-  use allocate_solution, only: nreg_num, left_offr, crs_index
+  use allocate_solution, only: st_matrix
   use mpi
 
   implicit none
@@ -41,15 +41,15 @@ module mpi_solve
     integer(I4) :: nsenrev, off_row_num
     !-------------------------------------------------------------------------------------------
     nsenrev = max(send_cind(neib_mpi_totn), recv_cind(neib_mpi_totn))
-    off_row_num = crs_index(1)%offind(nreg_num)
+    off_row_num = st_matrix%crs_index(1)%offind(st_matrix%nreg_num)
 
     allocate(requ_send(neib_mpi_totn), requ_recv(neib_mpi_totn))
     allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
     allocate(sbufint(nsenrev), rbufint(nsenrev))
     allocate(sbufreal(nsenrev), rbufreal(nsenrev))
-    allocate(fix_flag(nreg_num), offr_flag(off_row_num))
-    allocate(temp_pred(nreg_num), temp_outx(nreg_num))
-    allocate(lumat_dir(nreg_num,FACE))
+    allocate(fix_flag(st_matrix%nreg_num), offr_flag(off_row_num))
+    allocate(temp_pred(st_matrix%nreg_num), temp_outx(st_matrix%nreg_num))
+    allocate(lumat_dir(st_matrix%nreg_num,FACE))
 
     !$omp parallel
     !$omp do private(i)
@@ -59,7 +59,7 @@ module mpi_solve
     end do
     !$omp end do
     !$omp do private(i)
-    do i = 1, nreg_num
+    do i = 1, st_matrix%nreg_num
       fix_flag(i) = 0
       temp_pred(i) = DZERO ; temp_outx(i) = DZERO
       lumat_dir(i,:) = DZERO
@@ -228,7 +228,6 @@ module mpi_solve
   !*********************************************************************************************
     ! -- module
     use constval_module, only: DONE
-    use allocate_solution, only: dir_conn
     ! -- inout
     real(DP), intent(in) :: pre_ind(:), pre_inlu(:)
     real(DP), intent(inout) :: pre_d(:)
@@ -239,10 +238,10 @@ module mpi_solve
     integer(I4) :: rank_flag, allp_flag
     real(DP) :: d_invk, d_floor
     !-------------------------------------------------------------------------------------------
-    off_row_num = crs_index(1)%offind(nreg_num)
+    off_row_num = st_matrix%crs_index(1)%offind(st_matrix%nreg_num)
     !$omp parallel
     !$omp do private(i)
-    do i = 1, nreg_num
+    do i = 1, st_matrix%nreg_num
       fix_flag(i) = 0
       temp_pred(i) = pre_ind(i)
     end do
@@ -261,8 +260,8 @@ module mpi_solve
     rank_flag = 0 ; allp_flag = 0
     !$omp parallel do private(i, k)
     do i = 1, ncalc
-      do k = crs_index(1)%offind(i-1)+1, crs_index(1)%offind(i)
-        lumat_dir(i,dir_conn(k)) = pre_inlu(k)
+      do k = st_matrix%crs_index(1)%offind(i-1)+1, st_matrix%crs_index(1)%offind(i)
+        lumat_dir(i,st_matrix%dir_conn(k)) = pre_inlu(k)
       end do
     end do
     !$omp end parallel do
@@ -273,16 +272,16 @@ module mpi_solve
     prefix_loop: do while (allp_flag /= st_mpi%totn)
       do i = 1, ncalc
         if (fix_flag(i) == 0) then
-          off_sta = crs_index(1)%offind(i-1) + 1
-          off_end = crs_index(1)%offind(i)
+          off_sta = st_matrix%crs_index(1)%offind(i-1) + 1
+          off_end = st_matrix%crs_index(1)%offind(i)
           do k = off_sta, off_end
-            offr = crs_index(1)%offrow(k) ; off_left = 0
-            off_left = left_offr(k)
+            offr = st_matrix%crs_index(1)%offrow(k) ; off_left = 0
+            off_left = st_matrix%left_offr(k)
             if (off_left /= 0 .and. fix_flag(offr) == 1 .and. offr_flag(k) == 0) then
               offr_flag(k) = 1
               d_invk = DONE/pre_d(offr)
               temp_pred(i) = temp_pred(i)&
-                             - pre_inlu(k)*d_invk*lumat_dir(offr,FACE+1-dir_conn(k))
+                             - pre_inlu(k)*d_invk*lumat_dir(offr,FACE+1-st_matrix%dir_conn(k))
             else if (off_left == 0 .and. offr_flag(k) == 0) then
               offr_flag(k) = 1
             end if
@@ -302,7 +301,7 @@ module mpi_solve
         call senrec_ivectv(fix_flag)
       ! -- Send and Receive real vector value (rvectv)
         call senrec_rvectv(pre_d)
-      if (sum(fix_flag(:)) == nreg_num) then
+      if (sum(fix_flag(:)) == st_matrix%nreg_num) then
         rank_flag = 1
       end if
       ! -- Sum value for MPI (val)
@@ -317,7 +316,6 @@ module mpi_solve
   ! solve_mpi_ilu -- Solve mpi ilu factorization
   !*********************************************************************************************
     ! -- module
-    use allocate_solution, only: right_offr
     ! -- inout
     real(DP), intent(in) :: inrhs(:), indmat(:), inlumat(:)
     real(DP), intent(inout) :: outx(:)
@@ -327,10 +325,10 @@ module mpi_solve
     integer(I4) :: off_row_num, off_left, off_right
     integer(I4) :: rank_flag, allp_flag
     !-------------------------------------------------------------------------------------------
-    off_row_num = crs_index(1)%offind(nreg_num)
+    off_row_num = st_matrix%crs_index(1)%offind(st_matrix%nreg_num)
     !$omp parallel
     !$omp do private(i)
-    do i = 1, nreg_num
+    do i = 1, st_matrix%nreg_num
       fix_flag(i) = 0
       temp_outx(i) = inrhs(i)
     end do
@@ -350,11 +348,11 @@ module mpi_solve
     forwfix_loop: do while (allp_flag /= st_mpi%totn)
       do i = 1, ncalc
         if (fix_flag(i) == 0) then
-          off_sta = crs_index(1)%offind(i-1) + 1
-          off_end = crs_index(1)%offind(i)
+          off_sta = st_matrix%crs_index(1)%offind(i-1) + 1
+          off_end = st_matrix%crs_index(1)%offind(i)
           do k = off_sta, off_end
-            offr = crs_index(1)%offrow(k) ; off_left = 0
-            off_left = left_offr(k)
+            offr = st_matrix%crs_index(1)%offrow(k) ; off_left = 0
+            off_left = st_matrix%left_offr(k)
             if (off_left /= 0 .and. fix_flag(offr) == 1 .and. offr_flag(k) == 0) then
               offr_flag(k) = 1 ; temp_outx(i) = temp_outx(i) - inlumat(k)*outx(offr)
             else if (off_left == 0 .and. offr_flag(k) == 0) then
@@ -370,7 +368,7 @@ module mpi_solve
         call senrec_ivectv(fix_flag)
       ! -- Send and Receive real vector value (rvectv)
         call senrec_rvectv(outx)
-      if (sum(fix_flag(:)) == nreg_num) then
+      if (sum(fix_flag(:)) == st_matrix%nreg_num) then
         rank_flag = 1
       end if
       ! -- Sum value for MPI (val)
@@ -379,7 +377,7 @@ module mpi_solve
 
     !$omp parallel
     !$omp do private(i)
-    do i = 1, nreg_num
+    do i = 1, st_matrix%nreg_num
       fix_flag(i) = 0
       temp_outx(i) = DZERO
     end do
@@ -394,11 +392,11 @@ module mpi_solve
     backfix_loop: do while (allp_flag /= st_mpi%totn)
       do i = ncalc, 1, -1
         if (fix_flag(i) == 0) then
-          off_sta = crs_index(1)%offind(i-1) + 1
-          off_end = crs_index(1)%offind(i)
+          off_sta = st_matrix%crs_index(1)%offind(i-1) + 1
+          off_end = st_matrix%crs_index(1)%offind(i)
           do k = off_sta, off_end
-            offr = crs_index(1)%offrow(k) ; off_right = 0
-            off_right = right_offr(k)
+            offr = st_matrix%crs_index(1)%offrow(k) ; off_right = 0
+            off_right = st_matrix%right_offr(k)
             if (off_right /= 0 .and. fix_flag(offr) == 1 .and. offr_flag(k) == 0) then
               offr_flag(k) = 1 ; temp_outx(i) = temp_outx(i) + inlumat(k)*outx(offr)
             else if (off_right == 0 .and. offr_flag(k) == 0) then
@@ -414,7 +412,7 @@ module mpi_solve
         call senrec_ivectv(fix_flag)
       ! -- Send and Receive real vector value (rvectv)
         call senrec_rvectv(outx)
-      if (sum(fix_flag(:)) == nreg_num) then
+      if (sum(fix_flag(:)) == st_matrix%nreg_num) then
         rank_flag = 1
       end if
       ! -- Sum value for MPI (val)

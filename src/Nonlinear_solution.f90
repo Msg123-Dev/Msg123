@@ -10,7 +10,7 @@ module nonlinear_solution
   use set_cell, only: ncalc
   use make_cell, only: st_geom
   use prep_calculation, only: st_time
-  use allocate_solution, only: nreg_num, array_var
+  use allocate_solution, only: st_matrix
   use calc_function, only: calc_func
   use calc_simulation, only: calc_l2norm2
 #ifdef MPI_MSG
@@ -168,7 +168,7 @@ module nonlinear_solution
           res_fact = DONE
         end if
         ! -- Check residual convergence (residual)
-          call check_residual(array_var(1)%rhs, func_scal, res_flag, res_fact,&
+          call check_residual(st_matrix%array_var(1)%rhs, func_scal, res_flag, res_fact,&
                               hnew=st_sol%head_new)
         if (st_time%out_iter > 1) then
           res_flag = res_flag .and. head_change_flag
@@ -190,7 +190,7 @@ module nonlinear_solution
 
       if (st_time%out_iter == 1) then
         ! -- Calculate l2 norm square (resl2norm2)
-          call calc_l2norm2(1, array_var(1)%rhs, l2norm_new)
+          call calc_l2norm2(1, st_matrix%array_var(1)%rhs, l2norm_new)
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1) then
           ! -- Sum value for MPI (val)
@@ -202,7 +202,7 @@ module nonlinear_solution
       end if
 
       !$omp parallel do private(i)
-      do i = 1, nreg_num
+      do i = 1, st_matrix%nreg_num
         st_sol%head_pre(i) = st_sol%head_new(i)
         st_sol%head_change(i) = DZERO
       end do
@@ -236,7 +236,7 @@ module nonlinear_solution
         call limit_step(max_step, st_coef%stod, st_sol, step_pnorm, step_lmax)
 
       !$omp parallel do private(i)
-      do i = 1, nreg_num
+      do i = 1, st_matrix%nreg_num
         st_sol%head_new(i) = st_sol%head_pre(i) + st_sol%head_change(i)
       end do
       !$omp end parallel do
@@ -375,8 +375,8 @@ module nonlinear_solution
       if (max_num > 0) then
 #endif
         cxyzn = get_cnum(max_num)
-        conv_dmat = array_var(1)%dmat(max_num)*len_scal**2
-        conv_rhs = array_var(1)%rhs(max_num)*len_scal**3
+        conv_dmat = st_matrix%array_var(1)%dmat(max_num)*len_scal**2
+        conv_rhs = st_matrix%array_var(1)%rhs(max_num)*len_scal**3
         conv_head = st_sol%head_new(max_num)*len_scal + z_base
       end if
 #ifdef MPI_MSG
@@ -542,22 +542,24 @@ module nonlinear_solution
   !*********************************************************************************************
     ! -- modules
     use set_cell, only: amg_setflag
-    use allocate_solution, only: crs_index, pro_var, res_var
     ! -- inout
 
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    array_var(1)%lumat(:) = DZERO
-    array_var(1)%dmat(:) = DZERO
-    array_var(1)%rhs(:) = DZERO
+    st_matrix%array_var(1)%lumat(:) = DZERO
+    st_matrix%array_var(1)%dmat(:) = DZERO
+    st_matrix%array_var(1)%rhs(:) = DZERO
 
     if (st_ctrl%precon_type == 1 .and. amg_setflag == 1) then
       do i = 2, st_ctrl%nlevel
-        deallocate(array_var(i)%dmat, array_var(i)%rhs, array_var(i)%lumat, array_var(i)%x)
-        deallocate(crs_index(i)%offrow, crs_index(i)%offind)
-        deallocate(pro_var(i)%pindex, pro_var(i)%poffrow, pro_var(i)%pval)
-        deallocate(res_var(i)%rindex, res_var(i)%roffrow, res_var(i)%rval)
+        deallocate(st_matrix%array_var(i)%dmat, st_matrix%array_var(i)%rhs,&
+                   st_matrix%array_var(i)%lumat, st_matrix%array_var(i)%x)
+        deallocate(st_matrix%crs_index(i)%offrow, st_matrix%crs_index(i)%offind)
+        deallocate(st_matrix%pro_var(i)%pindex, st_matrix%pro_var(i)%poffrow,&
+                   st_matrix%pro_var(i)%pval)
+        deallocate(st_matrix%res_var(i)%rindex, st_matrix%res_var(i)%roffrow,&
+                   st_matrix%res_var(i)%rval)
       end do
     end if
 
@@ -825,7 +827,7 @@ module nonlinear_solution
     !$omp parallel
     !$omp do private(i) reduction(+:slope, l2_jac)
     do i = 1, ncalc
-      slope = slope + array_var(1)%rhs(i)*jacvec(i)*maxpnorm
+      slope = slope + st_matrix%array_var(1)%rhs(i)*jacvec(i)*maxpnorm
       l2_jac = l2_jac + jacvec(i)*jacvec(i)
     end do
     !$omp end do
@@ -898,7 +900,8 @@ module nonlinear_solution
           wmode = .true. ; slope = DZERO
           !$omp parallel do private(i) reduction(+:slope)
           do i = 1, ncalc
-            slope = slope + res_wgt(i)*res_wgt(i)*array_var(1)%rhs(i)*jacvec(i)*maxpnorm
+            slope = slope + res_wgt(i)*res_wgt(i)*st_matrix%array_var(1)%rhs(i)*jacvec(i)&
+                    *maxpnorm
           end do
           !$omp end parallel do
 #ifdef MPI_MSG
@@ -1030,7 +1033,7 @@ module nonlinear_solution
     backi = backi + 1
 
     !$omp parallel do private(i)
-    do i = 1, nreg_num
+    do i = 1, st_matrix%nreg_num
       st_sol%head_new(i) = st_sol%head_pre(i) + in_lam*st_sol%head_change(i)
     end do
     !$omp end parallel do

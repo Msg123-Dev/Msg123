@@ -3,7 +3,7 @@ module make_amg_matrix
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE
   use initial_module, only: st_ctrl
-  use allocate_solution, only: crs_index, array_var, pro_var, res_var
+  use allocate_solution, only: st_matrix
 
   implicit none
   private
@@ -33,7 +33,7 @@ module make_amg_matrix
     amg_setflag = 0
 
     amg_level: do amglev = 2, st_ctrl%amg_nlevel
-      nfine = crs_index(amglev-1)%unknow
+      nfine = st_matrix%crs_index(amglev-1)%unknow
       if (nfine <= AMG_MIN_COARSE) then
         st_ctrl%nlevel = amglev - 1
         exit amg_level
@@ -45,7 +45,7 @@ module make_amg_matrix
       ! -- Make aggregation (aggregation)
         call make_aggregation()
 
-      crs_index(amglev)%unknow = ncoase
+      st_matrix%crs_index(amglev)%unknow = ncoase
 
       ! -- Make prolongation matrix by soomthed aggregation method (prolomat)
         call make_prolomat()
@@ -54,11 +54,11 @@ module make_amg_matrix
       ! -- Make galerkin coase operater (galerkin)
         call make_galerkin()
 
-      allocate(array_var(amglev)%x(ncoase), array_var(amglev)%rhs(ncoase))
+      allocate(st_matrix%array_var(amglev)%x(ncoase), st_matrix%array_var(amglev)%rhs(ncoase))
       !$omp parallel do private(i)
       do i = 1, ncoase
-        array_var(amglev)%x(i) = DZERO
-        array_var(amglev)%rhs(i) = DZERO
+        st_matrix%array_var(amglev)%x(i) = DZERO
+        st_matrix%array_var(amglev)%rhs(i) = DZERO
       end do
       !$omp end parallel do
 
@@ -82,7 +82,7 @@ module make_amg_matrix
     !-------------------------------------------------------------------------------------------
     allocate(temp_dmat(nfine))
     allocate(aggr_luflag(nfine), nonaggr_index(0:nfine))
-    allocate(nonaggr_lu(crs_index(amglev-1)%offind(nfine)))
+    allocate(nonaggr_lu(st_matrix%crs_index(amglev-1)%offind(nfine)))
     !$omp parallel
     !$omp do private(i)
     do i = 1, nfine
@@ -101,17 +101,17 @@ module make_amg_matrix
     nonaggr = 0
 
     do i = 1, nfine
-      temp_dmat(i) = array_var(amglev-1)%dmat(i)
+      temp_dmat(i) = st_matrix%array_var(amglev-1)%dmat(i)
       aggr_luflag(i) = 1
-      st_off = crs_index(amglev-1)%offind(i-1) + 1
-      en_off = crs_index(amglev-1)%offind(i)
+      st_off = st_matrix%crs_index(amglev-1)%offind(i-1) + 1
+      en_off = st_matrix%crs_index(amglev-1)%offind(i)
       do k = st_off, en_off
-        j = crs_index(amglev-1)%offrow(k)
+        j = st_matrix%crs_index(amglev-1)%offrow(k)
         if (j > nfine) then
           cycle
         end if
-        ddmat = array_var(amglev-1)%dmat(i)*array_var(amglev-1)%dmat(j)
-        lulumat = array_var(amglev-1)%lumat(k)
+        ddmat = st_matrix%array_var(amglev-1)%dmat(i)*st_matrix%array_var(amglev-1)%dmat(j)
+        lulumat = st_matrix%array_var(amglev-1)%lumat(k)
         if (lulumat**DTWO > abs(ddmat*st_ctrl%amg_theta**DTWO) .and. ddmat*lulumat > DZERO) then
           nonaggr = nonaggr + 1
           nonaggr_lu(nonaggr) = k
@@ -171,7 +171,7 @@ module make_amg_matrix
         ncoase = ncoase + 1
         aggr_num(i) = ncoase
         do k = nonaggr_index(i-1)+1, nonaggr_index(i)
-          j = crs_index(amglev-1)%offrow(nonaggr_lu(k))
+          j = st_matrix%crs_index(amglev-1)%offrow(nonaggr_lu(k))
           if (j > nfine) then
             cycle
           end if
@@ -198,7 +198,7 @@ module make_amg_matrix
     aggre_check: do i = 1, nfine
       if (aggr_num(i) == 0) then
         do k = nonaggr_index(i-1)+1, nonaggr_index(i)
-          j = crs_index(amglev-1)%offrow(nonaggr_lu(k))
+          j = st_matrix%crs_index(amglev-1)%offrow(nonaggr_lu(k))
           if (j > nfine) then
             cycle
           end if
@@ -295,7 +295,7 @@ module make_amg_matrix
 
     do i = 1, nfine
       do kk = nonaggr_index(i-1)+1, nonaggr_index(i)
-        j = crs_index(amglev-1)%offrow(nonaggr_lu(kk))
+        j = st_matrix%crs_index(amglev-1)%offrow(nonaggr_lu(kk))
         if (j > nfine) then
           cycle
         end if
@@ -342,7 +342,7 @@ module make_amg_matrix
         cycle
       end if
       do kk = nonaggr_index(i-1)+1, nonaggr_index(i)
-        j = crs_index(amglev-1)%offrow(nonaggr_lu(kk))
+        j = st_matrix%crs_index(amglev-1)%offrow(nonaggr_lu(kk))
         if (j > nfine) then
           cycle
         end if
@@ -357,7 +357,7 @@ module make_amg_matrix
         if (k > temp_prorow(i)) then
           stop 'Unexpected error in smooth aggregat'
         end if
-        temp_prov(k,i) = temp_prov(k,i) - array_var(amglev-1)%lumat(nonaggr_lu(kk))
+        temp_prov(k,i) = temp_prov(k,i) - st_matrix%array_var(amglev-1)%lumat(nonaggr_lu(kk))
       end do
     end do
     !$omp parallel do private(i, k)
@@ -387,24 +387,25 @@ module make_amg_matrix
     deallocate(aggr_inresult, aggr_belongnum)
     deallocate(nonaggr_lu, nonaggr_index, temp_dmat)
 
-    allocate(pro_var(amglev)%pindex(0:nfine))
-    pro_var(amglev)%pindex(:) = 0
+    allocate(st_matrix%pro_var(amglev)%pindex(0:nfine))
+    st_matrix%pro_var(amglev)%pindex(:) = 0
 
     do i = 1, nfine
-      pro_var(amglev)%pindex(i) = pro_var(amglev)%pindex(i-1) + temp_prorow(i)
+      st_matrix%pro_var(amglev)%pindex(i) = st_matrix%pro_var(amglev)%pindex(i-1)&
+                                            + temp_prorow(i)
     end do
-    k = pro_var(amglev)%pindex(nfine)
+    k = st_matrix%pro_var(amglev)%pindex(nfine)
 
-    allocate(pro_var(amglev)%poffrow(k))
-    allocate(pro_var(amglev)%pval(k))
-    pro_var(amglev)%poffrow(:) = 0
-    pro_var(amglev)%pval(:) = DZERO
+    allocate(st_matrix%pro_var(amglev)%poffrow(k))
+    allocate(st_matrix%pro_var(amglev)%pval(k))
+    st_matrix%pro_var(amglev)%poffrow(:) = 0
+    st_matrix%pro_var(amglev)%pval(:) = DZERO
     j = 0
     do i = 1, nfine
       do k = 1, temp_prorow(i)
         j = j + 1
-        pro_var(amglev)%poffrow(j) = temp_proag(k,i)
-        pro_var(amglev)%pval(j) = temp_prov(k,i)
+        st_matrix%pro_var(amglev)%poffrow(j) = temp_proag(k,i)
+        st_matrix%pro_var(amglev)%pval(j) = temp_prov(k,i)
       end do
     end do
 
@@ -423,40 +424,41 @@ module make_amg_matrix
     ! -- local
     integer(I4) :: i, j, k, kk, psta, pend
     !-------------------------------------------------------------------------------------------
-    allocate(res_var(amglev)%rindex(0:ncoase))
-    res_var(amglev)%rindex(:) = 0
+    allocate(st_matrix%res_var(amglev)%rindex(0:ncoase))
+    st_matrix%res_var(amglev)%rindex(:) = 0
     kk = 0
 
     do i = 1, nfine
-      psta = pro_var(amglev)%pindex(i-1) + 1
-      pend = pro_var(amglev)%pindex(i)
+      psta = st_matrix%pro_var(amglev)%pindex(i-1) + 1
+      pend = st_matrix%pro_var(amglev)%pindex(i)
       do j = psta, pend
-        k = pro_var(amglev)%poffrow(j) + 1
+        k = st_matrix%pro_var(amglev)%poffrow(j) + 1
         kk = kk + 1
         if (k <= ncoase) then
-          res_var(amglev)%rindex(k) = res_var(amglev)%rindex(k) + 1
+          st_matrix%res_var(amglev)%rindex(k) = st_matrix%res_var(amglev)%rindex(k) + 1
         end if
       end do
     end do
 
-    allocate(res_var(amglev)%roffrow(kk))
-    allocate(res_var(amglev)%rval(kk))
+    allocate(st_matrix%res_var(amglev)%roffrow(kk))
+    allocate(st_matrix%res_var(amglev)%rval(kk))
 
-    res_var(amglev)%roffrow(:) = 0
-    res_var(amglev)%rval(:) = DZERO
+    st_matrix%res_var(amglev)%roffrow(:) = 0
+    st_matrix%res_var(amglev)%rval(:) = DZERO
     do i = 1, ncoase
-      res_var(amglev)%rindex(i) = res_var(amglev)%rindex(i) + res_var(amglev)%rindex(i-1)
+      st_matrix%res_var(amglev)%rindex(i) = st_matrix%res_var(amglev)%rindex(i)&
+                                            + st_matrix%res_var(amglev)%rindex(i-1)
     end do
 
     do i = 1, nfine
-      psta = pro_var(amglev)%pindex(i-1) + 1
-      pend = pro_var(amglev)%pindex(i)
+      psta = st_matrix%pro_var(amglev)%pindex(i-1) + 1
+      pend = st_matrix%pro_var(amglev)%pindex(i)
       do j = psta, pend
-        kk = pro_var(amglev)%poffrow(j)
-        k = res_var(amglev)%rindex(kk) + 1
-        res_var(amglev)%rindex(kk) = k
-        res_var(amglev)%roffrow(k) = i
-        res_var(amglev)%rval(k) = pro_var(amglev)%pval(j)
+        kk = st_matrix%pro_var(amglev)%poffrow(j)
+        k = st_matrix%res_var(amglev)%rindex(kk) + 1
+        st_matrix%res_var(amglev)%rindex(kk) = k
+        st_matrix%res_var(amglev)%roffrow(k) = i
+        st_matrix%res_var(amglev)%rval(k) = st_matrix%pro_var(amglev)%pval(j)
       end do
     end do
 
@@ -481,11 +483,11 @@ module make_amg_matrix
     !-------------------------------------------------------------------------------------------
     galfin_flag = 0
     allocate(temp_size(nfine), temp_f2c(7,nfine), temp_node(ncoase))
-    allocate(crs_index(amglev)%offind(0:ncoase))
+    allocate(st_matrix%crs_index(amglev)%offind(0:ncoase))
     allocate(new_row(nfine*7), new_col(nfine*7))
     allocate(temp_aggr(ncoase))
     allocate(temp_val(7,nfine), new_lumat(nfine*7), temp_lumat(ncoase))
-    crs_index(amglev)%offind(0) = 0
+    st_matrix%crs_index(amglev)%offind(0) = 0
     !$omp parallel
     !$omp do private(i)
     do i = 1, nfine
@@ -495,7 +497,7 @@ module make_amg_matrix
     !$omp do private(i)
     do i = 1, ncoase
       temp_node(i) = 0 ; temp_aggr(i) = 0
-      crs_index(amglev)%offind(i) = 0
+      st_matrix%crs_index(amglev)%offind(i) = 0
       temp_lumat(i) = DZERO
     end do
     !$omp end do
@@ -525,24 +527,24 @@ module make_amg_matrix
           cycle
         end if
         cancel_flag = 0
-        rsta = res_var(amglev)%rindex(i-1) + 1
-        rend = res_var(amglev)%rindex(i)
+        rsta = st_matrix%res_var(amglev)%rindex(i-1) + 1
+        rend = st_matrix%res_var(amglev)%rindex(i)
         rest_1: do j = rsta, rend
-          fin_num = res_var(amglev)%roffrow(j)
+          fin_num = st_matrix%res_var(amglev)%roffrow(j)
           if (fin_num <= nfine .and. temp_size(fin_num) >= 7) then
             cancel_flag = 1
             exit rest_1
           end if
         end do rest_1
         if (cancel_flag == 0) then
-          rsta = res_var(amglev)%rindex(i-1) + 1
-          rend = res_var(amglev)%rindex(i)
+          rsta = st_matrix%res_var(amglev)%rindex(i-1) + 1
+          rend = st_matrix%res_var(amglev)%rindex(i)
           rest_2: do j = rsta, rend
-            fin_num = res_var(amglev)%roffrow(j)
-            st_off = crs_index(amglev-1)%offind(fin_num-1) + 1
-            en_off = crs_index(amglev-1)%offind(fin_num)
+            fin_num = st_matrix%res_var(amglev)%roffrow(j)
+            st_off = st_matrix%crs_index(amglev-1)%offind(fin_num-1) + 1
+            en_off = st_matrix%crs_index(amglev-1)%offind(fin_num)
             rest_3: do k = st_off, en_off
-              fine_lu = crs_index(amglev-1)%offrow(k)
+              fine_lu = st_matrix%crs_index(amglev-1)%offrow(k)
               if (fine_lu > nfine) then
                 cycle
               end if
@@ -566,11 +568,11 @@ module make_amg_matrix
 
         temp_aggr(i) = 1
 
-        rsta = res_var(amglev)%rindex(i-1) + 1
-        rend = res_var(amglev)%rindex(i)
+        rsta = st_matrix%res_var(amglev)%rindex(i-1) + 1
+        rend = st_matrix%res_var(amglev)%rindex(i)
         do j = rsta, rend
-          fin_num = res_var(amglev)%roffrow(j)
-          rest_v = res_var(amglev)%rval(j)
+          fin_num = st_matrix%res_var(amglev)%roffrow(j)
+          rest_v = st_matrix%res_var(amglev)%rval(j)
           if (fin_num <= nfine) then
             kk = temp_size(fin_num)
             if (kk == 0) then
@@ -586,17 +588,17 @@ module make_amg_matrix
               kk = kk + 1
               temp_size(fin_num) = kk
               temp_f2c(kk,fin_num) = i
-              temp_val(kk,fin_num) = rest_v*array_var(amglev-1)%dmat(fin_num)
+              temp_val(kk,fin_num) = rest_v*st_matrix%array_var(amglev-1)%dmat(fin_num)
             else
               temp_val(kk,fin_num) = temp_val(kk,fin_num) + &
-                                     rest_v*array_var(amglev-1)%dmat(fin_num)
+                                     rest_v*st_matrix%array_var(amglev-1)%dmat(fin_num)
             end if
           end if
 
-          st_off = crs_index(amglev-1)%offind(fin_num-1) + 1
-          en_off = crs_index(amglev-1)%offind(fin_num)
+          st_off = st_matrix%crs_index(amglev-1)%offind(fin_num-1) + 1
+          en_off = st_matrix%crs_index(amglev-1)%offind(fin_num)
           do k = st_off, en_off
-            fine_lu = crs_index(amglev-1)%offrow(k)
+            fine_lu = st_matrix%crs_index(amglev-1)%offrow(k)
             if (fine_lu > nfine) then
               cycle
             end if
@@ -614,9 +616,10 @@ module make_amg_matrix
               kk = kk + 1
               temp_size(fine_lu) = kk
               temp_f2c(kk,fine_lu) = i
-              temp_val(kk,fine_lu) = rest_v*array_var(amglev-1)%lumat(k)
+              temp_val(kk,fine_lu) = rest_v*st_matrix%array_var(amglev-1)%lumat(k)
             else
-              temp_val(kk,fine_lu) = temp_val(kk,fine_lu) + rest_v*array_var(amglev-1)%lumat(k)
+              temp_val(kk,fine_lu) = temp_val(kk,fine_lu)&
+                                     + rest_v*st_matrix%array_var(amglev-1)%lumat(k)
             end if
           end do
         end do
@@ -624,11 +627,11 @@ module make_amg_matrix
 
       do i = 1, ncoase
         node_size = 0
-        rsta = res_var(amglev)%rindex(i-1) + 1
-        rend = res_var(amglev)%rindex(i)
+        rsta = st_matrix%res_var(amglev)%rindex(i-1) + 1
+        rend = st_matrix%res_var(amglev)%rindex(i)
         do j = rsta, rend
-          fin_num = res_var(amglev)%roffrow(j)
-          rest_v = res_var(amglev)%rval(j)
+          fin_num = st_matrix%res_var(amglev)%roffrow(j)
+          rest_v = st_matrix%res_var(amglev)%rval(j)
           do k = 1, temp_size(fin_num)
             coa_num = temp_f2c(k,fin_num)
             rest_4: do ns = 1, node_size
@@ -653,7 +656,7 @@ module make_amg_matrix
             new_tconn_num = new_tconn_num + 1
             k = temp_node(j) + 1
             if (k <= ncoase) then
-              crs_index(amglev)%offind(k) = crs_index(amglev)%offind(k) + 1
+              st_matrix%crs_index(amglev)%offind(k) = st_matrix%crs_index(amglev)%offind(k) + 1
             end if
           end if
           coase_index = coase_index + 1
@@ -668,25 +671,27 @@ module make_amg_matrix
     deallocate(temp_size, temp_f2c, temp_val, temp_node, temp_lumat, temp_aggr)
 
     do i = 1, ncoase
-      crs_index(amglev)%offind(i) = crs_index(amglev)%offind(i) + crs_index(amglev)%offind(i-1)
+      st_matrix%crs_index(amglev)%offind(i) = st_matrix%crs_index(amglev)%offind(i)&
+                                              + st_matrix%crs_index(amglev)%offind(i-1)
     end do
 
-    allocate(crs_index(amglev)%offrow(new_tconn_num))
-    allocate(array_var(amglev)%lumat(new_tconn_num), array_var(amglev)%dmat(ncoase))
-    crs_index(amglev)%offrow(:) = 0
-    array_var(amglev)%lumat(:) = DZERO
-    array_var(amglev)%dmat(:) = DONE
-    crs_index(amglev)%lunum = new_tconn_num
+    allocate(st_matrix%crs_index(amglev)%offrow(new_tconn_num))
+    allocate(st_matrix%array_var(amglev)%lumat(new_tconn_num),&
+             st_matrix%array_var(amglev)%dmat(ncoase))
+    st_matrix%crs_index(amglev)%offrow(:) = 0
+    st_matrix%array_var(amglev)%lumat(:) = DZERO
+    st_matrix%array_var(amglev)%dmat(:) = DONE
+    st_matrix%crs_index(amglev)%lunum = new_tconn_num
 
     do j = 1, coase_index
       row = new_row(j)
       if (row /= new_col(j)) then
-        k = crs_index(amglev)%offind(row) + 1
-        crs_index(amglev)%offind(row) = k
-        crs_index(amglev)%offrow(k) = new_col(j)
-        array_var(amglev)%lumat(k) = new_lumat(j)
+        k = st_matrix%crs_index(amglev)%offind(row) + 1
+        st_matrix%crs_index(amglev)%offind(row) = k
+        st_matrix%crs_index(amglev)%offrow(k) = new_col(j)
+        st_matrix%array_var(amglev)%lumat(k) = new_lumat(j)
       else
-        array_var(amglev)%dmat(row) = new_lumat(j)
+        st_matrix%array_var(amglev)%dmat(row) = new_lumat(j)
       end if
     end do
 
@@ -738,12 +743,12 @@ module make_amg_matrix
 
     ! lay2
     do k = nonaggr_index(n-1)+1, nonaggr_index(n)
-      j = crs_index(amglev-1)%offrow(nonaggr_lu(k))
+      j = st_matrix%crs_index(amglev-1)%offrow(nonaggr_lu(k))
       if (j > nfine) then
         cycle
       end if
       do i = nonaggr_index(j-1)+1, nonaggr_index(j)
-        lay2 = crs_index(amglev-1)%offrow(nonaggr_lu(i))
+        lay2 = st_matrix%crs_index(amglev-1)%offrow(nonaggr_lu(i))
         if (lay2 > nfine) then
           cycle
         end if
@@ -764,7 +769,7 @@ module make_amg_matrix
     do k = 1, lay2_count
       j = lay2_num(k)
       do i = nonaggr_index(j-1)+1, nonaggr_index(j)
-        lay3 = crs_index(amglev-1)%offrow(nonaggr_lu(i))
+        lay3 = st_matrix%crs_index(amglev-1)%offrow(nonaggr_lu(i))
         if (lay3 > nfine) then
           cycle
         end if

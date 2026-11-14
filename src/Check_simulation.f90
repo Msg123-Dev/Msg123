@@ -8,7 +8,7 @@ module check_simulation
   use set_cell, only: ncalc
   use make_cell, only: st_geom
   use prep_calculation, only: st_time
-  use allocate_solution, only: crs_index, array_var
+  use allocate_solution, only: st_matrix
 
   implicit none
   private
@@ -137,13 +137,14 @@ module check_simulation
       else if (rel_flag .and. res_val <= rel_tol*scal_val) then
         pass_flag = .true.
       else if (round_flag) then
-        round_val = abs(array_var(1)%dmat(i))*abs(hnew(i))
+        round_val = abs(st_matrix%array_var(1)%dmat(i))*abs(hnew(i))
         if (stor_flag) then
           round_val = max(abs(stnew(i)), abs(stold(i)))*st_geom%cell_vol(i)*st_time%delt_inv&
                       + round_val
         end if
-        do k = crs_index(1)%offind(i-1)+1, crs_index(1)%offind(i)
-          round_val = round_val + abs(array_var(1)%lumat(k))*abs(hnew(crs_index(1)%offrow(k)))
+        do k = st_matrix%crs_index(1)%offind(i-1)+1, st_matrix%crs_index(1)%offind(i)
+          round_val = round_val + abs(st_matrix%array_var(1)%lumat(k))&
+                      *abs(hnew(st_matrix%crs_index(1)%offrow(k)))
         end do
         pass_flag = res_val <= ROUND_FACT*UROUND*round_val*vol_scal
       end if
@@ -187,9 +188,10 @@ module check_simulation
     do i = 1, ncalc
       scal_val = fscal(i)*vol_scal
       round_val = max(abs(stnew(i)), abs(stold(i)))*st_geom%cell_vol(i)*st_time%delt_inv&
-                  + abs(array_var(1)%dmat(i))*abs(hnew(i))
-      do k = crs_index(1)%offind(i-1)+1, crs_index(1)%offind(i)
-        round_val = round_val + abs(array_var(1)%lumat(k))*abs(hnew(crs_index(1)%offrow(k)))
+                  + abs(st_matrix%array_var(1)%dmat(i))*abs(hnew(i))
+      do k = st_matrix%crs_index(1)%offind(i-1)+1, st_matrix%crs_index(1)%offind(i)
+        round_val = round_val + abs(st_matrix%array_var(1)%lumat(k))&
+                    *abs(hnew(st_matrix%crs_index(1)%offrow(k)))
       end do
       allow_val = ROUND_FACT*UROUND*round_val*vol_scal
       if (abs_flag) then

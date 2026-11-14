@@ -9,7 +9,7 @@ module calc_function
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
   use calc_parameter, only: calc_srat_rperm
-  use allocate_solution, only: crs_index
+  use allocate_solution, only: st_matrix
 #ifdef MPI_MSG
   use utility_module, only: st_mpi
   use mpi_solve, only: senrec_rvectv
@@ -39,7 +39,6 @@ module calc_function
   ! allocate_calfun -- Allocate for calculate function value
   !*********************************************************************************************
     ! -- modules
-    use allocate_solution, only: nreg_num
 
     ! -- inout
 
@@ -54,7 +53,7 @@ module calc_function
     allocate(delh_s(ncals), elev_rati(ncals))
     allocate(surf_work(ncals))
     allocate(delh_r(st_bcnd%rive_num), delh_l(st_bcnd%lake_num), seal_flow(st_bcnd%seal_num))
-    allocate(jcvec(nreg_num), tempf2(ncalc))
+    allocate(jcvec(st_matrix%nreg_num), tempf2(ncalc))
 
   end subroutine allocate_calfun
 
@@ -326,9 +325,9 @@ module calc_function
 
     !$omp do private(i, j, k, sta_ind, end_ind, ind, delhead, relp1, relp2, relat, conn_val)
     do i = 1, ncalc
-      sta_ind = crs_index(1)%offind(i-1) ; end_ind = crs_index(1)%offind(i)
+      sta_ind = st_matrix%crs_index(1)%offind(i-1) ; end_ind = st_matrix%crs_index(1)%offind(i)
       do k = 1, end_ind-sta_ind
-        ind = sta_ind + k ; j = crs_index(1)%offrow(ind)
+        ind = sta_ind + k ; j = st_matrix%crs_index(1)%offrow(ind)
         delhead = infconn(j) - infconn(i)
         relp1 = rperm(i) ; relp2 = rperm(j)
 
@@ -822,7 +821,7 @@ module calc_function
     real(DP) :: sum_l2
 #endif
     !-------------------------------------------------------------------------------------------
-    vj_num = crs_index(vj)%unknow
+    vj_num = st_matrix%crs_index(vj)%unknow
     vj_regnum = size(injx)
 
     !$omp parallel

@@ -9,7 +9,7 @@ module make_linearsystem
   use set_condition, only: st_hydr, st_bcnd
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
-  use allocate_solution, only: nreg_num, crs_index
+  use allocate_solution, only: st_matrix
 #ifdef MPI_MSG
   use utility_module, only: st_mpi
   use mpi_solve, only: senrec_rvectv
@@ -33,11 +33,11 @@ module make_linearsystem
     ! -- local
     integer(I4) :: tot_ind
     !-------------------------------------------------------------------------------------------
-    tot_ind = crs_index(1)%offind(nreg_num)
+    tot_ind = st_matrix%crs_index(1)%offind(st_matrix%nreg_num)
 
-    allocate(st_coef%temp_rhs(nreg_num), st_coef%dkr_dpsi(nreg_num))
+    allocate(st_coef%temp_rhs(st_matrix%nreg_num), st_coef%dkr_dpsi(st_matrix%nreg_num))
     allocate(st_coef%dstor_dpsi(ncalc))
-    allocate(st_coef%stod(ncalc), st_coef%cond(nreg_num), st_coef%sead(ncalc))
+    allocate(st_coef%stod(ncalc), st_coef%cond(st_matrix%nreg_num), st_coef%sead(ncalc))
     allocate(st_coef%dmats(ncalc))
     allocate(st_coef%rivd(ncalc), st_coef%lakd(ncalc), st_coef%surd(ncals), st_coef%recd(ncalc))
     allocate(st_coef%deri_dcon(tot_ind), st_coef%rel_hyd(tot_ind), st_coef%deri_lucon(tot_ind))
@@ -63,7 +63,6 @@ module make_linearsystem
   ! make_matvec -- Make matrix and vector
   !*********************************************************************************************
     ! -- modules
-    use allocate_solution, only: array_var
     use calc_function, only: calc_func
     use make_amg_matrix, only: make_amgmat
     ! -- inout
@@ -74,7 +73,7 @@ module make_linearsystem
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
     !$omp parallel do private(i)
-    do i = 1, nreg_num
+    do i = 1, st_matrix%nreg_num
       st_coef%temp_rhs(i) = DZERO
     end do
     !$omp end parallel do
@@ -84,16 +83,17 @@ module make_linearsystem
                      st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, st_coef%temp_rhs,&
                      fscal, qext)
 
-    array_var(1)%rhs(:) = -st_coef%temp_rhs(:)
+    st_matrix%array_var(1)%rhs(:) = -st_coef%temp_rhs(:)
 
     ! -- Make matrix (matrix)
-      call make_matrix(st_sol, array_var(1)%dmat, array_var(1)%lumat, st_coef)
+      call make_matrix(st_sol, st_matrix%array_var(1)%dmat, st_matrix%array_var(1)%lumat,&
+                       st_coef)
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
     ! -- Send and Receive real vector value (rvectv)
-      call senrec_rvectv(array_var(1)%dmat)
-      call senrec_rvectv(array_var(1)%rhs)
+      call senrec_rvectv(st_matrix%array_var(1)%dmat)
+      call senrec_rvectv(st_matrix%array_var(1)%rhs)
     end if
 #endif
 
@@ -126,7 +126,7 @@ module make_linearsystem
     end do
     !$omp end parallel do
     !$omp parallel do private(i)
-    do i = 1, nreg_num
+    do i = 1, st_matrix%nreg_num
       st_coef%dkr_dpsi(i) = DZERO ; st_coef%cond(i) = DZERO
     end do
     !$omp end parallel do
@@ -255,7 +255,7 @@ module make_linearsystem
     integer(I4) :: tot_ind, sta_ind, end_ind, ind
     real(DP) :: delhead, relp1, relp2, relat
     !-------------------------------------------------------------------------------------------
-    tot_ind = crs_index(1)%offind(nreg_num)
+    tot_ind = st_matrix%crs_index(1)%offind(st_matrix%nreg_num)
     !$omp parallel
     !$omp do private(i)
     do i = 1, tot_ind
@@ -264,10 +264,10 @@ module make_linearsystem
     end do
     !$omp end do
     !$omp do private(i, j, k, sta_ind, end_ind, ind, relat, delhead, relp1, relp2)
-    do i = 1, nreg_num
-      sta_ind = crs_index(1)%offind(i-1) ; end_ind = crs_index(1)%offind(i)
+    do i = 1, st_matrix%nreg_num
+      sta_ind = st_matrix%crs_index(1)%offind(i-1) ; end_ind = st_matrix%crs_index(1)%offind(i)
       do k = 1, end_ind-sta_ind
-        ind = sta_ind + k ; j = crs_index(1)%offrow(ind)
+        ind = sta_ind + k ; j = st_matrix%crs_index(1)%offrow(ind)
         delhead = st_sol%head_new(j) - st_sol%head_new(i)
         relp1 = st_sol%rel_perm(i) ; relp2 = st_sol%rel_perm(j)
 
@@ -283,11 +283,12 @@ module make_linearsystem
 
     if (st_time%form_switch == 1) then
       !$omp do private(i, j, k, sta_ind, end_ind, ind, delhead)
-      do i = 1, nreg_num
-        sta_ind = crs_index(1)%offind(i-1) ; end_ind = crs_index(1)%offind(i)
+      do i = 1, st_matrix%nreg_num
+        sta_ind = st_matrix%crs_index(1)%offind(i-1)
+        end_ind = st_matrix%crs_index(1)%offind(i)
         do k = 1, end_ind-sta_ind
           ind = sta_ind + k
-          j = crs_index(1)%offrow(ind)
+          j = st_matrix%crs_index(1)%offrow(ind)
 
           delhead = st_sol%head_new(j) - st_sol%head_new(i)
 
@@ -302,8 +303,8 @@ module make_linearsystem
     end if
 
     !$omp do private(i, k, sta_ind, end_ind, ind)
-    do i = 1, nreg_num
-      sta_ind = crs_index(1)%offind(i-1) ; end_ind = crs_index(1)%offind(i)
+    do i = 1, st_matrix%nreg_num
+      sta_ind = st_matrix%crs_index(1)%offind(i-1) ; end_ind = st_matrix%crs_index(1)%offind(i)
       do k = 1, end_ind-sta_ind
         ind = sta_ind + k
         lumat_con(ind) = deri_lucon(ind) + deri_con2(ind)
@@ -644,8 +645,8 @@ module make_linearsystem
                               st_schm%rech_dreg_hwid, rech_fact, drech_fact)
           dmat_rec(c) = st_forc%calc_rech(i)*dist_rech*drech_fact
           if (st_time%form_switch == 1 .and. up_cell > 0 .and. st_schm%rech_root_type /= 1) then
-            do ind = crs_index(1)%offind(c-1)+1, crs_index(1)%offind(c)
-              if (crs_index(1)%offrow(ind) == up_cell) then
+            do ind = st_matrix%crs_index(1)%offind(c-1)+1, st_matrix%crs_index(1)%offind(c)
+              if (st_matrix%crs_index(1)%offrow(ind) == up_cell) then
                 lumat_rec(ind) = lumat_rec(ind)&
                                  - st_forc%calc_rech(i)*rech_fact*up_dist*up_drech
               end if

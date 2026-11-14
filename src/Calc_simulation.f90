@@ -1,7 +1,7 @@
 module calc_simulation
   ! -- modules
   use kind_module, only: I4, DP
-  use allocate_solution, only: crs_index
+  use allocate_solution, only: st_matrix
 
   implicit none
   private
@@ -25,7 +25,7 @@ module calc_simulation
     ! -- local
     integer(I4) :: i, l2_num
     !-------------------------------------------------------------------------------------------
-    l2_num = crs_index(l2level)%unknow
+    l2_num = st_matrix%crs_index(l2level)%unknow
 
     l2norm2 = DZERO
     !$omp parallel do private(i) reduction(+:l2norm2)
@@ -54,10 +54,10 @@ module calc_simulation
     !$omp parallel do private(i, j, k, off_sta, off_end, axsum)
     do i = 1, nres
       axsum = estd(i)*estx(i)
-      off_sta = crs_index(rlevel)%offind(i-1) + 1
-      off_end = crs_index(rlevel)%offind(i)
+      off_sta = st_matrix%crs_index(rlevel)%offind(i-1) + 1
+      off_end = st_matrix%crs_index(rlevel)%offind(i)
       do k = off_sta, off_end
-        j = crs_index(rlevel)%offrow(k)
+        j = st_matrix%crs_index(rlevel)%offrow(k)
         axsum = axsum + estlu(k)*estx(j)
       end do
       resb(i) = curb(i) - axsum

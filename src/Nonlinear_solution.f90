@@ -2,7 +2,7 @@ module nonlinear_solution
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE, DHALF, DTWO, DSMAL
-  use types_module, only: sol_set
+  use types_module, only: sol_set, matrix_set
   use utility_module, only: st_mpi, log_fnum
   use initial_module, only: st_sim, st_ctrl
   use read_input, only: len_scal, len_scal_inv, z_base
@@ -10,7 +10,6 @@ module nonlinear_solution
   use set_cell, only: ncalc
   use make_cell, only: st_geom
   use prep_calculation, only: st_time
-  use allocate_solution, only: st_matrix
   use calc_function, only: calc_func
   use calc_simulation, only: calc_l2norm2
 #ifdef MPI_MSG
@@ -54,7 +53,7 @@ module nonlinear_solution
 
   end subroutine allocate_nonlin
 
-  subroutine calc_numsol(st_kryl, st_amgt, st_coef, st_sol)
+  subroutine calc_numsol(st_kryl, st_amgt, st_coef, st_sol, st_matrix)
   !*********************************************************************************************
   ! calc_numsol -- Calculate numerical solution
   !*********************************************************************************************
@@ -76,6 +75,7 @@ module nonlinear_solution
     type(amgt_set), intent(inout) :: st_amgt
     type(coef_set), intent(inout) :: st_coef
     type(sol_set), intent(inout) :: st_sol
+    type(matrix_set), intent(inout) :: st_matrix
     ! -- local
     integer(I4) :: i
     integer(I4) :: out_iter
@@ -121,7 +121,7 @@ module nonlinear_solution
     beta_run = 0 ; beta_flag = .false. ; roll_run = 0
     res_l1 = DZERO ; qext_l1 = DZERO ; mass_error = DZERO ; check_val = huge(1.00_DP)
     ! -- Set for backtracking (backtr)
-      call set_backtr(st_sol, max_step)
+      call set_backtr(st_sol, max_step, st_matrix)
 
     outer_loop : do out_iter = 1, st_ctrl%maxout_iter
       st_time%out_iter = out_iter
@@ -151,7 +151,7 @@ module nonlinear_solution
       back_flag = .false. ; wpass_flag = .false.
 
       ! -- Reset coefficients matrix and constant vector (matvec)
-        call reset_matvec()
+        call reset_matvec(st_matrix)
 
       if (st_sim%sim_type == -1) then
         ! -- Calculate surface water level (surfw)
@@ -159,7 +159,7 @@ module nonlinear_solution
       end if
 
       ! -- Make coefficients matrix and constant vector (matvec)
-        call make_matvec(st_coef, st_sol, func_scal, qext_sum)
+        call make_matvec(st_coef, st_sol, func_scal, qext_sum, st_matrix)
 
       if (st_sim%sim_type == -1 .and. st_ctrl%conv_type == 1) then
         if (st_time%out_iter == 1) then
@@ -169,6 +169,8 @@ module nonlinear_solution
         end if
         ! -- Check residual convergence (residual)
           call check_residual(st_matrix%array_var(1)%rhs, func_scal, res_flag, res_fact,&
+                              st_matrix%array_var(1)%dmat, st_matrix%array_var(1)%lumat,&
+                              st_matrix%crs_index(1)%offind, st_matrix%crs_index(1)%offrow,&
                               hnew=st_sol%head_new)
         if (st_time%out_iter > 1) then
           res_flag = res_flag .and. head_change_flag
@@ -190,7 +192,8 @@ module nonlinear_solution
 
       if (st_time%out_iter == 1) then
         ! -- Calculate l2 norm square (resl2norm2)
-          call calc_l2norm2(1, st_matrix%array_var(1)%rhs, l2norm_new)
+          call calc_l2norm2(st_matrix%crs_index(1)%unknow, st_matrix%array_var(1)%rhs,&
+                            l2norm_new)
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1) then
           ! -- Sum value for MPI (val)
@@ -227,13 +230,14 @@ module nonlinear_solution
       end if
       if (l2norm_pre > DZERO) then
       ! -- Solve linear algebra (linalg)
-        call solve_linalg(l2norm_pre, st_sol%head_change, st_kryl, st_amgt, l2norm_jac)
+        call solve_linalg(l2norm_pre, st_sol%head_change, st_kryl, st_amgt, l2norm_jac,&
+                          st_matrix)
       else
         l2norm_jac = DZERO ; st_time%conv_flag = .true.
       end if
 
       ! -- Limit the step length (limit_step)
-        call limit_step(max_step, st_coef%stod, st_sol, step_pnorm, step_lmax)
+        call limit_step(max_step, st_coef%stod, st_sol, step_pnorm, step_lmax, st_matrix)
 
       !$omp parallel do private(i)
       do i = 1, st_matrix%nreg_num
@@ -278,7 +282,8 @@ module nonlinear_solution
       if (st_time%form_switch == 0 .and. st_ctrl%picard_btr > 0 .and.&
           .not. st_time%conv_flag) then
         ! -- Run backtracking for the picard iteration (picbtr)
-          call run_picbtr(back_iter, check_val, l2norm_new, l2norm_pre, new_func, st_sol)
+          call run_picbtr(back_iter, check_val, l2norm_new, l2norm_pre, new_func, st_sol,&
+                          st_matrix)
         ! -- Check absolute error max norm
           call check_abserrmax(st_sol%head_new, st_sol%head_pre, max_var, max_unk,&
                                max_num)
@@ -304,7 +309,7 @@ module nonlinear_solution
           call run_backtr(back_iter, back_flag, beta_iter, maxs_flag, wpass_flag,&
                           wpass_run < WPASS_RUN_MAX, l2norm_new, l2norm_pre, l2norm_jac,&
                           lambda, gradient, max_step, step_pnorm, step_lmax, st_coef%temp_rhs,&
-                          new_func, st_sol)
+                          new_func, st_sol, st_matrix)
         beta_run = beta_run + beta_iter
         if (wpass_flag) then
           wpass_run = wpass_run + 1
@@ -355,11 +360,11 @@ module nonlinear_solution
 
       if (back_iter == 0) then
         ! -- Calculate function value (func)
-          call calc_func(st_sol%stor_old, st_sol%stor_new, st_sol%surf_head, st_sol%head_new,&
-                         st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, new_func,&
-                         func_scal, qext_sum)
+          call calc_func(st_matrix, st_sol%stor_old, st_sol%stor_new, st_sol%surf_head,&
+                         st_sol%head_new, st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati,&
+                         new_func, func_scal, qext_sum)
         ! -- Calculate l2 norm square (resl2norm2)
-          call calc_l2norm2(1, new_func, l2norm_new)
+          call calc_l2norm2(st_matrix%crs_index(1)%unknow, new_func, l2norm_new)
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1) then
           ! -- Sum value for MPI (val)
@@ -418,8 +423,10 @@ module nonlinear_solution
       if (st_time%conv_flag .and. st_ctrl%conv_type == 1 .and.&
           st_sim%sim_type /= -1) then
         ! -- Check residual convergence (residual)
-          call check_residual(new_func, func_scal, res_flag, DONE, st_sol%stor_new,&
-                              st_sol%stor_old, st_sol%head_new)
+          call check_residual(new_func, func_scal, res_flag, DONE,&
+                              st_matrix%array_var(1)%dmat, st_matrix%array_var(1)%lumat,&
+                              st_matrix%crs_index(1)%offind, st_matrix%crs_index(1)%offrow,&
+                              st_sol%stor_new, st_sol%stor_old, st_sol%head_new)
         st_time%conv_flag = res_flag
       end if
       if (.not. st_time%conv_flag) then
@@ -536,14 +543,14 @@ module nonlinear_solution
 
   end subroutine calc_numsol
 
-  subroutine reset_matvec
+  subroutine reset_matvec(st_matrix)
   !*********************************************************************************************
   ! reset_matvec -- Reset coefficients matrix and constant vector
   !*********************************************************************************************
     ! -- modules
     use set_cell, only: amg_setflag
     ! -- inout
-
+    type(matrix_set), intent(inout) :: st_matrix
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
@@ -581,7 +588,7 @@ module nonlinear_solution
 
   end subroutine calc_surfw
 
-  subroutine limit_step(maxstep, stod, st_sol, pnorm, lam_maxi)
+  subroutine limit_step(maxstep, stod, st_sol, pnorm, lam_maxi, st_matrix)
   !*********************************************************************************************
   ! limit_step -- Limit the step length by the maximum step and the saturation change
   !*********************************************************************************************
@@ -593,6 +600,7 @@ module nonlinear_solution
     real(DP), intent(in) :: maxstep, stod(:)
     type(sol_set), intent(inout) :: st_sol
     real(DP), intent(out) :: pnorm, lam_maxi
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     integer(I4) :: i
     real(DP) :: l2_pnorm, l2_pnorm_s, maxpnorm, dsat_scale, dsat_cell
@@ -603,7 +611,7 @@ module nonlinear_solution
     !-------------------------------------------------------------------------------------------
     maxpnorm = DONE
     ! -- Calculate l2 norm square (l2norm2)
-      call calc_l2norm2(1, st_sol%head_change, l2_pnorm)
+      call calc_l2norm2(st_matrix%crs_index(1)%unknow, st_sol%head_change, l2_pnorm)
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
@@ -659,7 +667,7 @@ module nonlinear_solution
 
   end subroutine limit_step
 
-  subroutine set_backtr(st_sol, maxstep)
+  subroutine set_backtr(st_sol, maxstep, st_matrix)
   !*********************************************************************************************
   ! set_backtr -- Set for backtracking
   !*********************************************************************************************
@@ -668,6 +676,7 @@ module nonlinear_solution
     ! -- inout
     type(sol_set), intent(in) :: st_sol
     real(DP), intent(out) :: maxstep
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     real(DP) :: l2_xnew
 #ifdef MPI_MSG
@@ -675,7 +684,7 @@ module nonlinear_solution
 #endif
     !-------------------------------------------------------------------------------------------
     ! -- Calculate l2 norm square (resl2norm2)
-      call calc_l2norm2(1, st_sol%head_new, l2_xnew)
+      call calc_l2norm2(st_matrix%crs_index(1)%unknow, st_sol%head_new, l2_xnew)
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
       ! -- Sum value for MPI (val)
@@ -729,7 +738,7 @@ module nonlinear_solution
 
   end subroutine set_eise_walk
 
-  subroutine run_picbtr(backi, maxchg, l2_new, l2_pre, new_f, st_sol)
+  subroutine run_picbtr(backi, maxchg, l2_new, l2_pre, new_f, st_sol, st_matrix)
   !*********************************************************************************************
   ! run_picbtr -- Run backtracking for the picard iteration
   !*********************************************************************************************
@@ -741,6 +750,7 @@ module nonlinear_solution
     real(DP), intent(in) :: maxchg, l2_pre
     real(DP), intent(inout) :: new_f(:)
     type(sol_set), intent(inout) :: st_sol
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     integer(I4) :: btr_iter
     real(DP) :: lam, l2_tol
@@ -748,7 +758,7 @@ module nonlinear_solution
     lam = DONE
     l2_tol = l2_pre*st_ctrl%picard_btol*st_ctrl%picard_btol
     ! -- Calculate function and l2norm2 (funcl2norm)
-      call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol)
+      call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol, st_matrix)
     if (l2_new <= l2_tol) then
       return
     end if
@@ -759,7 +769,7 @@ module nonlinear_solution
       end if
       lam = lam*st_ctrl%picard_bfact
       ! -- Calculate function and l2norm2 (funcl2norm)
-        call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol)
+        call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol, st_matrix)
       if (l2_new <= l2_tol) then
         exit btr_loop
       end if
@@ -772,7 +782,8 @@ module nonlinear_solution
   end subroutine run_picbtr
 
   subroutine run_backtr(backi, backf, betai, maxsf, wpass_flag, wretry_flag, l2_new, l2_pre,&
-                        l2_jac, lam, grad, maxstep, pnorm, lam_maxi, pre_f, new_f, st_sol)
+                        l2_jac, lam, grad, maxstep, pnorm, lam_maxi, pre_f, new_f, st_sol,&
+                        st_matrix)
   !*********************************************************************************************
   ! run_backtr -- Run backtracking
   !*********************************************************************************************
@@ -793,6 +804,7 @@ module nonlinear_solution
     real(DP), intent(out) :: grad
     real(DP), intent(inout) :: new_f(:)
     type(sol_set), intent(inout) :: st_sol
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     integer(I4) :: i
     real(DP) :: l2_new2, slope, av, bv, rhs1, rhs2, root, step_len
@@ -817,7 +829,7 @@ module nonlinear_solution
     end do
     !$omp end parallel do
     ! -- Calculate vector by jacobi-free (vecjacf)
-      call calc_vecjacf(1, st_sol%head_change, st_sol%stor_old, st_sol%stor_new,&
+      call calc_vecjacf(st_matrix, 1, st_sol%head_change, st_sol%stor_old, st_sol%stor_new,&
                         st_sol%surf_head, st_sol%head_pre, st_sol%srat_new, st_sol%rel_perm,&
                         st_sol%surf_rati, pre_f, jacvec)
 
@@ -872,11 +884,11 @@ module nonlinear_solution
     grad = slope
     back_aloop: do
       ! -- Calculate function and l2norm2 (func2norm)
-        call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol)
+        call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol, st_matrix)
       if (.not. ieee_is_finite(l2_new) .or. l2_new > DIVERGE_LIMIT) then
         if (lam < lam_min .or. lam_min == DZERO) then
           ! -- Calculate function and l2norm2 (func2norm)
-            call calc_funcl2norm(DZERO, backi, l2_new, new_f, st_sol)
+            call calc_funcl2norm(DZERO, backi, l2_new, new_f, st_sol, st_matrix)
           backf = .true.
           return
         end if
@@ -893,9 +905,11 @@ module nonlinear_solution
         if (.not. wmode .and. wretry_flag .and. st_ctrl%conv_type == 1 .and.&
             st_sim%sim_type /= -1) then
           ! -- Calculate function and l2norm2 (func2norm)
-            call calc_funcl2norm(DZERO, backi, l2_new, new_f, st_sol)
+            call calc_funcl2norm(DZERO, backi, l2_new, new_f, st_sol, st_matrix)
           ! -- Calculate residual weight (res_weight)
-            call calc_res_weight(func_scal, st_sol%stor_new, st_sol%stor_old, st_sol%head_pre,&
+            call calc_res_weight(st_matrix%array_var(1)%dmat, st_matrix%array_var(1)%lumat,&
+                                 st_matrix%crs_index(1)%offind, st_matrix%crs_index(1)%offrow,&
+                                 func_scal, st_sol%stor_new, st_sol%stor_old, st_sol%head_pre,&
                                  res_wgt)
           wmode = .true. ; slope = DZERO
           !$omp parallel do private(i) reduction(+:slope)
@@ -919,7 +933,7 @@ module nonlinear_solution
           cycle back_aloop
         end if
         ! -- Calculate function and l2norm2 (func2norm)
-          call calc_funcl2norm(DZERO, backi, l2_new, new_f, st_sol)
+          call calc_funcl2norm(DZERO, backi, l2_new, new_f, st_sol, st_matrix)
         backf = .true.
         return
       end if
@@ -965,7 +979,7 @@ module nonlinear_solution
           end if
           lam2 = lam ; l2_new2 = f1_new ; lam = min(DTWO*lam, lam_max)
           ! -- Calculate function and l2norm2 (func2norm)
-            call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol)
+            call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol, st_matrix)
           f1_new = calc_merit(wmode, l2_new, new_f)
           alpha_cond = f1_pre + BACK_ALPHA*lam*slope
           beta_cond = f1_pre + BACK_BETA*lam*slope
@@ -980,7 +994,7 @@ module nonlinear_solution
           end if
           lam_incr = DHALF*lam_diff ; lam = lam_base + lam_incr
           ! -- Calculate function and l2norm2 (func2norm)
-            call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol)
+            call calc_funcl2norm(lam, backi, l2_new, new_f, st_sol, st_matrix)
           f1_new = calc_merit(wmode, l2_new, new_f)
           alpha_cond = f1_pre + BACK_ALPHA*lam*slope
           beta_cond = f1_pre + BACK_BETA*lam*slope
@@ -997,7 +1011,7 @@ module nonlinear_solution
 
         if (f1_new < beta_cond .or. (lam_diff < lam_min .and. f1_new > alpha_cond)) then
           ! -- Calculate function and l2norm2 (func2norm)
-            call calc_funcl2norm(lam_base, backi, l2_new, new_f, st_sol)
+            call calc_funcl2norm(lam_base, backi, l2_new, new_f, st_sol, st_matrix)
           betai = betai + 1
         end if
       end if
@@ -1012,7 +1026,7 @@ module nonlinear_solution
 
   end subroutine run_backtr
 
-  subroutine calc_funcl2norm(in_lam, backi, l2_new, new_f, st_sol)
+  subroutine calc_funcl2norm(in_lam, backi, l2_new, new_f, st_sol, st_matrix)
   !*********************************************************************************************
   ! calc_funcl2norm -- Calculate function and l2norm2
   !*********************************************************************************************
@@ -1024,6 +1038,7 @@ module nonlinear_solution
     real(DP), intent(out) :: l2_new
     real(DP), intent(inout) :: new_f(:)
     type(sol_set), intent(inout) :: st_sol
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     integer(I4) :: i
 #ifdef MPI_MSG
@@ -1039,11 +1054,11 @@ module nonlinear_solution
     !$omp end parallel do
 
     ! -- Calculate function value (func)
-      call calc_func(st_sol%stor_old, st_sol%stor_new, st_sol%surf_head, st_sol%head_new,&
-                     st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, new_f, func_scal,&
-                     qext_sum)
+      call calc_func(st_matrix, st_sol%stor_old, st_sol%stor_new, st_sol%surf_head,&
+                     st_sol%head_new, st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati,&
+                     new_f, func_scal, qext_sum)
     ! -- Calculate l2 norm square (resl2norm2)
-      call calc_l2norm2(1, new_f, l2_new)
+      call calc_l2norm2(st_matrix%crs_index(1)%unknow, new_f, l2_new)
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then

@@ -13,6 +13,7 @@ module types_module
   public :: out_time, out_step, msout_set, hydr_set, bcnd_set, forc_set, bflag_set, bcalc_set
   public :: bcount_set, rlbc_set, bfview_set, bound_fview
   public :: sol_set, kryl_set, amgt_set, coef_set, conn_set, gmap_set
+  public :: matrix_int, matrix_real, prolo_vec, restr_vec, matrix_set
 
   type :: mpi_set
     integer(I4) :: totn, rank, comm
@@ -335,6 +336,44 @@ module types_module
     real(DP), allocatable :: deri_sea(:), deri_ks_sea(:), delh_sea(:)
     real(DP), allocatable :: rel_sea(:), tran_sea(:)
   end type coef_set
+
+  type :: matrix_int
+    integer(I4) :: unknow
+    integer(I4) :: lunum
+    integer(I4), allocatable :: offrow(:)
+    integer(I4), allocatable :: offind(:)
+  end type matrix_int
+
+  type :: matrix_real
+    real(DP), allocatable :: dmat(:)
+    real(DP), allocatable :: lumat(:)
+    real(DP), allocatable :: x(:)
+    real(DP), allocatable :: rhs(:)
+  end type matrix_real
+
+  type :: prolo_vec
+    integer(I4), allocatable :: pindex(:)
+    integer(I4), allocatable :: poffrow(:)
+    real(DP), allocatable :: pval(:)
+  end type prolo_vec
+
+  type :: restr_vec
+    integer(I4), allocatable :: rindex(:)
+    integer(I4), allocatable :: roffrow(:)
+    real(DP), allocatable :: rval(:)
+  end type restr_vec
+
+  type :: matrix_set
+    integer(I4) :: nreg_num = 0
+    integer(I4) :: ncolor = 1
+    integer(I4), allocatable :: dir_conn(:), dir_seal(:)
+    integer(I4), allocatable :: left_offr(:), right_offr(:)
+    integer(I4), allocatable :: perm(:), iperm(:), color_ptr(:)
+    type(matrix_int), allocatable :: crs_index(:)
+    type(matrix_real), allocatable :: array_var(:)
+    type(prolo_vec), allocatable :: pro_var(:)
+    type(restr_vec), allocatable :: res_var(:)
+  end type matrix_set
 
   type :: gmap_set
     integer(I4) :: table_num = 0

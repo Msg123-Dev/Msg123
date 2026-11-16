@@ -8,7 +8,6 @@ module check_simulation
   use set_cell, only: ncalc
   use make_cell, only: st_geom
   use prep_calculation, only: st_time
-  use allocate_solution, only: st_matrix
 
   implicit none
   private
@@ -95,7 +94,8 @@ module check_simulation
 
   end subroutine check_abserrmax
 
-  subroutine check_residual(funcv, fscal, res_flag, res_fact, stnew, stold, hnew)
+  subroutine check_residual(funcv, fscal, res_flag, res_fact, dmat, lumat, offind, offrow,&
+                            stnew, stold, hnew)
   !*********************************************************************************************
   ! check_residual -- Check residual convergence criteria
   !*********************************************************************************************
@@ -104,7 +104,9 @@ module check_simulation
     use mpi_utility, only: mpisum_val
 #endif
     ! -- inout
+    integer(I4), intent(in) :: offind(0:), offrow(:)
     real(DP), intent(in) :: funcv(:), fscal(:), res_fact
+    real(DP), intent(in) :: dmat(:), lumat(:)
     logical, intent(out) :: res_flag
     real(DP), intent(in), optional :: stnew(:), stold(:), hnew(:)
     ! -- local
@@ -137,14 +139,14 @@ module check_simulation
       else if (rel_flag .and. res_val <= rel_tol*scal_val) then
         pass_flag = .true.
       else if (round_flag) then
-        round_val = abs(st_matrix%array_var(1)%dmat(i))*abs(hnew(i))
+        round_val = abs(dmat(i))*abs(hnew(i))
         if (stor_flag) then
           round_val = max(abs(stnew(i)), abs(stold(i)))*st_geom%cell_vol(i)*st_time%delt_inv&
                       + round_val
         end if
-        do k = st_matrix%crs_index(1)%offind(i-1)+1, st_matrix%crs_index(1)%offind(i)
-          round_val = round_val + abs(st_matrix%array_var(1)%lumat(k))&
-                      *abs(hnew(st_matrix%crs_index(1)%offrow(k)))
+        do k = offind(i-1)+1, offind(i)
+          round_val = round_val + abs(lumat(k))&
+                      *abs(hnew(offrow(k)))
         end do
         pass_flag = res_val <= ROUND_FACT*UROUND*round_val*vol_scal
       end if
@@ -167,13 +169,15 @@ module check_simulation
 
   end subroutine check_residual
 
-  subroutine calc_res_weight(fscal, stnew, stold, hnew, res_wgt)
+  subroutine calc_res_weight(dmat, lumat, offind, offrow, fscal, stnew, stold, hnew, res_wgt)
   !*********************************************************************************************
   ! calc_res_weight -- Calculate residual weight from the residual convergence criteria
   !*********************************************************************************************
     ! -- modules
 
     ! -- inout
+    integer(I4), intent(in) :: offind(0:), offrow(:)
+    real(DP), intent(in) :: dmat(:), lumat(:)
     real(DP), intent(in) :: fscal(:), stnew(:), stold(:), hnew(:)
     real(DP), intent(out) :: res_wgt(:)
     ! -- local
@@ -188,10 +192,10 @@ module check_simulation
     do i = 1, ncalc
       scal_val = fscal(i)*vol_scal
       round_val = max(abs(stnew(i)), abs(stold(i)))*st_geom%cell_vol(i)*st_time%delt_inv&
-                  + abs(st_matrix%array_var(1)%dmat(i))*abs(hnew(i))
-      do k = st_matrix%crs_index(1)%offind(i-1)+1, st_matrix%crs_index(1)%offind(i)
-        round_val = round_val + abs(st_matrix%array_var(1)%lumat(k))&
-                    *abs(hnew(st_matrix%crs_index(1)%offrow(k)))
+                  + abs(dmat(i))*abs(hnew(i))
+      do k = offind(i-1)+1, offind(i)
+        round_val = round_val + abs(lumat(k))&
+                    *abs(hnew(offrow(k)))
       end do
       allow_val = ROUND_FACT*UROUND*round_val*vol_scal
       if (abs_flag) then

@@ -1,7 +1,6 @@
 module calc_simulation
   ! -- modules
   use kind_module, only: I4, DP
-  use allocate_solution, only: st_matrix
 
   implicit none
   private
@@ -11,7 +10,7 @@ module calc_simulation
 
   contains
 
-  subroutine calc_l2norm2(l2level, inbr, l2norm2)
+  subroutine calc_l2norm2(l2_num, inbr, l2norm2)
   !*********************************************************************************************
   ! calc_l2norm2 -- Calculate l2 norm square
   !*********************************************************************************************
@@ -19,13 +18,12 @@ module calc_simulation
     use constval_module, only: DZERO
 
     ! -- inout
-    integer(I4), intent(in) :: l2level
+    integer(I4), intent(in) :: l2_num
     real(DP), intent(in) :: inbr(:)
     real(DP), intent(out) :: l2norm2
     ! -- local
-    integer(I4) :: i, l2_num
+    integer(I4) :: i
     !-------------------------------------------------------------------------------------------
-    l2_num = st_matrix%crs_index(l2level)%unknow
 
     l2norm2 = DZERO
     !$omp parallel do private(i) reduction(+:l2norm2)
@@ -36,14 +34,15 @@ module calc_simulation
 
   end subroutine calc_l2norm2
 
-  subroutine calc_resi(rlevel, nres, estd, estlu, estx, curb, resb)
+  subroutine calc_resi(nres, offind, offrow, estd, estlu, estx, curb, resb)
   !*********************************************************************************************
   ! calc_resi -- Calculate residual
   !*********************************************************************************************
     ! -- modules
 
     ! -- inout
-    integer(I4), intent(in) :: rlevel, nres
+    integer(I4), intent(in) :: nres
+    integer(I4), intent(in) :: offind(0:), offrow(:)
     real(DP), intent(in) :: estd(:), estlu(:), estx(:), curb(:)
     real(DP), intent(out) :: resb(:)
     ! -- local
@@ -54,10 +53,10 @@ module calc_simulation
     !$omp parallel do private(i, j, k, off_sta, off_end, axsum)
     do i = 1, nres
       axsum = estd(i)*estx(i)
-      off_sta = st_matrix%crs_index(rlevel)%offind(i-1) + 1
-      off_end = st_matrix%crs_index(rlevel)%offind(i)
+      off_sta = offind(i-1) + 1
+      off_end = offind(i)
       do k = off_sta, off_end
-        j = st_matrix%crs_index(rlevel)%offrow(k)
+        j = offrow(k)
         axsum = axsum + estlu(k)*estx(j)
       end do
       resb(i) = curb(i) - axsum

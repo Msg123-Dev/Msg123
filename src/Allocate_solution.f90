@@ -2,57 +2,18 @@ module allocate_solution
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO
-  use types_module, only: sol_set
+  use types_module, only: sol_set, matrix_set
   use set_cell, only: ncalc
 
   implicit none
   private
   public :: allocate_solvar
 
-  type :: matrix_int
-    integer(I4) :: unknow
-    integer(I4) :: lunum
-    integer(I4), allocatable :: offrow(:)
-    integer(I4), allocatable :: offind(:)
-  end type matrix_int
-
-  type :: matrix_real
-    real(DP), allocatable :: dmat(:)
-    real(DP), allocatable :: lumat(:)
-    real(DP), allocatable :: x(:)
-    real(DP), allocatable :: rhs(:)
-  end type matrix_real
-
-  type :: prolo_vec
-    integer(I4), allocatable :: pindex(:)
-    integer(I4), allocatable :: poffrow(:)
-    real(DP), allocatable :: pval(:)
-  end type prolo_vec
-
-  type :: restr_vec
-    integer(I4), allocatable :: rindex(:)
-    integer(I4), allocatable :: roffrow(:)
-    real(DP), allocatable :: rval(:)
-  end type restr_vec
-
-  type :: matrix_set
-    integer(I4) :: nreg_num = 0
-    integer(I4) :: ncolor = 1
-    integer(I4), allocatable :: dir_conn(:), dir_seal(:)
-    integer(I4), allocatable :: left_offr(:), right_offr(:)
-    integer(I4), allocatable :: perm(:), iperm(:), color_ptr(:)
-    type(matrix_int), allocatable :: crs_index(:)
-    type(matrix_real), allocatable :: array_var(:)
-    type(prolo_vec), allocatable :: pro_var(:)
-    type(restr_vec), allocatable :: res_var(:)
-  end type matrix_set
-  type(matrix_set), public :: st_matrix
-
   ! -- local
 
   contains
 
-  subroutine allocate_solvar(st_sol)
+  subroutine allocate_solvar(st_sol, st_matrix)
   !*********************************************************************************************
   ! allocate_solvar -- Allocate solution variable for time step
   !*********************************************************************************************
@@ -61,6 +22,7 @@ module allocate_solution
     ! -- inout
 
     type(sol_set), intent(inout) :: st_sol
+    type(matrix_set), intent(inout) :: st_matrix
     ! -- local
 
     !-------------------------------------------------------------------------------------------
@@ -68,7 +30,7 @@ module allocate_solution
       call allocate_timeup(st_sol)
 
     ! -- Allocate matrix and vector (matvec)
-      call allocate_matvec(st_sol)
+      call allocate_matvec(st_sol, st_matrix)
 
   end subroutine allocate_solvar
 
@@ -104,7 +66,7 @@ module allocate_solution
 
   end subroutine allocate_timeup
 
-  subroutine allocate_matvec(st_sol)
+  subroutine allocate_matvec(st_sol, st_matrix)
   !*********************************************************************************************
   ! allocate_matvec -- Allocate matrix and vector
   !*********************************************************************************************
@@ -117,6 +79,7 @@ module allocate_solution
     ! -- inout
 
     type(sol_set), intent(inout) :: st_sol
+    type(matrix_set), intent(inout) :: st_matrix
     ! -- local
     integer(I4) :: i, k
     !-------------------------------------------------------------------------------------------

@@ -313,15 +313,15 @@ module mpi_write
 
   end subroutine redu_mpi_mass
 
-  subroutine set_senrec_wtab()
+  subroutine set_senrec_wtab(st_matrix)
   !*********************************************************************************************
   ! set_senrec_wtab -- Set send and receive for water table
   !*********************************************************************************************
     ! -- module
+    use types_module, only: matrix_set
     use set_cell, only: send_cind, send_citem, neib_num
-    use allocate_solution, only: st_matrix
     ! -- inout
-
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     integer(I4) :: i, j, k, jj
     integer(I4) :: temp_item_num, temp_snum, temp_rnum, temp_neib_num

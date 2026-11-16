@@ -2,7 +2,7 @@ module calc_output
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE
-  use types_module, only: sol_set
+  use types_module, only: sol_set, matrix_set
   use initial_module, only: st_schm
   use set_cell, only: ncalc, ncals
   use make_cell, only: st_geom
@@ -59,7 +59,7 @@ module calc_output
 
   end subroutine calc_wtable
 
-  subroutine calc_cell_mas(st_sol)
+  subroutine calc_cell_mas(st_sol, st_matrix)
   !*********************************************************************************************
   ! calc_cell_mas -- Calculate cell massbalance
   !*********************************************************************************************
@@ -68,6 +68,7 @@ module calc_output
     ! -- inout
 
     type(sol_set), intent(inout) :: st_sol
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     integer(I4) :: i, s, c, k
     real(DP), allocatable :: ms_st(:), ms_co(:), ms_se(:), ms_we(:)
@@ -90,9 +91,9 @@ module calc_output
     !$omp end parallel
 
     ! -- Calculate massbalance (mass)
-      call calc_mass(0, st_sol%stor_old, st_sol%surf_old, st_sol%head_new, ms_st, ms_co, ms_se,&
-                     ms_we, ms_re, ms_su, ms_ri, ms_la, st_sol%srat_new, st_sol%rel_perm,&
-                     st_sol%surf_rati)
+      call calc_mass(st_matrix, 0, st_sol%stor_old, st_sol%surf_old, st_sol%head_new, ms_st,&
+                     ms_co, ms_se, ms_we, ms_re, ms_su, ms_ri, ms_la, st_sol%srat_new,&
+                     st_sol%rel_perm, st_sol%surf_rati)
     !$omp parallel
     !$omp do private(i)
     do i = 1, ncalc
@@ -220,18 +221,18 @@ module calc_output
 
   end subroutine calc_out_mass
 
-  subroutine calc_outvelc(st_sol)
+  subroutine calc_outvelc(st_sol, st_matrix)
   !*********************************************************************************************
   ! calc_outvelc -- Calculate output velocity
   !*********************************************************************************************
     ! -- modules
     use constval_module, only: DHALF
     use calc_parameter, only: calc_hyd_upwind, calc_kr_cell
-    use allocate_solution, only: st_matrix
     use allocate_output, only: pointv, facev
     ! -- inout
 
     type(sol_set), intent(in) :: st_sol
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     integer(I4) :: i, j, k, c, s
     integer(I4) :: sta_ind, end_ind, ind

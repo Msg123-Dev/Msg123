@@ -19,6 +19,7 @@ module linear_solution
   integer(I4), public :: in_iter
 
   ! -- local
+  real(DP), parameter :: DIVERGE_RATIO = 1.00E+03_DP
   real(DP) :: bnorm, rnorm
 
   contains
@@ -39,13 +40,14 @@ module linear_solution
              st_kryl%p(st_matrix%nreg_num))
     allocate(st_kryl%q(st_matrix%nreg_num), st_kryl%v(st_matrix%nreg_num))
     allocate(st_kryl%rs(st_matrix%nreg_num), st_kryl%t(st_matrix%nreg_num))
+    allocate(st_kryl%x_rmin(st_matrix%nreg_num))
 
     !$omp parallel do private(i)
     do i = 1, st_matrix%nreg_num
       st_kryl%resi(i) = DZERO
       st_kryl%d(i) = DZERO ; st_kryl%z(i) = DZERO ; st_kryl%p(i) = DZERO
       st_kryl%q(i) = DZERO ; st_kryl%v(i) = DZERO
-      st_kryl%rs(i) = DZERO ; st_kryl%t(i) = DZERO
+      st_kryl%rs(i) = DZERO ; st_kryl%t(i) = DZERO ; st_kryl%x_rmin(i) = DZERO
     end do
     !$omp end parallel do
 
@@ -138,7 +140,7 @@ module linear_solution
     type(matrix_set), intent(inout) :: st_matrix
     ! -- local
     integer(I4) :: n, d_size, lu_size, reg_size
-    real(DP) :: sk, sk0, sk2, alpha, beta
+    real(DP) :: sk, sk0, sk2, alpha, beta, rnorm_min
     real(DP) :: guard_nrm(2), guard_scal
 #ifdef MPI_MSG
     real(DP) :: sum_sk, sum_rnorm
@@ -150,6 +152,7 @@ module linear_solution
     reg_size = size(inx)
 
     sk = DZERO ; sk0 = DINFI ; sk2 = DZERO ; alpha = DZERO ; beta = DZERO
+    rnorm_min = DINFI
     !$omp parallel
     !$omp do private(n)
     do n = 1, reg_size
@@ -333,6 +336,15 @@ module linear_solution
       end if
 #endif
 
+      if (.not. st_time%conv_flag .and. rnorm < rnorm_min) then
+        rnorm_min = rnorm
+        !$omp parallel do private(n)
+        do n = 1, reg_size
+          st_kryl%x_rmin(n) = inx(n)
+        end do
+        !$omp end parallel do
+      end if
+
       if (st_time%conv_flag .or. in_iter == st_ctrl%maxinn_iter) then
         exit pcg_inter
       else
@@ -341,6 +353,15 @@ module linear_solution
 
     end do pcg_inter
 
+    if (.not. st_time%conv_flag .and. rnorm_min < DINFI .and.&
+        rnorm > DIVERGE_RATIO**2*rnorm_min) then
+      rnorm = rnorm_min
+      !$omp parallel do private(n)
+      do n = 1, reg_size
+        inx(n) = st_kryl%x_rmin(n)
+      end do
+      !$omp end parallel do
+    end if
 
   end subroutine solve_pcg
 
@@ -358,7 +379,7 @@ module linear_solution
     type(matrix_set), intent(inout) :: st_matrix
     ! -- local
     integer(I4) :: n, d_size, lu_size, reg_size
-    real(DP) :: sk, sk0, sk2, alpha, beta, bicgs_omega, ts, tt
+    real(DP) :: sk, sk0, sk2, alpha, beta, bicgs_omega, ts, tt, rnorm_min
     real(DP) :: guard_nrm(2), guard_scal
 #ifdef MPI_MSG
     real(DP) :: send_val(3), recv_val(3)
@@ -372,7 +393,7 @@ module linear_solution
     reg_size = size(inx)
 
     sk = DZERO ; sk0 = DINFI ; sk2 = DZERO ; alpha = DZERO ; beta = DZERO
-    bicgs_omega = DONE ; ts = DZERO ; tt = DZERO
+    bicgs_omega = DONE ; ts = DZERO ; tt = DZERO ; rnorm_min = DINFI
 
     !$omp parallel
     !$omp do private(n)
@@ -564,6 +585,15 @@ module linear_solution
       end if
 #endif
 
+      if (.not. st_time%conv_flag .and. rnorm < rnorm_min) then
+        rnorm_min = rnorm
+        !$omp parallel do private(n)
+        do n = 1, reg_size
+          st_kryl%x_rmin(n) = inx(n)
+        end do
+        !$omp end parallel do
+      end if
+
       if (st_time%conv_flag) then
         exit bicg_inter
       else
@@ -656,6 +686,15 @@ module linear_solution
         end if
 #endif
 
+        if (.not. st_time%conv_flag .and. rnorm < rnorm_min) then
+          rnorm_min = rnorm
+          !$omp parallel do private(n)
+          do n = 1, reg_size
+            st_kryl%x_rmin(n) = inx(n)
+          end do
+          !$omp end parallel do
+        end if
+
         if (st_time%conv_flag .or. in_iter == st_ctrl%maxinn_iter) then
           exit bicg_inter
         else
@@ -665,6 +704,15 @@ module linear_solution
 
     end do bicg_inter
 
+    if (.not. st_time%conv_flag .and. rnorm_min < DINFI .and.&
+        rnorm > DIVERGE_RATIO**2*rnorm_min) then
+      rnorm = rnorm_min
+      !$omp parallel do private(n)
+      do n = 1, reg_size
+        inx(n) = st_kryl%x_rmin(n)
+      end do
+      !$omp end parallel do
+    end if
 
   end subroutine solve_bicgs
 

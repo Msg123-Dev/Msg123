@@ -312,7 +312,7 @@ module types_module
   type :: kryl_set
     real(DP), allocatable :: resi(:)
     real(DP), allocatable :: d(:), z(:), p(:), q(:)
-    real(DP), allocatable :: v(:), rs(:), t(:)
+    real(DP), allocatable :: v(:), rs(:), t(:), x_rmin(:)
   end type kryl_set
 
   type :: amgt_set

@@ -2,6 +2,7 @@ module calc_function
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE
+  use types_module, only: matrix_set
   use initial_module, only: st_sim, st_schm
   use make_cell, only: st_geom
   use set_cell, only: ncalc, ncals
@@ -9,7 +10,6 @@ module calc_function
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
   use calc_parameter, only: calc_srat_rperm
-  use allocate_solution, only: st_matrix
 #ifdef MPI_MSG
   use utility_module, only: st_mpi
   use mpi_solve, only: senrec_rvectv
@@ -34,14 +34,14 @@ module calc_function
 
   contains
 
-  subroutine allocate_calfun()
+  subroutine allocate_calfun(st_matrix)
   !*********************************************************************************************
   ! allocate_calfun -- Allocate for calculate function value
   !*********************************************************************************************
     ! -- modules
 
     ! -- inout
-
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     !-------------------------------------------------------------------------------------------
     allocate(stof(ncalc), conf(ncalc), welf(ncalc), seaf(ncalc))
@@ -57,7 +57,8 @@ module calc_function
 
   end subroutine allocate_calfun
 
-  subroutine calc_func(stold, stnew, surfh, infx, snew, rperm, surfr, funcv, fscal, qext)
+  subroutine calc_func(st_matrix, stold, stnew, surfh, infx, snew, rperm, surfr, funcv, fscal,&
+                       qext)
   !*********************************************************************************************
   ! calc_func -- Calculate function value
   !*********************************************************************************************
@@ -67,6 +68,7 @@ module calc_function
     real(DP), intent(inout) :: stnew(:), infx(:), snew(:), rperm(:), surfr(:)
     real(DP), intent(out) :: funcv(:)
     real(DP), intent(out), optional :: fscal(:), qext
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     integer(I4) :: i, s
     real(DP) :: qext_sum
@@ -103,7 +105,8 @@ module calc_function
 #endif
 
     ! -- Function connect flow from adjacent cells (connflow)
-      call func_connflow(infx, rperm, conf, present(fscal))
+      call func_connflow(st_matrix%crs_index(1)%offind, st_matrix%crs_index(1)%offrow,&
+                         infx, rperm, conf, present(fscal))
 
     ! -- Function recharge term (rechterm)
       call func_rechterm(infx, recf)
@@ -197,7 +200,7 @@ module calc_function
 
   end subroutine calc_func
 
-  subroutine calc_mass(sfla, stold, surf_old, hnew, stom, conm, seam, welm, recm,&
+  subroutine calc_mass(st_matrix, sfla, stold, surf_old, hnew, stom, conm, seam, welm, recm,&
                        surm, rivm, lakm, snew, rperm, surfr)
   !*********************************************************************************************
   ! calc_mass -- Calculate function value for massbalance
@@ -210,6 +213,7 @@ module calc_function
     real(DP), intent(inout) :: stom(:), conm(:), seam(:), welm(:)
     real(DP), intent(inout) :: recm(:), surm(:), rivm(:), lakm(:)
     real(DP), intent(inout) :: snew(:), rperm(:), surfr(:)
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
@@ -229,7 +233,8 @@ module calc_function
 #endif
 
     ! -- Function connect flow from adjacent cells (connflow)
-      call func_connflow(hnew, rperm, conm, .false.)
+      call func_connflow(st_matrix%crs_index(1)%offind, st_matrix%crs_index(1)%offrow,&
+                         hnew, rperm, conm, .false.)
 
     ! -- Function recharge term (rechterm)
       call func_rechterm(hnew, recm)
@@ -298,13 +303,14 @@ module calc_function
 
   end subroutine func_stochn
 
-  subroutine func_connflow(infconn, rperm, confunc, wscal)
+  subroutine func_connflow(offind, offrow, infconn, rperm, confunc, wscal)
   !*********************************************************************************************
   ! func_connflow -- Function connect flow from adjacent cells
   !*********************************************************************************************
     ! -- modules
     use calc_parameter, only: calc_hyd_upwind
     ! -- inout
+    integer(I4), intent(in) :: offind(0:), offrow(:)
     real(DP), intent(in) :: infconn(:), rperm(:)
     real(DP), intent(out) :: confunc(:)
     logical, intent(in) :: wscal
@@ -325,9 +331,9 @@ module calc_function
 
     !$omp do private(i, j, k, sta_ind, end_ind, ind, delhead, relp1, relp2, relat, conn_val)
     do i = 1, ncalc
-      sta_ind = st_matrix%crs_index(1)%offind(i-1) ; end_ind = st_matrix%crs_index(1)%offind(i)
+      sta_ind = offind(i-1) ; end_ind = offind(i)
       do k = 1, end_ind-sta_ind
-        ind = sta_ind + k ; j = st_matrix%crs_index(1)%offrow(ind)
+        ind = sta_ind + k ; j = offrow(ind)
         delhead = infconn(j) - infconn(i)
         relp1 = rperm(i) ; relp2 = rperm(j)
 
@@ -799,7 +805,8 @@ module calc_function
 
   end subroutine func_sealterm
 
-  subroutine calc_vecjacf(vj, injv, stold, stnew, surfh, injx, snew, rperm, surfr, injf, outjv)
+  subroutine calc_vecjacf(st_matrix, vj, injv, stold, stnew, surfh, injx, snew, rperm, surfr,&
+                          injf, outjv)
   !*********************************************************************************************
   ! calc_vecjacf -- Calculate vector by jacobi-free
   !*********************************************************************************************
@@ -812,6 +819,7 @@ module calc_function
     real(DP), intent(in) :: injv(:), stold(:), surfh(:), injf(:)
     real(DP), intent(inout) :: stnew(:), injx(:), snew(:), rperm(:), surfr(:)
     real(DP), intent(out) :: outjv(:)
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     integer(I4) :: i
     integer(I4) :: vj_num, vj_regnum
@@ -892,7 +900,7 @@ module calc_function
     !$omp end parallel do
 
     ! -- Calculate function value (func)
-      call calc_func(stold, stnew, surfh, jcvec, snew, rperm, surfr, tempf2)
+      call calc_func(st_matrix, stold, stnew, surfh, jcvec, snew, rperm, surfr, tempf2)
 
     !$omp parallel do private(i)
     do i = 1, vj_num

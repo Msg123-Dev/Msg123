@@ -2,14 +2,13 @@ module make_linearsystem
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE
-  use types_module, only: coef_set, sol_set
+  use types_module, only: coef_set, sol_set, matrix_set
   use initial_module, only: st_ctrl, st_schm
   use set_cell, only: ncalc, ncals
   use make_cell, only: st_geom
   use set_condition, only: st_hydr, st_bcnd
   use prep_calculation, only: st_time
   use assign_boundary, only: st_forc
-  use allocate_solution, only: st_matrix
 #ifdef MPI_MSG
   use utility_module, only: st_mpi
   use mpi_solve, only: senrec_rvectv
@@ -23,13 +22,14 @@ module make_linearsystem
 
   contains
 
-  subroutine allocate_matvec(st_coef)
+  subroutine allocate_matvec(st_coef, st_matrix)
   !*********************************************************************************************
   ! allocate_matvec -- Allocate for matrix and vector
   !*********************************************************************************************
     ! -- modules
     ! -- inout
     type(coef_set), intent(inout) :: st_coef
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     integer(I4) :: tot_ind
     !-------------------------------------------------------------------------------------------
@@ -58,7 +58,7 @@ module make_linearsystem
 
   end subroutine allocate_matvec
 
-  subroutine make_matvec(st_coef, st_sol, fscal, qext)
+  subroutine make_matvec(st_coef, st_sol, fscal, qext, st_matrix)
   !*********************************************************************************************
   ! make_matvec -- Make matrix and vector
   !*********************************************************************************************
@@ -69,6 +69,7 @@ module make_linearsystem
     real(DP), intent(out) :: fscal(:), qext
     type(coef_set), intent(inout) :: st_coef
     type(sol_set), intent(inout) :: st_sol
+    type(matrix_set), intent(inout) :: st_matrix
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
@@ -79,15 +80,16 @@ module make_linearsystem
     !$omp end parallel do
 
     ! -- Calculate function value (func)
-      call calc_func(st_sol%stor_old, st_sol%stor_new, st_sol%surf_head, st_sol%head_new,&
-                     st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati, st_coef%temp_rhs,&
-                     fscal, qext)
+      call calc_func(st_matrix, st_sol%stor_old, st_sol%stor_new, st_sol%surf_head,&
+                     st_sol%head_new, st_sol%srat_new, st_sol%rel_perm, st_sol%surf_rati,&
+                     st_coef%temp_rhs, fscal, qext)
 
     st_matrix%array_var(1)%rhs(:) = -st_coef%temp_rhs(:)
 
     ! -- Make matrix (matrix)
-      call make_matrix(st_sol, st_matrix%array_var(1)%dmat, st_matrix%array_var(1)%lumat,&
-                       st_coef)
+      call make_matrix(st_matrix%nreg_num, st_matrix%crs_index(1)%offind,&
+                       st_matrix%crs_index(1)%offrow, st_sol, st_matrix%array_var(1)%dmat,&
+                       st_matrix%array_var(1)%lumat, st_coef)
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
@@ -99,12 +101,12 @@ module make_linearsystem
 
     if (st_ctrl%precon_type == 1) then
       ! -- Make amg matrix (amgmat)
-        call make_amgmat()
+        call make_amgmat(st_matrix)
     end if
 
   end subroutine make_matvec
 
-  subroutine make_matrix(st_sol, diamat, lumat, st_coef)
+  subroutine make_matrix(nreg_num, offind, offrow, st_sol, diamat, lumat, st_coef)
   !*********************************************************************************************
   ! make_matrix -- Make matrix
   !*********************************************************************************************
@@ -112,6 +114,8 @@ module make_linearsystem
     use initial_module, only: st_sim
     use calc_parameter, only: calc_srat_rperm
     ! -- inout
+    integer(I4), intent(in) :: nreg_num
+    integer(I4), intent(in) :: offind(0:), offrow(:)
     type(sol_set), intent(in) :: st_sol
     real(DP), intent(out) :: diamat(:), lumat(:)
     type(coef_set), intent(inout) :: st_coef
@@ -126,7 +130,7 @@ module make_linearsystem
     end do
     !$omp end parallel do
     !$omp parallel do private(i)
-    do i = 1, st_matrix%nreg_num
+    do i = 1, nreg_num
       st_coef%dkr_dpsi(i) = DZERO ; st_coef%cond(i) = DZERO
     end do
     !$omp end parallel do
@@ -153,9 +157,9 @@ module make_linearsystem
 #endif
 
     ! -- Form connect flow from adjacent cells (connflow)
-      call form_connflow(st_coef%dkr_dpsi, st_sol, st_coef%cond, lumat, st_coef%deri_dcon,&
-                         st_coef%rel_hyd, st_coef%deri_lucon, st_coef%deri_con1,&
-                         st_coef%deri_con2)
+      call form_connflow(nreg_num, offind, offrow, st_coef%dkr_dpsi, st_sol, st_coef%cond,&
+                         lumat, st_coef%deri_dcon, st_coef%rel_hyd, st_coef%deri_lucon,&
+                         st_coef%deri_con1, st_coef%deri_con2)
 
     ! -- Set river boundary dmat (rivebound)
       call set_rivebound(st_coef%dkr_dpsi, st_sol, st_coef%rivd, st_coef%over_riv,&
@@ -179,7 +183,7 @@ module make_linearsystem
     if (st_schm%rech_dreg_type == 1 .or. st_schm%rech_hort_type == 2 .or.&
         st_schm%rech_dunn_type == 2) then
       ! -- Set recharge boundary dmat (rechbound)
-        call set_rechbound(st_sol, st_coef%recd, lumat)
+        call set_rechbound(offind, offrow, st_sol, st_coef%recd, lumat)
     end if
 
     !$omp parallel
@@ -237,7 +241,8 @@ module make_linearsystem
 
   end subroutine form_stochn
 
-  subroutine form_connflow(dkr_dpsi, st_sol, dmat_con, lumat_con, deri_dcon, rel_hyd,&
+  subroutine form_connflow(nreg_num, offind, offrow, dkr_dpsi, st_sol, dmat_con, lumat_con,&
+                           deri_dcon, rel_hyd,&
                            deri_lucon, deri_con1, deri_con2)
   !*********************************************************************************************
   ! form_connflow -- Form connect flow from adjacent cells
@@ -245,6 +250,8 @@ module make_linearsystem
     ! -- modules
     use calc_parameter, only: calc_hyd_upwind
     ! -- inout
+    integer(I4), intent(in) :: nreg_num
+    integer(I4), intent(in) :: offind(0:), offrow(:)
     real(DP), intent(in) :: dkr_dpsi(:)
     type(sol_set), intent(in) :: st_sol
     real(DP), intent(inout) :: dmat_con(:)
@@ -255,7 +262,7 @@ module make_linearsystem
     integer(I4) :: tot_ind, sta_ind, end_ind, ind
     real(DP) :: delhead, relp1, relp2, relat
     !-------------------------------------------------------------------------------------------
-    tot_ind = st_matrix%crs_index(1)%offind(st_matrix%nreg_num)
+    tot_ind = offind(nreg_num)
     !$omp parallel
     !$omp do private(i)
     do i = 1, tot_ind
@@ -264,10 +271,10 @@ module make_linearsystem
     end do
     !$omp end do
     !$omp do private(i, j, k, sta_ind, end_ind, ind, relat, delhead, relp1, relp2)
-    do i = 1, st_matrix%nreg_num
-      sta_ind = st_matrix%crs_index(1)%offind(i-1) ; end_ind = st_matrix%crs_index(1)%offind(i)
+    do i = 1, nreg_num
+      sta_ind = offind(i-1) ; end_ind = offind(i)
       do k = 1, end_ind-sta_ind
-        ind = sta_ind + k ; j = st_matrix%crs_index(1)%offrow(ind)
+        ind = sta_ind + k ; j = offrow(ind)
         delhead = st_sol%head_new(j) - st_sol%head_new(i)
         relp1 = st_sol%rel_perm(i) ; relp2 = st_sol%rel_perm(j)
 
@@ -283,12 +290,12 @@ module make_linearsystem
 
     if (st_time%form_switch == 1) then
       !$omp do private(i, j, k, sta_ind, end_ind, ind, delhead)
-      do i = 1, st_matrix%nreg_num
-        sta_ind = st_matrix%crs_index(1)%offind(i-1)
-        end_ind = st_matrix%crs_index(1)%offind(i)
+      do i = 1, nreg_num
+        sta_ind = offind(i-1)
+        end_ind = offind(i)
         do k = 1, end_ind-sta_ind
           ind = sta_ind + k
-          j = st_matrix%crs_index(1)%offrow(ind)
+          j = offrow(ind)
 
           delhead = st_sol%head_new(j) - st_sol%head_new(i)
 
@@ -303,8 +310,8 @@ module make_linearsystem
     end if
 
     !$omp do private(i, k, sta_ind, end_ind, ind)
-    do i = 1, st_matrix%nreg_num
-      sta_ind = st_matrix%crs_index(1)%offind(i-1) ; end_ind = st_matrix%crs_index(1)%offind(i)
+    do i = 1, nreg_num
+      sta_ind = offind(i-1) ; end_ind = offind(i)
       do k = 1, end_ind-sta_ind
         ind = sta_ind + k
         lumat_con(ind) = deri_lucon(ind) + deri_con2(ind)
@@ -608,13 +615,14 @@ module make_linearsystem
 
   end subroutine set_seabound
 
-  subroutine set_rechbound(st_sol, dmat_rec, lumat_rec)
+  subroutine set_rechbound(offind, offrow, st_sol, dmat_rec, lumat_rec)
   !*********************************************************************************************
   ! set_rechbound -- Set recharge boundary to dmat
   !*********************************************************************************************
     ! -- modules
     use calc_function, only: calc_rech_fact, calc_rech_rej
     ! -- inout
+    integer(I4), intent(in) :: offind(0:), offrow(:)
     real(DP), intent(inout) :: dmat_rec(:), lumat_rec(:)
     type(sol_set), intent(in) :: st_sol
     ! -- local
@@ -645,8 +653,8 @@ module make_linearsystem
                               st_schm%rech_dreg_hwid, rech_fact, drech_fact)
           dmat_rec(c) = st_forc%calc_rech(i)*dist_rech*drech_fact
           if (st_time%form_switch == 1 .and. up_cell > 0 .and. st_schm%rech_root_type /= 1) then
-            do ind = st_matrix%crs_index(1)%offind(c-1)+1, st_matrix%crs_index(1)%offind(c)
-              if (st_matrix%crs_index(1)%offrow(ind) == up_cell) then
+            do ind = offind(c-1)+1, offind(c)
+              if (offrow(ind) == up_cell) then
                 lumat_rec(ind) = lumat_rec(ind)&
                                  - st_forc%calc_rech(i)*rech_fact*up_dist*up_drech
               end if

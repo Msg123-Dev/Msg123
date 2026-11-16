@@ -1,7 +1,7 @@
 module write_output
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use types_module, only: sol_set
+  use types_module, only: sol_set, matrix_set
   use constval_module, only: DZERO
   use utility_module, only: st_mpi, close_file
   use read_input, only: len_scal, z_base
@@ -26,7 +26,7 @@ module write_output
 
   contains
 
-  subroutine write_outf(time_val, st_sol)
+  subroutine write_outf(time_val, st_sol, st_matrix)
   !*********************************************************************************************
   ! write_outf -- write output file
   !*********************************************************************************************
@@ -46,6 +46,7 @@ module write_output
     ! -- inout
     real(SP), intent(in) :: time_val
     type(sol_set), intent(inout) :: st_sol
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     integer(I4) :: rest_fnum
     integer(I4) :: header_flag = 0, allocate_flag = 0
@@ -69,14 +70,14 @@ module write_output
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1 .and. st_out_type%wtab == out_type(2)) then
         ! -- Set send and receive for water table (senrec_wtab)
-          call set_senrec_wtab()
+          call set_senrec_wtab(st_matrix)
       end if
 #endif
     end if
 
     if (st_out_type%mass == out_type(1)) then
       ! -- Calculate cell massbalance (cell_mas)
-        call calc_cell_mas(st_sol)
+        call calc_cell_mas(st_sol, st_matrix)
     end if
 
     if (st_out_type%rivr == out_type(2)) then
@@ -187,13 +188,13 @@ module write_output
       if (st_out_type%velc == out_type(3)) then
         if (st_out_step%velc == SZERO) then
           ! -- Write velocity file (out_velcf)
-            call write_out_velcf(time_val, st_sol)
+            call write_out_velcf(time_val, st_sol, st_matrix)
         else if (check_outstep(st_out_step%velc)) then
           ! -- Write velocity file (out_velcf)
-            call write_out_velcf(time_val, st_sol)
+            call write_out_velcf(time_val, st_sol, st_matrix)
         else if (lasttime_flag== 1) then
           ! -- Write velocity file (out_velcf)
-            call write_out_velcf(time_val, st_sol)
+            call write_out_velcf(time_val, st_sol, st_matrix)
         end if
       end if
 
@@ -561,7 +562,7 @@ module write_output
 
   end subroutine write_out_massf
 
-  subroutine write_out_velcf(time_out, st_sol)
+  subroutine write_out_velcf(time_out, st_sol, st_matrix)
   !*********************************************************************************************
   ! write_out_velcf -- Write velocity file
   !*********************************************************************************************
@@ -571,13 +572,14 @@ module write_output
     ! -- inout
     real(SP), intent(in) :: time_out
     type(sol_set), intent(in) :: st_sol
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     integer(I4) :: i, velx_fnum, vely_fnum, velz_fnum
     integer(I4), allocatable :: calc2calc(:)
     real(DP), allocatable :: velcx(:), velcy(:), velcz(:)
     !-------------------------------------------------------------------------------------------
     ! -- Calculate output velocity (outvelc)
-      call calc_outvelc(st_sol)
+      call calc_outvelc(st_sol, st_matrix)
 
     allocate(calc2calc(ncalc))
     allocate(velcx(ncalc), velcy(ncalc), velcz(ncalc))

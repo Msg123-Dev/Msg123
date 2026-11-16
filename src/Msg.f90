@@ -4,7 +4,7 @@ program msg123
 !***********************************************************************************************
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use types_module, only: kryl_set, amgt_set, coef_set, sol_set
+  use types_module, only: kryl_set, amgt_set, coef_set, sol_set, matrix_set
   use utility_module, only: log_fnum, st_mpi
   use initial_module, only: init_msg, st_ctrl
   use read_input, only: read_main_file
@@ -37,6 +37,7 @@ program msg123
   type(kryl_set) :: st_kryl
   type(amgt_set) :: st_amgt
   type(coef_set) :: st_coef
+  type(matrix_set) :: st_matrix
 #ifdef MPI_MSG
 #endif
   ! -- format
@@ -84,24 +85,24 @@ program msg123
 #endif
 
   ! -- Allocate solution variable for time step (solvar)
-    call allocate_solvar(st_sol)
+    call allocate_solvar(st_sol, st_matrix)
   ! -- Allocate for calculate function value (calfun)
-    call allocate_calfun()
+    call allocate_calfun(st_matrix)
   ! -- Allocate for matrix and vector (matvec)
-    call allocate_matvec(st_coef)
+    call allocate_matvec(st_coef, st_matrix)
   ! -- Allocate for nonlinear solution work arrays (nonlin)
     call allocate_nonlin()
   ! -- Allocate for krylov work vectors (krylov)
-    call allocate_krylov(st_kryl)
+    call allocate_krylov(st_kryl, st_matrix)
 #ifdef MPI_MSG
   if (st_mpi%totn /= 1) then
     ! -- Allocate for mpi solve work buffers (mpisolve)
-      call allocate_mpisolve()
+      call allocate_mpisolve(st_matrix)
   end if
 #endif
   if (st_ctrl%precon_type == 1) then
     ! -- Allocate for amg algebra (amgalg)
-      call allocate_amgalg(st_amgt)
+      call allocate_amgalg(st_amgt, st_matrix)
   end if
 
   if (st_mpi%rank == 0) then
@@ -118,13 +119,13 @@ program msg123
       call update_tstep(st_sol)
 
     ! -- Calculate numerical solution (numsol)
-      call calc_numsol(st_kryl, st_amgt, st_coef, st_sol)
+      call calc_numsol(st_kryl, st_amgt, st_coef, st_sol, st_matrix)
 
     if (st_time%conv_flag) then
       ! -- Check last time step conditions (lastts)
         call check_lastts()
       ! -- Write output file (outf)
-        call write_outf(real(st_time%now_time, kind=SP), st_sol)
+        call write_outf(real(st_time%now_time, kind=SP), st_sol, st_matrix)
 #ifdef ICI
       ! -- Put variables (var)
         call put_var(st_sol)

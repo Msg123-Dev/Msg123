@@ -2,8 +2,8 @@ module make_amg_matrix
   ! -- modules
   use kind_module, only: I4, DP
   use constval_module, only: DZERO, DONE
+  use types_module, only: matrix_set
   use initial_module, only: st_ctrl
-  use allocate_solution, only: st_matrix
 
   implicit none
   private
@@ -19,14 +19,14 @@ module make_amg_matrix
 
   contains
 
-  subroutine make_amgmat()
+  subroutine make_amgmat(st_matrix)
   !*********************************************************************************************
   ! make_amgmat -- Make amg matrix
   !*********************************************************************************************
     ! -- modules
     use set_cell, only: amg_setflag
     ! -- inout
-
+    type(matrix_set), intent(inout) :: st_matrix
     ! -- local
     integer(I4) :: i
     !-------------------------------------------------------------------------------------------
@@ -41,18 +41,18 @@ module make_amg_matrix
         st_ctrl%nlevel = amglev
       end if
       ! -- Make graph for next coase level matrix by filtering (grapfilt)
-        call make_grapfilt()
+        call make_grapfilt(st_matrix)
       ! -- Make aggregation (aggregation)
-        call make_aggregation()
+        call make_aggregation(st_matrix)
 
       st_matrix%crs_index(amglev)%unknow = ncoase
 
       ! -- Make prolongation matrix by soomthed aggregation method (prolomat)
-        call make_prolomat()
+        call make_prolomat(st_matrix)
       ! -- Transpose prolongation matrix to restriction matrix (inter2restr)
-        call trans_prolo2restr()
+        call trans_prolo2restr(st_matrix)
       ! -- Make galerkin coase operater (galerkin)
-        call make_galerkin()
+        call make_galerkin(st_matrix)
 
       allocate(st_matrix%array_var(amglev)%x(ncoase), st_matrix%array_var(amglev)%rhs(ncoase))
       !$omp parallel do private(i)
@@ -68,14 +68,14 @@ module make_amg_matrix
 
   end subroutine make_amgmat
 
-  subroutine make_grapfilt()
+  subroutine make_grapfilt(st_matrix)
   !*********************************************************************************************
   ! make_grapfilt -- Make graph for next coase level matrix by filtering
   !*********************************************************************************************
     ! -- modules
     use constval_module, only: DTWO
     ! -- inout
-
+    type(matrix_set), intent(inout) :: st_matrix
     ! -- local
     integer(I4) :: i, j, k, st_off, en_off, nonaggr
     real(DP) :: ddmat, lulumat
@@ -127,14 +127,14 @@ module make_amg_matrix
 
   end subroutine make_grapfilt
 
-  subroutine make_aggregation()
+  subroutine make_aggregation(st_matrix)
   !*********************************************************************************************
   ! make_aggregation -- Make aggregation
   !*********************************************************************************************
     ! -- modules
 
     ! -- inout
-
+    type(matrix_set), intent(inout) :: st_matrix
     ! -- local
     integer(I4) :: i, j, k
     integer(I4), allocatable :: aggr_num(:), aggr_index(:)
@@ -188,7 +188,7 @@ module make_amg_matrix
         aggr_luflag(i) = 0
         glob_num(i) = i
         ! -- Remove and Enter queue deep layer (quedeep)
-          call remove_enter_quedeep(i)
+          call remove_enter_quedeep(i, st_matrix)
       end do que_loop
     end if
 
@@ -250,14 +250,14 @@ module make_amg_matrix
 
   end subroutine make_aggregation
 
-  subroutine make_prolomat()
+  subroutine make_prolomat(st_matrix)
   !*********************************************************************************************
   ! make_prolomat -- Make prolongation matrix by soomthed aggregation method
   !*********************************************************************************************
     ! -- modules
 
     ! -- inout
-
+    type(matrix_set), intent(inout) :: st_matrix
     ! -- local
     integer(I4) :: i, j, k, kk, tsapce, fine_row
     real(DP), allocatable :: temp_prov(:,:)
@@ -413,14 +413,14 @@ module make_amg_matrix
 
   end subroutine make_prolomat
 
-  subroutine trans_prolo2restr()
+  subroutine trans_prolo2restr(st_matrix)
   !*********************************************************************************************
   ! trans_prolo2restr -- Transpose prolongation matrix to restriction matrix
   !*********************************************************************************************
     ! -- modules
 
     ! -- inout
-
+    type(matrix_set), intent(inout) :: st_matrix
     ! -- local
     integer(I4) :: i, j, k, kk, psta, pend
     !-------------------------------------------------------------------------------------------
@@ -464,14 +464,14 @@ module make_amg_matrix
 
   end subroutine trans_prolo2restr
 
-  subroutine make_galerkin()
+  subroutine make_galerkin(st_matrix)
   !*********************************************************************************************
   ! make_galerkin -- Make galerkin coase operater
   !*********************************************************************************************
     ! -- modules
 
     ! -- inout
-
+    type(matrix_set), intent(inout) :: st_matrix
     ! -- local
     integer(I4) :: i, j, k, kk, st_off, en_off, rsta, rend
     integer(I4) :: galfin_flag, cancel_flag, fin_num, fine_lu, size_flag
@@ -727,7 +727,7 @@ module make_amg_matrix
 
   end subroutine grow_galerkin
 
-  subroutine remove_enter_quedeep(n)
+  subroutine remove_enter_quedeep(n, st_matrix)
   !*********************************************************************************************
   ! remove_enter_quedeep -- Remove and Enter queue deep layer
   !*********************************************************************************************
@@ -735,6 +735,7 @@ module make_amg_matrix
 
     ! -- inout
     integer(I4), intent(in) :: n
+    type(matrix_set), intent(in) :: st_matrix
     ! -- local
     integer(I4) :: i, j, k
     integer(I4) :: lay2_count, lay2, lay3

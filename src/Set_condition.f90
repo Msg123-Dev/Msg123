@@ -2188,18 +2188,20 @@ module set_condition
             end if
           else if (i <= ncalc) then !for mpi
 #ifdef MPI_MSG
-            mpi_send = mpi_send + 1 ; calc_num = recv_citem(send2recv(mpi_send))
-            tks = reg_cksz(i) ; aks = reg_cksz(calc_num) ; tconn_num = tconn_num + 1
-            off_row(tconn_num) = calc_num ; sflag = 0 ; conn_dir(tconn_num) = 1
-            left_num = left_num + 1 ; left_off(tconn_num) = left_num
-            ! -- Set distance between adjacent cell (dis_adj)
-              call set_dis_adj(1, sflag, i, calc_num, dis1, dis2, dis12)
-            ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
-              call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            st_hydr%area_dis(tconn_num) = reg_fare(i,1)/dis12
-            st_hydr%sat_hydf(tconn_num) = hyd_face
-            if (st_out_type%velc > 0) then
-              st_hydr%conn_dis(tconn_num) = DONE/dis12
+            if (st_conn%calc2reg(i) == st_conn%calc2reg(off_num) .or. st_sim%reg_neib == 1) then
+              mpi_send = mpi_send + 1 ; calc_num = recv_citem(send2recv(mpi_send))
+              tks = reg_cksz(i) ; aks = reg_cksz(calc_num) ; tconn_num = tconn_num + 1
+              off_row(tconn_num) = calc_num ; sflag = 0 ; conn_dir(tconn_num) = 1
+              left_num = left_num + 1 ; left_off(tconn_num) = left_num
+              ! -- Set distance between adjacent cell (dis_adj)
+                call set_dis_adj(1, sflag, i, calc_num, dis1, dis2, dis12)
+              ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
+                call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
+              st_hydr%area_dis(tconn_num) = reg_fare(i,1)/dis12
+              st_hydr%sat_hydf(tconn_num) = hyd_face
+              if (st_out_type%velc > 0) then
+                st_hydr%conn_dis(tconn_num) = DONE/dis12
+              end if
             end if
 #endif
           end if
@@ -2252,18 +2254,20 @@ module set_condition
             end if
           else if (i <= ncalc) then !for mpi
 #ifdef MPI_MSG
-            mpi_send = mpi_send + 1 ; calc_num = recv_citem(send2recv(mpi_send))
-            tks = reg_cksy(i) ; aks = reg_cksy(calc_num) ; tconn_num = tconn_num + 1
-            off_row(tconn_num) = calc_num ; sflag = 0 ; conn_dir(tconn_num) = 2
-            left_num = left_num + 1 ; left_off(tconn_num) = left_num
-            ! -- Set distance between adjacent cell (dis_adj)
-              call set_dis_adj(2, sflag, i, calc_num, dis1, dis2, dis12)
-            ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
-              call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            st_hydr%area_dis(tconn_num) = reg_fare(i,2)/dis12
-            st_hydr%sat_hydf(tconn_num) = hyd_face
-            if (st_out_type%velc > 0) then
-              st_hydr%conn_dis(tconn_num) = DONE/dis12
+            if (st_conn%calc2reg(i) == st_conn%calc2reg(off_num) .or. st_sim%reg_neib == 1) then
+              mpi_send = mpi_send + 1 ; calc_num = recv_citem(send2recv(mpi_send))
+              tks = reg_cksy(i) ; aks = reg_cksy(calc_num) ; tconn_num = tconn_num + 1
+              off_row(tconn_num) = calc_num ; sflag = 0 ; conn_dir(tconn_num) = 2
+              left_num = left_num + 1 ; left_off(tconn_num) = left_num
+              ! -- Set distance between adjacent cell (dis_adj)
+                call set_dis_adj(2, sflag, i, calc_num, dis1, dis2, dis12)
+              ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
+                call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
+              st_hydr%area_dis(tconn_num) = reg_fare(i,2)/dis12
+              st_hydr%sat_hydf(tconn_num) = hyd_face
+              if (st_out_type%velc > 0) then
+                st_hydr%conn_dis(tconn_num) = DONE/dis12
+              end if
             end if
 #endif
           end if
@@ -2310,18 +2314,20 @@ module set_condition
             end if
           else if (i <= ncalc) then !for mpi
 #ifdef MPI_MSG
-            mpi_send = mpi_send + 1 ; calc_num = recv_citem(send2recv(mpi_send))
-            tks = reg_cksx(i) ; aks = reg_cksx(calc_num) ; tconn_num = tconn_num + 1
-            off_row(tconn_num) = calc_num ; sflag = 0 ; conn_dir(tconn_num) = 3
-            left_num = left_num + 1 ; left_off(tconn_num) = left_num
-            ! -- Set distance between adjacent cell (dis_adj)
-              call set_dis_adj(3, sflag, i, calc_num, dis1, dis2, dis12)
-            ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
-              call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            st_hydr%area_dis(tconn_num) = reg_fare(i,3)/dis12
-            st_hydr%sat_hydf(tconn_num) = hyd_face
-            if (st_out_type%velc > 0) then
-              st_hydr%conn_dis(tconn_num) = DONE/dis12
+            if (st_conn%calc2reg(i) == st_conn%calc2reg(off_num) .or. st_sim%reg_neib == 1) then
+              mpi_send = mpi_send + 1 ; calc_num = recv_citem(send2recv(mpi_send))
+              tks = reg_cksx(i) ; aks = reg_cksx(calc_num) ; tconn_num = tconn_num + 1
+              off_row(tconn_num) = calc_num ; sflag = 0 ; conn_dir(tconn_num) = 3
+              left_num = left_num + 1 ; left_off(tconn_num) = left_num
+              ! -- Set distance between adjacent cell (dis_adj)
+                call set_dis_adj(3, sflag, i, calc_num, dis1, dis2, dis12)
+              ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
+                call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
+              st_hydr%area_dis(tconn_num) = reg_fare(i,3)/dis12
+              st_hydr%sat_hydf(tconn_num) = hyd_face
+              if (st_out_type%velc > 0) then
+                st_hydr%conn_dis(tconn_num) = DONE/dis12
+              end if
             end if
 #endif
           end if
@@ -2368,18 +2374,20 @@ module set_condition
             end if
           else if (i <= ncalc) then !for mpi
 #ifdef MPI_MSG
-            mpi_send = mpi_send + 1 ; calc_num = recv_citem(send2recv(mpi_send))
-            tks = reg_cksx(i) ; aks = reg_cksx(calc_num) ; tconn_num = tconn_num + 1
-            off_row(tconn_num) = calc_num ; sflag = 0 ; conn_dir(tconn_num) = 4
-            right_num = right_num + 1 ; right_off(tconn_num) = right_num
-            ! -- Set distance between adjacent cell (dis_adj)
-              call set_dis_adj(4, sflag, i, calc_num, dis1, dis2, dis12)
-            ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
-              call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            st_hydr%area_dis(tconn_num) = reg_fare(i,4)/dis12
-            st_hydr%sat_hydf(tconn_num) = hyd_face
-            if (st_out_type%velc > 0) then
-              st_hydr%conn_dis(tconn_num) = DONE/dis12
+            if (st_conn%calc2reg(i) == st_conn%calc2reg(off_num) .or. st_sim%reg_neib == 1) then
+              mpi_send = mpi_send + 1 ; calc_num = recv_citem(send2recv(mpi_send))
+              tks = reg_cksx(i) ; aks = reg_cksx(calc_num) ; tconn_num = tconn_num + 1
+              off_row(tconn_num) = calc_num ; sflag = 0 ; conn_dir(tconn_num) = 4
+              right_num = right_num + 1 ; right_off(tconn_num) = right_num
+              ! -- Set distance between adjacent cell (dis_adj)
+                call set_dis_adj(4, sflag, i, calc_num, dis1, dis2, dis12)
+              ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
+                call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
+              st_hydr%area_dis(tconn_num) = reg_fare(i,4)/dis12
+              st_hydr%sat_hydf(tconn_num) = hyd_face
+              if (st_out_type%velc > 0) then
+                st_hydr%conn_dis(tconn_num) = DONE/dis12
+              end if
             end if
 #endif
           end if
@@ -2426,18 +2434,20 @@ module set_condition
             end if
           else if (i <= ncalc) then !for mpi
 #ifdef MPI_MSG
-            mpi_send = mpi_send + 1 ; calc_num = recv_citem(send2recv(mpi_send))
-            tks = reg_cksy(i) ; aks = reg_cksy(calc_num) ; tconn_num = tconn_num + 1
-            off_row(tconn_num) = calc_num ; sflag = 0 ; conn_dir(tconn_num) = 5
-            right_num = right_num + 1 ; right_off(tconn_num) = right_num
-            ! -- Set distance between adjacent cell (dis_adj)
-              call set_dis_adj(5, sflag, i, calc_num, dis1, dis2, dis12)
-            ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
-              call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            st_hydr%area_dis(tconn_num) = reg_fare(i,5)/dis12
-            st_hydr%sat_hydf(tconn_num) = hyd_face
-            if (st_out_type%velc > 0) then
-              st_hydr%conn_dis(tconn_num) = DONE/dis12
+            if (st_conn%calc2reg(i) == st_conn%calc2reg(off_num) .or. st_sim%reg_neib == 1) then
+              mpi_send = mpi_send + 1 ; calc_num = recv_citem(send2recv(mpi_send))
+              tks = reg_cksy(i) ; aks = reg_cksy(calc_num) ; tconn_num = tconn_num + 1
+              off_row(tconn_num) = calc_num ; sflag = 0 ; conn_dir(tconn_num) = 5
+              right_num = right_num + 1 ; right_off(tconn_num) = right_num
+              ! -- Set distance between adjacent cell (dis_adj)
+                call set_dis_adj(5, sflag, i, calc_num, dis1, dis2, dis12)
+              ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
+                call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
+              st_hydr%area_dis(tconn_num) = reg_fare(i,5)/dis12
+              st_hydr%sat_hydf(tconn_num) = hyd_face
+              if (st_out_type%velc > 0) then
+                st_hydr%conn_dis(tconn_num) = DONE/dis12
+              end if
             end if
 #endif
           end if
@@ -2483,18 +2493,20 @@ module set_condition
             end if
           else if (i <= ncalc) then !for mpi
 #ifdef MPI_MSG
-            mpi_send = mpi_send + 1 ; calc_num = recv_citem(send2recv(mpi_send))
-            tks = reg_cksz(i) ; aks = reg_cksz(calc_num) ; tconn_num = tconn_num + 1
-            off_row(tconn_num) = calc_num ; sflag = 0 ; conn_dir(tconn_num) = 6
-            right_num = right_num + 1 ; right_off(tconn_num) = right_num
-            ! -- Set distance between adjacent cell (dis_adj)
-              call set_dis_adj(6, sflag, i, calc_num, dis1, dis2, dis12)
-            ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
-              call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
-            st_hydr%area_dis(tconn_num) = reg_fare(i,6)/dis12
-            st_hydr%sat_hydf(tconn_num) = hyd_face
-            if (st_out_type%velc > 0) then
-              st_hydr%conn_dis(tconn_num) = DONE/dis12
+            if (st_conn%calc2reg(i) == st_conn%calc2reg(off_num) .or. st_sim%reg_neib == 1) then
+              mpi_send = mpi_send + 1 ; calc_num = recv_citem(send2recv(mpi_send))
+              tks = reg_cksz(i) ; aks = reg_cksz(calc_num) ; tconn_num = tconn_num + 1
+              off_row(tconn_num) = calc_num ; sflag = 0 ; conn_dir(tconn_num) = 6
+              right_num = right_num + 1 ; right_off(tconn_num) = right_num
+              ! -- Set distance between adjacent cell (dis_adj)
+                call set_dis_adj(6, sflag, i, calc_num, dis1, dis2, dis12)
+              ! -- Set saturated hydradulic conductivity by harmonic mean (sat_hyd)
+                call set_sat_hyd(sflag, tks, aks, dis1, dis2, hyd_face)
+              st_hydr%area_dis(tconn_num) = reg_fare(i,6)/dis12
+              st_hydr%sat_hydf(tconn_num) = hyd_face
+              if (st_out_type%velc > 0) then
+                st_hydr%conn_dis(tconn_num) = DONE/dis12
+              end if
             end if
 #endif
           end if

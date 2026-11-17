@@ -12,7 +12,7 @@ module mpi_read
   public :: set_int4_fview, set_real4_fview, set_real8_fview
   public :: read_mpi_restf, read_mpi_head, read_mpi_file, read_dist_file
   public :: skip_mpi_file, skip_mpi_file_int, close_mpi_file
-  public :: read_mpi_calcreg, read_dist_seaval
+  public :: read_dist_calcreg, read_dist_seaval
 
   interface read_mpi_head
     module procedure read_mpi_i4head
@@ -1071,76 +1071,92 @@ module mpi_read
 
   end subroutine close_mpi_file
 
-  subroutine read_mpi_calcreg(reg_type, is_3dpart, part_sta, part_num, part_reg, totreg_out)
+  subroutine read_dist_calcreg(reg_type, read_sta, read_num, read_reg, totreg_out)
   !*********************************************************************************************
-  ! read_mpi_calcreg -- Read calc region file for mpi
+  ! read_dist_calcreg -- Read this rank's read-range calculation regions
   !*********************************************************************************************
     ! -- modules
 
     ! -- inout
-    integer(I4), intent(in) :: reg_type, part_sta, part_num
-    logical, intent(in) :: is_3dpart
-    integer(I4), intent(out) :: part_reg(:)
+    integer(I4), intent(in) :: reg_type, read_sta, read_num
+    integer(I4), intent(out) :: read_reg(:)
     integer(I4), intent(out) :: totreg_out
     ! -- local
-    integer(I4) :: nxy, i, k, ierr, max_ierr, mpi_fh, loc_max, all_max
-    integer(I4), allocatable :: lay_buf(:)
+    integer(I4) :: nxy, i, g, ij, ierr, max_ierr, mpi_fh, col_sta, tail_num, wrap_num
+    integer(I4) :: loc_max, all_max
+    integer(I4), allocatable :: tail_val(:), wrap_val(:)
     integer(KIND=MPI_OFFSET_KIND) :: off
     integer(I4) :: istat(MPI_STATUS_SIZE)
-    logical :: is_3dfile
     !-------------------------------------------------------------------------------------------
     nxy = st_grid%nx*st_grid%ny
-    is_3dfile = (reg_type == in_type(6))
     ierr = 0
     call open_mpi_read_file(1, 0, trim(st_sim%reg_name), "calculation region", mpi_fh)
 
-    off = int(part_sta-1, MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
-    call MPI_FILE_READ_AT_ALL(mpi_fh, off, part_reg, part_num, MPI_INTEGER, istat, ierr)
-    ! -- Max value for MPI (val)
-      call mpimax_val(ierr, "read calculation region file error", max_ierr)
-    ierr = max_ierr
-    if (ierr /= MPI_SUCCESS) then
-      if (st_mpi%rank == 0) then
-        call write_err_read(mpi_fh)
-      end if
-    end if
-
-    loc_max = 0
-    do i = 1, part_num
-      if (part_reg(i) > loc_max) then
-        loc_max = part_reg(i)
-      end if
-    end do
-
-    if (is_3dfile .and. .not. is_3dpart) then
-      allocate(lay_buf(max(part_num,1)))
-      do k = 2, st_grid%nz
-        off = (int(k-1, MPI_OFFSET_KIND)*int(nxy, MPI_OFFSET_KIND) &
-               + int(part_sta-1, MPI_OFFSET_KIND)) * 4_MPI_OFFSET_KIND
-        call MPI_FILE_READ_AT_ALL(mpi_fh, off, lay_buf, part_num, MPI_INTEGER, istat, ierr)
-        ! -- Max value for MPI (val)
-          call mpimax_val(ierr, "read calculation region file error", max_ierr)
-        ierr = max_ierr
-        if (ierr /= MPI_SUCCESS) then
-          if (st_mpi%rank == 0) then
-            call write_err_read(mpi_fh)
-          end if
+    if (reg_type == in_type(6)) then
+      ! -- 3d: value(g) at byte (g-1)*4, so the read range is a contiguous slab
+      off = int(read_sta-1, MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
+      call MPI_FILE_READ_AT_ALL(mpi_fh, off, read_reg, read_num, MPI_INTEGER, istat, ierr)
+      ! -- Max value for MPI (val)
+        call mpimax_val(ierr, "read calculation region file error", max_ierr)
+      ierr = max_ierr
+      if (ierr /= MPI_SUCCESS) then
+        if (st_mpi%rank == 0) then
+          call write_err_read(mpi_fh)
         end if
-        do i = 1, part_num
-          if (lay_buf(i) > loc_max) then
-            loc_max = lay_buf(i)
-          end if
-        end do
+      end if
+    else
+      ! -- 2d: read only the columns of the read range (col_sta to nxy, then from 1)
+      col_sta = 1
+      if (read_num > 0) then
+        col_sta = mod(read_sta-1, nxy) + 1
+      end if
+      tail_num = min(read_num, nxy-col_sta+1) ; wrap_num = min(read_num, nxy) - tail_num
+      allocate(tail_val(max(tail_num,1)), wrap_val(max(wrap_num,1)))
+      off = int(col_sta-1, MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
+      call MPI_FILE_READ_AT_ALL(mpi_fh, off, tail_val, tail_num, MPI_INTEGER, istat, ierr)
+      ! -- Max value for MPI (val)
+        call mpimax_val(ierr, "read calculation region file error", max_ierr)
+      ierr = max_ierr
+      if (ierr /= MPI_SUCCESS) then
+        if (st_mpi%rank == 0) then
+          call write_err_read(mpi_fh)
+        end if
+      end if
+      off = 0_MPI_OFFSET_KIND
+      call MPI_FILE_READ_AT_ALL(mpi_fh, off, wrap_val, wrap_num, MPI_INTEGER, istat, ierr)
+      ! -- Max value for MPI (val)
+        call mpimax_val(ierr, "read calculation region file error", max_ierr)
+      ierr = max_ierr
+      if (ierr /= MPI_SUCCESS) then
+        if (st_mpi%rank == 0) then
+          call write_err_read(mpi_fh)
+        end if
+      end if
+      do i = 1, read_num
+        g = read_sta + i - 1
+        ij = mod(g-1, nxy) + 1
+        if (ij >= col_sta) then
+          read_reg(i) = tail_val(ij-col_sta+1)
+        else
+          read_reg(i) = wrap_val(ij)
+        end if
       end do
-      deallocate(lay_buf)
+      deallocate(tail_val, wrap_val)
     end if
 
     call close_mpi_file(mpi_fh)
 
+    loc_max = 0
+    do i = 1, read_num
+      if (read_reg(i) > loc_max) then
+        loc_max = read_reg(i)
+      end if
+    end do
+
     call MPI_ALLREDUCE(loc_max, all_max, 1, MPI_INTEGER, MPI_MAX, st_mpi%comm, ierr)
     totreg_out = all_max
 
-  end subroutine read_mpi_calcreg
+  end subroutine read_dist_calcreg
 
 
   subroutine read_dist_seaval(seal_ftype, seal_path, head_num, read_sta, read_num, read_seaval)

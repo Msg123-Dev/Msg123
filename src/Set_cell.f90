@@ -123,6 +123,9 @@ module set_cell
     end if
 #endif
 
+    ! -- Set read range (read_range)
+      call set_read_range()
+
 #ifdef MPI_MSG
     ! -- Set own rank's region (own_reg)
       call set_own_reg()
@@ -139,8 +142,8 @@ module set_cell
       call div_nocalc_flag()
 #endif
 
-    ! -- Set read range (read_range)
-      call set_read_range()
+    ! -- Set read owner (read_owner)
+      call set_read_owner()
 
     sea_ftype = 0 ; sea_ptn = 0 ; sea_nclas = 0 ; sea_path = repeat(' ', CHALEN)
     sea_head = 0
@@ -245,22 +248,20 @@ module set_cell
       deallocate(read_seaval)
     end if
 
-    if (sea_ftype /= 0) then
-      sea_null = 0
-      do i = 1, read_num
-        if (pre_sea(i) == 1 .and. sea_hit(i) == 0) then
-          sea_null = 1
-          exit
-        end if
-      end do
-#ifdef MPI_MSG
-      sea_chk(1) = sea_null
-      call mpimax_val(sea_chk, "sea region check", sea_all)
-      sea_null = sea_all(1)
-#endif
-      if (sea_null /= 0) then
-        call write_err_stop("Null value in sea region.")
+    sea_null = 0
+    do i = 1, read_num
+      if (pre_sea(i) == 1 .and. sea_hit(i) == 0) then
+        sea_null = 1
+        exit
       end if
+    end do
+#ifdef MPI_MSG
+    sea_chk(1) = sea_null
+    call mpimax_val(sea_chk, "sea region check", sea_all)
+    sea_null = sea_all(1)
+#endif
+    if (sea_null /= 0) then
+      call write_err_stop("Null value in sea region.")
     end if
     deallocate(sea_hit, pre_sea)
     if (allocated(sp_i)) then
@@ -567,7 +568,7 @@ module set_cell
   ! set_own_reg -- Set own rank's region
   !*********************************************************************************************
     ! -- modules
-    use mpi_read, only: read_mpi_calcreg
+    use mpi_read, only: read_dist_calcreg
     ! -- inout
 
     ! -- local
@@ -602,8 +603,8 @@ module set_cell
     type_2d(:) = [in_type(3:4)] ; type_3d(:) = [in_type(5:6)]
 
     if (reg_type == in_type(0)) then
-      do i = 1, part_num
-        own_part_reg(i) = 1
+      do i = 1, read_num
+        read_reg(i) = 1
       end do
       totnreg = 1
 
@@ -621,21 +622,24 @@ module set_cell
       reg_name(size(reg_name)) = st_sim%reg_name(sta_pos:)
       deallocate(temp_char)
 
-      allocate(cflag(max(part_num,1)))
+      do i = 1, read_num
+        read_reg(i) = 0
+      end do
+      allocate(cflag(max(read_num,1)))
       do j = 1, st_clas%totn
-        call set_clas_flag(j, part_sta, part_num, cflag)
+        call set_clas_flag(j, read_sta, read_num, cflag)
         if (trim(adjustl(st_sim%inact_name)) == trim(adjustl(st_clas%name(j)))) then
-          do i = 1, part_num
+          do i = 1, read_num
             if (cflag(i) == 1) then
-              own_part_reg(i) = -1
+              read_reg(i) = -1
             end if
           end do
         end if
         do i = 1, size(reg_name)
           if (trim(adjustl(reg_name(i))) == trim(adjustl(st_clas%name(j)))) then
-            do g = 1, part_num
+            do g = 1, read_num
               if (cflag(g) == 1) then
-                own_part_reg(g) = i
+                read_reg(g) = i
               end if
             end do
           end if
@@ -645,7 +649,7 @@ module set_cell
       deallocate(cflag, reg_name)
 
     else if (reg_type == type_2d(2) .or. reg_type == type_3d(2)) then
-      call read_mpi_calcreg(reg_type, div_reg_3d, part_sta, part_num, own_part_reg, totnreg)
+      call read_dist_calcreg(reg_type, read_sta, read_num, read_reg, totnreg)
 
     else if (reg_type == type_2d(1) .or. reg_type == type_3d(1)) then
       tot_chk = 0
@@ -665,7 +669,7 @@ module set_cell
         allocate(glo_tmp(1))
         glo_tmp(1) = 0
       end if
-      call scatterv_val(st_mpi%totn, part_num, glo_tmp, own_part_reg, "part region")
+      call scatterv_val(st_mpi%totn, read_num, glo_tmp, read_reg, "cell region")
       call bcast_val(tot_chk, "text region count")
       totnreg = tot_chk
       deallocate(glo_tmp)
@@ -674,8 +678,8 @@ module set_cell
 
     if (reg_type /= in_type(0)) then
       mism_loc(1) = 0
-      do i = 1, part_num
-        if (own_part_reg(i) == -1) then
+      do i = 1, read_num
+        if (read_reg(i) == -1) then
           mism_loc(1) = 1
           exit
         end if
@@ -690,7 +694,101 @@ module set_cell
       call write_err_stop("There is no calculation cell.")
     end if
 
+    ! -- Reduce cell regions to the part region (part_reg)
+      call reduce_part_reg()
+
   end subroutine set_own_reg
+#endif
+
+#ifdef MPI_MSG
+  subroutine reduce_part_reg()
+  !*********************************************************************************************
+  ! reduce_part_reg -- Reduce cell regions to the smallest region of each partition unit
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i, k, key, part_size, pbase, prem, nkey, proc_id, dest_rank
+    integer(I4) :: send_tot, recv_tot, pos
+    integer(I4), allocatable :: key_min(:), key_home(:), send_count(:), recv_count(:)
+    integer(I4), allocatable :: fill_pos(:), q_key(:), q_reg(:), recv_key(:), recv_reg(:)
+    !-------------------------------------------------------------------------------------------
+    if (div_reg_3d) then
+      part_size = st_grid%nxyz
+    else
+      part_size = st_grid%nx*st_grid%ny
+    end if
+    pbase = part_size/st_mpi%totn ; prem = mod(part_size, st_mpi%totn)
+
+    nkey = min(read_num, part_size)
+    allocate(key_min(nkey + 1), key_home(nkey + 1))
+    do k = 1, nkey + 1
+      key_min(k) = 0 ; key_home(k) = 0
+    end do
+    do i = 1, read_num
+      k = mod(i-1, part_size) + 1
+      if (read_reg(i) >= 1) then
+        if (key_min(k) == 0 .or. read_reg(i) < key_min(k)) then
+          key_min(k) = read_reg(i)
+        end if
+      end if
+    end do
+
+    allocate(send_count(st_mpi%totn), fill_pos(st_mpi%totn))
+    do proc_id = 1, st_mpi%totn
+      send_count(proc_id) = 0
+    end do
+    do k = 1, nkey
+      key = mod(read_sta + k - 2, part_size) + 1
+      if (key <= prem*(pbase+1)) then
+        key_home(k) = (key-1)/(pbase+1)
+      else
+        key_home(k) = prem + (key - 1 - prem*(pbase+1))/pbase
+      end if
+      if (key_min(k) >= 1) then
+        dest_rank = key_home(k) + 1 ; send_count(dest_rank) = send_count(dest_rank) + 1
+      end if
+    end do
+    send_tot = 0
+    do proc_id = 1, st_mpi%totn
+      fill_pos(proc_id) = send_tot ; send_tot = send_tot + send_count(proc_id)
+    end do
+    allocate(q_key(send_tot + 1), q_reg(send_tot + 1))
+    do k = 1, nkey
+      if (key_min(k) >= 1) then
+        dest_rank = key_home(k) + 1
+        fill_pos(dest_rank) = fill_pos(dest_rank) + 1
+        q_key(fill_pos(dest_rank)) = mod(read_sta + k - 2, part_size) + 1
+        q_reg(fill_pos(dest_rank)) = key_min(k)
+      end if
+    end do
+
+    allocate(recv_count(st_mpi%totn))
+    call alltoall_val(send_count, "part region count", recv_count)
+    recv_tot = 0
+    do proc_id = 1, st_mpi%totn
+      recv_tot = recv_tot + recv_count(proc_id)
+    end do
+    allocate(recv_key(recv_tot + 1), recv_reg(recv_tot + 1))
+    call alltoallv_val(q_key, send_count, recv_count, "part region key", recv_key)
+    call alltoallv_val(q_reg, send_count, recv_count, "part region value", recv_reg)
+
+    do i = 1, part_num
+      own_part_reg(i) = -1
+    end do
+    do i = 1, recv_tot
+      pos = recv_key(i) - part_sta + 1
+      if (own_part_reg(pos) < 1 .or. recv_reg(i) < own_part_reg(pos)) then
+        own_part_reg(pos) = recv_reg(i)
+      end if
+    end do
+
+    deallocate(key_min, key_home, send_count, recv_count, fill_pos)
+    deallocate(q_key, q_reg, recv_key, recv_reg)
+
+  end subroutine reduce_part_reg
 #endif
 
 #ifdef MPI_MSG
@@ -705,9 +803,10 @@ module set_cell
     ! -- local
     integer(I4) :: i, k, part_pos, nxy, ntot
     integer(I4) :: reg_id, pos_in_reg, sta_mpi, end_mpi, reg_nproc, proc_cals, remain_cals
-    integer(I4) :: proc_pos, rough_divn, sum_cals, sum_mpi, pro_num, quot, max_reg
+    integer(I4) :: proc_pos, rough_divn, sum_cals, sum_mpi, pro_num, quot, max_reg, used_num
     integer(I4), allocatable :: reg_ncals(:), reg_remain(:), reg_mpi_num(:), reg_mpi_end(:)
     integer(I4), allocatable :: my_reg_ncals(:), cals_end(:), seen(:), rang_mpi(:)
+    integer(I4), allocatable :: used_ncals(:), used_end(:)
     !-------------------------------------------------------------------------------------------
     nxy = st_grid%nx*st_grid%ny
     if (div_reg_3d) then
@@ -732,11 +831,20 @@ module set_cell
     allocate(reg_ncals(totnreg))
     call mpisum_val(my_reg_ncals, "region column count", reg_ncals)
 
-    allocate(reg_remain(totnreg), reg_mpi_num(totnreg), reg_mpi_end(0:totnreg))
-    reg_mpi_end(0) = 0
-    !$omp parallel do private(i)
+    used_num = count(reg_ncals(:) > 0)
+    allocate(used_ncals(max(used_num,1)), used_end(0:used_num))
+    used_num = 0
     do i = 1, totnreg
-      reg_remain(i) = 0 ; reg_mpi_num(i) = 0 ; reg_mpi_end(i) = 0
+      if (reg_ncals(i) > 0) then
+        used_num = used_num + 1 ; used_ncals(used_num) = reg_ncals(i)
+      end if
+    end do
+
+    allocate(reg_remain(max(used_num,1)), reg_mpi_num(max(used_num,1)), reg_mpi_end(0:totnreg))
+    used_end(0) = 0 ; reg_mpi_end(0) = 0
+    !$omp parallel do private(i)
+    do i = 1, used_num
+      reg_remain(i) = 0 ; reg_mpi_num(i) = 0 ; used_end(i) = 0
     end do
     !$omp end parallel do
     rough_divn = sum(reg_ncals(:))/st_mpi%totn
@@ -744,34 +852,46 @@ module set_cell
       rough_divn = 1
     end if
     sum_cals = 0 ; sum_mpi = 0
-    do i = 1, totnreg
-      sum_cals = sum_cals + reg_ncals(i)
+    do i = 1, used_num
+      sum_cals = sum_cals + used_ncals(i)
       quot = sum_cals/rough_divn ; reg_remain(i) = mod(sum_cals, rough_divn)
       if (quot == 0) then
-        reg_mpi_num(i) = 1 ; reg_remain(i) = 0 ; reg_mpi_end(i) = sum_mpi + 1
-      else if (sum_cals > reg_ncals(i) .and. i /= totnreg) then
-        reg_mpi_end(i) = sum_mpi + 1 ; sum_cals = 0
+        reg_mpi_num(i) = 1 ; reg_remain(i) = 0 ; used_end(i) = sum_mpi + 1
+      else if (sum_cals > used_ncals(i) .and. i /= used_num) then
+        used_end(i) = sum_mpi + 1 ; sum_cals = 0
       else
-        reg_mpi_num(i) = quot ; sum_mpi = sum_mpi + quot ; reg_mpi_end(i) = sum_mpi
+        reg_mpi_num(i) = quot ; sum_mpi = sum_mpi + quot ; used_end(i) = sum_mpi
         sum_cals = 0
       end if
     end do
     pro_num = 0
-    if (reg_mpi_end(totnreg) < st_mpi%totn) then
-      do k = 1, st_mpi%totn-reg_mpi_end(totnreg)
-        max_reg = maxloc(reg_remain(:),1)
-        reg_mpi_num(max_reg) = reg_mpi_num(max_reg) + 1
-        if (reg_remain(max_reg) < reg_ncals(max_reg)/2) then
-          pro_num = max_reg + 1
-        else
-          pro_num = max_reg
-        end if
-        reg_remain(max_reg) = 0
-        do i = pro_num, totnreg
-          reg_mpi_end(i) = reg_mpi_end(i) + 1
+    if (used_num > 0) then
+      if (used_end(used_num) < st_mpi%totn) then
+        do k = 1, st_mpi%totn-used_end(used_num)
+          max_reg = maxloc(reg_remain(:),1)
+          reg_mpi_num(max_reg) = reg_mpi_num(max_reg) + 1
+          if (reg_remain(max_reg) < used_ncals(max_reg)/2) then
+            pro_num = max_reg + 1
+          else
+            pro_num = max_reg
+          end if
+          reg_remain(max_reg) = 0
+          do i = pro_num, used_num
+            used_end(i) = used_end(i) + 1
+          end do
         end do
-      end do
+      end if
     end if
+
+    ! -- Give regions without partition units an empty rank range
+      k = 0
+      do i = 1, totnreg
+        if (reg_ncals(i) > 0) then
+          k = k + 1 ; reg_mpi_end(i) = used_end(k)
+        else
+          reg_mpi_end(i) = reg_mpi_end(i-1)
+        end if
+      end do
 
     ! -- Clamp the rank ranges to the rank count without falling back
       do i = 1, totnreg
@@ -821,7 +941,7 @@ module set_cell
     end do
 
     deallocate(my_reg_ncals, reg_ncals, reg_remain, reg_mpi_num, reg_mpi_end)
-    deallocate(cals_end, seen, rang_mpi)
+    deallocate(cals_end, seen, rang_mpi, used_ncals, used_end)
 
   end subroutine div_calc_reg_dist
 #endif
@@ -1028,7 +1148,7 @@ module set_cell
     integer(I4) :: reg_mpi_ncals, reg_mpi_remain, sta_mpi, end_mpi, mpi
     integer(I4), allocatable :: reg_ncals(:), reg_remain(:)
     integer(I4), allocatable :: reg_mpi_num(:), reg_mpi_end(:)
-    integer(I4), allocatable :: reg_off(:), all_num(:), reg_pos(:)
+    integer(I4), allocatable :: reg_off(:), all_num(:), reg_pos(:), part_reg(:)
     !-------------------------------------------------------------------------------------------
     nxy = st_grid%nx*st_grid%ny
     if (div_reg_3d) then
@@ -1036,6 +1156,20 @@ module set_cell
     else
       ntot = nxy
     end if
+    allocate(part_reg(ntot))
+    !$omp parallel do private(ij)
+    do ij = 1, ntot
+      part_reg(ij) = 0
+    end do
+    !$omp end parallel do
+    do ij = 1, st_grid%nxyz
+      k = mod(ij-1, ntot) + 1 ; reg_id = glob_reg_flag(ij)
+      if (reg_id >= 1) then
+        if (part_reg(k) == 0 .or. reg_id < part_reg(k)) then
+          part_reg(k) = reg_id
+        end if
+      end if
+    end do
     allocate(reg_ncals(totnreg), reg_remain(totnreg))
     allocate(reg_mpi_num(totnreg), reg_mpi_end(0:totnreg))
     reg_mpi_end(0) = 0
@@ -1045,7 +1179,7 @@ module set_cell
     end do
     !$omp end parallel do
     do ij = 1, ntot
-      reg_id = glob_reg_flag(ij)
+      reg_id = part_reg(ij)
       if (reg_id >= 1) reg_ncals(reg_id) = reg_ncals(reg_id) + 1
     end do
 
@@ -1098,7 +1232,7 @@ module set_cell
     end do
     !$omp end parallel do
     do ij = 1, ntot
-      reg_id = glob_reg_flag(ij)
+      reg_id = part_reg(ij)
       if (reg_id >= 1) then
         reg_pos(reg_id) = reg_pos(reg_id) + 1
         all_num(reg_off(reg_id-1) + reg_pos(reg_id)) = ij
@@ -1124,7 +1258,7 @@ module set_cell
       end do
     end do
 
-    deallocate(reg_ncals, reg_mpi_num, reg_mpi_end, reg_off, all_num, reg_pos)
+    deallocate(reg_ncals, reg_mpi_num, reg_mpi_end, reg_off, all_num, reg_pos, part_reg)
 
     if (.not. div_reg_3d) then
       !$omp parallel do private(i)
@@ -1133,6 +1267,14 @@ module set_cell
       end do
       !$omp end parallel do
     end if
+
+    !$omp parallel do private(i)
+    do i = 1, st_grid%nxyz
+      if (glob_reg_flag(i) < 1) then
+        glob_mpi_flag(i) = 0
+      end if
+    end do
+    !$omp end parallel do
 
   end subroutine div_calc_reg
 #endif
@@ -1213,16 +1355,7 @@ module set_cell
     ! -- inout
 
     ! -- local
-    integer(I4) :: i, base_num, rem_num
-#ifdef MPI_MSG
-    integer(I4) :: g, k, key, nxy, part_size, pbase, prem, psta
-    integer(I4) :: cand_raw, nkey, proc_id, dest_rank, send_tot, recv_tot, pos
-    integer(I4), allocatable :: cand_list(:), key_list(:), key_home(:)
-    integer(I4), allocatable :: send_count(:), recv_count(:), fill_pos(:)
-    integer(I4), allocatable :: q_key(:), recv_key(:), reply_reg(:), reply_owner(:)
-    integer(I4), allocatable :: ans_reg(:), ans_owner(:)
-    type(gmap_set) :: key_map
-#endif
+    integer(I4) :: base_num, rem_num
     !-------------------------------------------------------------------------------------------
     base_num = st_grid%nxyz/st_mpi%totn ; rem_num = mod(st_grid%nxyz, st_mpi%totn)
     read_num = base_num
@@ -1232,6 +1365,27 @@ module set_cell
     read_sta = st_mpi%rank*base_num + min(st_mpi%rank, rem_num) + 1
     allocate(read_reg(read_num), read_mpi(read_num))
 
+  end subroutine set_read_range
+
+  subroutine set_read_owner()
+  !*********************************************************************************************
+  ! set_read_owner -- Set the owner rank of each cell in the read range
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i
+#ifdef MPI_MSG
+    integer(I4) :: g, k, key, nxy, part_size, pbase, prem, psta
+    integer(I4) :: cand_raw, nkey, proc_id, dest_rank, send_tot, recv_tot, pos
+    integer(I4), allocatable :: cand_list(:), key_list(:), key_home(:)
+    integer(I4), allocatable :: send_count(:), recv_count(:), fill_pos(:)
+    integer(I4), allocatable :: q_key(:), recv_key(:), reply_owner(:), ans_owner(:)
+    type(gmap_set) :: key_map
+#endif
+    !-------------------------------------------------------------------------------------------
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
       nxy = st_grid%nx*st_grid%ny
@@ -1298,14 +1452,13 @@ module set_cell
       do proc_id = 1, st_mpi%totn
         recv_tot = recv_tot + recv_count(proc_id)
       end do
-      allocate(recv_key(recv_tot + 1), reply_reg(recv_tot + 1), reply_owner(recv_tot + 1))
+      allocate(recv_key(recv_tot + 1), reply_owner(recv_tot + 1))
       call alltoallv_val(q_key, send_count, recv_count, "read range key", recv_key)
       do i = 1, recv_tot
         pos = recv_key(i) - psta + 1
-        reply_reg(i) = own_part_reg(pos) ; reply_owner(i) = own_part_mpi(pos)
+        reply_owner(i) = own_part_mpi(pos)
       end do
-      allocate(ans_reg(send_tot + 1), ans_owner(send_tot + 1))
-      call alltoallv_val(reply_reg, recv_count, send_count, "read range reg", ans_reg)
+      allocate(ans_owner(send_tot + 1))
       call alltoallv_val(reply_owner, recv_count, send_count, "read range owner", ans_owner)
 
       call gmap_init(key_map, send_tot)
@@ -1320,12 +1473,12 @@ module set_cell
           key = mod(g-1, nxy) + 1
         end if
         pos = gmap_get(key_map, key)
-        read_reg(i) = ans_reg(pos) ; read_mpi(i) = ans_owner(pos)
+        read_mpi(i) = ans_owner(pos)
       end do
       call gmap_free(key_map)
       deallocate(cand_list, key_list, key_home)
       deallocate(send_count, fill_pos, recv_count, q_key, recv_key)
-      deallocate(reply_reg, reply_owner, ans_reg, ans_owner)
+      deallocate(reply_owner, ans_owner)
 
     else
       nxy = st_grid%nx*st_grid%ny
@@ -1336,10 +1489,16 @@ module set_cell
         else
           key = mod(g-1, nxy) + 1
         end if
-        read_reg(i) = own_part_reg(key) ; read_mpi(i) = own_part_mpi(key)
+        read_mpi(i) = own_part_mpi(key)
       end do
 
     end if
+
+    do i = 1, read_num
+      if (read_reg(i) < 1 .and. read_mpi(i) > 0) then
+        read_mpi(i) = -read_mpi(i)
+      end if
+    end do
 #else
     do i = 1, read_num
       read_reg(i) = glob_reg_flag(read_sta + i - 1)
@@ -1347,7 +1506,7 @@ module set_cell
     end do
 #endif
 
-  end subroutine set_read_range
+  end subroutine set_read_owner
 
   subroutine set_seaval_clasf(nclas, clas_name, clas_val, seaval)
   !*********************************************************************************************
@@ -1625,7 +1784,7 @@ module set_cell
       count_calc = count_calc + 1 ; temp_cend(temp_nreg) = temp_cend(temp_nreg) + 1
       l2g_ijk(count_calc) = ij
       call gmap_put(st_conn%glo2loc_map, ij, count_calc)
-      st_conn%calc2reg(count_calc) = temp_nreg
+      st_conn%calc2reg(count_calc) = own_calc_reg(own_pos)
     end do
 
     allocate(calc_end(0:loc_regn))

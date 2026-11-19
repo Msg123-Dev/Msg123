@@ -11,7 +11,7 @@ module mpi_set
   private
   public :: bcast_ici_set, bcast_sim_flag, bcast_xyz_num, bcast_clas_set, bcast_glob_flag
   public :: set_calc_view, set_seal_view, set_cell_view, set_rest_view, set_write_fview
-  public :: senrec_reg_info, senrec_grid_num
+  public :: senrec_reg_info
   public :: bcast_calc_ftype, bcast_sim_val, bcast_glob_xyzv
   public :: bcast_retn_clas, bcast_parm_clas, bcast_init_dep
   public :: bcast_bound_ftype, bcast_solval
@@ -1492,22 +1492,22 @@ module mpi_set
 
   end subroutine set_write_fview
 
-  subroutine senrec_reg_info(pron, s_nreg, r_nreg)
+  subroutine senrec_reg_info(pron, s_nreg, s_cend, s_cell, r_nreg, r_cend, r_cell)
   !*********************************************************************************************
-  ! senrec_reg_info -- Send and Receive region information
+  ! senrec_reg_info -- Send and Receive region information and calculation grid cells
   !*********************************************************************************************
     ! -- module
 
     ! -- inout
     integer(I4), intent(in) :: pron
-    integer(I4), intent(in) :: s_nreg(:)
-    integer(I4), allocatable, intent(out) :: r_nreg(:)
+    integer(I4), intent(in) :: s_nreg(:), s_cend(0:), s_cell(:,:)
+    integer(I4), allocatable, intent(out) :: r_nreg(:), r_cend(:), r_cell(:,:)
     ! -- local
     integer(I4) :: i, ierr
-    integer(I4) :: nreg
+    integer(I4) :: nreg, ncel
     integer(I4), allocatable :: istat(:)
     !-------------------------------------------------------------------------------------------
-    ierr = 0
+    ierr = 0 ; nreg = 0 ; ncel = 0
     allocate(istat(MPI_STATUS_SIZE))
     !$omp parallel do private(i)
     do i = 1, MPI_STATUS_SIZE
@@ -1528,15 +1528,27 @@ module mpi_set
     end if
 
     if (pron == st_mpi%rank+1) then
-      call MPI_SEND(s_nreg(1), size(s_nreg), MPI_INTEGER, 0, 0, st_mpi%comm, ierr)
+      call MPI_SEND(s_cend(0), size(s_cend), MPI_INTEGER, 0, 1, st_mpi%comm, ierr)
+      if (size(s_nreg) > 0) then
+        call MPI_SEND(s_nreg(1), size(s_nreg), MPI_INTEGER, 0, 2, st_mpi%comm, ierr)
+      end if
     else if (st_mpi%rank == 0) then
-      allocate(r_nreg(nreg))
+      allocate(r_nreg(nreg), r_cend(0:nreg))
       !$omp parallel do private(i)
       do i = 1, nreg
         r_nreg(i) = 0
       end do
       !$omp end parallel do
-      call MPI_RECV(r_nreg(1), nreg, MPI_INTEGER, pron-1, 0, st_mpi%comm, istat, ierr)
+      !$omp parallel do private(i)
+      do i = 0, nreg
+        r_cend(i) = 0
+      end do
+      !$omp end parallel do
+      call MPI_RECV(r_cend(0), nreg+1, MPI_INTEGER, pron-1, 1, st_mpi%comm, istat, ierr)
+      if (nreg > 0) then
+        call MPI_RECV(r_nreg(1), nreg, MPI_INTEGER, pron-1, 2, st_mpi%comm, istat, ierr)
+      end if
+      ncel = r_cend(nreg)
     end if
 
     if (ierr /= MPI_SUCCESS) then
@@ -1545,39 +1557,16 @@ module mpi_set
       end if
     end if
 
-    deallocate(istat)
-
-  end subroutine senrec_reg_info
-
-  subroutine senrec_grid_num(pron, x_num, y_num, z_num)
-  !*********************************************************************************************
-  ! senrec_grid_num -- Send and Receive grid number
-  !*********************************************************************************************
-    ! -- module
-
-    ! -- inout
-    integer(I4), intent(in) :: pron
-    integer(I4), intent(inout) :: x_num, y_num, z_num
-    ! -- local
-    integer(I4) :: i, ierr
-    integer(I4), allocatable :: istat(:)
-    !-------------------------------------------------------------------------------------------
-    ierr = 0
-    allocate(istat(MPI_STATUS_SIZE))
-    !$omp parallel do private(i)
-    do i = 1, MPI_STATUS_SIZE
-      istat(i) = 0
-    end do
-    !$omp end parallel do
-
     if (pron == st_mpi%rank+1) then
-      call MPI_SEND(x_num, 1, MPI_INTEGER, 0, 1, st_mpi%comm, ierr)
-      call MPI_SEND(y_num, 1, MPI_INTEGER, 0, 2, st_mpi%comm, ierr)
-      call MPI_SEND(z_num, 1, MPI_INTEGER, 0, 3, st_mpi%comm, ierr)
+      if (size(s_cell) > 0) then
+        call MPI_SEND(s_cell(1,1), size(s_cell), MPI_INTEGER, 0, 3, st_mpi%comm, ierr)
+      end if
     else if (st_mpi%rank == 0) then
-      call MPI_RECV(x_num, 1, MPI_INTEGER, pron-1, 1, st_mpi%comm, istat, ierr)
-      call MPI_RECV(y_num, 1, MPI_INTEGER, pron-1, 2, st_mpi%comm, istat, ierr)
-      call MPI_RECV(z_num, 1, MPI_INTEGER, pron-1, 3, st_mpi%comm, istat, ierr)
+      allocate(r_cell(4,ncel))
+      if (ncel > 0) then
+        call MPI_RECV(r_cell(1,1), size(r_cell), MPI_INTEGER, pron-1, 3,&
+                      st_mpi%comm, istat, ierr)
+      end if
     end if
 
     if (ierr /= MPI_SUCCESS) then
@@ -1588,7 +1577,7 @@ module mpi_set
 
     deallocate(istat)
 
-  end subroutine senrec_grid_num
+  end subroutine senrec_reg_info
 
   subroutine bcast_calc_ftype()
   !*********************************************************************************************

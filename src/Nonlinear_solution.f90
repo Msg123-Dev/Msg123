@@ -237,7 +237,8 @@ module nonlinear_solution
       end if
 
       ! -- Limit the step length (limit_step)
-        call limit_step(max_step, st_coef%stod, st_sol, step_pnorm, step_lmax, st_matrix)
+        call limit_step(max_step, st_coef%stod, st_sol, step_pnorm, step_lmax, st_matrix,&
+                        roll_run)
 
       !$omp parallel do private(i)
       do i = 1, st_matrix%nreg_num
@@ -588,7 +589,7 @@ module nonlinear_solution
 
   end subroutine calc_surfw
 
-  subroutine limit_step(maxstep, stod, st_sol, pnorm, lam_maxi, st_matrix)
+  subroutine limit_step(maxstep, stod, st_sol, pnorm, lam_maxi, st_matrix, roll_num)
   !*********************************************************************************************
   ! limit_step -- Limit the step length by the maximum step and the saturation change
   !*********************************************************************************************
@@ -597,19 +598,29 @@ module nonlinear_solution
     use mpi_utility, only: mpimin_val
 #endif
     ! -- inout
+    integer(I4), intent(in) :: roll_num
     real(DP), intent(in) :: maxstep, stod(:)
     type(sol_set), intent(inout) :: st_sol
     real(DP), intent(out) :: pnorm, lam_maxi
     type(matrix_set), intent(in) :: st_matrix
     ! -- local
     integer(I4) :: i
-    real(DP) :: l2_pnorm, l2_pnorm_s, maxpnorm, dsat_scale, dsat_cell
+    real(DP) :: l2_pnorm, l2_pnorm_s, maxpnorm, dsat_scale, dsat_cell, head_low
     real(DP), parameter :: DSAT_STEP_FRAC = 0.9_DP
 #ifdef MPI_MSG
     real(DP) :: sum_l2, min_val
 #endif
     !-------------------------------------------------------------------------------------------
-    maxpnorm = DONE
+    maxpnorm = DONE ; head_low = -(XMAX + z_base)*len_scal_inv
+    if (roll_num == 0) then
+      !$omp parallel do private(i)
+      do i = 1, ncalc
+        if (st_sol%head_pre(i) + st_sol%head_change(i) < head_low) then
+          st_sol%head_change(i) = head_low - st_sol%head_pre(i)
+        end if
+      end do
+      !$omp end parallel do
+    end if
     ! -- Calculate l2 norm square (l2norm2)
       call calc_l2norm2(st_matrix%crs_index(1)%unknow, st_sol%head_change, l2_pnorm)
 

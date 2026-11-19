@@ -55,19 +55,20 @@ module set_cell
     use initial_module, only: out_type, st_out_type, st_out_path
     use check_condition, only: read_seal_set, read_seal_clasf, read_seal_point, read_sea_allv
 #ifdef MPI_MSG
-    use mpi_utility, only: barrier_proc, bcast_file
+    use mpi_utility, only: bcast_file
     use mpi_read, only: read_dist_seaval
     use mpi_set, only: bcast_sim_flag, bcast_xyz_num, bcast_clas_set, bcast_clas_val
     use mpi_set, only: set_calc_view, set_seal_view, set_rest_view, set_write_fview
-    use mpi_set, only: senrec_reg_info, senrec_grid_num
+    use mpi_set, only: senrec_reg_info
 #endif
     ! -- inout
 
     ! -- local
     integer(I4) :: i, j, n, nxy, nc_unknow, mpi_ncals, mpi_ncalc, calg_num
-    integer(I4) :: sta_calc, end_calc, i_num, j_num, k_num, pro_nreg, loc_num
+    integer(I4) :: sta_calc, end_calc, pro_nreg, loc_num
     integer(I4) :: sea_ftype, sea_ptn, sea_nclas, sea_null, sea_head
     integer(I4), allocatable :: cur_nreg(:), sp_i(:), sp_j(:), sp_k(:), sea_hit(:), pre_sea(:)
+    integer(I4), allocatable :: cur_cend(:), calg_cell(:,:), cur_cell(:,:)
     real(SP), allocatable :: sp_v(:), sea_clas_val(:), read_seaval(:)
     character(CHALEN) :: sea_path
     character(VARLEN), allocatable :: sea_clas_name(:)
@@ -495,67 +496,43 @@ module set_cell
     end if
 
     if (st_out_type%calg == out_type(1)) then
+      allocate(calg_cell(4,ncalc))
+      ! -- Set calculation grid cells by region (calg_cell)
+        call set_calg_cell(calg_cell)
       if (st_mpi%rank == 0) then
         call open_new_wtxt(st_out_path%calg, "output calculation grid number", calg_num)
         write(calg_num,'(a)') "Calclation_No,I,J,K"
       end if
       do n = 1, st_mpi%totn
+        if (n == 1) then
+          if (st_mpi%rank == 0) then
+            allocate(cur_nreg(loc_regn), cur_cend(0:loc_regn), cur_cell(4,ncalc))
+            cur_nreg(:) = loc_nreg(:) ; cur_cend(:) = calc_end(:)
+            cur_cell(:,:) = calg_cell(:,:)
+          end if
 #ifdef MPI_MSG
-        if (st_mpi%totn /= 1) then
-          ! -- Send and Receive region information (reg_info)
-            call senrec_reg_info(n, loc_nreg, cur_nreg)
-          pro_nreg = size(cur_nreg)
         else
-          pro_nreg = loc_regn
-          allocate(cur_nreg(pro_nreg))
-          !$omp parallel do private(i)
-          do i = 1, pro_nreg
-            cur_nreg(i) = loc_nreg(i)
-          end do
-          !$omp end parallel do
-        end if
-#else
-        pro_nreg = loc_regn
-        allocate(cur_nreg(pro_nreg))
-        !$omp parallel do private(i)
-        do i = 1, pro_nreg
-          cur_nreg(i) = loc_nreg(i)
-        end do
-        !$omp end parallel do
+          ! -- Send and Receive region information (reg_info)
+            call senrec_reg_info(n, loc_nreg, calc_end, calg_cell, cur_nreg, cur_cend, cur_cell)
 #endif
+        end if
         if (st_mpi%rank == 0) then
           write(calg_num,'(a,i0)') "Rank", n-1
-        end if
-        do i = 1, pro_nreg
-          if (st_mpi%rank == 0) then
+          pro_nreg = size(cur_nreg)
+          do i = 1, pro_nreg
             write(calg_num,'(a,i0)') "Region", cur_nreg(i)
-          end if
-          sta_calc = calc_end(i-1) ; end_calc = calc_end(i)
-          do j = sta_calc+1, end_calc
-            if (n == st_mpi%rank+1) then
-              ! -- Get calculation number from grid number (calc_grid)
-                call get_calc_grid(j, i_num, j_num, k_num)
-            end if
-#ifdef MPI_MSG
-            if (st_mpi%totn /= 1) then
-              ! -- Send and Receive grid number (grid_num)
-                call senrec_grid_num(n, i_num, j_num, k_num)
-            end if
-#endif
-            if (st_mpi%rank == 0) then
-              write(calg_num,'(*(i0:,","))') j, i_num, j_num, k_num
-            end if
+            sta_calc = cur_cend(i-1) ; end_calc = cur_cend(i)
+            do j = sta_calc+1, end_calc
+              write(calg_num,'(*(i0:,","))') cur_cell(:,j)
+            end do
           end do
-        end do
-#ifdef MPI_MSG
-        ! -- Barrier process (proc)
-          call barrier_proc()
-#endif
+          deallocate(cur_nreg, cur_cend, cur_cell)
+        end if
       end do
-      deallocate(cur_nreg)
       if (st_mpi%rank == 0) then
         call close_file(calg_num)
       end if
+      deallocate(calg_cell)
     end if
 
     deallocate(calc_end, loc_nreg)
@@ -1789,15 +1766,47 @@ module set_cell
 
     allocate(calc_end(0:loc_regn))
     calc_end(0) = 0
-    !$omp parallel do private(i)
     do i = 1, loc_regn
       calc_end(i) = calc_end(i-1) + temp_cend(i)
     end do
-    !$omp end parallel do
 
     deallocate(temp_cend)
 
   end subroutine set_rel_gloloc
+
+  subroutine set_calg_cell(out_cell)
+  !*********************************************************************************************
+  ! set_calg_cell -- Set calculation grid cells grouped by local region
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(out) :: out_cell(:,:)
+    ! -- local
+    integer(I4) :: i, j, pos
+    integer(I4), allocatable :: reg_pos(:)
+    !-------------------------------------------------------------------------------------------
+    allocate(reg_pos(loc_regn))
+    !$omp parallel do private(i)
+    do i = 1, loc_regn
+      reg_pos(i) = calc_end(i-1)
+    end do
+    !$omp end parallel do
+
+    do j = 1, ncalc
+      do i = 1, loc_regn
+        if (st_conn%calc2reg(j) == loc_nreg(i)) then
+          reg_pos(i) = reg_pos(i) + 1 ; pos = reg_pos(i) ; out_cell(1,pos) = j
+          ! -- Get calculation number from grid number (calc_grid)
+            call get_calc_grid(j, out_cell(2,pos), out_cell(3,pos), out_cell(4,pos))
+          exit
+        end if
+      end do
+    end do
+
+    deallocate(reg_pos)
+
+  end subroutine set_calg_cell
 
 #ifdef MPI_MSG
   subroutine set_mpi_rel()

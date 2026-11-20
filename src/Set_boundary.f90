@@ -5,10 +5,10 @@ module set_boundary
   use types_module, only: rlbc_set, bfview_set, bound_fview
   use utility_module, only: st_mpi, write_logf, write_err_stop, get_ilen, conv_i2s
   use initial_module, only: in_type, st_in_type, st_rivf_type, st_lakf_type, st_in_path
-  use initial_module, only: st_in_unit, st_schm, st_grid
+  use initial_module, only: st_sim, st_schm, st_grid, st_in_unit
   use read_input, only: len_scal, z_base
   use check_condition, only: check_input_nan
-  use set_cell, only: ncals, st_conn, check_col_part
+  use set_cell, only: ncalc, ncals, st_conn, check_col_part
   use make_cell, only: st_geom
   use set_condition, only: st_bcnd, st_hydr
   use assign_boundary, only: assign_surfbv, assign_rilav, st_forc
@@ -24,6 +24,7 @@ module set_boundary
   public :: set_rech_root
 
   type(rlbc_set), public :: st_rive, st_lake
+  character(:), allocatable, public :: surfonly_reg
   logical, public :: rech_reprev = .false.
 #ifdef MPI_MSG
   type(bound_fview), public :: bfview
@@ -48,7 +49,6 @@ module set_boundary
   !*********************************************************************************************
     ! -- modules
     use open_file, only: open_in_rivef, open_in_lakef
-    use set_cell, only: ncalc
     use set_condition, only: set_connect, set_srabyd, set_chabyd, set_wellconn
     use calc_boundary, only: calc_reprev, count_rivecalc, count_lakecalc, calc_rivea
 #ifdef MPI_MSG
@@ -355,7 +355,153 @@ module set_boundary
     end if
 #endif
 
+    ! -- Check the outlets of each region (outlet)
+      call check_outlet()
+
   end subroutine set_bound
+
+  subroutine check_outlet()
+  !*********************************************************************************************
+  ! check_outlet -- Check the outlets of each region in the steady state
+  !*********************************************************************************************
+    ! -- modules
+#ifdef MPI_MSG
+    use mpi_utility, only: mpimax_val
+#endif
+    ! -- inout
+
+    ! -- local
+    integer(I4) :: i, c, n, nunit
+    integer(I4), allocatable :: bound_flag(:), surf_flag(:), cell_flag(:)
+#ifdef MPI_MSG
+    integer(I4), allocatable :: max_flag(:)
+#endif
+    character(:), allocatable :: num_str, err_mes
+    !-------------------------------------------------------------------------------------------
+    surfonly_reg = ""
+    if (st_sim%sim_type /= -1) then
+      deallocate(st_conn%calc2reg)
+      return
+    end if
+
+    nunit = 1
+    if (st_sim%reg_neib == 0) then
+      do i = 1, ncalc
+        nunit = max(nunit, st_conn%calc2reg(i))
+      end do
+#ifdef MPI_MSG
+      if (st_mpi%totn /= 1) then
+        ! -- Max value for MPI (val)
+          call mpimax_val(nunit, "number of regions", n)
+        nunit = n
+      end if
+#endif
+    end if
+    allocate(bound_flag(nunit), surf_flag(nunit), cell_flag(nunit))
+    do n = 1, nunit
+      bound_flag(n) = 0 ; surf_flag(n) = 0 ; cell_flag(n) = 0
+    end do
+
+    do i = 1, ncalc
+      n = 1
+      if (st_sim%reg_neib == 0) then
+        n = st_conn%calc2reg(i)
+      end if
+      if (n >= 1) then
+        cell_flag(n) = 1
+      end if
+    end do
+    do i = 1, st_bcnd%seal_num
+      c = st_bcnd%sea2cal(i)
+      if (c >= 1 .and. c <= ncalc) then
+        n = 1
+        if (st_sim%reg_neib == 0) then
+          n = st_conn%calc2reg(c)
+        end if
+        if (n >= 1 .and. st_hydr%sea_hydf(i)*st_hydr%sea_abyd(i) > DZERO) then
+          bound_flag(n) = 1
+        end if
+      end if
+    end do
+    do i = 1, st_bcnd%rive_num
+      c = st_bcnd%rive2calc(i)
+      if (c >= 1 .and. c <= ncalc) then
+        n = 1
+        if (st_sim%reg_neib == 0) then
+          n = st_conn%calc2reg(c)
+        end if
+        if (n >= 1 .and. st_forc%rive_hydk(i)*st_forc%abyd_rive(i) > DZERO) then
+          bound_flag(n) = 1
+        end if
+      end if
+    end do
+    do i = 1, st_bcnd%lake_num
+      c = st_bcnd%lake2calc(i)
+      if (c >= 1 .and. c <= ncalc) then
+        n = 1
+        if (st_sim%reg_neib == 0) then
+          n = st_conn%calc2reg(c)
+        end if
+        if (n >= 1 .and. st_forc%lake_hydk(i)*st_forc%abyd_lake(i) > DZERO) then
+          bound_flag(n) = 1
+        end if
+      end if
+    end do
+    do i = 1, ncals
+      n = 1
+      if (st_sim%reg_neib == 0) then
+        n = st_conn%calc2reg(i)
+      end if
+      if (n >= 1 .and. st_hydr%hydf_surf(i)*st_hydr%abyd_surf(i) > DZERO) then
+        surf_flag(n) = 1
+      end if
+    end do
+
+#ifdef MPI_MSG
+    if (st_mpi%totn /= 1) then
+      allocate(max_flag(nunit))
+      ! -- Max value for MPI (val)
+        call mpimax_val(cell_flag, "region cells", max_flag)
+      cell_flag(:) = max_flag(:)
+      ! -- Max value for MPI (val)
+        call mpimax_val(bound_flag, "region sea level, river or lake boundary", max_flag)
+      bound_flag(:) = max_flag(:)
+      ! -- Max value for MPI (val)
+        call mpimax_val(surf_flag, "region ground surface", max_flag)
+      surf_flag(:) = max_flag(:)
+      deallocate(max_flag)
+    end if
+#endif
+
+    do n = 1, nunit
+      if (cell_flag(n) == 1 .and. bound_flag(n) == 0) then
+        if (st_sim%reg_neib == 0) then
+          allocate(character(get_ilen(n)) :: num_str)
+          call conv_i2s(n, num_str)
+          err_mes = "Region "//num_str
+        else
+          num_str = "the calculation domain" ; err_mes = "The calculation domain"
+        end if
+        if (surf_flag(n) == 0) then
+          call write_err_stop(err_mes//" has no sea level, river or lake boundary and no "//&
+                              "ground surface; its steady state cannot be determined.")
+        end if
+        if (st_mpi%rank == 0) then
+          call write_logf("Caution!! "//err_mes//" has no sea level, river or lake boundary"//&
+                          "; in the steady state its only outlet is the ground surface.")
+        end if
+        if (len(surfonly_reg) == 0) then
+          surfonly_reg = num_str
+        else
+          surfonly_reg = surfonly_reg//", "//num_str
+        end if
+        deallocate(num_str, err_mes)
+      end if
+    end do
+
+    deallocate(bound_flag, surf_flag, cell_flag, st_conn%calc2reg)
+
+  end subroutine check_outlet
 
   subroutine set_seal_info()
   !*********************************************************************************************
@@ -1436,7 +1582,6 @@ module set_boundary
   !*********************************************************************************************
     ! -- modules
     use constval_module, only: DONE
-    use initial_module, only: st_sim
     ! -- inout
     real(DP), intent(in), optional :: in_time
     ! -- local

@@ -23,7 +23,7 @@ module nonlinear_solution
 
   ! -- local
   integer(I4), parameter :: MAXSTEP_RUN_MAX = 5, STAGN_RUN_MAX = 10, CYCLE_RUN_MAX = 100
-  integer(I4), parameter :: WPASS_RUN_MAX = 1, ROLL_RUN_MAX = 3
+  integer(I4), parameter :: WPASS_RUN_MAX = 1, ROLL_RUN_MAX = 2
   real(DP), parameter :: VARMAX = 1.00E+03_DP, XMAX = 1.00E+04_DP
   real(DP), parameter :: STAGN_FLOOR = 1.00E-04_DP, CYCLE_RTOL = 1.00E-03_DP
   real(DP), parameter :: XMAX_INV = 1.00E-04_DP
@@ -89,7 +89,7 @@ module nonlinear_solution
     real(DP) :: res_l1, qext_l1, mass_error
     real(DP) :: res_fact, step_pnorm, step_lmax, step_change
     logical :: back_flag, res_flag, maxs_flag, stagn_flag, cycle_flag
-    logical :: head_change_flag, wpass_flag, beta_flag
+    logical :: head_change_flag, wpass_flag, beta_flag, pic_retry_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
     real(DP) :: var_max, unk_max, var_abs_max
@@ -118,7 +118,7 @@ module nonlinear_solution
     head_change_flag = .false.
     stagn_run = 0 ; mass_error_pre = DZERO ; stagn_flag = .false.
     cycle_run = 0 ; mass_error_min = DZERO ; cycle_flag = .false. ; wpass_run = 0
-    beta_run = 0 ; beta_flag = .false. ; roll_run = 0
+    beta_run = 0 ; beta_flag = .false. ; roll_run = 0 ; pic_retry_flag = .false.
     res_l1 = DZERO ; qext_l1 = DZERO ; mass_error = DZERO ; check_val = huge(1.00_DP)
     ! -- Set for backtracking (backtr)
       call set_backtr(st_sol, max_step, st_matrix)
@@ -145,6 +145,9 @@ module nonlinear_solution
         st_time%form_switch = 1
       else
         st_time%form_switch = 0
+      end if
+      if (st_sim%sim_type == -1 .and. roll_run == ROLL_RUN_MAX) then
+        st_time%form_switch = 0 ; roll_run = 0 ; pic_retry_flag = .true.
       end if
 
       back_iter = 0 ; beta_iter = 0
@@ -318,7 +321,7 @@ module nonlinear_solution
         if (back_flag) then
           roll_run = roll_run + 1
         else
-          roll_run = 0
+          roll_run = 0 ; pic_retry_flag = .false.
         end if
         if (maxs_flag) then
           maxstep_run = maxstep_run + 1
@@ -483,10 +486,11 @@ module nonlinear_solution
           end if
         end if
         exit outer_loop
-      else if ((st_time%out_iter == st_ctrl%maxout_iter .or. roll_run == ROLL_RUN_MAX) .and.&
+      else if ((st_time%out_iter == st_ctrl%maxout_iter .or.&
+                (roll_run == ROLL_RUN_MAX .and. pic_retry_flag)) .and.&
                st_sim%sim_type == -1) then
         if (st_mpi%rank == 0) then
-          if (roll_run == ROLL_RUN_MAX) then
+          if (roll_run == ROLL_RUN_MAX .and. pic_retry_flag) then
             write(conv_fnum,22)
           end if
           write(conv_fnum,15)

@@ -582,7 +582,6 @@ module calc_function
     integer(I4) :: i, j, k
     integer(I4) :: sta_wind, end_wind, wind
     !-------------------------------------------------------------------------------------------
-    !$omp parallel do private(i, j, k, sta_wind, end_wind, wind)
     do i = 1, st_bcnd%well_num
       sta_wind = st_bcnd%well_index(i-1) ; end_wind = st_bcnd%well_index(i)
       do k = 1, end_wind-sta_wind
@@ -591,7 +590,6 @@ module calc_function
         welfunc(j) = st_forc%calc_well(j)
       end do
     end do
-    !$omp end parallel do
 
   end subroutine func_wellterm
 

@@ -1752,14 +1752,12 @@ module time_module
     real(DP), allocatable :: temp_whead(:)
     !-------------------------------------------------------------------------------------------
     allocate(temp_whead(st_bcnd%well_num))
-    !$omp parallel
-    !$omp do private(i)
+    !$omp parallel do private(i)
     do i = 1, st_bcnd%well_num
       temp_whead(i) = whead_new(i)
     end do
-    !$omp end do
+    !$omp end parallel do
 
-    !$omp do private(i, j, k, tot_cond)
     do i = 1, st_bcnd%well_num
       tot_cond = DZERO
       do k = st_bcnd%well_index(i-1)+1, st_bcnd%well_index(i)
@@ -1784,8 +1782,6 @@ module time_module
         end do
       end if
     end do
-    !$omp end do
-    !$omp end parallel
 
     deallocate(whead_new, temp_whead)
 

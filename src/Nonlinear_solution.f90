@@ -63,6 +63,7 @@ module nonlinear_solution
     use types_module, only: kryl_set, amgt_set, coef_set
     use utility_module, only: write_err_stop
     use initial_module, only: st_out_step
+    use set_boundary, only: surfonly_reg
     use make_linearsystem, only: make_matvec
     use check_simulation, only: check_abserrmax, check_residual
     use linear_solution, only: solve_linalg, in_iter
@@ -229,7 +230,15 @@ module nonlinear_solution
         if (st_mpi%rank == 0) then
           write(conv_fnum,15)
         end if
-        call write_err_stop("Nan detected in the steady state calculation.")
+        if (len(surfonly_reg) == 0) then
+          call write_err_stop("Nan detected in the steady state calculation.")
+        else if (st_sim%reg_neib == 0) then
+          call write_err_stop("Nan detected in the steady state calculation. Regions "//&
+                              "whose only outlet is the ground surface: "//surfonly_reg)
+        else
+          call write_err_stop("Nan detected in the steady state calculation. The only "//&
+                              "outlet of the calculation domain is the ground surface.")
+        end if
       end if
       if (l2norm_pre > DZERO) then
       ! -- Solve linear algebra (linalg)
@@ -280,7 +289,15 @@ module nonlinear_solution
         if (st_mpi%rank == 0) then
           write(conv_fnum,15)
         end if
-        call write_err_stop("Nan detected in the steady state calculation.")
+        if (len(surfonly_reg) == 0) then
+          call write_err_stop("Nan detected in the steady state calculation.")
+        else if (st_sim%reg_neib == 0) then
+          call write_err_stop("Nan detected in the steady state calculation. Regions "//&
+                              "whose only outlet is the ground surface: "//surfonly_reg)
+        else
+          call write_err_stop("Nan detected in the steady state calculation. The only "//&
+                              "outlet of the calculation domain is the ground surface.")
+        end if
       end if
 
       if (st_time%form_switch == 0 .and. st_ctrl%picard_btr > 0 .and.&

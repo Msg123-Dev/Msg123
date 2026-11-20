@@ -578,7 +578,6 @@ module check_condition
     integer(I4) :: i, c_num, ii, jj, kk
     integer(I4) :: pi, pj, pk, ist, ien, jst, jen, kst, ken
     !-------------------------------------------------------------------------------------------
-    !$omp parallel do private(i, ii, jj, kk, pi, pj, pk, ist, ien, jst, jen, kst, ken, c_num)
     do i = 1, pointn
       pi = p_i(i) ; pj = p_j(i) ; pk = p_k(i)
       if (pi == -1 .and. pj == -1 .and. pk == -1) then !all cells
@@ -608,7 +607,6 @@ module check_condition
         end do
       end do
     end do
-    !$omp end parallel do
 
   end subroutine set_point2seal
 

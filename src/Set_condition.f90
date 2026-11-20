@@ -239,13 +239,11 @@ module set_condition
     !-------------------------------------------------------------------------------------------
     mpi_ncalc = ncalc + neib_ncalc ; cnum = size(cell_val(:))
     gridx = st_grid%nx ; gridy = st_grid%ny ; gridz = st_grid%nz
-    !$omp parallel
-    !$omp do private(i)
+    !$omp parallel do private(i)
     do i = 1, ncalc
       tg_flag(i) = 0
     end do
-    !$omp end do
-    !$omp do private(i, ii, jj, kk, pi, pj, pk, ist, ien, jst, jen, kst, ken, c_num, l_ijk)
+    !$omp end parallel do
     do i = 1, tgn
       if (tg_val(i) /= SNOVAL) then
         pi = p_i(i) ; pj = p_j(i) ; pk = p_k(i)
@@ -281,8 +279,6 @@ module set_condition
         end do
       end if
     end do
-    !$omp end do
-    !$omp end parallel
 
     call count_flag(tg_flag, tg_num)
 
@@ -307,13 +303,11 @@ module set_condition
     integer(I4) :: pi, pj, ist, ien, jst, jen, l_ij
     !-------------------------------------------------------------------------------------------
     gridx = st_grid%nx ; gridy = st_grid%ny
-    !$omp parallel
-    !$omp do private(i)
+    !$omp parallel do private(i)
     do i = 1, ncals
       tg_flag(i) = 0
     end do
-    !$omp end do
-    !$omp do private(i, ii, jj, pi, pj, ist, ien, jst, jen, s_num, l_ij)
+    !$omp end parallel do
     do i = 1, tgn
       pi = p_i(i) ; pj = p_j(i)
       if (pi == -1 .and. pj == -1) then !all i,j cells
@@ -338,8 +332,6 @@ module set_condition
       end do
 
     end do
-    !$omp end do
-    !$omp end parallel
 
     call count_flag(tg_flag, tg_num)
 

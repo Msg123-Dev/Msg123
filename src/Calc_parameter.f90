@@ -260,15 +260,68 @@ module calc_parameter
     real(SP), intent(in) :: vana, vann
     real(DP), intent(out) :: kr, dkr
     ! -- local
-    real(DP) :: beta, se, term
+    real(DP) :: beta, se, term, log_ratio, term_rest
     !-------------------------------------------------------------------------------------------
     beta = abs(phead*vana)**vann
     se = (DONE+beta)**(-retm)
-    term = DONE-(DONE-se**(DONE/retm))**retm
+    if (beta > DZERO) then
+      if (beta >= DONE) then
+        log_ratio = log_one_plus(DONE/beta)
+      else
+        log_ratio = log_one_plus(beta)-log(beta)
+      end if
+      term = -exp_minus_one(-retm*log_ratio)
+      term_rest = exp(-retm*log_ratio)
+    else
+      term = DONE
+      term_rest = DZERO
+    end if
     kr = se**(DHALF)*term**DTWO
-    dkr = -(retm*vann/((DONE+beta)*phead))*sqrt(se)*term*(DHALF*term*beta + DTWO*(DONE-term))
+    dkr = -(retm*vann/((DONE+beta)*phead))*sqrt(se)*term*(DHALF*term*beta + DTWO*term_rest)
 
   end subroutine calc_kr_vgm
+
+  function log_one_plus(x_val) result(log_val)
+  !*********************************************************************************************
+  ! log_one_plus -- Calculate log(1+x) without cancellation for small x
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(DP), intent(in) :: x_val
+    ! -- local
+    real(DP) :: log_val, sum_val
+    !-------------------------------------------------------------------------------------------
+    sum_val = DONE+x_val
+    if (sum_val == DONE) then
+      log_val = x_val
+    else
+      log_val = log(sum_val)*(x_val/(sum_val-DONE))
+    end if
+
+  end function log_one_plus
+
+  function exp_minus_one(x_val) result(dif_val)
+  !*********************************************************************************************
+  ! exp_minus_one -- Calculate exp(x)-1 without cancellation for small x
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    real(DP), intent(in) :: x_val
+    ! -- local
+    real(DP) :: dif_val, exp_val
+    !-------------------------------------------------------------------------------------------
+    exp_val = exp(x_val)
+    if (exp_val == DONE) then
+      dif_val = x_val
+    else if (exp_val-DONE == -DONE) then
+      dif_val = -DONE
+    else
+      dif_val = (exp_val-DONE)*x_val/log(exp_val)
+    end if
+
+  end function exp_minus_one
 
   subroutine calc_hyd_geoharm(srato1, srato2, hyd_c1, hyd_c2, d1, d2, hyd_gh)
   !*********************************************************************************************

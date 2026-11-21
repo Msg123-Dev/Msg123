@@ -22,7 +22,7 @@ module set_cell
 #ifdef MPI_MSG
   integer(I4), allocatable, public :: send_cind(:), recv_cind(:)
   integer(I4), allocatable, public :: send_citem(:), recv_citem(:)
-  integer(I4), allocatable, public :: neib_num(:), send2recv(:), calc2recv(:)
+  integer(I4), allocatable, public :: neib_num(:), send2recv(:)
   integer(I4), allocatable, public :: loc2glo_nos(:), loc2glo_noc(:)
   integer(I4), allocatable, public :: loc2unk_ij(:)
 #endif
@@ -310,13 +310,6 @@ module set_cell
       call set_hash_neib()
 
 #ifdef MPI_MSG
-    allocate(calc2recv(ncalc))
-    !$omp parallel do private(i)
-    do i = 1, ncalc
-      calc2recv(i) = 0
-    end do
-    !$omp end parallel do
-
     ! -- Set mpi relationship (mpi_rel)
       call set_mpi_rel()
 #endif
@@ -1824,8 +1817,8 @@ module set_cell
     integer(I4) :: cals_niebn, calc_niebn, reg_num, own_reg
     integer(I4), allocatable :: temp_neib_num(:), temp_neib_flag(:), temp_mpi_num(:)
     integer(I4), allocatable :: neib_glos(:), neib_gloc(:), neib_locc(:)
-    integer(I4), allocatable :: sort_recv_num(:), temp_calc_reg(:)
-    integer(I4), allocatable :: recv_num(:), send_num(:)
+    integer(I4), allocatable :: temp_calc_reg(:)
+    integer(I4), allocatable :: send_num(:)
     integer(I4), allocatable :: temp_sort(:), sort_mpi_num(:), loc_send_num(:)
     integer(I4), allocatable :: mpi_l2g_ij(:), mpi_l2g_ijk(:), mpi_calc2reg(:)
     logical :: find_flag
@@ -2066,7 +2059,7 @@ module set_cell
       allocate(neib_num(neib_mpi_totn))
       allocate(send_cind(0:neib_mpi_totn), recv_cind(0:neib_mpi_totn))
       allocate(send_citem(sendrecv_num), recv_citem(sendrecv_num))
-      allocate(temp_sort(neib_ncalc), sort_recv_num(neib_ncalc), sort_mpi_num(neib_ncalc))
+      allocate(temp_sort(neib_ncalc), sort_mpi_num(neib_ncalc))
       allocate(send2recv(neib_ncalc), loc_send_num(neib_ncalc))
       send_cind(0) = 0 ; recv_cind(0) = 0
       !$omp parallel
@@ -2083,7 +2076,7 @@ module set_cell
       !$omp do private(i)
       do i = 1, neib_ncalc
         temp_sort(i) = neib_gloc(i)
-        sort_recv_num(i) = 0 ; send2recv(i) = 0
+        send2recv(i) = 0
         loc_send_num(i) = 0
       end do
       !$omp end do
@@ -2093,7 +2086,7 @@ module set_cell
       do i = 1, neib_ncalc
         recv_loc = findloc(neib_gloc(1:neib_ncalc), value = temp_sort(i), dim = 1)
         neib_gloc(recv_loc) = 0 ; loc_send_num(i) = recv_loc
-        sort_recv_num(i) = neib_locc(recv_loc) ; sort_mpi_num(i) = temp_mpi_num(recv_loc)
+        sort_mpi_num(i) = temp_mpi_num(recv_loc)
       end do
       deallocate(neib_gloc)
 
@@ -2102,15 +2095,10 @@ module set_cell
         send_cind(i) = count(sort_mpi_num(:) == neib_mpi_num) + send_cind(i-1)
         recv_cind(i) = send_cind(i)
         sta_send = send_cind(i-1) ; end_send = send_cind(i)
-        allocate(recv_num(count(sort_mpi_num(:) == neib_mpi_num)))
         allocate(send_num(count(sort_mpi_num(:) == neib_mpi_num)))
-        recv_num(:) = pack(sort_recv_num(:), sort_mpi_num(:) == neib_mpi_num)
         send_num(:) = pack(neib_locc(:), temp_mpi_num(:) == neib_mpi_num)
         do j = 1, end_send-sta_send
           k = sta_send + j ; recv_citem(k) = ncalc + k ; send_citem(k) = send_num(j)
-          if (calc2recv(recv_num(j)) == 0) then
-            calc2recv(recv_num(j)) = ncalc + k
-          end if
         end do
         j = 0
         do send_loc = 1, neib_ncalc
@@ -2118,10 +2106,10 @@ module set_cell
             j = j + 1 ; send2recv(loc_send_num(send_loc)) = sta_send + j
           end if
         end do
-        deallocate(recv_num, send_num)
+        deallocate(send_num)
       end do
 
-      deallocate(temp_neib_num, temp_mpi_num, sort_recv_num, sort_mpi_num)
+      deallocate(temp_neib_num, temp_mpi_num, sort_mpi_num)
       deallocate(neib_locc, loc_send_num)
 
     end if

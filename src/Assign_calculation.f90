@@ -475,13 +475,9 @@ module assign_calc
   ! assign_initv -- Assign initial value
   !*********************************************************************************************
     ! -- modules
-    use set_cell, only: get_calc_grid
 #ifdef MPI_MSG
-    use mpi_utility, only: mpisum_val
     use mpi_read, only: read_mpi_restf, read_mpi_head
-    use mpi_set, only: bcast_init_dep, senrec_neibval
-    use set_cell, only: neib_mpi_totn, neib_ncalc, send_cind, recv_cind, send_citem, recv_citem
-    use set_cell, only: neib_num, calc2recv
+    use mpi_set, only: bcast_init_dep
 #endif
     ! -- inout
     integer(I4), intent(in) :: init_ftype
@@ -490,11 +486,6 @@ module assign_calc
     integer(I4) :: i, ierr
     integer(I4) :: init_fnum, init_inttype
     real(DP) :: temp_end, temp_delt
-#ifdef MPI_MSG
-    integer(I4) :: j, k, xn, yn, zn, xyzn
-    integer(I4) :: nov_num, sum_init
-    real(DP), allocatable :: recv_init(:)
-#endif
     !-------------------------------------------------------------------------------------------
     allocate(st_hydr%read_init(ncalc))
     !$omp parallel do private(i)
@@ -599,41 +590,6 @@ module assign_calc
       ! -- Set initial waterlevel from surface elevation (init_elev)
         call set_init_elev()
     end if
-
-#ifdef MPI_MSG
-    if (st_mpi%totn /= 1) then
-      sum_init = 1
-      allocate(recv_init(ncalc+neib_ncalc))
-      !$omp parallel do private(i)
-      do i = 1, ncalc+neib_ncalc
-        recv_init(i) = DNOVAL
-      end do
-      !$omp end parallel do
-      do while (sum_init /= 0)
-        ! -- Send and Receive neighbor value (neibval)
-          call senrec_neibval(neib_mpi_totn, neib_num, send_cind, recv_cind, send_citem,&
-                              recv_citem, st_hydr%read_init, recv_init)
-        do i = 1, ncalc
-          if (calc2recv(i) > 0 .and. st_hydr%read_init(i) == DNOVAL) then
-            st_hydr%read_init(i) = recv_init(calc2recv(i))
-            call get_calc_grid(i, xn, yn, zn)
-            do k = zn+1, st_grid%nz
-              xyzn = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(yn-1) + xn
-              j = 0 ; j = gmap_get(st_conn%glo2loc_map, xyzn)
-              if (j /= 0 .and. j <= ncalc) then
-                st_hydr%read_init(j) = st_hydr%read_init(i)
-              end if
-            end do
-          end if
-        end do
-        nov_num = count(st_hydr%read_init(:) == DNOVAL)
-        ! -- Sum value for MPI (val)
-          call mpisum_val(nov_num, "non initial", sum_init)
-      end do
-      deallocate(recv_init)
-    end if
-    deallocate(calc2recv)
-#endif
 
     st_init%rest_time = st_init%rest_time*st_init%multi
     st_init%rest_delt = temp_delt*st_init%multi

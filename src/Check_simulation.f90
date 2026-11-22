@@ -95,7 +95,7 @@ module check_simulation
   end subroutine check_abserrmax
 
   subroutine check_residual(funcv, fscal, res_flag, res_fact, dmat, lumat, offind, offrow,&
-                            stnew, stold, hnew)
+                            stnew, stold, hnew, floor_l2)
   !*********************************************************************************************
   ! check_residual -- Check residual convergence criteria
   !*********************************************************************************************
@@ -109,36 +109,36 @@ module check_simulation
     real(DP), intent(in) :: dmat(:), lumat(:)
     logical, intent(out) :: res_flag
     real(DP), intent(in), optional :: stnew(:), stold(:), hnew(:)
+    real(DP), intent(out), optional :: floor_l2
     ! -- local
     integer(I4) :: i, k, viol_num
-    real(DP) :: vol_scal, res_val, scal_val, abs_tol, rel_tol, round_val, acc_val
-    logical :: abs_flag, rel_flag, pass_flag, round_flag, stor_flag
+    real(DP) :: vol_scal, res_val, scal_val, abs_tol, rel_tol, round_val, acc_val, floor_sum
+    logical :: abs_flag, rel_flag, pass_flag, round_flag, stor_flag, sum_flag
 #ifdef MPI_MSG
     integer(I4) :: sum_viol
+    real(DP) :: sum_floor
 #endif
     !-------------------------------------------------------------------------------------------
     res_flag = .true.
+    if (present(floor_l2)) then
+      floor_l2 = DZERO
+    end if
     abs_flag = st_ctrl%res_abs_tol > DZERO ; rel_flag = st_ctrl%res_rel_tol > DZERO
     if (.not. abs_flag .and. .not. rel_flag) then
       return
     end if
     round_flag = present(hnew) ; stor_flag = present(stnew) .and. present(stold)
+    sum_flag = round_flag .and. present(floor_l2) ; floor_sum = DZERO
 
     viol_num = 0 ; vol_scal = len_scal**3 ; acc_val = calc_acc_floor(fscal)
     abs_tol = st_ctrl%res_abs_tol*res_fact ; rel_tol = st_ctrl%res_rel_tol*res_fact
     !$omp parallel do private(i, k, res_val, scal_val, round_val, pass_flag) &
-    !$omp             reduction(+:viol_num)
+    !$omp             reduction(+:viol_num, floor_sum)
     do i = 1, ncalc
       res_val = abs(funcv(i))*vol_scal
       scal_val = fscal(i)*vol_scal
-      pass_flag = .false.
-      if (abs_flag .and. res_val <= abs_tol) then
-        pass_flag = .true.
-      else if (rel_flag .and. scal_val <= acc_val) then
-        pass_flag = .true.
-      else if (rel_flag .and. res_val <= rel_tol*scal_val) then
-        pass_flag = .true.
-      else if (round_flag) then
+      round_val = DZERO
+      if (round_flag) then
         round_val = abs(dmat(i))*abs(hnew(i))
         if (stor_flag) then
           round_val = max(abs(stnew(i)), abs(stold(i)))*st_geom%cell_vol(i)*st_time%delt_inv&
@@ -148,6 +148,18 @@ module check_simulation
           round_val = round_val + abs(lumat(k))&
                       *abs(hnew(offrow(k)))
         end do
+      end if
+      if (sum_flag) then
+        floor_sum = floor_sum + (ROUND_FACT*UROUND*round_val)**2
+      end if
+      pass_flag = .false.
+      if (abs_flag .and. res_val <= abs_tol) then
+        pass_flag = .true.
+      else if (rel_flag .and. scal_val <= acc_val) then
+        pass_flag = .true.
+      else if (rel_flag .and. res_val <= rel_tol*scal_val) then
+        pass_flag = .true.
+      else if (round_flag) then
         pass_flag = res_val <= ROUND_FACT*UROUND*round_val*vol_scal
       end if
       if (.not. pass_flag) then
@@ -161,10 +173,18 @@ module check_simulation
       ! -- Sum value for MPI (val)
         call mpisum_val(viol_num, "residual criteria violation", sum_viol)
       viol_num = sum_viol
+      if (sum_flag) then
+        ! -- Sum value for MPI (val)
+          call mpisum_val(floor_sum, "residual rounding floor", sum_floor)
+        floor_sum = sum_floor
+      end if
     end if
 #endif
     if (viol_num /= 0) then
       res_flag = .false.
+    end if
+    if (sum_flag) then
+      floor_l2 = floor_sum
     end if
 
   end subroutine check_residual

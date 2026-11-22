@@ -88,9 +88,9 @@ module nonlinear_solution
     real(DP) :: conv_dmat, conv_rhs, conv_head, conv_var, mass_error_pre, mass_error_min
     real(DP) :: l2norm_new, l2norm_pre, l2norm_jac, lambda, eater, gradient, max_step
     real(DP) :: res_l1, qext_l1, mass_error
-    real(DP) :: res_fact, step_pnorm, step_lmax, step_change
+    real(DP) :: res_fact, step_pnorm, step_lmax, step_change, res_floor2
     logical :: back_flag, res_flag, maxs_flag, stagn_flag, cycle_flag
-    logical :: head_change_flag, wpass_flag, beta_flag, pic_retry_flag
+    logical :: head_change_flag, wpass_flag, beta_flag, pic_retry_flag, floor_step_flag
 #ifdef MPI_MSG
     real(DP) :: sum_l2
     real(DP) :: var_max, unk_max, var_abs_max
@@ -116,7 +116,7 @@ module nonlinear_solution
     22 format(1X,"Stop due to repeated full rollback in backtracking")
     !-------------------------------------------------------------------------------------------
     conv_fnum = st_out_fnum%conv ; eater = DHALF ; maxstep_run = 0
-    head_change_flag = .false.
+    head_change_flag = .false. ; floor_step_flag = .false.
     stagn_run = 0 ; mass_error_pre = DZERO ; stagn_flag = .false.
     cycle_run = 0 ; mass_error_min = DZERO ; cycle_flag = .false. ; wpass_run = 0
     beta_run = 0 ; beta_flag = .false. ; roll_run = 0 ; pic_retry_flag = .false.
@@ -151,7 +151,7 @@ module nonlinear_solution
         st_time%form_switch = 0 ; roll_run = 0 ; pic_retry_flag = .true.
       end if
 
-      back_iter = 0 ; beta_iter = 0
+      back_iter = 0 ; beta_iter = 0 ; res_floor2 = DZERO
       back_flag = .false. ; wpass_flag = .false.
 
       ! -- Reset coefficients matrix and constant vector (matvec)
@@ -175,7 +175,7 @@ module nonlinear_solution
           call check_residual(st_matrix%array_var(1)%rhs, func_scal, res_flag, res_fact,&
                               st_matrix%array_var(1)%dmat, st_matrix%array_var(1)%lumat,&
                               st_matrix%crs_index(1)%offind, st_matrix%crs_index(1)%offrow,&
-                              hnew=st_sol%head_new)
+                              hnew=st_sol%head_new, floor_l2=res_floor2)
         if (st_time%out_iter > 1) then
           res_flag = res_flag .and. head_change_flag
         end if
@@ -326,11 +326,16 @@ module nonlinear_solution
       if (st_time%form_switch == 1 .and.&
           (.not. st_time%conv_flag .or. st_ctrl%conv_type == 1)) then
         step_change = check_val
-        ! -- Run backtracking (backtr)
-          call run_backtr(back_iter, back_flag, beta_iter, maxs_flag, wpass_flag,&
-                          wpass_run < WPASS_RUN_MAX, l2norm_new, l2norm_pre, l2norm_jac,&
-                          lambda, gradient, max_step, step_pnorm, step_lmax, st_coef%temp_rhs,&
-                          new_func, st_sol, st_matrix)
+        if (st_time%conv_flag .and. .not. floor_step_flag .and. res_floor2 > DZERO .and.&
+            l2norm_pre <= res_floor2) then
+          maxs_flag = .false. ; gradient = DZERO ; floor_step_flag = .true.
+        else
+          ! -- Run backtracking (backtr)
+            call run_backtr(back_iter, back_flag, beta_iter, maxs_flag, wpass_flag,&
+                            wpass_run < WPASS_RUN_MAX, l2norm_new, l2norm_pre, l2norm_jac,&
+                            lambda, gradient, max_step, step_pnorm, step_lmax,&
+                            st_coef%temp_rhs, new_func, st_sol, st_matrix)
+        end if
         beta_run = beta_run + beta_iter
         if (wpass_flag) then
           wpass_run = wpass_run + 1

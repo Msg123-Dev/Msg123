@@ -31,6 +31,7 @@ module calc_function
   real(DP), allocatable :: surf_work(:)
   real(DP), allocatable :: delh_r(:), delh_l(:), seal_flow(:)
   real(DP), allocatable :: jcvec(:), tempf2(:)
+  real(DP), allocatable :: pert_stor(:), pert_srat(:), pert_rperm(:), pert_surfr(:)
 
   contains
 
@@ -54,6 +55,8 @@ module calc_function
     allocate(surf_work(ncals))
     allocate(delh_r(st_bcnd%rive_num), delh_l(st_bcnd%lake_num), seal_flow(st_bcnd%seal_num))
     allocate(jcvec(st_matrix%nreg_num), tempf2(ncalc))
+    allocate(pert_stor(st_matrix%nreg_num), pert_srat(st_matrix%nreg_num))
+    allocate(pert_rperm(st_matrix%nreg_num), pert_surfr(ncals))
 
   end subroutine allocate_calfun
 
@@ -815,7 +818,7 @@ module calc_function
     ! -- inout
     integer(I4), intent(in) :: vj
     real(DP), intent(in) :: injv(:), stold(:), surfh(:), injf(:)
-    real(DP), intent(inout) :: stnew(:), injx(:), snew(:), rperm(:), surfr(:)
+    real(DP), intent(in) :: stnew(:), injx(:), snew(:), rperm(:), surfr(:)
     real(DP), intent(out) :: outjv(:)
     type(matrix_set), intent(in) :: st_matrix
     ! -- local
@@ -897,8 +900,22 @@ module calc_function
     end do
     !$omp end parallel do
 
+    !$omp parallel
+    !$omp do private(i)
+    do i = 1, vj_regnum
+      pert_stor(i) = stnew(i) ; pert_srat(i) = snew(i) ; pert_rperm(i) = rperm(i)
+    end do
+    !$omp end do
+    !$omp do private(i)
+    do i = 1, ncals
+      pert_surfr(i) = surfr(i)
+    end do
+    !$omp end do
+    !$omp end parallel
+
     ! -- Calculate function value (func)
-      call calc_func(st_matrix, stold, stnew, surfh, jcvec, snew, rperm, surfr, tempf2)
+      call calc_func(st_matrix, stold, pert_stor, surfh, jcvec, pert_srat, pert_rperm,&
+                     pert_surfr, tempf2)
 
     !$omp parallel do private(i)
     do i = 1, vj_num

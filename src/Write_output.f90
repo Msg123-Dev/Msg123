@@ -470,14 +470,14 @@ module write_output
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
     ! -- Calculate water table for MPI (mpi_wtable)
-      call calc_mpi_wtable(st_sol%head_new, st_sol%srat_new)
+      call calc_mpi_wtable(st_sol%head_new)
     else
     ! -- Calculate water table (wtable)
-      call calc_wtable(st_sol%head_new, st_sol%srat_new)
+      call calc_wtable(st_sol%head_new)
     end if
 #else
     ! -- Calculate water table (wtable)
-      call calc_wtable(st_sol%head_new, st_sol%srat_new)
+      call calc_wtable(st_sol%head_new)
 #endif
 
     allocate(cals2cals(ncals))

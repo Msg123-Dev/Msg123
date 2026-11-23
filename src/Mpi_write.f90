@@ -1,11 +1,12 @@
 module mpi_write
   ! -- modules
   use kind_module, only: I4, SP, DP
-  use constval_module, only: SNOVAL, DZERO, DONE
+  use constval_module, only: SNOVAL, DZERO
   use utility_module, only: st_mpi, write_err_write, write_err_stop
   use mpi_utility, only: mpimax_val
   use initial_module, only: st_grid
   use set_cell, only: get_calc_grid, ncalc, ncals, neib_mpi_totn, neib_ncalc, st_conn
+  use make_cell, only: st_geom
   use mpi
 
   implicit none
@@ -401,7 +402,7 @@ module mpi_write
 
   end subroutine set_senrec_wtab
 
-  subroutine calc_mpi_wtable(hnew, snew)
+  subroutine calc_mpi_wtable(hnew)
   !*********************************************************************************************
   ! calc_mpi_wtable -- Calculate water table for MPI
   !*********************************************************************************************
@@ -410,7 +411,7 @@ module mpi_write
     use set_cell, only: get_cals_grid
     use allocate_output, only: wtable
     ! -- inout
-    real(DP), intent(in) :: hnew(:), snew(:)
+    real(DP), intent(in) :: hnew(:)
     ! -- local
     integer(I4) :: i, j, k, ierr, nxyz, loc_n, loc_r, i_num, j_num, mpi_ncalc
     integer(I4) :: wtab_sendn, wtab_recvn, sum_sendn, sum_recvn
@@ -419,20 +420,25 @@ module mpi_write
     integer(I4) :: rank_flag, allp_flag
     integer(I4), allocatable :: send_flag(:), recv_flag(:)
     integer, allocatable :: flag_send(:), req_flag_recv(:)
-    integer, allocatable :: head_send(:), req_head_recv(:), srat_send(:), req_srat_recv(:)
+    integer, allocatable :: level_send(:), req_level_recv(:), psi_send(:), req_psi_recv(:)
+    integer, allocatable :: ztop_send(:), req_ztop_recv(:)
     integer, allocatable :: stat_s(:,:), stat_r(:,:)
-    real(DP), allocatable :: send_head(:), send_srat(:), recv_head(:), recv_srat(:)
+    real(DP) :: top_psi, below_psi, below_top
+    real(DP), allocatable :: send_level(:), send_psi(:), send_ztop(:)
+    real(DP), allocatable :: recv_level(:), recv_psi(:), recv_ztop(:)
+    logical :: below_flag
     !-------------------------------------------------------------------------------------------
     wtab_sendn = send_wtab_cind(neib_wtab_stotn)
     wtab_recvn = recv_wtab_cind(neib_wtab_rtotn)
     mpi_ncalc = ncalc + neib_ncalc
     allocate(send_flag(wtab_sendn), recv_flag(wtab_recvn))
     allocate(flag_send(neib_mpi_totn), req_flag_recv(neib_mpi_totn))
-    allocate(head_send(neib_mpi_totn), req_head_recv(neib_mpi_totn))
-    allocate(srat_send(neib_mpi_totn), req_srat_recv(neib_mpi_totn))
+    allocate(level_send(neib_mpi_totn), req_level_recv(neib_mpi_totn))
+    allocate(psi_send(neib_mpi_totn), req_psi_recv(neib_mpi_totn))
+    allocate(ztop_send(neib_mpi_totn), req_ztop_recv(neib_mpi_totn))
     allocate(stat_s(MPI_STATUS_SIZE,neib_mpi_totn), stat_r(MPI_STATUS_SIZE,neib_mpi_totn))
-    allocate(send_head(wtab_sendn), send_srat(wtab_sendn))
-    allocate(recv_head(wtab_recvn), recv_srat(wtab_recvn))
+    allocate(send_level(wtab_sendn), send_psi(wtab_sendn), send_ztop(wtab_sendn))
+    allocate(recv_level(wtab_recvn), recv_psi(wtab_recvn), recv_ztop(wtab_recvn))
     !$omp parallel
     !$omp do private(i)
     do i = 1, wtab_sendn
@@ -447,8 +453,9 @@ module mpi_write
     !$omp do private(i)
     do i = 1, neib_mpi_totn
       flag_send(i) = MPI_REQUEST_NULL ; req_flag_recv(i) = MPI_REQUEST_NULL
-      head_send(i) = MPI_REQUEST_NULL ; req_head_recv(i) = MPI_REQUEST_NULL
-      srat_send(i) = MPI_REQUEST_NULL ; req_srat_recv(i) = MPI_REQUEST_NULL
+      level_send(i) = MPI_REQUEST_NULL ; req_level_recv(i) = MPI_REQUEST_NULL
+      psi_send(i) = MPI_REQUEST_NULL ; req_psi_recv(i) = MPI_REQUEST_NULL
+      ztop_send(i) = MPI_REQUEST_NULL ; req_ztop_recv(i) = MPI_REQUEST_NULL
     end do
     !$omp end do
     !$omp do private(j)
@@ -458,12 +465,12 @@ module mpi_write
     !$omp end do
     !$omp do private(i)
     do i = 1, wtab_sendn
-      send_head(i) = DZERO ; send_srat(i) = DZERO
+      send_level(i) = DZERO ; send_psi(i) = DZERO ; send_ztop(i) = DZERO
     end do
     !$omp end do
     !$omp do private(i)
     do i = 1, wtab_recvn
-      recv_head(i) = DZERO ; recv_srat(i) = DZERO
+      recv_level(i) = DZERO ; recv_psi(i) = DZERO ; recv_ztop(i) = DZERO
     end do
     !$omp end do
     !$omp end parallel
@@ -488,8 +495,8 @@ module mpi_write
       call set_send_flag(send_flag)
     wtab_fix_loop: do while (allp_flag /= st_mpi%totn)
       ! -- Set send variable (send_vari)
-        call set_send_vari(recv_flag, send_flag, hnew, snew, recv_head, recv_srat, send_head,&
-                           send_srat)
+        call set_send_vari(recv_flag, send_flag, hnew, recv_level, recv_psi, recv_ztop,&
+                           send_level, send_psi, send_ztop)
 
       do i = 1, neib_wtab_stotn
         isend_sta = send_wtab_cind(i-1)+1 ; isend_end = send_wtab_cind(i)
@@ -497,10 +504,12 @@ module mpi_write
         if (send_len /= 0) then
           call MPI_ISEND(send_flag(isend_sta), send_len, MPI_INTEGER, neib_wtab_snum(i), 0,&
                          st_mpi%comm, flag_send(i), ierr)
-          call MPI_ISEND(send_head(isend_sta), send_len, MPI_REAL8, neib_wtab_snum(i), 1,&
-                         st_mpi%comm, head_send(i), ierr)
-          call MPI_ISEND(send_srat(isend_sta), send_len, MPI_REAL8, neib_wtab_snum(i), 2,&
-                         st_mpi%comm, srat_send(i), ierr)
+          call MPI_ISEND(send_level(isend_sta), send_len, MPI_REAL8, neib_wtab_snum(i), 1,&
+                         st_mpi%comm, level_send(i), ierr)
+          call MPI_ISEND(send_psi(isend_sta), send_len, MPI_REAL8, neib_wtab_snum(i), 2,&
+                         st_mpi%comm, psi_send(i), ierr)
+          call MPI_ISEND(send_ztop(isend_sta), send_len, MPI_REAL8, neib_wtab_snum(i), 3,&
+                         st_mpi%comm, ztop_send(i), ierr)
         end if
       end do
 
@@ -510,16 +519,19 @@ module mpi_write
         if (irecv_end /= 0) then
           call MPI_IRECV(recv_flag(irecv_sta), recv_len, MPI_INTEGER, neib_wtab_rnum(i), 0,&
                          st_mpi%comm, req_flag_recv(i), ierr)
-          call MPI_IRECV(recv_head(irecv_sta), recv_len, MPI_REAL8, neib_wtab_rnum(i), 1,&
-                         st_mpi%comm, req_head_recv(i), ierr)
-          call MPI_IRECV(recv_srat(irecv_sta), recv_len, MPI_REAL8, neib_wtab_rnum(i), 2,&
-                         st_mpi%comm, req_srat_recv(i), ierr)
+          call MPI_IRECV(recv_level(irecv_sta), recv_len, MPI_REAL8, neib_wtab_rnum(i), 1,&
+                         st_mpi%comm, req_level_recv(i), ierr)
+          call MPI_IRECV(recv_psi(irecv_sta), recv_len, MPI_REAL8, neib_wtab_rnum(i), 2,&
+                         st_mpi%comm, req_psi_recv(i), ierr)
+          call MPI_IRECV(recv_ztop(irecv_sta), recv_len, MPI_REAL8, neib_wtab_rnum(i), 3,&
+                         st_mpi%comm, req_ztop_recv(i), ierr)
         end if
       end do
 
       call MPI_WAITALL(neib_wtab_rtotn, req_flag_recv, stat_r, ierr)
-      call MPI_WAITALL(neib_wtab_rtotn, req_head_recv, stat_r, ierr)
-      call MPI_WAITALL(neib_wtab_rtotn, req_srat_recv, stat_r, ierr)
+      call MPI_WAITALL(neib_wtab_rtotn, req_level_recv, stat_r, ierr)
+      call MPI_WAITALL(neib_wtab_rtotn, req_psi_recv, stat_r, ierr)
+      call MPI_WAITALL(neib_wtab_rtotn, req_ztop_recv, stat_r, ierr)
       if (ierr /= MPI_SUCCESS) then
         if (st_mpi%rank == 0) then
           call write_err_stop("Receive water table information.")
@@ -527,8 +539,9 @@ module mpi_write
       end if
 
       call MPI_WAITALL(neib_wtab_stotn, flag_send, stat_s, ierr)
-      call MPI_WAITALL(neib_wtab_stotn, head_send, stat_s, ierr)
-      call MPI_WAITALL(neib_wtab_stotn, srat_send, stat_s, ierr)
+      call MPI_WAITALL(neib_wtab_stotn, level_send, stat_s, ierr)
+      call MPI_WAITALL(neib_wtab_stotn, psi_send, stat_s, ierr)
+      call MPI_WAITALL(neib_wtab_stotn, ztop_send, stat_s, ierr)
       if (ierr /= MPI_SUCCESS) then
         if (st_mpi%rank == 0) then
           call write_err_stop("Send water table information.")
@@ -556,35 +569,43 @@ module mpi_write
         call mpisum_val(rank_flag, "water table", allp_flag)
     end do wtab_fix_loop
 
-    !$omp parallel do private(i, k, nxyz, loc_n, loc_r, i_num, j_num)
+    !$omp parallel do private(i, k, nxyz, loc_n, loc_r, i_num, j_num, top_psi, below_psi,&
+    !$omp&                    below_top, below_flag)
     do i = 1, ncals
       call get_cals_grid(i, i_num, j_num)
+      below_flag = .false. ; below_psi = DZERO ; below_top = DZERO
       wtab: do k = st_grid%nz, 1, -1
         nxyz = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
         loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:mpi_ncalc), value = nxyz, dim = 1)
         if (loc_n /= 0) then
           loc_r = 0 ; loc_r = findloc(recv_wtab_citem(:), value = loc_n, dim = 1)
-          if (loc_r == 0) then
-            if (snew(loc_n) /= DONE) then
-              wtable(i) = hnew(loc_n)
-              exit wtab
-            else
-              wtable(i) = hnew(loc_n)
-            end if
-          else
-            if (recv_srat(loc_r) /= DONE) then
-              wtable(i) = recv_head(loc_r)
+          if (loc_r /= 0) then
+            wtable(i) = recv_level(loc_r)
+            if (recv_psi(loc_r) < DZERO) then
               exit wtab
             end if
+            below_flag = .true. ; below_psi = recv_psi(loc_r) ; below_top = recv_ztop(loc_r)
+          else if (loc_n <= ncalc) then
+            top_psi = hnew(loc_n) - st_geom%cell_top(loc_n)
+            if (top_psi < DZERO .and. below_flag) then
+              wtable(i) = below_top + below_psi*(st_geom%cell_top(loc_n) - below_top)&
+                          /(below_psi - top_psi)
+              exit wtab
+            end if
+            wtable(i) = hnew(loc_n)
+            if (top_psi < DZERO) then
+              exit wtab
+            end if
+            below_flag = .true. ; below_psi = top_psi ; below_top = st_geom%cell_top(loc_n)
           end if
         end if
       end do wtab
     end do
     !$omp end parallel do
 
-    deallocate(send_flag, recv_flag, flag_send, req_flag_recv, head_send, req_head_recv)
-    deallocate(srat_send, req_srat_recv, stat_s, stat_r)
-    deallocate(send_head, send_srat, recv_head, recv_srat)
+    deallocate(send_flag, recv_flag, flag_send, req_flag_recv, level_send, req_level_recv)
+    deallocate(psi_send, req_psi_recv, ztop_send, req_ztop_recv, stat_s, stat_r)
+    deallocate(send_level, send_psi, send_ztop, recv_level, recv_psi, recv_ztop)
 
   end subroutine calc_mpi_wtable
 
@@ -628,7 +649,8 @@ module mpi_write
 
   end subroutine set_send_flag
 
-  subroutine set_send_vari(r_flag, s_flag, c_head, c_srat, r_head, r_srat, s_head, s_srat)
+  subroutine set_send_vari(r_flag, s_flag, c_head, r_level, r_psi, r_ztop, s_level, s_psi,&
+                           s_ztop)
   !*********************************************************************************************
   ! set_send_vari -- Set send variable
   !*********************************************************************************************
@@ -637,41 +659,52 @@ module mpi_write
     ! -- inout
     integer(I4), intent(in) :: r_flag(:)
     integer(I4), intent(inout) :: s_flag(:)
-    real(DP), intent(in) :: c_head(:), c_srat(:)
-    real(DP), intent(in) :: r_head(:), r_srat(:)
-    real(DP), intent(out) :: s_head(:), s_srat(:)
+    real(DP), intent(in) :: c_head(:)
+    real(DP), intent(in) :: r_level(:), r_psi(:), r_ztop(:)
+    real(DP), intent(out) :: s_level(:), s_psi(:), s_ztop(:)
     ! -- local
     integer(I4) :: i, j, k, c_num, isend, nxyz, loc_n, loc_r, mpi_ncalc
     integer(I4) :: is_sta, is_end
     integer(I4) :: i_num, j_num, k_num
+    real(DP) :: top_psi
+    logical :: below_flag
     !-------------------------------------------------------------------------------------------
     mpi_ncalc = ncalc + neib_ncalc
     !$omp parallel do private(i, j, k, c_num, isend, nxyz, loc_n, loc_r, is_sta, is_end,&
-    !$omp&                    i_num, j_num, k_num)
+    !$omp&                    i_num, j_num, k_num, top_psi, below_flag)
     do i = 1, neib_wtab_stotn
       is_sta = send_wtab_cind(i-1) ; is_end = send_wtab_cind(i)
       do isend = 1, is_end-is_sta
         j = is_sta + isend ; c_num = send_wtab_citem(j)
         call get_calc_grid(c_num, i_num, j_num, k_num)
+        s_level(j) = DZERO ; s_psi(j) = DZERO ; s_ztop(j) = DZERO ; below_flag = .false.
         unsat: do k = st_grid%nz, k_num, -1
           nxyz = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
           loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:mpi_ncalc), value = nxyz, dim = 1)
           if (loc_n /= 0) then
             loc_r = 0 ; loc_r = findloc(recv_wtab_citem(:), value = loc_n, dim = 1)
-            if (loc_r == 0) then
-              s_head(j) = c_head(loc_n) ; s_srat(j) = c_srat(loc_n)
-            else if (r_flag(loc_r) /= 0) then
-              s_flag(j) = 1
-              if (r_srat(loc_r) /= DONE) then
-                s_head(j) = r_head(loc_r) ; s_srat(j) = r_srat(loc_r)
-              else
-                s_head(j) = c_head(loc_n) ; s_srat(j) = c_srat(loc_n)
+            if (loc_r /= 0) then
+              if (r_flag(loc_r) /= 0) then
+                s_flag(j) = 1
+                s_level(j) = r_level(loc_r) ; s_psi(j) = r_psi(loc_r)
+                s_ztop(j) = r_ztop(loc_r)
+                if (s_psi(j) < DZERO) then
+                  exit unsat
+                end if
+                below_flag = .true.
               end if
-            else
-              s_head(j) = c_head(loc_n) ; s_srat(j) = c_srat(loc_n)
-            end if
-            if (s_srat(j) /= DONE) then
-              exit unsat
+            else if (loc_n <= ncalc) then
+              top_psi = c_head(loc_n) - st_geom%cell_top(loc_n)
+              if (top_psi < DZERO .and. below_flag) then
+                s_level(j) = s_ztop(j) + s_psi(j)*(st_geom%cell_top(loc_n) - s_ztop(j))&
+                             /(s_psi(j) - top_psi)
+              else
+                s_level(j) = c_head(loc_n)
+              end if
+              s_psi(j) = top_psi ; s_ztop(j) = st_geom%cell_top(loc_n) ; below_flag = .true.
+              if (top_psi < DZERO) then
+                exit unsat
+              end if
             end if
           end if
         end do unsat

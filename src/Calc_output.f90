@@ -22,7 +22,7 @@ module calc_output
 
   contains
 
-  subroutine calc_wtable(hyd_head, deg_satu)
+  subroutine calc_wtable(hyd_head)
   !*********************************************************************************************
   ! calc_wtable -- Calculate water table
   !*********************************************************************************************
@@ -31,27 +31,36 @@ module calc_output
     use set_cell, only: st_conn, get_cals_grid, check_col_part
     use allocate_output, only: wtable
     ! -- inout
-    real(DP), intent(in) :: hyd_head(:), deg_satu(:)
+    real(DP), intent(in) :: hyd_head(:)
     ! -- local
     integer(I4) :: i, k, nijk, c_num
     integer(I4) :: i_num, j_num
+    real(DP) :: top_psi, below_psi, below_top
+    logical :: below_flag
     !-------------------------------------------------------------------------------------------
     ! -- Check the column partition (col_part)
       call check_col_part()
 
-    !$omp parallel do private(i, k, i_num, j_num, c_num, nijk)
+    !$omp parallel do private(i, k, i_num, j_num, c_num, nijk, top_psi, below_psi, below_top,&
+    !$omp&                    below_flag)
     do i = 1, ncals
       call get_cals_grid(i, i_num, j_num)
+      below_flag = .false. ; below_psi = DZERO ; below_top = DZERO
       unsat: do k = st_grid%nz, 1, -1
         nijk = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
         c_num = 0 ; c_num = findloc(st_conn%loc2glo_ijk(:), value = nijk, dim = 1)
         if (c_num /= 0 .and. c_num <= ncalc) then
-          if (deg_satu(c_num) /= DONE) then
-            wtable(i) = hyd_head(c_num)
+          top_psi = hyd_head(c_num) - st_geom%cell_top(c_num)
+          if (top_psi < DZERO .and. below_flag) then
+            wtable(i) = below_top + below_psi*(st_geom%cell_top(c_num) - below_top)&
+                        /(below_psi - top_psi)
             exit unsat
-          else
-            wtable(i) = hyd_head(c_num)
           end if
+          wtable(i) = hyd_head(c_num)
+          if (top_psi < DZERO) then
+            exit unsat
+          end if
+          below_flag = .true. ; below_psi = top_psi ; below_top = st_geom%cell_top(c_num)
         end if
       end do unsat
     end do

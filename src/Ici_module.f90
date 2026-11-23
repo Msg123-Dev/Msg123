@@ -264,7 +264,7 @@ module ici_module
     if (coupled_matsiro .and. mat_put) then
       if (st_out_type%wtab /= out_type(2)) then
         ! -- Calculate water table (wtable)
-          call calc_wtable(st_sol%head_new, st_sol%srat_new)
+          call calc_wtable(st_sol%head_new)
       end if
       allocate(wtab_dep(ncals))
       ! -- Calculate water table depth (wtab_depth)

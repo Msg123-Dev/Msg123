@@ -2,7 +2,8 @@ module mpi_write
   ! -- modules
   use kind_module, only: I4, SP, DP
   use constval_module, only: SNOVAL, DZERO
-  use utility_module, only: st_mpi, write_err_write, write_err_stop
+  use types_module, only: gmap_set
+  use utility_module, only: st_mpi, write_err_write, write_err_stop, gmap_get
   use mpi_utility, only: mpimax_val
   use initial_module, only: st_grid
   use set_cell, only: get_calc_grid, ncalc, ncals, neib_mpi_totn, st_conn
@@ -18,7 +19,8 @@ module mpi_write
   integer(I4) :: neib_wtab_stotn, neib_wtab_rtotn
   integer(I4), allocatable :: neib_wtab_snum(:), neib_wtab_rnum(:)
   integer(I4), allocatable :: send_wtab_cind(:), recv_wtab_cind(:)
-  integer(I4), allocatable :: send_wtab_citem(:), recv_wtab_glo(:)
+  integer(I4), allocatable :: send_wtab_citem(:)
+  type(gmap_set) :: recv_wtab_map
 
   contains
 
@@ -320,7 +322,7 @@ module mpi_write
   !*********************************************************************************************
     ! -- module
     use types_module, only: matrix_set
-    use utility_module, only: iquick_sort, iquick_sort2
+    use utility_module, only: iquick_sort, iquick_sort2, gmap_init, gmap_put
     use set_cell, only: recv_cind, neib_num
     ! -- inout
     type(matrix_set), intent(in) :: st_matrix
@@ -328,6 +330,7 @@ module mpi_write
     integer(I4) :: i, k, ind, neib_ind, temp_neib_num
     integer(I4) :: temp_snum, temp_rnum, sta_ind, end_ind
     integer(I4), allocatable :: temp_send_cind(:), temp_recv_cind(:), temp_send_glo(:)
+    integer(I4), allocatable :: temp_recv_glo(:)
     !-------------------------------------------------------------------------------------------
     allocate(temp_send_cind(0:neib_mpi_totn), temp_recv_cind(0:neib_mpi_totn))
     !$omp parallel do private(i)
@@ -355,7 +358,7 @@ module mpi_write
       k = temp_send_cind(i) ; temp_send_cind(i) = temp_snum ; temp_snum = temp_snum + k
       k = temp_recv_cind(i) ; temp_recv_cind(i) = temp_rnum ; temp_rnum = temp_rnum + k
     end do
-    allocate(send_wtab_citem(temp_snum), recv_wtab_glo(temp_rnum), temp_send_glo(temp_snum))
+    allocate(send_wtab_citem(temp_snum), temp_send_glo(temp_snum), temp_recv_glo(temp_rnum))
 
     do i = 1, ncalc
       do ind = st_matrix%crs_index(1)%offind(i-1)+1, st_matrix%crs_index(1)%offind(i)
@@ -368,7 +371,7 @@ module mpi_write
             temp_send_glo(temp_send_cind(neib_ind)) = st_conn%loc2glo_ijk(i)
           else if (st_matrix%dir_conn(ind) == 6) then
             temp_recv_cind(neib_ind) = temp_recv_cind(neib_ind) + 1
-            recv_wtab_glo(temp_recv_cind(neib_ind)) = st_conn%loc2glo_ijk(i)&
+            temp_recv_glo(temp_recv_cind(neib_ind)) = st_conn%loc2glo_ijk(i)&
                                                       + st_grid%nx*st_grid%ny
           end if
         end if
@@ -379,7 +382,11 @@ module mpi_write
       sta_ind = temp_send_cind(i-1) + 1 ; end_ind = temp_send_cind(i)
       call iquick_sort2(temp_send_glo, send_wtab_citem, sta_ind, end_ind)
       sta_ind = temp_recv_cind(i-1) + 1 ; end_ind = temp_recv_cind(i)
-      call iquick_sort(recv_wtab_glo, sta_ind, end_ind)
+      call iquick_sort(temp_recv_glo, sta_ind, end_ind)
+    end do
+    call gmap_init(recv_wtab_map, temp_rnum)
+    do i = 1, temp_rnum
+      call gmap_put(recv_wtab_map, temp_recv_glo(i), i)
     end do
 
     neib_wtab_stotn = count(temp_send_cind(1:) /= temp_send_cind(:neib_mpi_totn-1))
@@ -575,7 +582,7 @@ module mpi_write
       below_flag = .false. ; below_psi = DZERO ; below_top = DZERO
       wtab: do k = st_grid%nz, 1, -1
         nxyz = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
-        loc_r = 0 ; loc_r = findloc(recv_wtab_glo(:), value = nxyz, dim = 1)
+        loc_r = 0 ; loc_r = gmap_get(recv_wtab_map, nxyz)
         if (loc_r /= 0) then
           wtable(i) = recv_level(loc_r)
           if (recv_psi(loc_r) < DZERO) then
@@ -583,8 +590,8 @@ module mpi_write
           end if
           below_flag = .true. ; below_psi = recv_psi(loc_r) ; below_top = recv_ztop(loc_r)
         else
-          loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:ncalc), value = nxyz, dim = 1)
-          if (loc_n /= 0) then
+          loc_n = 0 ; loc_n = gmap_get(st_conn%glo2loc_map, nxyz)
+          if (loc_n /= 0 .and. loc_n <= ncalc) then
             top_psi = hnew(loc_n) - st_geom%cell_top(loc_n)
             if (top_psi < DZERO .and. below_flag) then
               wtable(i) = below_top + below_psi*(st_geom%cell_top(loc_n) - below_top)&
@@ -630,13 +637,13 @@ module mpi_write
         call get_calc_grid(c_num, i_num, j_num, k_num)
         sr_flag: do k = st_grid%nz, k_num, -1
           nxyz = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
-          loc_r = 0 ; loc_r = findloc(recv_wtab_glo(:), value = nxyz, dim = 1)
+          loc_r = 0 ; loc_r = gmap_get(recv_wtab_map, nxyz)
           if (loc_r /= 0) then
             flag_send(j) = 0
             exit sr_flag
           end if
-          loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:ncalc), value = nxyz, dim = 1)
-          if (loc_n /= 0) then
+          loc_n = 0 ; loc_n = gmap_get(st_conn%glo2loc_map, nxyz)
+          if (loc_n /= 0 .and. loc_n <= ncalc) then
             flag_send(j) = 1
             exit sr_flag
           end if
@@ -677,7 +684,7 @@ module mpi_write
         s_level(j) = DZERO ; s_psi(j) = DZERO ; s_ztop(j) = DZERO ; below_flag = .false.
         unsat: do k = st_grid%nz, k_num, -1
           nxyz = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
-          loc_r = 0 ; loc_r = findloc(recv_wtab_glo(:), value = nxyz, dim = 1)
+          loc_r = 0 ; loc_r = gmap_get(recv_wtab_map, nxyz)
           if (loc_r /= 0) then
             if (r_flag(loc_r) /= 0) then
               s_flag(j) = 1
@@ -689,8 +696,8 @@ module mpi_write
               below_flag = .true.
             end if
           else
-            loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:ncalc), value = nxyz, dim = 1)
-            if (loc_n /= 0) then
+            loc_n = 0 ; loc_n = gmap_get(st_conn%glo2loc_map, nxyz)
+            if (loc_n /= 0 .and. loc_n <= ncalc) then
               top_psi = c_head(loc_n) - st_geom%cell_top(loc_n)
               if (top_psi < DZERO .and. below_flag) then
                 s_level(j) = s_ztop(j) + s_psi(j)*(st_geom%cell_top(loc_n) - s_ztop(j))&

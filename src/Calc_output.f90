@@ -27,6 +27,7 @@ module calc_output
   ! calc_wtable -- Calculate water table
   !*********************************************************************************************
     ! -- modules
+    use utility_module, only: gmap_get
     use initial_module, only: st_grid
     use set_cell, only: st_conn, get_cals_grid, check_col_part
     use allocate_output, only: wtable
@@ -48,7 +49,7 @@ module calc_output
       below_flag = .false. ; below_psi = DZERO ; below_top = DZERO
       unsat: do k = st_grid%nz, 1, -1
         nijk = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
-        c_num = 0 ; c_num = findloc(st_conn%loc2glo_ijk(:), value = nijk, dim = 1)
+        c_num = 0 ; c_num = gmap_get(st_conn%glo2loc_map, nijk)
         if (c_num /= 0 .and. c_num <= ncalc) then
           top_psi = hyd_head(c_num) - st_geom%cell_top(c_num)
           if (top_psi < DZERO .and. below_flag) then

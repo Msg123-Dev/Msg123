@@ -269,7 +269,7 @@ module set_condition
           do jj = jst, jen
             do kk = kst, ken
               c_num = gridx*(gridy*(kk-1) + (jj-1)) + ii
-              l_ijk = 0 ; l_ijk = findloc(st_conn%loc2glo_ijk(:), value = c_num, dim = 1)
+              l_ijk = 0 ; l_ijk = gmap_get(st_conn%glo2loc_map, c_num)
               if (l_ijk > mpi_ncalc .and. l_ijk <= cnum) then
                 cell_val(l_ijk-mpi_ncalc) = tg_val(i)
                 tg_flag(l_ijk-mpi_ncalc) = 1
@@ -289,7 +289,7 @@ module set_condition
   ! set_point2surf -- Set surface value from point
   !*********************************************************************************************
     ! -- modules
-
+    use set_cell, only: surf_map
     ! -- inout
     integer(I4), intent(in) :: tgn
     integer(I4), intent(in) :: p_i(:), p_j(:)
@@ -323,7 +323,7 @@ module set_condition
       do ii = ist, ien
         do jj = jst, jen
           s_num = gridx*(jj-1) + ii
-          l_ij = 0 ; l_ij = findloc(st_conn%loc2glo_ij(:), value = s_num, dim = 1)
+          l_ij = 0 ; l_ij = gmap_get(surf_map, s_num)
           if (l_ij > 0 .and. l_ij <= ncals) then
             cell_val(l_ij) = tg_val(i)
             tg_flag(l_ij) = 1
@@ -1528,7 +1528,7 @@ module set_condition
     cwn = 0
     do i = 1, locwn
       c_num = st_grid%nx*(st_grid%ny*(rw_ks(i)-1) + (rw_j(i)-1)) + rw_i(i)
-      l_num = 0 ; l_num = findloc(st_conn%loc2glo_ijk(:), value = c_num, dim = 1)
+      l_num = 0 ; l_num = gmap_get(st_conn%glo2loc_map, c_num)
       if (l_num /= 0 .and. l_num <= ncalc) then
         cwn = cwn + 1 ; s_num = st_grid%nx*(rw_j(i)-1) + rw_i(i)
         w_id(cwn) = rw_id(i) ; w_ij(cwn) = s_num
@@ -1835,8 +1835,8 @@ module set_condition
     do i = 1, wnum
       do k = st_well%ks(i), st_well%ke(i)
         c_num = st_grid%nx*st_grid%ny*(k-1) + st_well%ij(i)
-        l_num = 0 ; l_num = findloc(st_conn%loc2glo_ijk(:ncalc), value = c_num, dim = 1)
-        if (l_num /= 0) then
+        l_num = 0 ; l_num = gmap_get(st_conn%glo2loc_map, c_num)
+        if (l_num /= 0 .and. l_num <= ncalc) then
           index_count = index_count + 1
           temp_wconn(index_count) = l_num
         end if
@@ -2511,7 +2511,6 @@ module set_condition
 
     deallocate(reg_cksx, reg_cksy, reg_cksz)
     deallocate(reg_dis, reg_fare)
-    call gmap_free(st_conn%glo2loc_map)
 
   end subroutine set_connect
 

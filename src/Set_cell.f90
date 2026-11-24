@@ -19,6 +19,7 @@ module set_cell
   integer(I4), public :: ncalc, ncals, ncell, nsurf, no_ncalc, no_ncals
   integer(I4), public :: seal_snum, seal_cnum, neib_mpi_totn, neib_ncals, neib_ncalc
   type(conn_set), public :: st_conn
+  type(gmap_set), public :: surf_map
 #ifdef MPI_MSG
   integer(I4), allocatable, public :: send_cind(:), recv_cind(:)
   integer(I4), allocatable, public :: send_citem(:), recv_citem(:)
@@ -35,7 +36,6 @@ module set_cell
   integer(I4), allocatable :: own_calc_glo(:), own_calc_reg(:), own_nocal_glo(:)
   integer(I4), allocatable :: read_reg(:), read_mpi(:)
   logical :: div_reg_3d
-  type(gmap_set) :: surf_map
 #ifndef MPI_MSG
   integer(I4), allocatable :: glob_reg_flag(:), glob_mpi_flag(:)
 #else
@@ -480,8 +480,6 @@ module set_cell
     deallocate(loc2unk_ij, loc2unk_ijk)
 #endif
 #endif
-
-    call gmap_free(surf_map)
 
     if (st_ctrl%noclas_flag /= 1) then
       ! -- Set local cell classification (loc_cell_clas)
@@ -1813,7 +1811,7 @@ module set_cell
     ! -- local
     integer(I4) :: i, j, k, ij
     integer(I4) :: i_num, j_num, k_num, g_num, n_num, w_num, e_num, s_num, u_num, d_num
-    integer(I4) :: neib_mpi_num, sta_send, end_send, sendrecv_num, send_loc, recv_loc
+    integer(I4) :: neib_mpi_num, sta_send, end_send, sendrecv_num, send_loc
     integer(I4) :: cals_niebn, calc_niebn, reg_num, own_reg
     integer(I4), allocatable :: temp_neib_num(:), temp_neib_flag(:), temp_mpi_num(:)
     integer(I4), allocatable :: neib_glos(:), neib_gloc(:), neib_locc(:)
@@ -2077,16 +2075,22 @@ module set_cell
       do i = 1, neib_ncalc
         temp_sort(i) = neib_gloc(i)
         send2recv(i) = 0
-        loc_send_num(i) = 0
+        loc_send_num(i) = i
       end do
       !$omp end do
       !$omp end parallel
 
-      call iquick_sort(temp_sort, 1, neib_ncalc)
+      call iquick_sort2(temp_sort, loc_send_num, 1, neib_ncalc)
+      k = 1
+      do i = 2, neib_ncalc
+        if (temp_sort(i) /= temp_sort(k)) then
+          call iquick_sort(loc_send_num, k, i-1)
+          k = i
+        end if
+      end do
+      call iquick_sort(loc_send_num, k, neib_ncalc)
       do i = 1, neib_ncalc
-        recv_loc = findloc(neib_gloc(1:neib_ncalc), value = temp_sort(i), dim = 1)
-        neib_gloc(recv_loc) = 0 ; loc_send_num(i) = recv_loc
-        sort_mpi_num(i) = temp_mpi_num(recv_loc)
+        sort_mpi_num(i) = temp_mpi_num(loc_send_num(i))
       end do
       deallocate(neib_gloc)
 

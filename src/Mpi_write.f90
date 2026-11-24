@@ -5,7 +5,7 @@ module mpi_write
   use utility_module, only: st_mpi, write_err_write, write_err_stop
   use mpi_utility, only: mpimax_val
   use initial_module, only: st_grid
-  use set_cell, only: get_calc_grid, ncalc, ncals, neib_mpi_totn, neib_ncalc, st_conn
+  use set_cell, only: get_calc_grid, ncalc, ncals, neib_mpi_totn, st_conn
   use make_cell, only: st_geom
   use mpi
 
@@ -18,7 +18,7 @@ module mpi_write
   integer(I4) :: neib_wtab_stotn, neib_wtab_rtotn
   integer(I4), allocatable :: neib_wtab_snum(:), neib_wtab_rnum(:)
   integer(I4), allocatable :: send_wtab_cind(:), recv_wtab_cind(:)
-  integer(I4), allocatable :: send_wtab_citem(:), recv_wtab_citem(:)
+  integer(I4), allocatable :: send_wtab_citem(:), recv_wtab_glo(:)
 
   contains
 
@@ -320,85 +320,85 @@ module mpi_write
   !*********************************************************************************************
     ! -- module
     use types_module, only: matrix_set
-    use set_cell, only: send_cind, send_citem, neib_num
+    use utility_module, only: iquick_sort, iquick_sort2
+    use set_cell, only: recv_cind, neib_num
     ! -- inout
     type(matrix_set), intent(in) :: st_matrix
     ! -- local
-    integer(I4) :: i, j, k, jj
-    integer(I4) :: temp_item_num, temp_snum, temp_rnum, temp_neib_num
-    integer(I4) :: sta_ind, end_ind, ind
-    integer(I4), allocatable :: temp_wtab_snum(:), temp_wtab_rnum(:)
-    integer(I4), allocatable :: temp_send_cind(:), temp_recv_cind(:)
-    integer(I4), allocatable :: temp_send_citem(:), temp_recv_citem(:)
+    integer(I4) :: i, k, ind, neib_ind, temp_neib_num
+    integer(I4) :: temp_snum, temp_rnum, sta_ind, end_ind
+    integer(I4), allocatable :: temp_send_cind(:), temp_recv_cind(:), temp_send_glo(:)
     !-------------------------------------------------------------------------------------------
-    temp_item_num = st_matrix%crs_index(1)%offind(st_matrix%nreg_num)&
-                    - st_matrix%crs_index(1)%offind(ncalc)
-    allocate(temp_wtab_snum(neib_mpi_totn), temp_wtab_rnum(neib_mpi_totn))
     allocate(temp_send_cind(0:neib_mpi_totn), temp_recv_cind(0:neib_mpi_totn))
-    allocate(temp_send_citem(temp_item_num), temp_recv_citem(temp_item_num))
-    temp_send_cind(0) = 0 ; temp_recv_cind(0) = 0
-    !$omp parallel
-    !$omp do private(i)
-    do i = 1, neib_mpi_totn
-      temp_wtab_snum(i) = -1 ; temp_wtab_rnum(i) = -1
+    !$omp parallel do private(i)
+    do i = 0, neib_mpi_totn
       temp_send_cind(i) = 0 ; temp_recv_cind(i) = 0
     end do
-    !$omp end do
-    !$omp do private(i)
-    do i = 1, temp_item_num
-      temp_send_citem(i) = 0 ; temp_recv_citem(i) = 0
+    !$omp end parallel do
+
+    do i = 1, ncalc
+      do ind = st_matrix%crs_index(1)%offind(i-1)+1, st_matrix%crs_index(1)%offind(i)
+        temp_neib_num = st_matrix%crs_index(1)%offrow(ind)
+        if (temp_neib_num > ncalc) then
+          neib_ind = count(recv_cind(1:neib_mpi_totn) < temp_neib_num-ncalc) + 1
+          if (st_matrix%dir_conn(ind) == 1) then
+            temp_send_cind(neib_ind) = temp_send_cind(neib_ind) + 1
+          else if (st_matrix%dir_conn(ind) == 6) then
+            temp_recv_cind(neib_ind) = temp_recv_cind(neib_ind) + 1
+          end if
+        end if
+      end do
     end do
-    !$omp end do
-    !$omp end parallel
 
     temp_snum = 0 ; temp_rnum = 0
     do i = 1, neib_mpi_totn
-      do j = send_cind(i-1)+1, send_cind(i)
-        jj = send_citem(j)
-        sta_ind = st_matrix%crs_index(1)%offind(jj-1)
-        end_ind = st_matrix%crs_index(1)%offind(jj)
-        do k = 1, end_ind-sta_ind
-          ind = sta_ind + k ; temp_neib_num = st_matrix%crs_index(1)%offrow(ind)
-          if (st_matrix%dir_conn(ind) == 1 .and. temp_neib_num > ncalc) then
-            temp_snum = temp_snum + 1 ; temp_send_citem(temp_snum) = jj
-            if (temp_wtab_snum(i) == -1) then
-              temp_wtab_snum(i) = neib_num(i)
-            end if
-          else if (st_matrix%dir_conn(ind) == 6 .and. temp_neib_num > ncalc) then
-            temp_rnum = temp_rnum + 1 ; temp_recv_citem(temp_rnum) = temp_neib_num
-            if (temp_wtab_rnum(i) == -1) then
-              temp_wtab_rnum(i) = neib_num(i)
-            end if
+      k = temp_send_cind(i) ; temp_send_cind(i) = temp_snum ; temp_snum = temp_snum + k
+      k = temp_recv_cind(i) ; temp_recv_cind(i) = temp_rnum ; temp_rnum = temp_rnum + k
+    end do
+    allocate(send_wtab_citem(temp_snum), recv_wtab_glo(temp_rnum), temp_send_glo(temp_snum))
+
+    do i = 1, ncalc
+      do ind = st_matrix%crs_index(1)%offind(i-1)+1, st_matrix%crs_index(1)%offind(i)
+        temp_neib_num = st_matrix%crs_index(1)%offrow(ind)
+        if (temp_neib_num > ncalc) then
+          neib_ind = count(recv_cind(1:neib_mpi_totn) < temp_neib_num-ncalc) + 1
+          if (st_matrix%dir_conn(ind) == 1) then
+            temp_send_cind(neib_ind) = temp_send_cind(neib_ind) + 1
+            send_wtab_citem(temp_send_cind(neib_ind)) = i
+            temp_send_glo(temp_send_cind(neib_ind)) = st_conn%loc2glo_ijk(i)
+          else if (st_matrix%dir_conn(ind) == 6) then
+            temp_recv_cind(neib_ind) = temp_recv_cind(neib_ind) + 1
+            recv_wtab_glo(temp_recv_cind(neib_ind)) = st_conn%loc2glo_ijk(i)&
+                                                      + st_grid%nx*st_grid%ny
           end if
-        end do
+        end if
       end do
-      temp_send_cind(i) = temp_snum ; temp_recv_cind(i) = temp_rnum
     end do
 
-    neib_wtab_stotn = count(temp_wtab_snum(:) /= -1)
-    neib_wtab_rtotn = count(temp_wtab_rnum(:) /= -1)
+    do i = 1, neib_mpi_totn
+      sta_ind = temp_send_cind(i-1) + 1 ; end_ind = temp_send_cind(i)
+      call iquick_sort2(temp_send_glo, send_wtab_citem, sta_ind, end_ind)
+      sta_ind = temp_recv_cind(i-1) + 1 ; end_ind = temp_recv_cind(i)
+      call iquick_sort(recv_wtab_glo, sta_ind, end_ind)
+    end do
 
+    neib_wtab_stotn = count(temp_send_cind(1:) /= temp_send_cind(:neib_mpi_totn-1))
+    neib_wtab_rtotn = count(temp_recv_cind(1:) /= temp_recv_cind(:neib_mpi_totn-1))
     allocate(neib_wtab_snum(neib_wtab_stotn), neib_wtab_rnum(neib_wtab_rtotn))
     allocate(send_wtab_cind(0:neib_wtab_stotn), recv_wtab_cind(0:neib_wtab_rtotn))
-    allocate(send_wtab_citem(temp_snum), recv_wtab_citem(temp_rnum))
-
-    neib_wtab_snum(:) = pack(temp_wtab_snum(:), temp_wtab_snum(:) /= -1)
-    neib_wtab_rnum(:) = pack(temp_wtab_rnum(:), temp_wtab_rnum(:) /= -1)
-    send_wtab_citem(:) = temp_send_citem(1:temp_snum)
-    recv_wtab_citem(:) = temp_recv_citem(1:temp_rnum)
+    send_wtab_cind(0) = 0 ; recv_wtab_cind(0) = 0
 
     temp_snum = 0 ; temp_rnum = 0
     do i = 1, neib_mpi_totn
       if (temp_send_cind(i) /= temp_send_cind(i-1)) then
         temp_snum = temp_snum + 1
-        send_wtab_cind(temp_snum) = temp_send_cind(i)
+        neib_wtab_snum(temp_snum) = neib_num(i) ; send_wtab_cind(temp_snum) = temp_send_cind(i)
       end if
       if (temp_recv_cind(i) /= temp_recv_cind(i-1)) then
         temp_rnum = temp_rnum + 1
-        recv_wtab_cind(temp_rnum) = temp_recv_cind(i)
+        neib_wtab_rnum(temp_rnum) = neib_num(i) ; recv_wtab_cind(temp_rnum) = temp_recv_cind(i)
       end if
     end do
-    send_wtab_cind(0) = 0 ; recv_wtab_cind(0) = 0
 
   end subroutine set_senrec_wtab
 
@@ -413,7 +413,7 @@ module mpi_write
     ! -- inout
     real(DP), intent(in) :: hnew(:)
     ! -- local
-    integer(I4) :: i, j, k, ierr, nxyz, loc_n, loc_r, i_num, j_num, mpi_ncalc
+    integer(I4) :: i, j, k, ierr, nxyz, loc_n, loc_r, i_num, j_num
     integer(I4) :: wtab_sendn, wtab_recvn, sum_sendn, sum_recvn
     integer(I4) :: isend_sta, isend_end, irecv_sta, irecv_end
     integer(I4) :: send_len, recv_len
@@ -430,7 +430,6 @@ module mpi_write
     !-------------------------------------------------------------------------------------------
     wtab_sendn = send_wtab_cind(neib_wtab_stotn)
     wtab_recvn = recv_wtab_cind(neib_wtab_rtotn)
-    mpi_ncalc = ncalc + neib_ncalc
     allocate(send_flag(wtab_sendn), recv_flag(wtab_recvn))
     allocate(flag_send(neib_mpi_totn), req_flag_recv(neib_mpi_totn))
     allocate(level_send(neib_mpi_totn), req_level_recv(neib_mpi_totn))
@@ -576,16 +575,16 @@ module mpi_write
       below_flag = .false. ; below_psi = DZERO ; below_top = DZERO
       wtab: do k = st_grid%nz, 1, -1
         nxyz = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
-        loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:mpi_ncalc), value = nxyz, dim = 1)
-        if (loc_n /= 0) then
-          loc_r = 0 ; loc_r = findloc(recv_wtab_citem(:), value = loc_n, dim = 1)
-          if (loc_r /= 0) then
-            wtable(i) = recv_level(loc_r)
-            if (recv_psi(loc_r) < DZERO) then
-              exit wtab
-            end if
-            below_flag = .true. ; below_psi = recv_psi(loc_r) ; below_top = recv_ztop(loc_r)
-          else if (loc_n <= ncalc) then
+        loc_r = 0 ; loc_r = findloc(recv_wtab_glo(:), value = nxyz, dim = 1)
+        if (loc_r /= 0) then
+          wtable(i) = recv_level(loc_r)
+          if (recv_psi(loc_r) < DZERO) then
+            exit wtab
+          end if
+          below_flag = .true. ; below_psi = recv_psi(loc_r) ; below_top = recv_ztop(loc_r)
+        else
+          loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:ncalc), value = nxyz, dim = 1)
+          if (loc_n /= 0) then
             top_psi = hnew(loc_n) - st_geom%cell_top(loc_n)
             if (top_psi < DZERO .and. below_flag) then
               wtable(i) = below_top + below_psi*(st_geom%cell_top(loc_n) - below_top)&
@@ -618,11 +617,10 @@ module mpi_write
     ! -- inout
     integer(I4), intent(out) :: flag_send(:)
     ! -- local
-    integer(I4) :: i, j, k, c_num, isend, nxyz, loc_n, loc_r, mpi_ncalc
+    integer(I4) :: i, j, k, c_num, isend, nxyz, loc_n, loc_r
     integer(I4) :: is_sta, is_end
     integer(I4) :: i_num, j_num, k_num
     !-------------------------------------------------------------------------------------------
-    mpi_ncalc = ncalc + neib_ncalc
     !$omp parallel do private(i, j, k, c_num, isend, nxyz, loc_n, loc_r, is_sta, is_end,&
     !$omp&                    i_num, j_num, k_num)
     do i = 1, neib_wtab_stotn
@@ -632,14 +630,14 @@ module mpi_write
         call get_calc_grid(c_num, i_num, j_num, k_num)
         sr_flag: do k = st_grid%nz, k_num, -1
           nxyz = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
-          loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:mpi_ncalc), value = nxyz, dim = 1)
+          loc_r = 0 ; loc_r = findloc(recv_wtab_glo(:), value = nxyz, dim = 1)
+          if (loc_r /= 0) then
+            flag_send(j) = 0
+            exit sr_flag
+          end if
+          loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:ncalc), value = nxyz, dim = 1)
           if (loc_n /= 0) then
-            loc_r = 0 ; loc_r = findloc(recv_wtab_citem(:), value = loc_n, dim = 1)
-            if (loc_r /= 0) then
-              flag_send(j) = 0
-            else
-              flag_send(j) = 1
-            end if
+            flag_send(j) = 1
             exit sr_flag
           end if
         end do sr_flag
@@ -663,13 +661,12 @@ module mpi_write
     real(DP), intent(in) :: r_level(:), r_psi(:), r_ztop(:)
     real(DP), intent(out) :: s_level(:), s_psi(:), s_ztop(:)
     ! -- local
-    integer(I4) :: i, j, k, c_num, isend, nxyz, loc_n, loc_r, mpi_ncalc
+    integer(I4) :: i, j, k, c_num, isend, nxyz, loc_n, loc_r
     integer(I4) :: is_sta, is_end
     integer(I4) :: i_num, j_num, k_num
     real(DP) :: top_psi
     logical :: below_flag
     !-------------------------------------------------------------------------------------------
-    mpi_ncalc = ncalc + neib_ncalc
     !$omp parallel do private(i, j, k, c_num, isend, nxyz, loc_n, loc_r, is_sta, is_end,&
     !$omp&                    i_num, j_num, k_num, top_psi, below_flag)
     do i = 1, neib_wtab_stotn
@@ -680,20 +677,20 @@ module mpi_write
         s_level(j) = DZERO ; s_psi(j) = DZERO ; s_ztop(j) = DZERO ; below_flag = .false.
         unsat: do k = st_grid%nz, k_num, -1
           nxyz = (st_grid%nx*st_grid%ny)*(k-1) + st_grid%nx*(j_num-1) + i_num
-          loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:mpi_ncalc), value = nxyz, dim = 1)
-          if (loc_n /= 0) then
-            loc_r = 0 ; loc_r = findloc(recv_wtab_citem(:), value = loc_n, dim = 1)
-            if (loc_r /= 0) then
-              if (r_flag(loc_r) /= 0) then
-                s_flag(j) = 1
-                s_level(j) = r_level(loc_r) ; s_psi(j) = r_psi(loc_r)
-                s_ztop(j) = r_ztop(loc_r)
-                if (s_psi(j) < DZERO) then
-                  exit unsat
-                end if
-                below_flag = .true.
+          loc_r = 0 ; loc_r = findloc(recv_wtab_glo(:), value = nxyz, dim = 1)
+          if (loc_r /= 0) then
+            if (r_flag(loc_r) /= 0) then
+              s_flag(j) = 1
+              s_level(j) = r_level(loc_r) ; s_psi(j) = r_psi(loc_r)
+              s_ztop(j) = r_ztop(loc_r)
+              if (s_psi(j) < DZERO) then
+                exit unsat
               end if
-            else if (loc_n <= ncalc) then
+              below_flag = .true.
+            end if
+          else
+            loc_n = 0 ; loc_n = findloc(st_conn%loc2glo_ijk(:ncalc), value = nxyz, dim = 1)
+            if (loc_n /= 0) then
               top_psi = c_head(loc_n) - st_geom%cell_top(loc_n)
               if (top_psi < DZERO .and. below_flag) then
                 s_level(j) = s_ztop(j) + s_psi(j)*(st_geom%cell_top(loc_n) - s_ztop(j))&

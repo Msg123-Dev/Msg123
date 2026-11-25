@@ -15,22 +15,28 @@ module calc_simulation
   ! calc_l2norm2 -- Calculate l2 norm square
   !*********************************************************************************************
     ! -- modules
-    use constval_module, only: DZERO
+    use constval_module, only: BLOCKLEN, DZERO
+    use utility_module, only: sum_block, add_sum_block
 
     ! -- inout
     integer(I4), intent(in) :: l2_num
     real(DP), intent(in) :: inbr(:)
     real(DP), intent(out) :: l2norm2
     ! -- local
-    integer(I4) :: i
+    integer(I4) :: i, b, block_num
     !-------------------------------------------------------------------------------------------
 
-    l2norm2 = DZERO
-    !$omp parallel do private(i) reduction(+:l2norm2)
-    do i = 1, l2_num
-      l2norm2 = l2norm2 + inbr(i)*inbr(i)
+    block_num = (l2_num-1)/BLOCKLEN + 1
+    !$omp parallel do private(b, i, l2norm2)
+    do b = 1, block_num
+      l2norm2 = DZERO
+      do i = (b-1)*BLOCKLEN+1, min(b*BLOCKLEN, l2_num)
+        l2norm2 = l2norm2 + inbr(i)*inbr(i)
+      end do
+      sum_block(b,1) = l2norm2
     end do
     !$omp end parallel do
+    l2norm2 = add_sum_block(block_num, 1)
 
   end subroutine calc_l2norm2
 

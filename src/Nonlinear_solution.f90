@@ -1,9 +1,9 @@
 module nonlinear_solution
   ! -- modules
   use kind_module, only: I4, DP
-  use constval_module, only: DZERO, DONE, DHALF, DTWO, DSMAL
+  use constval_module, only: BLOCKLEN, DZERO, DONE, DHALF, DTWO, DSMAL
   use types_module, only: sol_set, matrix_set
-  use utility_module, only: st_mpi, log_fnum
+  use utility_module, only: log_fnum, sum_block, st_mpi, add_sum_block
   use initial_module, only: st_sim, st_ctrl
   use read_input, only: len_scal, len_scal_inv, z_base
   use check_condition, only: st_out_fnum
@@ -78,7 +78,7 @@ module nonlinear_solution
     type(sol_set), intent(inout) :: st_sol
     type(matrix_set), intent(inout) :: st_matrix
     ! -- local
-    integer(I4) :: i
+    integer(I4) :: i, b, block_num
     integer(I4) :: out_iter
     integer(I4) :: max_num, conv_fnum
     integer(I4) :: back_iter, beta_iter, maxstep_run, stagn_run, cycle_run, wpass_run, beta_run
@@ -415,12 +415,17 @@ module nonlinear_solution
         call bcast_convinfo(cxyzn, conv_dmat, conv_rhs, conv_head, max_var)
 #endif
       conv_var = max_var*len_scal
-      res_l1 = DZERO
-      !$omp parallel do private(i) reduction(+:res_l1)
-      do i = 1, ncalc
-        res_l1 = res_l1 + abs(new_func(i))
+      block_num = (ncalc-1)/BLOCKLEN + 1
+      !$omp parallel do private(b, i, res_l1)
+      do b = 1, block_num
+        res_l1 = DZERO
+        do i = (b-1)*BLOCKLEN+1, min(b*BLOCKLEN, ncalc)
+          res_l1 = res_l1 + abs(new_func(i))
+        end do
+        sum_block(b,1) = res_l1
       end do
       !$omp end parallel do
+      res_l1 = add_sum_block(block_num, 1)
       qext_l1 = qext_sum
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
@@ -843,7 +848,7 @@ module nonlinear_solution
     type(sol_set), intent(inout) :: st_sol
     type(matrix_set), intent(in) :: st_matrix
     ! -- local
-    integer(I4) :: i
+    integer(I4) :: i, b, block_num
     real(DP) :: l2_new2, slope, av, bv, rhs1, rhs2, root, step_len
     real(DP) :: f1_pre, f1_new
     real(DP) :: lam2, temp_lam, lam_inv, lam2_inv, del_lam, lam_max, lam_min
@@ -872,12 +877,16 @@ module nonlinear_solution
 
     step_len = pnorm
 
-    slope = DZERO ; l2_jac = DZERO
+    block_num = (ncalc-1)/BLOCKLEN + 1
     !$omp parallel
-    !$omp do private(i) reduction(+:slope, l2_jac)
-    do i = 1, ncalc
-      slope = slope + st_matrix%array_var(1)%rhs(i)*jacvec(i)*maxpnorm
-      l2_jac = l2_jac + jacvec(i)*jacvec(i)
+    !$omp do private(b, i, slope, l2_jac)
+    do b = 1, block_num
+      slope = DZERO ; l2_jac = DZERO
+      do i = (b-1)*BLOCKLEN+1, min(b*BLOCKLEN, ncalc)
+        slope = slope + st_matrix%array_var(1)%rhs(i)*jacvec(i)*maxpnorm
+        l2_jac = l2_jac + jacvec(i)*jacvec(i)
+      end do
+      sum_block(b,1) = slope ; sum_block(b,2) = l2_jac
     end do
     !$omp end do
 
@@ -890,6 +899,7 @@ module nonlinear_solution
     end do
     !$omp end do
     !$omp end parallel
+    slope = add_sum_block(block_num, 1) ; l2_jac = add_sum_block(block_num, 2)
 
     l2_jac = l2_jac*maxpnorm*maxpnorm
 
@@ -948,13 +958,18 @@ module nonlinear_solution
                                  st_matrix%crs_index(1)%offind, st_matrix%crs_index(1)%offrow,&
                                  func_scal, st_sol%stor_new, st_sol%stor_old, st_sol%head_pre,&
                                  res_wgt)
-          wmode = .true. ; slope = DZERO
-          !$omp parallel do private(i) reduction(+:slope)
-          do i = 1, ncalc
-            slope = slope + res_wgt(i)*res_wgt(i)*st_matrix%array_var(1)%rhs(i)*jacvec(i)&
-                    *maxpnorm
+          wmode = .true.
+          !$omp parallel do private(b, i, slope)
+          do b = 1, block_num
+            slope = DZERO
+            do i = (b-1)*BLOCKLEN+1, min(b*BLOCKLEN, ncalc)
+              slope = slope + res_wgt(i)*res_wgt(i)*st_matrix%array_var(1)%rhs(i)*jacvec(i)&
+                      *maxpnorm
+            end do
+            sum_block(b,1) = slope
           end do
           !$omp end parallel do
+          slope = add_sum_block(block_num, 1)
 #ifdef MPI_MSG
           if (st_mpi%totn /= 1) then
             ! -- Sum value for MPI (val)
@@ -1147,7 +1162,7 @@ module nonlinear_solution
     real(DP), intent(in) :: l2_val, func_val(:)
     logical, intent(in) :: wmode
     ! -- local
-    integer(I4) :: i
+    integer(I4) :: i, b, block_num
     real(DP) :: merit
 #ifdef MPI_MSG
     real(DP) :: sum_l2
@@ -1158,12 +1173,17 @@ module nonlinear_solution
       return
     end if
 
-    merit = DZERO
-    !$omp parallel do private(i) reduction(+:merit)
-    do i = 1, ncalc
-      merit = merit + (res_wgt(i)*func_val(i))**2
+    block_num = (ncalc-1)/BLOCKLEN + 1
+    !$omp parallel do private(b, i, merit)
+    do b = 1, block_num
+      merit = DZERO
+      do i = (b-1)*BLOCKLEN+1, min(b*BLOCKLEN, ncalc)
+        merit = merit + (res_wgt(i)*func_val(i))**2
+      end do
+      sum_block(b,1) = merit
     end do
     !$omp end parallel do
+    merit = add_sum_block(block_num, 1)
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
       ! -- Sum value for MPI (val)

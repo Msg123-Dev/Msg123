@@ -1,8 +1,9 @@
 module calc_function
   ! -- modules
   use kind_module, only: I4, DP
-  use constval_module, only: DZERO, DONE
+  use constval_module, only: BLOCKLEN, DZERO, DONE
   use types_module, only: matrix_set
+  use utility_module, only: sum_block, add_sum_block
   use initial_module, only: st_sim, st_schm
   use make_cell, only: st_geom
   use set_cell, only: ncalc, ncals
@@ -73,7 +74,7 @@ module calc_function
     real(DP), intent(out), optional :: fscal(:), qext
     type(matrix_set), intent(in) :: st_matrix
     ! -- local
-    integer(I4) :: i, s
+    integer(I4) :: i, s, b, block_num
     real(DP) :: qext_sum
     !-------------------------------------------------------------------------------------------
     !$omp parallel
@@ -192,13 +193,17 @@ module calc_function
     end if
 
     if (present(qext)) then
-      qext_sum = DZERO
-      !$omp parallel do private(i) reduction(+:qext_sum)
-      do i = 1, ncalc
-        qext_sum = qext_sum + abs(funcvs(i)) + abs(welf(i)) + abs(seaf(i))
+      block_num = (ncalc-1)/BLOCKLEN + 1
+      !$omp parallel do private(b, i, qext_sum)
+      do b = 1, block_num
+        qext_sum = DZERO
+        do i = (b-1)*BLOCKLEN+1, min(b*BLOCKLEN, ncalc)
+          qext_sum = qext_sum + abs(funcvs(i)) + abs(welf(i)) + abs(seaf(i))
+        end do
+        sum_block(b,1) = qext_sum
       end do
       !$omp end parallel do
-      qext = qext_sum
+      qext = add_sum_block(block_num, 1)
     end if
 
   end subroutine calc_func
@@ -771,7 +776,7 @@ module calc_function
     real(DP), intent(in) :: infseal(:), rperm(:)
     real(DP), intent(inout) :: seafunc(:)
     ! -- local
-    integer(I4) :: i, c, s
+    integer(I4) :: i, j, c, s
     real(DP) :: delhead, relat
     !-------------------------------------------------------------------------------------------
     !$omp parallel
@@ -795,11 +800,20 @@ module calc_function
     end do
     !$omp end do
 
-    !$omp do private(i, c)
+    !$omp do private(i, j, c)
     do i = 1, st_bcnd%seal_num
       c = st_bcnd%seal2calc(i)
-      !$omp atomic
-      seafunc(c) = seafunc(c) + seal_flow(i)
+      if (i > 1) then
+        if (st_bcnd%seal2calc(i-1) == c) then
+          cycle
+        end if
+      end if
+      do j = i, st_bcnd%seal_num
+        if (st_bcnd%seal2calc(j) /= c) then
+          exit
+        end if
+        seafunc(c) = seafunc(c) + seal_flow(j)
+      end do
     end do
     !$omp end do
     !$omp end parallel
@@ -822,7 +836,7 @@ module calc_function
     real(DP), intent(out) :: outjv(:)
     type(matrix_set), intent(in) :: st_matrix
     ! -- local
-    integer(I4) :: i
+    integer(I4) :: i, b, block_num
     integer(I4) :: vj_num, vj_regnum
     real(DP), parameter :: JFREE_EPS = epsilon(1.00_DP)
     real(DP) :: eps, eps_inv, l2_x, l2_v, l1_v, sign
@@ -847,20 +861,20 @@ module calc_function
     !$omp end parallel
 
     ! Brown and Saad version
-    l2_v = DZERO ; l2_x = DZERO ; l1_v = DZERO
-    !$omp parallel
-    !$omp do private(i) reduction(+:l2_v, l2_x)
-    do i = 1, vj_num
-      l2_v = l2_v + injv(i)*injv(i)
-      l2_x = l2_x + injx(i)*injv(i)
+    block_num = (vj_num-1)/BLOCKLEN + 1
+    !$omp parallel do private(b, i, l2_v, l2_x, l1_v)
+    do b = 1, block_num
+      l2_v = DZERO ; l2_x = DZERO ; l1_v = DZERO
+      do i = (b-1)*BLOCKLEN+1, min(b*BLOCKLEN, vj_num)
+        l2_v = l2_v + injv(i)*injv(i)
+        l2_x = l2_x + injx(i)*injv(i)
+        l1_v = l1_v + abs(injv(i))
+      end do
+      sum_block(b,1) = l2_v ; sum_block(b,2) = l2_x ; sum_block(b,3) = l1_v
     end do
-    !$omp end do
-    !$omp do private(i) reduction(+:l1_v)
-    do i = 1, vj_num
-      l1_v = l1_v + abs(injv(i))
-    end do
-    !$omp end do
-    !$omp end parallel
+    !$omp end parallel do
+    l2_v = add_sum_block(block_num, 1) ; l2_x = add_sum_block(block_num, 2)
+    l1_v = add_sum_block(block_num, 3)
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then

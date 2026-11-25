@@ -100,6 +100,8 @@ module check_simulation
   ! check_residual -- Check residual convergence criteria
   !*********************************************************************************************
     ! -- modules
+    use constval_module, only: BLOCKLEN
+    use utility_module, only: sum_block, add_sum_block
 #ifdef MPI_MSG
     use mpi_utility, only: mpisum_val
 #endif
@@ -111,7 +113,7 @@ module check_simulation
     real(DP), intent(in), optional :: stnew(:), stold(:), hnew(:)
     real(DP), intent(out), optional :: floor_l2
     ! -- local
-    integer(I4) :: i, k, viol_num
+    integer(I4) :: i, k, viol_num, b, block_num
     real(DP) :: vol_scal, res_val, scal_val, abs_tol, rel_tol, round_val, acc_val, floor_sum
     logical :: abs_flag, rel_flag, pass_flag, round_flag, stor_flag, sum_flag
 #ifdef MPI_MSG
@@ -128,45 +130,50 @@ module check_simulation
       return
     end if
     round_flag = present(hnew) ; stor_flag = present(stnew) .and. present(stold)
-    sum_flag = round_flag .and. present(floor_l2) ; floor_sum = DZERO
+    sum_flag = round_flag .and. present(floor_l2)
 
     viol_num = 0 ; vol_scal = len_scal**3 ; acc_val = calc_acc_floor(fscal)
     abs_tol = st_ctrl%res_abs_tol*res_fact ; rel_tol = st_ctrl%res_rel_tol*res_fact
-    !$omp parallel do private(i, k, res_val, scal_val, round_val, pass_flag) &
-    !$omp             reduction(+:viol_num, floor_sum)
-    do i = 1, ncalc
-      res_val = abs(funcv(i))*vol_scal
-      scal_val = fscal(i)*vol_scal
-      round_val = DZERO
-      if (round_flag) then
-        round_val = abs(dmat(i))*abs(hnew(i))
-        if (stor_flag) then
-          round_val = max(abs(stnew(i)), abs(stold(i)))*st_geom%cell_vol(i)*st_time%delt_inv&
-                      + round_val
+    block_num = (ncalc-1)/BLOCKLEN + 1
+    !$omp parallel do private(b, i, k, res_val, scal_val, round_val, pass_flag, floor_sum) &
+    !$omp             reduction(+:viol_num)
+    do b = 1, block_num
+      floor_sum = DZERO
+      do i = (b-1)*BLOCKLEN+1, min(b*BLOCKLEN, ncalc)
+        res_val = abs(funcv(i))*vol_scal
+        scal_val = fscal(i)*vol_scal
+        round_val = DZERO
+        if (round_flag) then
+          round_val = abs(dmat(i))*abs(hnew(i))
+          if (stor_flag) then
+            round_val = max(abs(stnew(i)), abs(stold(i)))*st_geom%cell_vol(i)*st_time%delt_inv&
+                        + round_val
+          end if
+          do k = offind(i-1)+1, offind(i)
+            round_val = round_val + abs(lumat(k))*abs(hnew(offrow(k)))
+          end do
         end if
-        do k = offind(i-1)+1, offind(i)
-          round_val = round_val + abs(lumat(k))&
-                      *abs(hnew(offrow(k)))
-        end do
-      end if
-      if (sum_flag) then
-        floor_sum = floor_sum + (ROUND_FACT*UROUND*round_val)**2
-      end if
-      pass_flag = .false.
-      if (abs_flag .and. res_val <= abs_tol) then
-        pass_flag = .true.
-      else if (rel_flag .and. scal_val <= acc_val) then
-        pass_flag = .true.
-      else if (rel_flag .and. res_val <= rel_tol*scal_val) then
-        pass_flag = .true.
-      else if (round_flag) then
-        pass_flag = res_val <= ROUND_FACT*UROUND*round_val*vol_scal
-      end if
-      if (.not. pass_flag) then
-        viol_num = viol_num + 1
-      end if
+        if (sum_flag) then
+          floor_sum = floor_sum + (ROUND_FACT*UROUND*round_val)**2
+        end if
+        pass_flag = .false.
+        if (abs_flag .and. res_val <= abs_tol) then
+          pass_flag = .true.
+        else if (rel_flag .and. scal_val <= acc_val) then
+          pass_flag = .true.
+        else if (rel_flag .and. res_val <= rel_tol*scal_val) then
+          pass_flag = .true.
+        else if (round_flag) then
+          pass_flag = res_val <= ROUND_FACT*UROUND*round_val*vol_scal
+        end if
+        if (.not. pass_flag) then
+          viol_num = viol_num + 1
+        end if
+      end do
+      sum_block(b,1) = floor_sum
     end do
     !$omp end parallel do
+    floor_sum = add_sum_block(block_num, 1)
 
 #ifdef MPI_MSG
     if (st_mpi%totn /= 1) then
@@ -214,8 +221,7 @@ module check_simulation
       round_val = max(abs(stnew(i)), abs(stold(i)))*st_geom%cell_vol(i)*st_time%delt_inv&
                   + abs(dmat(i))*abs(hnew(i))
       do k = offind(i-1)+1, offind(i)
-        round_val = round_val + abs(lumat(k))&
-                    *abs(hnew(offrow(k)))
+        round_val = round_val + abs(lumat(k))*abs(hnew(offrow(k)))
       end do
       allow_val = ROUND_FACT*UROUND*round_val*vol_scal
       if (abs_flag) then

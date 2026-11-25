@@ -1,9 +1,9 @@
 module linear_solution
   ! -- modules
   use kind_module, only: I4, DP
-  use constval_module, only: DZERO, DONE, DINFI, UROUND
+  use constval_module, only: BLOCKLEN, DZERO, DONE, DINFI, UROUND
   use types_module, only: kryl_set, amgt_set, matrix_set
-  use utility_module, only: st_mpi
+  use utility_module, only: sum_block, st_mpi, add_sum_block
   use initial_module, only: st_ctrl
   use prep_calculation, only: st_time
   use check_simulation, only: check_insol
@@ -139,7 +139,7 @@ module linear_solution
     type(amgt_set), intent(inout) :: st_amgt
     type(matrix_set), intent(inout) :: st_matrix
     ! -- local
-    integer(I4) :: n, d_size, lu_size, reg_size
+    integer(I4) :: n, b, d_size, lu_size, reg_size, block_num
     real(DP) :: sk, sk0, sk2, alpha, beta, rnorm_min
     real(DP) :: guard_nrm(2), guard_scal
 #ifdef MPI_MSG
@@ -149,6 +149,7 @@ module linear_solution
     !-------------------------------------------------------------------------------------------
     d_size = st_matrix%crs_index(level)%unknow
     lu_size = st_matrix%crs_index(level)%lunum
+    block_num = (d_size-1)/BLOCKLEN + 1
     reg_size = size(inx)
 
     sk = DZERO ; sk0 = DINFI ; sk2 = DZERO ; alpha = DZERO ; beta = DZERO
@@ -236,12 +237,16 @@ module linear_solution
           call loop_amg(level, st_kryl%resi, st_kryl%z, st_amgt, st_matrix)
       end if
 
-      sk = DZERO
-      !$omp parallel do private(n) reduction(+:sk)
-      do n = 1, d_size
-        sk = sk + st_kryl%resi(n)*st_kryl%z(n)
+      !$omp parallel do private(b, n, sk)
+      do b = 1, block_num
+        sk = DZERO
+        do n = (b-1)*BLOCKLEN+1, min(b*BLOCKLEN, d_size)
+          sk = sk + st_kryl%resi(n)*st_kryl%z(n)
+        end do
+        sum_block(b,1) = sk
       end do
       !$omp end parallel do
+      sk = add_sum_block(block_num, 1)
 
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
@@ -286,14 +291,19 @@ module linear_solution
                          st_matrix%array_var(level)%dmat, st_matrix%array_var(level)%lumat,&
                          st_kryl%q)
 
-      sk2 = DZERO ; guard_nrm(1) = DZERO ; guard_nrm(2) = DZERO
-      !$omp parallel do private(n) reduction(+:sk2, guard_nrm)
-      do n = 1, d_size
-        sk2 = sk2 + st_kryl%p(n)*st_kryl%q(n)
-        guard_nrm(1) = guard_nrm(1) + st_kryl%p(n)*st_kryl%p(n)
-        guard_nrm(2) = guard_nrm(2) + st_kryl%q(n)*st_kryl%q(n)
+      !$omp parallel do private(b, n, sk2, guard_nrm)
+      do b = 1, block_num
+        sk2 = DZERO ; guard_nrm(1) = DZERO ; guard_nrm(2) = DZERO
+        do n = (b-1)*BLOCKLEN+1, min(b*BLOCKLEN, d_size)
+          sk2 = sk2 + st_kryl%p(n)*st_kryl%q(n)
+          guard_nrm(1) = guard_nrm(1) + st_kryl%p(n)*st_kryl%p(n)
+          guard_nrm(2) = guard_nrm(2) + st_kryl%q(n)*st_kryl%q(n)
+        end do
+        sum_block(b,1) = sk2 ; sum_block(b,2) = guard_nrm(1) ; sum_block(b,3) = guard_nrm(2)
       end do
       !$omp end parallel do
+      sk2 = add_sum_block(block_num, 1)
+      guard_nrm(1) = add_sum_block(block_num, 2) ; guard_nrm(2) = add_sum_block(block_num, 3)
 
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
@@ -378,7 +388,7 @@ module linear_solution
     type(amgt_set), intent(inout) :: st_amgt
     type(matrix_set), intent(inout) :: st_matrix
     ! -- local
-    integer(I4) :: n, d_size, lu_size, reg_size
+    integer(I4) :: n, b, d_size, lu_size, reg_size, block_num
     real(DP) :: sk, sk0, sk2, alpha, beta, bicgs_omega, ts, tt, rnorm_min
     real(DP) :: guard_nrm(2), guard_scal
 #ifdef MPI_MSG
@@ -390,6 +400,7 @@ module linear_solution
     !-------------------------------------------------------------------------------------------
     d_size = st_matrix%crs_index(level)%unknow
     lu_size = st_matrix%crs_index(level)%lunum
+    block_num = (d_size-1)/BLOCKLEN + 1
     reg_size = size(inx)
 
     sk = DZERO ; sk0 = DINFI ; sk2 = DZERO ; alpha = DZERO ; beta = DZERO
@@ -452,12 +463,16 @@ module linear_solution
     !$omp end parallel do
 
     bicg_inter: do in_iter = 1, st_ctrl%maxinn_iter
-      sk = DZERO
-      !$omp parallel do private(n) reduction(+:sk)
-      do n = 1, d_size
-        sk = sk + st_kryl%resi(n)*st_kryl%rs(n)
+      !$omp parallel do private(b, n, sk)
+      do b = 1, block_num
+        sk = DZERO
+        do n = (b-1)*BLOCKLEN+1, min(b*BLOCKLEN, d_size)
+          sk = sk + st_kryl%resi(n)*st_kryl%rs(n)
+        end do
+        sum_block(b,1) = sk
       end do
       !$omp end parallel do
+      sk = add_sum_block(block_num, 1)
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
         ! -- Sum value for MPI (val)
@@ -536,14 +551,19 @@ module linear_solution
                          st_matrix%array_var(level)%dmat, st_matrix%array_var(level)%lumat,&
                          st_kryl%v)
 
-      sk2 = DZERO ; guard_nrm(1) = DZERO ; guard_nrm(2) = DZERO
-      !$omp parallel do private(n) reduction(+:sk2, guard_nrm)
-      do n = 1, d_size
-        sk2 = sk2 + st_kryl%v(n)*st_kryl%rs(n)
-        guard_nrm(1) = guard_nrm(1) + st_kryl%v(n)*st_kryl%v(n)
-        guard_nrm(2) = guard_nrm(2) + st_kryl%rs(n)*st_kryl%rs(n)
+      !$omp parallel do private(b, n, sk2, guard_nrm)
+      do b = 1, block_num
+        sk2 = DZERO ; guard_nrm(1) = DZERO ; guard_nrm(2) = DZERO
+        do n = (b-1)*BLOCKLEN+1, min(b*BLOCKLEN, d_size)
+          sk2 = sk2 + st_kryl%v(n)*st_kryl%rs(n)
+          guard_nrm(1) = guard_nrm(1) + st_kryl%v(n)*st_kryl%v(n)
+          guard_nrm(2) = guard_nrm(2) + st_kryl%rs(n)*st_kryl%rs(n)
+        end do
+        sum_block(b,1) = sk2 ; sum_block(b,2) = guard_nrm(1) ; sum_block(b,3) = guard_nrm(2)
       end do
       !$omp end parallel do
+      sk2 = add_sum_block(block_num, 1)
+      guard_nrm(1) = add_sum_block(block_num, 2) ; guard_nrm(2) = add_sum_block(block_num, 3)
 #ifdef MPI_MSG
       if (st_mpi%totn /= 1) then
         send_val(1) = sk2 ; send_val(2) = guard_nrm(1) ; send_val(3) = guard_nrm(2)
@@ -635,14 +655,19 @@ module linear_solution
                            st_matrix%array_var(level)%dmat, st_matrix%array_var(level)%lumat,&
                            st_kryl%t)
 
-        ts = DZERO ; tt = DZERO ; guard_nrm(1) = DZERO
-        !$omp parallel do private(n) reduction(+:ts, tt, guard_nrm)
-        do n = 1, d_size
-          ts = ts + st_kryl%t(n)*st_kryl%resi(n)
-          tt = tt + st_kryl%t(n)*st_kryl%t(n)
-          guard_nrm(1) = guard_nrm(1) + st_kryl%resi(n)*st_kryl%resi(n)
+        !$omp parallel do private(b, n, ts, tt, guard_nrm)
+        do b = 1, block_num
+          ts = DZERO ; tt = DZERO ; guard_nrm(1) = DZERO
+          do n = (b-1)*BLOCKLEN+1, min(b*BLOCKLEN, d_size)
+            ts = ts + st_kryl%t(n)*st_kryl%resi(n)
+            tt = tt + st_kryl%t(n)*st_kryl%t(n)
+            guard_nrm(1) = guard_nrm(1) + st_kryl%resi(n)*st_kryl%resi(n)
+          end do
+          sum_block(b,1) = ts ; sum_block(b,2) = tt ; sum_block(b,3) = guard_nrm(1)
         end do
         !$omp end parallel do
+        ts = add_sum_block(block_num, 1) ; tt = add_sum_block(block_num, 2)
+        guard_nrm(1) = add_sum_block(block_num, 3)
 
 #ifdef MPI_MSG
         if (st_mpi%totn /= 1) then

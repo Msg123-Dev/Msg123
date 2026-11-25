@@ -568,7 +568,7 @@ module make_linearsystem
     real(DP), intent(out) :: deri_sea(:), deri_ks_sea(:), delh_sea(:), rel_sea(:)
     real(DP), intent(out) :: tran_sea(:)
     ! -- local
-    integer(I4) :: i, c, s
+    integer(I4) :: i, j, c, s
     real(DP) :: relat
     !-------------------------------------------------------------------------------------------
     !$omp parallel
@@ -604,11 +604,20 @@ module make_linearsystem
       !$omp end do
     end if
 
-    !$omp do private(i, c)
+    !$omp do private(i, j, c)
     do i = 1, st_bcnd%seal_num
       c = st_bcnd%seal2calc(i)
-      !$omp atomic
-      dmat_sea(c) = dmat_sea(c) + deri_sea(i) + deri_ks_sea(i)
+      if (i > 1) then
+        if (st_bcnd%seal2calc(i-1) == c) then
+          cycle
+        end if
+      end if
+      do j = i, st_bcnd%seal_num
+        if (st_bcnd%seal2calc(j) /= c) then
+          exit
+        end if
+        dmat_sea(c) = dmat_sea(c) + deri_sea(j) + deri_ks_sea(j)
+      end do
     end do
     !$omp end do
     !$omp end parallel

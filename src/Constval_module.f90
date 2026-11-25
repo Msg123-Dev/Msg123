@@ -5,6 +5,7 @@ module constval_module
   implicit none
   integer(I4), parameter :: VARLEN = 30, CHALEN = 100, TIMELEN = 3
   integer(I4), parameter :: FACE = 6
+  integer(I4), parameter :: BLOCKLEN = 16384
 
   integer(I4), parameter :: INF_SPEC = 0, INF_CLAS = 1, INF_POIN = 2
   integer(I4), parameter :: INF_2DTX = 3, INF_2DBI = 4, INF_3DTX = 5

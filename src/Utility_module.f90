@@ -7,6 +7,7 @@ module utility_module
   implicit none
   private
   integer(I4), public :: log_fnum = error_unit
+  real(DP), allocatable, public :: sum_block(:,:)
   type(mpi_set), public :: st_mpi
   public :: get_file_stat, get_days
   public :: open_new_rtxt, open_new_rbin, open_new_wtxt, open_new_wbin
@@ -16,6 +17,7 @@ module utility_module
   public :: conv_unit, get_ilen, conv_i2s, conv_lower
   public :: iquick_sort, iquick_sort2
   public :: gmap_init, gmap_put, gmap_get, gmap_free, get_hash_start
+  public :: add_sum_block
 
   ! -- local
   integer(I4), allocatable :: wtxt_fnum(:)
@@ -649,5 +651,24 @@ module utility_module
     slot = int(mod(int(hash_key, I8)*HASH_MULT, int(table_num, I8)), I4) + 1
 
   end function get_hash_start
+
+  function add_sum_block(block_num, sum_col) result(sum_val)
+  !*********************************************************************************************
+  ! add_sum_block -- Add the block sums in the order of the blocks
+  !*********************************************************************************************
+    ! -- modules
+
+    ! -- inout
+    integer(I4), intent(in) :: block_num, sum_col
+    ! -- local
+    integer(I4) :: b
+    real(DP) :: sum_val
+    !-------------------------------------------------------------------------------------------
+    sum_val = sum_block(1,sum_col)
+    do b = 2, block_num
+      sum_val = sum_val + sum_block(b,sum_col)
+    end do
+
+  end function add_sum_block
 
 end module utility_module

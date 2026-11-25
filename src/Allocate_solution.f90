@@ -71,6 +71,8 @@ module allocate_solution
   ! allocate_matvec -- Allocate matrix and vector
   !*********************************************************************************************
     ! -- modules
+    use constval_module, only: BLOCKLEN
+    use utility_module, only: sum_block, write_err_stop
     use initial_module, only: st_ctrl, st_out_type
     use set_cell, only: neib_ncalc
     use set_condition, only: tconn_num, off_row, off_index, conn_dir, sea_dir, left_off, st_hydr
@@ -93,6 +95,7 @@ module allocate_solution
     allocate(st_hydr%abyd_seal(st_bcnd%seal_num), st_hydr%hydf_seal(st_bcnd%seal_num))
     allocate(st_hydr%krpos_seal(st_bcnd%seal_num))
     allocate(st_bcnd%seal2calc(st_bcnd%seal_num), st_bcnd%seal2seal(st_bcnd%seal_num))
+    allocate(sum_block((ncalc-1)/BLOCKLEN+1, 3))
     allocate(st_matrix%dir_conn(tconn_num))
     !$omp parallel
     !$omp do private(i)
@@ -130,6 +133,12 @@ module allocate_solution
     end do
     !$omp end do
     !$omp end parallel
+
+    do i = 2, st_bcnd%seal_num
+      if (st_bcnd%seal2calc(i) < st_bcnd%seal2calc(i-1)) then
+        call write_err_stop("The sea faces are not in the order of the cells.")
+      end if
+    end do
 
     deallocate(st_hydr%area_dis, st_hydr%sat_hydf, conn_dir)
     deallocate(st_hydr%sea_abyd, st_hydr%sea_hydf, st_hydr%sea_krpos)
